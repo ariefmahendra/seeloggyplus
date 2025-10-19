@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane fx:id="mainBorderPane" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.seeloggyplus.controller.MainController">
+
+    <!-- Top: MenuBar -->
+    <top>
+        <VBox>
+            <MenuBar fx:id="menuBar">
+                <!-- File Menu -->
+                <Menu fx:id="fileMenu" text="File">
+                    <MenuItem fx:id="openFileMenuItem" text="Open File..." accelerator="Ctrl+O"/>
+                    <MenuItem fx:id="openRemoteMenuItem" text="Open Remote File..." accelerator="Ctrl+R"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem fx:id="exitMenuItem" text="Exit" accelerator="Alt+F4"/>
+                </Menu>
+
+                <!-- View Menu -->
+                <Menu fx:id="viewMenu" text="View">
+                    <CheckMenuItem fx:id="showLeftPanelMenuItem" text="Show Recent Files Panel" selected="true"/>
+                    <CheckMenuItem fx:id="showBottomPanelMenuItem" text="Show Detail Panel" selected="true"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="Refresh" accelerator="F5"/>
+                </Menu>
+
+                <!-- Settings Menu -->
+                <Menu fx:id="settingsMenu" text="Settings">
+                    <MenuItem fx:id="parsingConfigMenuItem" text="Parsing Configuration..." accelerator="Ctrl+P"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="Preferences..."/>
+                </Menu>
+
+                <!-- Help Menu -->
+                <Menu fx:id="helpMenu" text="Help">
+                    <MenuItem fx:id="aboutMenuItem" text="About"/>
+                    <MenuItem text="Documentation"/>
+                </Menu>
+            </MenuBar>
+
+            <!-- Toolbar -->
+            <ToolBar fx:id="toolBar">
+                <Label text="Search:"/>
+                <TextField fx:id="searchField" promptText="Enter search text or regex..." prefWidth="300"/>
+                <CheckBox fx:id="regexCheckBox" text="Regex"/>
+                <CheckBox fx:id="caseSensitiveCheckBox" text="Case Sensitive"/>
+                <Button fx:id="searchButton" text="Search"/>
+                <Button fx:id="clearSearchButton" text="Clear"/>
+            </ToolBar>
+        </VBox>
+    </top>
+
+    <!-- Center: Main Content -->
+    <center>
+        <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
+            <!-- Left Panel: Recent Files -->
+            <VBox fx:id="leftPanel" spacing="5" minWidth="200" prefWidth="250">
+                <padding>
+                    <Insets top="5" right="5" bottom="5" left="5"/>
+                </padding>
+
+                <Label text="Recent Log Files" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+
+                <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS"/>
+
+                <Button fx:id="clearRecentButton" text="Clear Recent Files" maxWidth="Infinity"/>
+            </VBox>
+
+            <!-- Right Panel: Log Viewer and Detail -->
+            <SplitPane fx:id="verticalSplitPane" orientation="VERTICAL" dividerPositions="0.7">
+                <!-- Center Panel: Log Table -->
+                <VBox fx:id="centerPanel" spacing="5">
+                    <padding>
+                        <Insets top="5" right="5" bottom="5" left="5"/>
+                    </padding>
+
+                    <TableView fx:id="logTableView" VBox.vgrow="ALWAYS">
+                        <placeholder>
+                            <Label text="No log file loaded. Open a file to view logs."/>
+                        </placeholder>
+                    </TableView>
+                </VBox>
+
+                <!-- Bottom Panel: Log Detail -->
+                <VBox fx:id="bottomPanel" spacing="5" minHeight="150" prefHeight="200">
+                    <padding>
+                        <Insets top="5" right="5" bottom="5" left="5"/>
+                    </padding>
+
+                    <HBox alignment="CENTER_LEFT" spacing="10">
+                        <Label fx:id="detailLabel" text="Log Detail" style="-fx-font-weight: bold; -fx-font-size: 14px;" HBox.hgrow="ALWAYS"/>
+
+                        <HBox fx:id="detailButtonsBox" spacing="5">
+                            <Button fx:id="prettifyJsonButton" text="Prettify JSON"/>
+                            <Button fx:id="prettifyXmlButton" text="Prettify XML"/>
+                            <Button fx:id="copyButton" text="Copy"/>
+                            <Button fx:id="clearDetailButton" text="Clear"/>
+                        </HBox>
+                    </HBox>
+
+                    <!-- CodeArea will be added programmatically in controller -->
+                    <!-- Placeholder for detail text area -->
+                </VBox>
+            </SplitPane>
+        </SplitPane>
+    </center>
+
+    <!-- Bottom: Status Bar -->
+    <bottom>
+        <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-background-color: #f0f0f0; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;">
+            <padding>
+                <Insets top="5" right="10" bottom="5" left="10"/>
+            </padding>
+
+            <Label fx:id="statusLabel" text="Ready" HBox.hgrow="ALWAYS"/>
+            <ProgressBar fx:id="progressBar" prefWidth="200" visible="false"/>
+        </HBox>
+    </bottom>
+
+</BorderPane>
