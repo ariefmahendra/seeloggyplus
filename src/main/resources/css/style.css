@@ -97,7 +97,7 @@
     -fx-border-color: #cccccc;
     -fx-border-radius: 3;
     -fx-background-radius: 3;
-    -fx-padding: 5 8 5 8;
+    -fx-padding: 1 8 5 8;
 }
 
 .text-field:focused, .text-area:focused {

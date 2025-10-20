@@ -49,6 +49,9 @@ dependencies {
     // RichTextFX for better text display
     implementation 'org.fxmisc.richtext:richtextfx:0.11.2'
 
+    // FontAwesomeFX for icons
+    implementation 'de.jensd:fontawesomefx-fontawesome:4.7.0-9.1.2'
+
     // Testing
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'

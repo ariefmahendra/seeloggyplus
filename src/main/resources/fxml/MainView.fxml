@@ -1,54 +1,88 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
+<?import java.net.URL?>
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.CheckMenuItem?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToolBar?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
 
-<BorderPane fx:id="mainBorderPane" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.seeloggyplus.controller.MainController">
-
+<BorderPane fx:id="mainBorderPane" minHeight="400" minWidth="600" prefHeight="800" prefWidth="1000" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
+    <stylesheets>
+        <URL value="@../css/style.css" />
+        <URL value="@../css/parsing-config-dialog.css" />
+    </stylesheets>
     <!-- Top: MenuBar -->
     <top>
         <VBox>
             <MenuBar fx:id="menuBar">
                 <!-- File Menu -->
                 <Menu fx:id="fileMenu" text="File">
-                    <MenuItem fx:id="openFileMenuItem" text="Open File..." accelerator="Ctrl+O"/>
-                    <MenuItem fx:id="openRemoteMenuItem" text="Open Remote File..." accelerator="Ctrl+R"/>
-                    <SeparatorMenuItem/>
-                    <MenuItem fx:id="exitMenuItem" text="Exit" accelerator="Alt+F4"/>
+                    <MenuItem fx:id="openFileMenuItem" accelerator="Ctrl+O" text="Open File..." />
+                    <MenuItem fx:id="openRemoteMenuItem" accelerator="Ctrl+R" text="Open Remote File..." />
+                    <SeparatorMenuItem />
+                    <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit" />
                 </Menu>
 
                 <!-- View Menu -->
                 <Menu fx:id="viewMenu" text="View">
-                    <CheckMenuItem fx:id="showLeftPanelMenuItem" text="Show Recent Files Panel" selected="true"/>
-                    <CheckMenuItem fx:id="showBottomPanelMenuItem" text="Show Detail Panel" selected="true"/>
-                    <SeparatorMenuItem/>
-                    <MenuItem text="Refresh" accelerator="F5"/>
+                    <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel" />
+                    <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel" />
+                    <SeparatorMenuItem />
+                    <MenuItem accelerator="F5" text="Refresh" />
                 </Menu>
 
                 <!-- Settings Menu -->
                 <Menu fx:id="settingsMenu" text="Settings">
-                    <MenuItem fx:id="parsingConfigMenuItem" text="Parsing Configuration..." accelerator="Ctrl+P"/>
-                    <SeparatorMenuItem/>
-                    <MenuItem text="Preferences..."/>
+                    <MenuItem fx:id="parsingConfigMenuItem" accelerator="Ctrl+P" text="Parsing Configuration..." />
+                    <SeparatorMenuItem />
+                    <MenuItem text="Preferences..." />
                 </Menu>
 
                 <!-- Help Menu -->
                 <Menu fx:id="helpMenu" text="Help">
-                    <MenuItem fx:id="aboutMenuItem" text="About"/>
-                    <MenuItem text="Documentation"/>
+                    <MenuItem fx:id="aboutMenuItem" text="About" />
+                    <MenuItem text="Documentation" />
                 </Menu>
             </MenuBar>
 
             <!-- Toolbar -->
             <ToolBar fx:id="toolBar">
-                <Label text="Search:"/>
-                <TextField fx:id="searchField" promptText="Enter search text or regex..." prefWidth="300"/>
-                <CheckBox fx:id="regexCheckBox" text="Regex"/>
-                <CheckBox fx:id="caseSensitiveCheckBox" text="Case Sensitive"/>
-                <Button fx:id="searchButton" text="Search"/>
-                <Button fx:id="clearSearchButton" text="Clear"/>
+                <Label text="Search:" />
+                <TextField fx:id="searchField" prefWidth="300" promptText="Enter search text or regex..." />
+                <CheckBox fx:id="regexCheckBox" text="Regex" />
+                <CheckBox fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
+                <Button fx:id="searchButton" styleClass="icon-button">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="SEARCH" size="1.2em" />
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Search" />
+                    </tooltip>
+                </Button>
+                <Button fx:id="clearSearchButton" styleClass="icon-button">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="TIMES" size="1.2em" />
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Clear search" />
+                    </tooltip>
+                </Button>
             </ToolBar>
         </VBox>
     </top>
@@ -57,47 +91,61 @@
     <center>
         <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
             <!-- Left Panel: Recent Files -->
-            <VBox fx:id="leftPanel" spacing="5" minWidth="200" prefWidth="250">
+            <VBox fx:id="leftPanel" minWidth="200" prefWidth="250" spacing="5">
                 <padding>
-                    <Insets top="5" right="5" bottom="5" left="5"/>
+                    <Insets bottom="5" left="5" right="5" top="5" />
                 </padding>
 
-                <Label text="Recent Log Files" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+                <Label style="-fx-font-weight: bold; -fx-font-size: 14px;" text="Recent Log Files" />
 
-                <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS"/>
+                <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS" />
 
-                <Button fx:id="clearRecentButton" text="Clear Recent Files" maxWidth="Infinity"/>
+                <Button fx:id="clearRecentButton" maxWidth="Infinity" styleClass="button-danger" text="Clear Recent Files" />
             </VBox>
 
             <!-- Right Panel: Log Viewer and Detail -->
-            <SplitPane fx:id="verticalSplitPane" orientation="VERTICAL" dividerPositions="0.7">
+            <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
                 <!-- Center Panel: Log Table -->
                 <VBox fx:id="centerPanel" spacing="5">
                     <padding>
-                        <Insets top="5" right="5" bottom="5" left="5"/>
+                        <Insets bottom="5" left="5" right="5" top="5" />
                     </padding>
 
                     <TableView fx:id="logTableView" VBox.vgrow="ALWAYS">
                         <placeholder>
-                            <Label text="No log file loaded. Open a file to view logs."/>
+                            <Label text="No log file loaded. Open a file to view logs." />
                         </placeholder>
                     </TableView>
                 </VBox>
 
                 <!-- Bottom Panel: Log Detail -->
-                <VBox fx:id="bottomPanel" spacing="5" minHeight="150" prefHeight="200">
+                <VBox fx:id="bottomPanel" minHeight="150" prefHeight="200" spacing="5">
                     <padding>
-                        <Insets top="5" right="5" bottom="5" left="5"/>
+                        <Insets bottom="5" left="5" right="5" top="5" />
                     </padding>
 
                     <HBox alignment="CENTER_LEFT" spacing="10">
-                        <Label fx:id="detailLabel" text="Log Detail" style="-fx-font-weight: bold; -fx-font-size: 14px;" HBox.hgrow="ALWAYS"/>
+                        <Label fx:id="detailLabel" style="-fx-font-weight: bold; -fx-font-size: 14px;" text="Log Detail" HBox.hgrow="ALWAYS" />
 
-                        <HBox fx:id="detailButtonsBox" spacing="5">
-                            <Button fx:id="prettifyJsonButton" text="Prettify JSON"/>
-                            <Button fx:id="prettifyXmlButton" text="Prettify XML"/>
-                            <Button fx:id="copyButton" text="Copy"/>
-                            <Button fx:id="clearDetailButton" text="Clear"/>
+                        <HBox fx:id="detailButtonsBox" alignment="CENTER_LEFT" spacing="5">
+                            <Button fx:id="prettifyJsonButton" styleClass="button-raised" text="Prettify JSON" />
+                            <Button fx:id="prettifyXmlButton" styleClass="button-raised" text="Prettify XML" />
+                            <Button fx:id="copyButton" styleClass="icon-button">
+                                <graphic>
+                                    <FontAwesomeIconView glyphName="COPY" size="1.2em" />
+                                </graphic>
+                                <tooltip>
+                                    <Tooltip text="Copy details" />
+                                </tooltip>
+                            </Button>
+                            <Button fx:id="clearDetailButton" prefHeight="30.0" prefWidth="30.0" styleClass="icon-button">
+                                <graphic>
+                                    <FontAwesomeIconView glyphName="TIMES" size="1.2em" styleClass="danger-icon" />
+                                </graphic>
+                                <tooltip>
+                                    <Tooltip text="Clear details" />
+                                </tooltip>
+                            </Button>
                         </HBox>
                     </HBox>
 
@@ -112,11 +160,11 @@
     <bottom>
         <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-background-color: #f0f0f0; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;">
             <padding>
-                <Insets top="5" right="10" bottom="5" left="10"/>
+                <Insets bottom="5" left="10" right="10" top="5" />
             </padding>
 
-            <Label fx:id="statusLabel" text="Ready" HBox.hgrow="ALWAYS"/>
-            <ProgressBar fx:id="progressBar" prefWidth="200" visible="false"/>
+            <Label fx:id="statusLabel" text="Ready" HBox.hgrow="ALWAYS" />
+            <ProgressBar fx:id="progressBar" prefWidth="200" visible="false" />
         </HBox>
     </bottom>
 

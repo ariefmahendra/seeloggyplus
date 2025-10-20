@@ -781,10 +781,12 @@ public class MainController {
             Parent root = loader.load();
 
             Stage dialog = new Stage();
-            dialog.setTitle("Parsing Configuration");
-            dialog.initModality(Modality.APPLICATION_MODAL);
             dialog.initOwner(menuBar.getScene().getWindow());
-            dialog.setScene(new Scene(root));
+            Scene scene = new Scene(root);
+            scene.getStylesheets().add(getClass().getResource("/css/parsing-config-dialog.css").toExternalForm());
+            dialog.setScene(scene);
+            dialog.setWidth(1000);
+            dialog.setHeight(800);
 
             dialog.showAndWait();
 

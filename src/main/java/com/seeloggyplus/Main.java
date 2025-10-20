@@ -77,8 +77,8 @@ public class Main extends Application {
      * Restore window size and position from preferences
      */
     private void restoreWindowPreferences(Stage stage) {
-        double width = 800;
-        double height = 600;
+        double width = 1000;
+        double height = 800;
         double x = 100;
         double y = 100;
         boolean maximized = false;
