@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
-<?import java.net.URL?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
@@ -18,12 +17,9 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 
-<GridPane hgap="15" styleClass="dialog-pane" vgap="10" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.ParsingConfigController">
-    <stylesheets>
-        <URL value="@../css/style.css" />
-        <URL value="@../css/parsing-config-dialog.css" />
-    </stylesheets>
+<GridPane hgap="15" vgap="10" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.ParsingConfigController">
 
     <columnConstraints>
         <ColumnConstraints hgrow="SOMETIMES" minWidth="220" prefWidth="280" />
@@ -37,48 +33,67 @@
     </rowConstraints>
 
     <!-- Header -->
-    <VBox styleClass="header-panel" GridPane.columnIndex="0" GridPane.columnSpan="2">
-        <Label styleClass="title-label" text="Parsing Configuration" />
-        <Label styleClass="subtitle-label" text="Create and manage regex patterns for log parsing" />
+    <VBox GridPane.columnIndex="0" GridPane.columnSpan="2">
+        <Label text="Parsing Configuration">
+            <font>
+                <Font name="System Bold" size="14.0" />
+            </font>
+        </Label>
+        <Label text="Create and manage regex patterns for log parsing" />
+        <padding>
+            <Insets left="15.0" />
+        </padding>
     </VBox>
 
     <!-- Left Panel: Configuration List -->
     <VBox spacing="8" GridPane.columnIndex="0" GridPane.rowIndex="1">
-        <Label styleClass="section-title" text="Saved Configurations">
-         <padding>
-            <Insets left="10.0" />
-         </padding></Label>
+        <Label text="Saved Configurations">
+            <padding>
+                <Insets left="10.0" />
+            </padding>
+            <font>
+                <Font name="System Bold" size="12.0" />
+            </font>
+        </Label>
         <ListView fx:id="configListView" VBox.vgrow="ALWAYS" />
         <HBox alignment="CENTER_LEFT" spacing="10">
-            <Button fx:id="addButton" prefHeight="30.0" prefWidth="30.0" styleClass="icon-button">
+            <Button fx:id="addButton" prefHeight="30.0" prefWidth="30.0">
                 <graphic>
                     <FontAwesomeIconView glyphName="PLUS" size="1.2em" />
                 </graphic>
-                <tooltip><Tooltip text="Add new configuration" /></tooltip>
+                <tooltip>
+                    <Tooltip text="Add new configuration" />
+                </tooltip>
             </Button>
-            <Button fx:id="editButton" prefHeight="30.0" prefWidth="30.0" styleClass="icon-button">
+            <Button fx:id="editButton" prefHeight="30.0" prefWidth="30.0">
                 <graphic>
                     <FontAwesomeIconView glyphName="PENCIL" size="1.2em" />
                 </graphic>
-                <tooltip><Tooltip text="Edit selected configuration" /></tooltip>
+                <tooltip>
+                    <Tooltip text="Edit selected configuration" />
+                </tooltip>
             </Button>
-            <Button fx:id="deleteButton" prefHeight="30.0" prefWidth="30.0" styleClass="icon-button">
+            <Button fx:id="deleteButton" prefHeight="30.0" prefWidth="30.0">
                 <graphic>
-                    <FontAwesomeIconView glyphName="TRASH" size="1.2em" styleClass="danger-icon" />
+                    <FontAwesomeIconView glyphName="TRASH" size="1.2em" />
                 </graphic>
-                <tooltip><Tooltip text="Delete selected configuration" /></tooltip>
+                <tooltip>
+                    <Tooltip text="Delete selected configuration" />
+                </tooltip>
             </Button>
-            <Button fx:id="duplicateButton" prefHeight="30.0" prefWidth="30.0" styleClass="icon-button">
+            <Button fx:id="duplicateButton" prefHeight="30.0" prefWidth="30.0">
                 <graphic>
                     <FontAwesomeIconView glyphName="COPY" size="1.2em" />
                 </graphic>
-                <tooltip><Tooltip text="Duplicate selected configuration" /></tooltip>
+                <tooltip>
+                    <Tooltip text="Duplicate selected configuration" />
+                </tooltip>
             </Button>
             <Region HBox.hgrow="ALWAYS" />
-            <Button fx:id="setDefaultButton" styleClass="button-primary" text="Set as Default" />
-         <padding>
-            <Insets left="10.0" />
-         </padding>
+            <Button fx:id="setDefaultButton" text="Set as Default" />
+            <padding>
+                <Insets left="10.0" />
+            </padding>
         </HBox>
     </VBox>
 
@@ -86,47 +101,51 @@
     <ScrollPane fitToHeight="true" fitToWidth="true" GridPane.columnIndex="1" GridPane.rowIndex="1">
         <VBox spacing="12">
             <!-- Details Section -->
-            <VBox spacing="8" styleClass="content-box">
-                <Label styleClass="section-title" text="Configuration Details" />
+            <VBox spacing="8">
+                <Label text="Configuration Details">
+                    <font>
+                        <Font name="System Bold" size="12.0" />
+                    </font>
+                </Label>
                 <GridPane hgap="10" vgap="5">
                     <Label text="Name:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
                     <TextField fx:id="nameField" promptText="Enter configuration name" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" GridPane.rowIndex="0" />
                     <Label text="Description:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
                     <TextArea fx:id="descriptionArea" promptText="A brief summary of the pattern" wrapText="true" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" GridPane.rowIndex="1" />
-               <columnConstraints>
-                  <ColumnConstraints />
-                  <ColumnConstraints />
-               </columnConstraints>
-               <rowConstraints>
-                  <RowConstraints />
-                  <RowConstraints />
-               </rowConstraints>
+                    <columnConstraints>
+                        <ColumnConstraints />
+                        <ColumnConstraints />
+                    </columnConstraints>
+                    <rowConstraints>
+                        <RowConstraints />
+                        <RowConstraints />
+                    </rowConstraints>
                 </GridPane>
             </VBox>
 
             <!-- Regex Pattern Section -->
-            <VBox spacing="5" styleClass="content-box">
+            <VBox spacing="5">
                 <Label text="Regex Pattern" />
-                <TextArea fx:id="regexPatternArea" prefRowCount="6" styleClass="monospace-text" wrapText="true" VBox.vgrow="ALWAYS" />
+                <TextArea fx:id="regexPatternArea" prefRowCount="6" wrapText="true" VBox.vgrow="ALWAYS" />
                 <HBox alignment="CENTER_LEFT">
-                    <Label fx:id="validationLabel" styleClass="validation-label" />
+                    <Label fx:id="validationLabel" />
                 </HBox>
             </VBox>
 
             <!-- Named Groups Section -->
-            <VBox spacing="5" styleClass="content-box">
-                <Label styleClass="subtitle-label" text="Detected Named Groups (Table Columns)" />
+            <VBox spacing="5">
+                <Label text="Detected Named Groups (Table Columns)" />
                 <ListView fx:id="groupNamesListView" VBox.vgrow="ALWAYS" />
             </VBox>
 
             <!-- Test Section -->
-            <VBox spacing="8" styleClass="content-box" VBox.vgrow="ALWAYS">
+            <VBox spacing="8" VBox.vgrow="ALWAYS">
                 <HBox alignment="CENTER_LEFT" spacing="10">
-                    <Label styleClass="section-title" text="Test Pattern" HBox.hgrow="ALWAYS" />
-                    <Button fx:id="testParsingButton" styleClass="button-primary" text="Test" />
+                    <Label text="Test Pattern" HBox.hgrow="ALWAYS" />
+                    <Button fx:id="testParsingButton" text="Test" />
                 </HBox>
-                <TextArea fx:id="sampleLogArea" promptText="Paste a sample log line here..." styleClass="monospace-text" VBox.vgrow="ALWAYS" />
-                <Label fx:id="testResultLabel" styleClass="validation-label" />
+                <TextArea fx:id="sampleLogArea" promptText="Paste a sample log line here..." VBox.vgrow="ALWAYS" />
+                <Label fx:id="testResultLabel" />
                 <TableView fx:id="previewTableView" VBox.vgrow="ALWAYS">
                     <columns>
                         <TableColumn fx:id="fieldNameColumn" prefWidth="150" text="Field Name" />
@@ -137,16 +156,19 @@
                     </placeholder>
                 </TableView>
             </VBox>
+            <padding>
+                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+            </padding>
         </VBox>
     </ScrollPane>
 
     <!-- Footer: Action Buttons -->
-    <HBox alignment="CENTER_RIGHT" spacing="10" styleClass="bottom-bar" GridPane.columnIndex="1" GridPane.rowIndex="2">
-        <Button fx:id="saveButton" styleClass="button-primary" text="Save &amp; Close" />
-        <Button fx:id="applyButton" styleClass="button-primary" text="Apply" />
-        <Button fx:id="cancelButton" styleClass="button-danger" text="Cancel" />
-      <padding>
-         <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-      </padding>
+    <HBox alignment="CENTER_RIGHT" spacing="10" GridPane.columnIndex="1" GridPane.rowIndex="2">
+        <Button fx:id="saveButton" text="Save &amp; Close" />
+        <Button fx:id="applyButton" text="Apply" />
+        <Button fx:id="cancelButton" text="Cancel" />
+        <padding>
+            <Insets bottom="10.0" left="5.0" right="5.0" top="10.0" />
+        </padding>
     </HBox>
 </GridPane>

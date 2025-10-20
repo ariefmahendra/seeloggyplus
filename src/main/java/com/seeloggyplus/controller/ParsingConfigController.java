@@ -587,9 +587,7 @@ public class ParsingConfigController {
         private final Label statusLabel = new Label();
 
         public ConfigListCell() {
-            nameLabel.getStyleClass().add("config-name-label");
-            descLabel.getStyleClass().add("config-detail-label");
-            statusLabel.getStyleClass().add("config-detail-label");
+            nameLabel.setStyle("-fx-font-weight: bold;");
             vbox.getChildren().addAll(nameLabel, descLabel, statusLabel);
         }
 

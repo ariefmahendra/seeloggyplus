@@ -783,7 +783,6 @@ public class MainController {
             Stage dialog = new Stage();
             dialog.initOwner(menuBar.getScene().getWindow());
             Scene scene = new Scene(root);
-            scene.getStylesheets().add(getClass().getResource("/css/parsing-config-dialog.css").toExternalForm());
             dialog.setScene(scene);
             dialog.setWidth(1000);
             dialog.setHeight(800);
@@ -1065,14 +1064,9 @@ public class MainController {
             } else {
                 VBox vbox = new VBox(2);
                 Label nameLabel = new Label(item.getFileName());
-                nameLabel.getStyleClass().add("recent-file-name-label");
-
+                nameLabel.setStyle("-fx-font-weight: bold;");
                 Label pathLabel = new Label(item.getFullPathDisplay());
-                pathLabel.getStyleClass().add("recent-file-detail-label");
-
                 Label sizeLabel = new Label(item.getFormattedFileSize());
-                sizeLabel.getStyleClass().add("recent-file-detail-label");
-
                 vbox.getChildren().addAll(nameLabel, pathLabel, sizeLabel);
                 setGraphic(vbox);
             }

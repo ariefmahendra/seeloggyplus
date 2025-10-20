@@ -29,8 +29,7 @@ public class Main extends Application {
     @Override
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
-
-
+        
         try {
             // Load main view
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
@@ -38,10 +37,6 @@ public class Main extends Application {
 
             // Create scene
             Scene scene = new Scene(root);
-
-            // Load CSS
-            String css = Objects.requireNonNull(getClass().getResource("/css/style.css")).toExternalForm();
-            scene.getStylesheets().add(css);
 
             // Configure stage
             primaryStage.setTitle(APP_TITLE + " v" + VERSION);
