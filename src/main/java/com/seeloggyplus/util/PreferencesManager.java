@@ -15,7 +15,6 @@ import java.util.prefs.Preferences;
 
 public class PreferencesManager {
 
-
     private static final String RECENT_FILES_KEY = "recentFiles";
     private static final String SSH_SERVERS_KEY = "sshServers";
     private static final String WINDOW_X_KEY = "windowX";

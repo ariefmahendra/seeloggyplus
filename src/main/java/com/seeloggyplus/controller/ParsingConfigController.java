@@ -2,11 +2,11 @@ package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.ParsingConfig;
 import com.seeloggyplus.service.LogParserService;
-import com.seeloggyplus.repository.ParsingConfigRepository;
-import com.seeloggyplus.repository.ParsingConfigRepositoryImpl;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+
+import com.seeloggyplus.service.ParsingConfigService;
+import com.seeloggyplus.service.ParsingConfigServiceImpl;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -25,9 +25,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ParsingConfigController {
 
-    private static final Logger logger = LoggerFactory.getLogger(
-        ParsingConfigController.class
-    );
+    private static final Logger logger = LoggerFactory.getLogger(ParsingConfigController.class);
 
     @FXML
     private ListView<ParsingConfig> configListView;
@@ -89,7 +87,8 @@ public class ParsingConfigController {
     @FXML
     private Button applyButton;
 
-    private ParsingConfigRepository parsingConfigRepository;
+    private ParsingConfigService parsingConfigService;
+
     private LogParserService logParserService;
     private ObservableList<ParsingConfig> configList;
     private ParsingConfig selectedConfig;
@@ -99,9 +98,10 @@ public class ParsingConfigController {
     public void initialize() {
         logger.info("Initializing ParsingConfigController");
 
-        parsingConfigRepository = new ParsingConfigRepositoryImpl();
+        parsingConfigService = new ParsingConfigServiceImpl();
+
         logParserService = new LogParserService();
-        configList = FXCollections.observableArrayList(parsingConfigRepository.findAll());
+        configList = FXCollections.observableArrayList(parsingConfigService.findAll());
 
         setupConfigList();
         setupDetailPanel();
@@ -394,7 +394,7 @@ public class ParsingConfigController {
 
         Optional<ButtonType> result = alert.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
-            parsingConfigRepository.delete(selected);
+            parsingConfigService.delete(selected);
             configList.remove(selected);
             if (!configList.isEmpty()) {
                 configListView.getSelectionModel().selectFirst();
@@ -435,7 +435,7 @@ public class ParsingConfigController {
         selected.setDefault(true);
 
         for (ParsingConfig config : configList) {
-            parsingConfigRepository.update(config);
+            parsingConfigService.update(config);
         }
 
         configListView.refresh();
@@ -453,9 +453,9 @@ public class ParsingConfigController {
         for (int i = 0; i < configList.size(); i++) {
             ParsingConfig config = configList.get(i);
             if (config.getId() == 0) {
-                parsingConfigRepository.save(config);
+                parsingConfigService.save(config);
             } else {
-                parsingConfigRepository.update(config);
+                parsingConfigService.update(config);
             }
         }
         closeDialog();
@@ -472,9 +472,9 @@ public class ParsingConfigController {
         for (int i = 0; i < configList.size(); i++) {
             ParsingConfig config = configList.get(i);
             if (config.getId() == 0) {
-                parsingConfigRepository.save(config);
+                parsingConfigService.save(config);
             } else {
-                parsingConfigRepository.update(config);
+                parsingConfigService.update(config);
             }
         }
     }

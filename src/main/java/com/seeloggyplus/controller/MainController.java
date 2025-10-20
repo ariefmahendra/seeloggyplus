@@ -3,10 +3,7 @@ package com.seeloggyplus.controller;
 import com.seeloggyplus.model.LogEntry;
 import com.seeloggyplus.model.ParsingConfig;
 import com.seeloggyplus.model.RecentFile;
-import com.seeloggyplus.service.XmlPrettifyService;
-import com.seeloggyplus.service.JsonPrettifyService;
-import com.seeloggyplus.service.LogParserService;
-import com.seeloggyplus.service.SSHService;
+import com.seeloggyplus.service.*;
 import com.seeloggyplus.repository.RecentFileRepository;
 import com.seeloggyplus.repository.ParsingConfigRepository;
 import com.seeloggyplus.repository.ParsingConfigRepositoryImpl;
@@ -44,9 +41,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MainController {
 
-    private static final Logger logger = LoggerFactory.getLogger(
-        MainController.class
-    );
+    private static final Logger logger = LoggerFactory.getLogger(MainController.class);
 
     // FXML Components - MenuBar
     @FXML
@@ -163,15 +158,14 @@ public class MainController {
 
     // Services and Data
 
+    private ParsingConfigService parsingConfigService;
+    private RecentFileService recentFileService;
     private LogParserService logParserService;
     private SSHService sshService;
     private ObservableList<LogEntry> allLogEntries;
     private FilteredList<LogEntry> filteredLogEntries;
     private ParsingConfig currentParsingConfig;
     private File currentFile;
-    private RecentFile currentRecentFile;
-    private ParsingConfigRepository parsingConfigRepository;
-    private RecentFileRepository recentFileRepository;
 
     /**
      * Initialize the controller
@@ -180,9 +174,8 @@ public class MainController {
     public void initialize() {
         logger.info("Initializing MainController");
 
-        parsingConfigRepository = new ParsingConfigRepositoryImpl();
-        recentFileRepository = new RecentFileRepositoryImpl();
-
+        parsingConfigService = new ParsingConfigServiceImpl();
+        recentFileService = new RecentConfigServiceImpl();
         logParserService = new LogParserService();
         sshService = new SSHService();
 
@@ -215,8 +208,8 @@ public class MainController {
         exitMenuItem.setOnAction(e -> handleExit());
 
         // View Menu
-        showLeftPanelMenuItem.setSelected(true); // You need to implement the logic to get this value from the database
-        showBottomPanelMenuItem.setSelected(true); // You need to implement the logic to get this value from the database
+        showLeftPanelMenuItem.setSelected(true);
+        showBottomPanelMenuItem.setSelected(true);
         showBottomPanelMenuItem.setOnAction(e -> toggleBottomPanel());
 
         // Settings Menu
@@ -235,7 +228,7 @@ public class MainController {
             new RecentFileListCell()
         );
         recentFilesListView.setItems(
-            FXCollections.observableArrayList(recentFileRepository.findAll())
+            FXCollections.observableArrayList(recentFileService.findAll())
         );
 
         // Handle selection
@@ -243,7 +236,6 @@ public class MainController {
             .getSelectionModel()
             .selectedItemProperty()
             .addListener((obs, oldVal, newVal) -> {
-                // Only open the file if it's a new selection and not already loaded
                 if (
                     newVal != null &&
                     (currentFile == null || !currentFile.getAbsolutePath().equals(newVal.getFilePath()))
@@ -479,7 +471,7 @@ public class MainController {
                 currentParsingConfig.validatePattern();
             }
             currentParsingConfig.setDefault(true);
-            parsingConfigRepository.save(currentParsingConfig);
+            parsingConfigService.save(currentParsingConfig);
             logger.info(
                 "Created default parsing config with {} groups",
                 currentParsingConfig.getGroupNames().size()
@@ -570,7 +562,7 @@ public class MainController {
                     file.length()
                 );
                 recentFile.setParsingConfig(currentParsingConfig);
-                recentFileRepository.save(recentFile);
+                recentFileService.save(recentFile);
                 refreshRecentFilesList();
             }
 
@@ -938,7 +930,7 @@ public class MainController {
 
         Optional<ButtonType> result = alert.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
-            recentFileRepository.deleteAll();
+            recentFileService.deleteAll();
             refreshRecentFilesList();
         }
     }
@@ -948,7 +940,7 @@ public class MainController {
      */
     private void refreshRecentFilesList() {
         recentFilesListView.setItems(
-            FXCollections.observableArrayList(recentFileRepository.findAll())
+            FXCollections.observableArrayList(recentFileService.findAll())
         );
     }
 

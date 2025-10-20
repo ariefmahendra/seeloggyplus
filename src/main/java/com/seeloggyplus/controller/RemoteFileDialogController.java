@@ -5,10 +5,12 @@ import com.seeloggyplus.model.SSHServer;
 import com.seeloggyplus.service.DatabaseService;
 import com.seeloggyplus.service.SSHService;
 import java.io.File;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+
+import com.seeloggyplus.service.ServerManagementService;
+import com.seeloggyplus.service.ServerManagementServiceImpl;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -135,7 +137,7 @@ public class RemoteFileDialogController {
     private Button cancelButton;
 
     // Services and Data
-    private DatabaseService databaseService;
+    private ServerManagementService serverManagementService;
     private SSHService sshService;
     private ObservableList<SSHService.RemoteFileInfo> remoteFiles;
     private ObservableList<SSHServer> savedServers;
@@ -151,7 +153,7 @@ public class RemoteFileDialogController {
     public void initialize() {
         logger.info("Initializing RemoteFileDialogController");
 
-        databaseService = DatabaseService.getInstance();
+        serverManagementService = new ServerManagementServiceImpl();
         sshService = new SSHService();
         remoteFiles = FXCollections.observableArrayList();
         savedServers = FXCollections.observableArrayList();
@@ -214,7 +216,7 @@ public class RemoteFileDialogController {
      * Load saved servers from database
      */
     private void loadSavedServers() {
-        List<SSHServer> servers = databaseService.getAllSSHServers();
+        List<SSHServer> servers = serverManagementService.getAllServers();
         savedServers.setAll(servers);
         logger.info("Loaded {} saved SSH servers", servers.size());
     }
@@ -404,7 +406,7 @@ public class RemoteFileDialogController {
                 return;
             }
 
-            databaseService.saveSSHServer(server);
+            serverManagementService.saveServer(server);
             loadSavedServers();
 
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -443,7 +445,7 @@ public class RemoteFileDialogController {
 
         Optional<ButtonType> result = alert.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
-            databaseService.deleteSSHServer(server.getId());
+            serverManagementService.deleteServer(server.getId());
             loadSavedServers();
             savedServersComboBox.getSelectionModel().clearSelection();
 
@@ -528,7 +530,7 @@ public class RemoteFileDialogController {
 
                 // Update last used timestamp if this is a saved server
                 if (currentServer != null && currentServer.getId() != null) {
-                    databaseService.updateSSHServerLastUsed(
+                    serverManagementService.updateServerLastUsed(
                         currentServer.getId()
                     );
                 }

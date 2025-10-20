@@ -60,24 +60,24 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
     @Override
     public void save(RecentFile recentFile) {
         String sql = "INSERT OR REPLACE INTO recent_files (file_path, file_name, last_opened, file_size, is_remote, remote_host, remote_port, remote_user, remote_path, parsing_config_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, recentFile.getFilePath());
-            pstmt.setString(2, recentFile.getFileName());
-            pstmt.setString(3, recentFile.getLastOpened().toString());
-            pstmt.setLong(4, recentFile.getFileSize());
-            pstmt.setBoolean(5, recentFile.isRemote());
-            pstmt.setString(6, recentFile.getRemoteHost());
-            pstmt.setInt(7, recentFile.getRemotePort());
-            pstmt.setString(8, recentFile.getRemoteUser());
-            pstmt.setString(9, recentFile.getRemotePath());
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setString(1, recentFile.getFilePath());
+            preparedStatement.setString(2, recentFile.getFileName());
+            preparedStatement.setString(3, recentFile.getLastOpened().toString());
+            preparedStatement.setLong(4, recentFile.getFileSize());
+            preparedStatement.setBoolean(5, recentFile.isRemote());
+            preparedStatement.setString(6, recentFile.getRemoteHost());
+            preparedStatement.setInt(7, recentFile.getRemotePort());
+            preparedStatement.setString(8, recentFile.getRemoteUser());
+            preparedStatement.setString(9, recentFile.getRemotePath());
             if (recentFile.getParsingConfig() != null) {
-                pstmt.setInt(10, recentFile.getParsingConfig().getId());
+                preparedStatement.setInt(10, recentFile.getParsingConfig().getId());
             } else {
-                pstmt.setNull(10, java.sql.Types.INTEGER);
+                preparedStatement.setNull(10, java.sql.Types.INTEGER);
             }
-            pstmt.executeUpdate();
+            preparedStatement.executeUpdate();
         } catch (SQLException e) {
-            logger.error("Error saving recent file: " + recentFile.getFileName(), e);
+            logger.error("Error saving recent file: {}", recentFile.getFileName(), e);
         }
     }
 

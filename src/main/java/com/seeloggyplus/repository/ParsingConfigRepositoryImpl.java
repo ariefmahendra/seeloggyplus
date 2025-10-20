@@ -21,14 +21,14 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
     @Override
     public Optional<ParsingConfig> findById(int id) {
         String sql = "SELECT * FROM parsing_configs WHERE id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, id);
-            ResultSet rs = pstmt.executeQuery();
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setInt(1, id);
+            ResultSet rs = preparedStatement.executeQuery();
             if (rs.next()) {
                 return Optional.of(mapRowToParsingConfig(rs));
             }
         } catch (SQLException e) {
-            logger.error("Error finding parsing config by id: " + id, e);
+            logger.error("Error finding parsing config by id: {}", id, e);
         }
         return Optional.empty();
     }
@@ -51,12 +51,12 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
     @Override
     public void save(ParsingConfig config) {
         String sql = "INSERT INTO parsing_configs(name, description, regex_pattern, is_default) VALUES(?,?,?,?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, config.getName());
-            pstmt.setString(2, config.getDescription());
-            pstmt.setString(3, config.getRegexPattern());
-            pstmt.setBoolean(4, config.isDefault());
-            pstmt.executeUpdate();
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setString(1, config.getName());
+            preparedStatement.setString(2, config.getDescription());
+            preparedStatement.setString(3, config.getRegexPattern());
+            preparedStatement.setBoolean(4, config.isDefault());
+            preparedStatement.executeUpdate();
 
             try (Statement stmt = connection.createStatement()) {
                 ResultSet rs = stmt.executeQuery("SELECT last_insert_rowid()");
@@ -66,41 +66,41 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
             }
 
         } catch (SQLException e) {
-            logger.error("Error saving parsing config: " + config.getName(), e);
+            logger.error("Error saving parsing config: {}", config.getName(), e);
         }
     }
 
     @Override
     public void update(ParsingConfig config) {
         String sql = "UPDATE parsing_configs SET name = ?, description = ?, regex_pattern = ?, is_default = ? WHERE id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, config.getName());
-            pstmt.setString(2, config.getDescription());
-            pstmt.setString(3, config.getRegexPattern());
-            pstmt.setBoolean(4, config.isDefault());
-            pstmt.setInt(5, config.getId());
-            pstmt.executeUpdate();
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setString(1, config.getName());
+            preparedStatement.setString(2, config.getDescription());
+            preparedStatement.setString(3, config.getRegexPattern());
+            preparedStatement.setBoolean(4, config.isDefault());
+            preparedStatement.setInt(5, config.getId());
+            preparedStatement.executeUpdate();
         } catch (SQLException e) {
-            logger.error("Error updating parsing config: " + config.getName(), e);
+            logger.error("Error updating parsing config: {}", config.getName(), e);
         }
     }
 
     @Override
     public void delete(ParsingConfig config) {
         String sql = "DELETE FROM parsing_configs WHERE id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, config.getId());
-            pstmt.executeUpdate();
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setInt(1, config.getId());
+            preparedStatement.executeUpdate();
         } catch (SQLException e) {
-            logger.error("Error deleting parsing config: " + config.getName(), e);
+            logger.error("Error deleting parsing config: {}", config.getName(), e);
         }
     }
 
     @Override
     public Optional<ParsingConfig> findDefault() {
         String sql = "SELECT * FROM parsing_configs WHERE is_default = 1";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            ResultSet rs = pstmt.executeQuery();
+        try (PreparedStatement prepareStatement = connection.prepareStatement(sql)) {
+            ResultSet rs = prepareStatement.executeQuery();
             if (rs.next()) {
                 return Optional.of(mapRowToParsingConfig(rs));
             }
