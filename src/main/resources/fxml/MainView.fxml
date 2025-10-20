@@ -7,6 +7,7 @@
 <?import javafx.scene.control.CheckMenuItem?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
@@ -21,6 +22,8 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.ComboBox?>
 <BorderPane fx:id="mainBorderPane" minHeight="400" minWidth="600" prefHeight="800" prefWidth="1000" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
     <top>
         <VBox>
@@ -61,22 +64,11 @@
                 <TextField fx:id="searchField" prefWidth="300" promptText="Enter search text or regex..." />
                 <CheckBox fx:id="regexCheckBox" text="Regex" />
                 <CheckBox fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
-                <Button fx:id="searchButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="SEARCH" size="1.2em" />
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Search" />
-                    </tooltip>
-                </Button>
-                <Button fx:id="clearSearchButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="TIMES" size="1.2em" />
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Clear search" />
-                    </tooltip>
-                </Button>
+                <Button fx:id="searchButton" text="Search" />
+                <Button fx:id="clearSearchButton" text="Clear" />
+                <Separator orientation="VERTICAL" />
+                <Label text="Level:" />
+                <ComboBox fx:id="logLevelFilterComboBox" promptText="All Levels" />
             </ToolBar>
         </VBox>
     </top>
@@ -121,40 +113,11 @@
                     <HBox alignment="CENTER_LEFT" spacing="10">
                         <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS" />
 
-                        <HBox fx:id="detailButtonsBox" alignment="CENTER_LEFT" spacing="5">
-                            <Button fx:id="prettifyJsonButton">
-                                <graphic>
-                                    <FontAwesomeIconView glyphName="LIST_ALT" size="1.2em" />
-                                </graphic>
-                                <tooltip>
-                                    <Tooltip text="Prettify JSON" />
-                                </tooltip>
-                            </Button>
-
-                            <Button fx:id="prettifyXmlButton">
-                                <graphic>
-                                    <FontAwesomeIconView glyphName="CODE" size="1.2em" />
-                                </graphic>
-                                <tooltip>
-                                    <Tooltip text="Prettify XML" />
-                                </tooltip>
-                            </Button>
-                            <Button fx:id="copyButton">
-                                <graphic>
-                                    <FontAwesomeIconView glyphName="COPY" size="1.2em" />
-                                </graphic>
-                                <tooltip>
-                                    <Tooltip text="Copy details" />
-                                </tooltip>
-                            </Button>
-                            <Button fx:id="clearDetailButton">
-                                <graphic>
-                                    <FontAwesomeIconView glyphName="TIMES" size="1.2em" />
-                                </graphic>
-                                <tooltip>
-                                    <Tooltip text="Clear details" />
-                                </tooltip>
-                            </Button>
+                        <HBox fx:id="detailButtonsBox" spacing="5">
+                            <Button fx:id="prettifyJsonButton" text="Prettify JSON" />
+                            <Button fx:id="prettifyXmlButton" text="Prettify XML" />
+                            <Button fx:id="copyButton" text="Copy" />
+                            <Button fx:id="clearDetailButton" text="Clear" />
                         </HBox>
                     </HBox>
 

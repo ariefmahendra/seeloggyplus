@@ -52,7 +52,9 @@ public class LogParserService {
         List<LogEntry> entries = new ArrayList<>();
 
         long totalLines = countLines(file);
-        long currentLine = 0;
+        long currentLineNumber = 0;
+        StringBuilder unparsedBuffer = new StringBuilder();
+        long unparsedStartLine = 0;
 
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8),
@@ -60,14 +62,40 @@ public class LogParserService {
 
             String line;
             while ((line = reader.readLine()) != null) {
-                currentLine++;
-                LogEntry entry = parseLine(line, currentLine, config);
-                entries.add(entry);
+                currentLineNumber++;
 
-                if (callback != null && currentLine % 100 == 0) {
-                    double progress = (double) currentLine / totalLines;
-                    callback.onProgress(progress, currentLine, totalLines);
+                // Check if the line matches the pattern
+                boolean matches = (config != null && config.isValid() && config.getCompiledPattern() != null) &&
+                                  config.getCompiledPattern().matcher(line).find();
+
+                if (matches) {
+                    // If there's anything in the buffer, add it as an unparsed entry
+                    if (unparsedBuffer.length() > 0) {
+                        entries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
+                        unparsedBuffer.setLength(0);
+                        unparsedStartLine = 0;
+                    }
+                    // Add the parsed entry
+                    entries.add(parseLine(line, currentLineNumber, config));
+                } else {
+                    // If it doesn't match, append to buffer
+                    if (unparsedBuffer.length() == 0) {
+                        unparsedStartLine = currentLineNumber;
+                    } else {
+                        unparsedBuffer.append("\n");
+                    }
+                    unparsedBuffer.append(line);
                 }
+
+                if (callback != null && currentLineNumber % 100 == 0) {
+                    double progress = (double) currentLineNumber / totalLines;
+                    callback.onProgress(progress, currentLineNumber, totalLines);
+                }
+            }
+
+            // Add any remaining unparsed lines at the end of the file
+            if (unparsedBuffer.length() > 0) {
+                entries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
             }
         }
 
@@ -88,10 +116,10 @@ public class LogParserService {
         }
 
         this.currentConfig = config;
-        List<LogEntry> entries = Collections.synchronizedList(new ArrayList<>());
+        List<LogEntry> rawEntries = Collections.synchronizedList(new ArrayList<>());
 
         long totalLines = countLines(file);
-        long[] currentLine = {0};
+        long[] currentLineCount = {0};
 
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8),
@@ -130,12 +158,12 @@ public class LogParserService {
             // Collect results
             for (Future<List<LogEntry>> future : futures) {
                 try {
-                    entries.addAll(future.get());
-                    currentLine[0] += BATCH_SIZE;
+                    rawEntries.addAll(future.get());
+                    currentLineCount[0] += BATCH_SIZE;
 
                     if (callback != null) {
-                        double progress = Math.min(1.0, (double) currentLine[0] / totalLines);
-                        callback.onProgress(progress, currentLine[0], totalLines);
+                        double progress = Math.min(1.0, (double) currentLineCount[0] / totalLines);
+                        callback.onProgress(progress, currentLineCount[0], totalLines);
                     }
                 } catch (InterruptedException | ExecutionException e) {
                     logger.error("Error processing batch", e);
@@ -144,14 +172,45 @@ public class LogParserService {
         }
 
         // Sort entries by line number to maintain order
-        entries.sort(Comparator.comparingLong(LogEntry::getLineNumber));
+        rawEntries.sort(Comparator.comparingLong(LogEntry::getLineNumber));
 
-        if (callback != null) {
-            callback.onComplete(entries.size());
+        // Post-process to combine non-matching lines
+        List<LogEntry> combinedEntries = new ArrayList<>();
+        StringBuilder unparsedBuffer = new StringBuilder();
+        long unparsedStartLine = 0;
+
+        for (LogEntry entry : rawEntries) {
+            if (entry.isParsed()) {
+                // If there's anything in the buffer, add it as an unparsed entry
+                if (unparsedBuffer.length() > 0) {
+                    combinedEntries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
+                    unparsedBuffer.setLength(0);
+                    unparsedStartLine = 0;
+                }
+                // Add the parsed entry
+                combinedEntries.add(entry);
+            } else {
+                // If it doesn't match, append to buffer
+                if (unparsedBuffer.length() == 0) {
+                    unparsedStartLine = entry.getLineNumber();
+                } else {
+                    unparsedBuffer.append("\n");
+                }
+                unparsedBuffer.append(entry.getRawLog());
+            }
         }
 
-        logger.info("Parsed {} lines from file in parallel: {}", entries.size(), file.getName());
-        return entries;
+        // Add any remaining unparsed lines at the end
+        if (unparsedBuffer.length() > 0) {
+            combinedEntries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
+        }
+
+        if (callback != null) {
+            callback.onComplete(combinedEntries.size());
+        }
+
+        logger.info("Parsed {} lines from file in parallel: {}", combinedEntries.size(), file.getName());
+        return combinedEntries;
     }
 
     /**

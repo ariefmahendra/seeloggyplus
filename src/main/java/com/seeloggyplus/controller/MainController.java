@@ -123,6 +123,9 @@ public class MainController {
     private Button clearSearchButton;
 
     @FXML
+    private ComboBox<String> logLevelFilterComboBox;
+
+    @FXML
     private Label statusLabel;
 
     @FXML
@@ -149,6 +152,9 @@ public class MainController {
 
     @FXML
     private Button prettifyXmlButton;
+
+    @FXML
+    private Button prettifySqlButton;
 
     @FXML
     private Button copyButton;
@@ -189,6 +195,7 @@ public class MainController {
         setupCenterPanel();
         setupBottomPanel();
         setupKeyboardShortcuts();
+        setupLogLevelFilter();
 
         // Restore panel visibility from preferences
         restorePanelVisibility();
@@ -301,6 +308,14 @@ public class MainController {
         prettifyXmlButton.setOnAction(e -> prettifyXml());
         copyButton.setOnAction(e -> copyDetailToClipboard());
         clearDetailButton.setOnAction(e -> clearDetail());
+    }
+
+    private void setupLogLevelFilter() {
+        logLevelFilterComboBox.setItems(FXCollections.observableArrayList(
+            "ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"
+        ));
+        logLevelFilterComboBox.getSelectionModel().select("ALL");
+        logLevelFilterComboBox.valueProperty().addListener((obs, oldVal, newVal) -> performSearch());
     }
 
     /**
@@ -615,55 +630,45 @@ public class MainController {
      */
     private void performSearch() {
         String searchText = searchField.getText();
-        if (searchText == null || searchText.trim().isEmpty()) {
-            clearSearch();
-            return;
-        }
-
         boolean isRegex = regexCheckBox.isSelected();
         boolean caseSensitive = caseSensitiveCheckBox.isSelected();
+        String selectedLevel = logLevelFilterComboBox.getSelectionModel().getSelectedItem();
 
         updateStatus("Searching...");
 
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
-                if (isRegex) {
-                    try {
-                        int flags = caseSensitive
-                            ? 0
-                            : Pattern.CASE_INSENSITIVE;
-                        Pattern pattern = Pattern.compile(searchText, flags);
+                Platform.runLater(() -> {
+                    filteredLogEntries.setPredicate(entry -> {
+                        // Level filtering
+                        if (selectedLevel != null && !selectedLevel.equals("ALL")) {
+                            if (!entry.getLevel().equalsIgnoreCase(selectedLevel)) {
+                                return false;
+                            }
+                        }
 
-                        Platform.runLater(() -> {
-                            filteredLogEntries.setPredicate(entry -> {
-                                return pattern
-                                    .matcher(entry.getRawLog())
-                                    .find();
-                            });
-                        });
-                    } catch (Exception e) {
-                        Platform.runLater(() -> {
-                            showError(
-                                "Invalid Regex",
-                                "The regex pattern is invalid: " +
-                                    e.getMessage()
-                            );
-                        });
-                    }
-                } else {
-                    String searchFor = caseSensitive
-                        ? searchText
-                        : searchText.toLowerCase();
-                    Platform.runLater(() -> {
-                        filteredLogEntries.setPredicate(entry -> {
-                            String searchIn = caseSensitive
-                                ? entry.getRawLog()
-                                : entry.getRawLog().toLowerCase();
+                        // Text/Regex filtering
+                        if (searchText == null || searchText.trim().isEmpty()) {
+                            return true; // No text search, only level filter applies
+                        }
+
+                        if (isRegex) {
+                            try {
+                                int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
+                                Pattern pattern = Pattern.compile(searchText, flags);
+                                return pattern.matcher(entry.getRawLog()).find();
+                            } catch (Exception e) {
+                                logger.error("Invalid regex pattern: {}", e.getMessage());
+                                return false; // Invalid regex, so no match
+                            }
+                        } else {
+                            String searchFor = caseSensitive ? searchText : searchText.toLowerCase();
+                            String searchIn = caseSensitive ? entry.getRawLog() : entry.getRawLog().toLowerCase();
                             return searchIn.contains(searchFor);
-                        });
+                        }
                     });
-                }
+                });
                 return null;
             }
         };
@@ -724,11 +729,33 @@ public class MainController {
      * Prettify JSON in detail view
      */
     private void prettifyJson() {
-        String text = detailTextArea.getText();
-        if (JsonPrettifyService.containsJson(text)) {
-            String prettified = JsonPrettifyService.prettifyFromLog(text);
-            detailTextArea.replaceText(prettified);
-            updateStatus("JSON prettified");
+        String fullText = detailTextArea.getText();
+        StringBuilder newTextBuilder = new StringBuilder(fullText);
+        int offset = 0;
+
+        while (true) {
+            String remainingText = newTextBuilder.substring(offset);
+            String extractedJson = JsonPrettifyService.extractJson(remainingText);
+
+            if (extractedJson == null) {
+                break; // No more JSON found
+            }
+
+            String prettifiedJson = JsonPrettifyService.prettify(extractedJson);
+
+            int start = newTextBuilder.indexOf(extractedJson, offset);
+            if (start == -1) {
+                break; // Should not happen if extractJson worked correctly
+            }
+            int end = start + extractedJson.length();
+
+            newTextBuilder.replace(start, end, prettifiedJson);
+            offset = start + prettifiedJson.length(); // Continue search after the replaced text
+        }
+
+        if (!newTextBuilder.toString().equals(fullText)) {
+            detailTextArea.replaceText(newTextBuilder.toString());
+            updateStatus("All JSON occurrences prettified");
         } else {
             showInfo("No JSON Found", "No valid JSON found in the log detail.");
         }
@@ -738,11 +765,33 @@ public class MainController {
      * Prettify XML in detail view
      */
     private void prettifyXml() {
-        String text = detailTextArea.getText();
-        if (XmlPrettifyService.containsXml(text)) {
-            String prettified = XmlPrettifyService.prettifyFromLog(text);
-            detailTextArea.replaceText(prettified);
-            updateStatus("XML prettified");
+        String fullText = detailTextArea.getText();
+        StringBuilder newTextBuilder = new StringBuilder(fullText);
+        int offset = 0;
+
+        while (true) {
+            String remainingText = newTextBuilder.substring(offset);
+            String extractedXml = XmlPrettifyService.extractXml(remainingText);
+
+            if (extractedXml == null) {
+                break; // No more XML found
+            }
+
+            String prettifiedXml = XmlPrettifyService.prettify(extractedXml);
+
+            int start = newTextBuilder.indexOf(extractedXml, offset);
+            if (start == -1) {
+                break; // Should not happen if extractXml worked correctly
+            }
+            int end = start + extractedXml.length();
+
+            newTextBuilder.replace(start, end, prettifiedXml);
+            offset = start + prettifiedXml.length(); // Continue search after the replaced text
+        }
+
+        if (!newTextBuilder.toString().equals(fullText)) {
+            detailTextArea.replaceText(newTextBuilder.toString());
+            updateStatus("All XML occurrences prettified");
         } else {
             showInfo("No XML Found", "No valid XML found in the log detail.");
         }

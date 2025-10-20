@@ -60,9 +60,15 @@ public class DatabaseService {
                 + "save_password BOOLEAN NOT NULL DEFAULT 0"
                 + ");";
 
+        String createPreferencesTable = "CREATE TABLE IF NOT EXISTS preferences ("
+                + "key TEXT PRIMARY KEY,"
+                + "value TEXT"
+                + ");";
+
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(createParsingConfigTable);
             stmt.execute(createSshServerTable);
+            stmt.execute(createPreferencesTable);
             logger.info("Tables created or already exist.");
         } catch (SQLException e) {
             logger.error("Failed to create tables.", e);

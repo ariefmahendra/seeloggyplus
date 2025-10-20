@@ -11,24 +11,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import com.seeloggyplus.model.Preference;
 import java.util.Objects;
 
 /**
  * Main application entry point for SeeLoggyPlus
  * High-performance log viewer with advanced parsing capabilities
  */
+import com.seeloggyplus.repository.PreferenceRepository;
+import com.seeloggyplus.repository.PreferenceRepositoryImpl;
+
 public class Main extends Application {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final String APP_TITLE = "SeeLoggyPlus - Log Viewer";
     private static final String VERSION = "1.0.0";
 
-
+    private PreferenceRepository preferenceRepository;
     private Stage primaryStage;
 
     @Override
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
+        this.preferenceRepository = new PreferenceRepositoryImpl();
         
         try {
             // Load main view
@@ -72,12 +77,11 @@ public class Main extends Application {
      * Restore window size and position from preferences
      */
     private void restoreWindowPreferences(Stage stage) {
-        double width = 1000;
-        double height = 800;
-        double x = 100;
-        double y = 100;
-        boolean maximized = false;
-
+        double width = Double.parseDouble(preferenceRepository.findByKey("window_width").map(Preference::getValue).orElse("1000"));
+        double height = Double.parseDouble(preferenceRepository.findByKey("window_height").map(Preference::getValue).orElse("800"));
+        double x = Double.parseDouble(preferenceRepository.findByKey("window_x").map(Preference::getValue).orElse("100"));
+        double y = Double.parseDouble(preferenceRepository.findByKey("window_y").map(Preference::getValue).orElse("100"));
+        boolean maximized = Boolean.parseBoolean(preferenceRepository.findByKey("window_maximized").map(Preference::getValue).orElse("false"));
 
         stage.setWidth(width);
         stage.setHeight(height);
@@ -95,7 +99,11 @@ public class Main extends Application {
      */
     private void saveWindowPreferences() {
         if (primaryStage != null) {
-
+            preferenceRepository.saveOrUpdate(new Preference("window_width", String.valueOf(primaryStage.getWidth())));
+            preferenceRepository.saveOrUpdate(new Preference("window_height", String.valueOf(primaryStage.getHeight())));
+            preferenceRepository.saveOrUpdate(new Preference("window_x", String.valueOf(primaryStage.getX())));
+            preferenceRepository.saveOrUpdate(new Preference("window_y", String.valueOf(primaryStage.getY())));
+            preferenceRepository.saveOrUpdate(new Preference("window_maximized", String.valueOf(primaryStage.isMaximized())));
         }
     }
 
