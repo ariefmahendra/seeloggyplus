@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Objects;
 
 /**
  * Main application entry point for SeeLoggyPlus
@@ -39,7 +40,7 @@ public class Main extends Application {
             Scene scene = new Scene(root);
 
             // Load CSS
-            String css = getClass().getResource("/css/style.css").toExternalForm();
+            String css = Objects.requireNonNull(getClass().getResource("/css/style.css")).toExternalForm();
             scene.getStylesheets().add(css);
 
             // Configure stage
@@ -51,7 +52,7 @@ public class Main extends Application {
 
             // Set application icon (if available)
             try {
-                Image icon = new Image(getClass().getResourceAsStream("/images/icon.png"));
+                Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/icon.png")));
                 primaryStage.getIcons().add(icon);
             } catch (Exception e) {
                 logger.warn("Application icon not found");
@@ -133,7 +134,6 @@ public class Main extends Application {
     }
 
     public static void main(String[] args) {
-        // Configure logging
         System.setProperty("logback.configurationFile", "logback.xml");
 
         logger.info("Starting SeeLoggyPlus application v{}", VERSION);

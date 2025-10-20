@@ -22,8 +22,6 @@ javafx {
 }
 
 dependencies {
-    // JavaFX (handled by plugin)
-
     // SSH Connection
     implementation 'com.jcraft:jsch:0.1.55'
 
@@ -35,15 +33,15 @@ dependencies {
     implementation 'org.xerial:sqlite-jdbc:3.44.1.0'
 
     // XML Processing
-    implementation 'dom4j:dom4j:1.6.1'
+    implementation 'org.dom4j:dom4j:2.2.0'
 
     // Logging
     implementation 'org.slf4j:slf4j-api:2.0.9'
-    implementation 'ch.qos.logback:logback-classic:1.4.11'
+    implementation 'ch.qos.logback:logback-classic:1.5.19'
 
     // Apache Commons for file operations
-    implementation 'commons-io:commons-io:2.13.0'
-    implementation 'org.apache.commons:commons-lang3:3.13.0'
+    implementation 'commons-io:commons-io:2.14.0'
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
 
     // ControlsFX for advanced UI components
     implementation 'org.controlsfx:controlsfx:11.1.2'
@@ -72,7 +70,7 @@ tasks.withType(JavaCompile) {
 }
 
 // Create fat JAR
-task fatJar(type: Jar) {
+tasks.register('fatJar', Jar) {
     archiveBaseName = "${project.name}-all"
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     manifest {
