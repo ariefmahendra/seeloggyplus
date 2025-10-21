@@ -1,11 +1,15 @@
 package com.seeloggyplus;
 
 
+import com.seeloggyplus.service.PreferenceService;
+import com.seeloggyplus.service.PreferenceServiceImpl;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,13 +17,13 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import com.seeloggyplus.model.Preference;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Main application entry point for SeeLoggyPlus
  * High-performance log viewer with advanced parsing capabilities
  */
-import com.seeloggyplus.repository.PreferenceRepository;
-import com.seeloggyplus.repository.PreferenceRepositoryImpl;
 
 public class Main extends Application {
 
@@ -27,13 +31,13 @@ public class Main extends Application {
     private static final String APP_TITLE = "SeeLoggyPlus - Log Viewer";
     private static final String VERSION = "1.0.0";
 
-    private PreferenceRepository preferenceRepository;
+    private PreferenceService preferenceService;
     private Stage primaryStage;
 
     @Override
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
-        this.preferenceRepository = new PreferenceRepositoryImpl();
+        this.preferenceService = new PreferenceServiceImpl();
         
         try {
             // Load main view
@@ -77,21 +81,67 @@ public class Main extends Application {
      * Restore window size and position from preferences
      */
     private void restoreWindowPreferences(Stage stage) {
-        double width = Double.parseDouble(preferenceRepository.findByKey("window_width").map(Preference::getValue).orElse("1000"));
-        double height = Double.parseDouble(preferenceRepository.findByKey("window_height").map(Preference::getValue).orElse("800"));
-        double x = Double.parseDouble(preferenceRepository.findByKey("window_x").map(Preference::getValue).orElse("100"));
-        double y = Double.parseDouble(preferenceRepository.findByKey("window_y").map(Preference::getValue).orElse("100"));
-        boolean maximized = Boolean.parseBoolean(preferenceRepository.findByKey("window_maximized").map(Preference::getValue).orElse("false"));
+        Optional<Double> windowX = getPreferenceAsDouble("window_x");
+        Optional<Double> windowY = getPreferenceAsDouble("window_y");
 
-        stage.setWidth(width);
-        stage.setHeight(height);
+        double windowWidth = getPreferenceAsDouble("window_width").orElse(1000.0);
+        double windowHeight = getPreferenceAsDouble("window_height").orElse(800.0);
 
-        if (x >= 0 && y >= 0) {
-            stage.setX(x);
-            stage.setY(y);
+        boolean maximized = preferenceService.getPreferencesByCode("window_maximized")
+                .filter(Predicate.not(String::isBlank))
+                .map(Boolean::parseBoolean)
+                .orElse(false);
+
+        stage.setWidth(windowWidth);
+        stage.setHeight(windowHeight);
+
+        if (windowX.isPresent() && windowY.isPresent()) {
+            double x = windowX.get();
+            double y = windowY.get();
+
+            if (isBoundsVisibleOnScreen(x, y, windowWidth, windowHeight)) {
+                stage.setX(x);
+                stage.setY(y);
+            } else {
+                stage.centerOnScreen();
+            }
+        } else {
+            stage.centerOnScreen();
         }
 
         stage.setMaximized(maximized);
+    }
+
+    /**
+     * Helper for robust get preference as double data type
+     */
+    private Optional<Double> getPreferenceAsDouble(String code) {
+        return preferenceService.getPreferencesByCode(code)
+                .filter(Predicate.not(String::isBlank))
+                .flatMap(s -> {
+                    try {
+                        return Optional.of(Double.parseDouble(s));
+                    } catch (NumberFormatException e) {
+                        return Optional.empty();
+                    }
+                });
+    }
+
+    /**
+     * Helper for checking coordinate only in screen
+     */
+    private boolean isBoundsVisibleOnScreen(double x, double y, double width, double height) {
+        Rectangle2D windowBounds = new Rectangle2D(x, y, width, height);
+
+        for (Screen screen : Screen.getScreens()) {
+            Rectangle2D screenBounds = screen.getVisualBounds();
+
+            if (screenBounds.intersects(windowBounds)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -99,11 +149,11 @@ public class Main extends Application {
      */
     private void saveWindowPreferences() {
         if (primaryStage != null) {
-            preferenceRepository.saveOrUpdate(new Preference("window_width", String.valueOf(primaryStage.getWidth())));
-            preferenceRepository.saveOrUpdate(new Preference("window_height", String.valueOf(primaryStage.getHeight())));
-            preferenceRepository.saveOrUpdate(new Preference("window_x", String.valueOf(primaryStage.getX())));
-            preferenceRepository.saveOrUpdate(new Preference("window_y", String.valueOf(primaryStage.getY())));
-            preferenceRepository.saveOrUpdate(new Preference("window_maximized", String.valueOf(primaryStage.isMaximized())));
+            preferenceService.saveOrUpdatePreferences(new Preference("window_width", String.valueOf(primaryStage.getWidth())));
+            preferenceService.saveOrUpdatePreferences(new Preference("window_height", String.valueOf(primaryStage.getHeight())));
+            preferenceService.saveOrUpdatePreferences(new Preference("window_x", String.valueOf(primaryStage.getX())));
+            preferenceService.saveOrUpdatePreferences(new Preference("window_y", String.valueOf(primaryStage.getY())));
+            preferenceService.saveOrUpdatePreferences(new Preference("window_maximized", String.valueOf(primaryStage.isMaximized())));
         }
     }
 

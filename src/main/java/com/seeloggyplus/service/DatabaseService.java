@@ -61,7 +61,7 @@ public class DatabaseService {
                 + ");";
 
         String createPreferencesTable = "CREATE TABLE IF NOT EXISTS preferences ("
-                + "key TEXT PRIMARY KEY,"
+                + "code TEXT PRIMARY KEY,"
                 + "value TEXT"
                 + ");";
 

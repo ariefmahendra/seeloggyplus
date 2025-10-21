@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
+
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleStringProperty;
@@ -46,124 +47,90 @@ public class MainController {
     // FXML Components - MenuBar
     @FXML
     private MenuBar menuBar;
-
     @FXML
     private Menu fileMenu;
-
     @FXML
     private MenuItem openFileMenuItem;
-
     @FXML
     private MenuItem openRemoteMenuItem;
-
     @FXML
     private MenuItem exitMenuItem;
-
     @FXML
     private Menu viewMenu;
-
     @FXML
     private CheckMenuItem showLeftPanelMenuItem;
-
     @FXML
     private CheckMenuItem showBottomPanelMenuItem;
-
     @FXML
     private Menu settingsMenu;
-
     @FXML
     private MenuItem parsingConfigMenuItem;
-
     @FXML
     private Menu helpMenu;
-
     @FXML
     private MenuItem aboutMenuItem;
 
     // FXML Components - Main Layout
     @FXML
     private BorderPane mainBorderPane;
-
     @FXML
     private SplitPane horizontalSplitPane;
-
     @FXML
     private SplitPane verticalSplitPane;
 
     // FXML Components - Left Panel (Recent Files)
     @FXML
     private VBox leftPanel;
-
     @FXML
     private ListView<RecentFile> recentFilesListView;
-
     @FXML
     private Button clearRecentButton;
 
     // FXML Components - Center Panel (Log Table)
     @FXML
     private VBox centerPanel;
-
     @FXML
     private ToolBar toolBar;
-
     @FXML
     private TextField searchField;
-
     @FXML
     private CheckBox regexCheckBox;
-
     @FXML
     private CheckBox caseSensitiveCheckBox;
-
     @FXML
     private Button searchButton;
-
     @FXML
     private Button clearSearchButton;
-
     @FXML
     private ComboBox<String> logLevelFilterComboBox;
-
     @FXML
     private Label statusLabel;
-
     @FXML
     private ProgressBar progressBar;
-
     @FXML
     private TableView<LogEntry> logTableView;
 
     // FXML Components - Bottom Panel (Log Detail)
     @FXML
     private VBox bottomPanel;
-
     @FXML
     private Label detailLabel;
-
     @FXML
     private CodeArea detailTextArea;
-
     @FXML
     private HBox detailButtonsBox;
-
     @FXML
     private Button prettifyJsonButton;
-
     @FXML
     private Button prettifyXmlButton;
-
     @FXML
     private Button prettifySqlButton;
-
     @FXML
     private Button copyButton;
-
     @FXML
     private Button clearDetailButton;
 
     // Services and Data
-
     private ParsingConfigService parsingConfigService;
     private RecentFileService recentFileService;
     private LogParserService logParserService;
@@ -217,6 +184,7 @@ public class MainController {
         // View Menu
         showLeftPanelMenuItem.setSelected(true);
         showBottomPanelMenuItem.setSelected(true);
+        showLeftPanelMenuItem.setOnAction(e -> toggleLeftPanel());
         showBottomPanelMenuItem.setOnAction(e -> toggleBottomPanel());
 
         // Settings Menu
@@ -232,24 +200,24 @@ public class MainController {
     private void setupLeftPanel() {
         // Configure recent files list view
         recentFilesListView.setCellFactory(listView ->
-            new RecentFileListCell()
+                new RecentFileListCell()
         );
         recentFilesListView.setItems(
-            FXCollections.observableArrayList(recentFileService.findAll())
+                FXCollections.observableArrayList(recentFileService.findAll())
         );
 
         // Handle selection
         recentFilesListView
-            .getSelectionModel()
-            .selectedItemProperty()
-            .addListener((obs, oldVal, newVal) -> {
-                if (
-                    newVal != null &&
-                    (currentFile == null || !currentFile.getAbsolutePath().equals(newVal.getFilePath()))
-                ) {
-                    handleRecentFileSelected(newVal);
-                }
-            });
+                .getSelectionModel()
+                .selectedItemProperty()
+                .addListener((obs, oldVal, newVal) -> {
+                    if (
+                            newVal != null &&
+                                    (currentFile == null || !currentFile.getAbsolutePath().equals(newVal.getFilePath()))
+                    ) {
+                        handleRecentFileSelected(newVal);
+                    }
+                });
 
         // Clear recent button
         clearRecentButton.setOnAction(e -> handleClearRecentFiles());
@@ -262,19 +230,17 @@ public class MainController {
         // Configure table view
         logTableView.setItems(filteredLogEntries);
         // Use UNCONSTRAINED_RESIZE_POLICY to allow horizontal scrolling
-        logTableView.setColumnResizePolicy(
-            TableView.UNCONSTRAINED_RESIZE_POLICY
-        );
+        logTableView.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
         // Handle row selection
         logTableView
-            .getSelectionModel()
-            .selectedItemProperty()
-            .addListener((obs, oldVal, newVal) -> {
-                if (newVal != null) {
-                    displayLogDetail(newVal);
-                }
-            });
+                .getSelectionModel()
+                .selectedItemProperty()
+                .addListener((obs, oldVal, newVal) -> {
+                    if (newVal != null) {
+                        displayLogDetail(newVal);
+                    }
+                });
 
         // Setup search functionality
         searchButton.setOnAction(e -> performSearch());
@@ -293,9 +259,7 @@ public class MainController {
         detailTextArea = new CodeArea();
         detailTextArea.setEditable(false);
         detailTextArea.setWrapText(true);
-        detailTextArea.setStyle(
-            "-fx-font-family: 'Consolas', 'Monaco', monospace; -fx-font-size: 12px;"
-        );
+        detailTextArea.setStyle("-fx-font-family: 'Consolas', 'Monaco', monospace; -fx-font-size: 12px;");
 
         // Add to bottom panel if not already in FXML
         if (bottomPanel.getChildren().size() < 3) {
@@ -312,7 +276,7 @@ public class MainController {
 
     private void setupLogLevelFilter() {
         logLevelFilterComboBox.setItems(FXCollections.observableArrayList(
-            "ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"
+                "ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"
         ));
         logLevelFilterComboBox.getSelectionModel().select("ALL");
         logLevelFilterComboBox.valueProperty().addListener((obs, oldVal, newVal) -> performSearch());
@@ -332,42 +296,32 @@ public class MainController {
      * Update table columns based on parsing configuration
      */
     private void updateTableColumns(ParsingConfig config) {
-        logger.info(
-            "Updating table columns with config: {}",
-            config != null ? config.getName() : "null"
-        );
+        logger.info( "Updating table columns with config: {}", config != null ? config.getName() : "null");
         logTableView.getColumns().clear();
 
         // Add line number column
         TableColumn<LogEntry, Long> lineCol = new TableColumn<>("Line");
-        lineCol.setCellValueFactory(cellData ->
-            new ReadOnlyObjectWrapper<>(cellData.getValue().getLineNumber())
-        );
+        lineCol.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue().getLineNumber()));
         lineCol.setPrefWidth(80);
         lineCol.setMinWidth(80);
         logTableView.getColumns().add(lineCol);
 
         if (config != null && config.isValid()) {
             List<String> groupNames = config.getGroupNames();
-            logger.info(
-                "Config has {} named groups: {}",
-                groupNames.size(),
-                groupNames
-            );
+            logger.info( "Config has {} named groups: {}", groupNames.size(), groupNames);
 
             for (int i = 0; i < groupNames.size(); i++) {
                 final int currentIndex = i;
                 final String groupName = groupNames.get(i);
 
-                TableColumn<LogEntry, String> column = new TableColumn<>(
-                    groupName
-                );
+                TableColumn<LogEntry, String> column = new TableColumn<>(groupName);
+
                 column.setCellValueFactory(cellData -> {
                     LogEntry entry = cellData.getValue();
                     if (entry.isParsed()) {
                         // Parsed entry, get the specific field
                         return new SimpleStringProperty(
-                            entry.getField(groupName)
+                                entry.getField(groupName)
                         );
                     } else {
                         // Un-parsed entry
@@ -380,25 +334,17 @@ public class MainController {
                         }
                     }
                 });
+
                 // Set a minimum width for usability; pref width will be set by auto-resizer
                 column.setMinWidth(80);
                 logTableView.getColumns().add(column);
             }
-            logger.info(
-                "Created {} columns total (including line number)",
-                logTableView.getColumns().size()
-            );
+            logger.info("Created {} columns total (including line number)", logTableView.getColumns().size());
         } else {
             // Default column - show raw log
-            logger.warn(
-                "Config is null or invalid, using default raw log column"
-            );
-            TableColumn<LogEntry, String> rawCol = new TableColumn<>(
-                "Log Message"
-            );
-            rawCol.setCellValueFactory(cellData ->
-                new SimpleStringProperty(cellData.getValue().getRawLog())
-            );
+            logger.warn("Config is null or invalid, using default raw log column");
+            TableColumn<LogEntry, String> rawCol = new TableColumn<>("Log Message");
+            rawCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getRawLog()));
             rawCol.setPrefWidth(800);
             logTableView.getColumns().add(rawCol);
             logger.info("Created 2 columns (line number + raw log)");
@@ -412,11 +358,11 @@ public class MainController {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Open Log File");
         fileChooser
-            .getExtensionFilters()
-            .addAll(
-                new FileChooser.ExtensionFilter("Log Files", "*.log", "*.txt"),
-                new FileChooser.ExtensionFilter("All Files", "*.*")
-            );
+                .getExtensionFilters()
+                .addAll(
+                        new FileChooser.ExtensionFilter("Log Files", "*.log", "*.txt"),
+                        new FileChooser.ExtensionFilter("All Files", "*.*")
+                );
 
         File file = fileChooser.showOpenDialog(menuBar.getScene().getWindow());
         if (file != null) {
@@ -431,7 +377,7 @@ public class MainController {
     private void handleOpenRemote() {
         try {
             FXMLLoader loader = new FXMLLoader(
-                getClass().getResource("/fxml/RemoteFileDialog.fxml")
+                    getClass().getResource("/fxml/RemoteFileDialog.fxml")
             );
             Parent root = loader.load();
 
@@ -454,42 +400,42 @@ public class MainController {
 
     /**
      * Open and parse log file
-     * @param file The file to open
+     *
+     * @param file                  The file to open
      * @param updateRecentFilesList true if the file should be added to the top of the recent files list
      */
     private void openLogFile(File file, boolean updateRecentFilesList) {
         currentFile = file;
 
-        // Get parsing configuration
-        currentParsingConfig = new ParsingConfigRepositoryImpl().findDefault().orElse(null);
+        currentParsingConfig = parsingConfigService.findDefault().orElse(null);
 
         // If no parsing config exists, create a default one
         if (currentParsingConfig == null) {
             logger.warn("No default parsing config found, creating default");
             currentParsingConfig = new ParsingConfig(
-                "Default",
-                "Default log parsing configuration",
-                "(?<timestamp>\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?<level>\\w+)\\s+(?<message>.*)"
+                    "Default",
+                    "Default log parsing configuration",
+                    "(?<timestamp>\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?<level>\\w+)\\s+(?<message>.*)"
             );
             // Validate the pattern to extract group names
             if (!currentParsingConfig.validatePattern()) {
                 logger.error(
-                    "Failed to validate default parsing config: {}",
-                    currentParsingConfig.getValidationError()
+                        "Failed to validate default parsing config: {}",
+                        currentParsingConfig.getValidationError()
                 );
                 // Use a simpler pattern as fallback
                 currentParsingConfig = new ParsingConfig(
-                    "Simple Default",
-                    "Simple default configuration",
-                    "(?<line>.*)"
+                        "Simple Default",
+                        "Simple default configuration",
+                        "(?<line>.*)"
                 );
                 currentParsingConfig.validatePattern();
             }
             currentParsingConfig.setDefault(true);
             parsingConfigService.save(currentParsingConfig);
             logger.info(
-                "Created default parsing config with {} groups",
-                currentParsingConfig.getGroupNames().size()
+                    "Created default parsing config with {} groups",
+                    currentParsingConfig.getGroupNames().size()
             );
         }
 
@@ -503,42 +449,42 @@ public class MainController {
             @Override
             protected List<LogEntry> call() throws Exception {
                 return logParserService.parseFile(
-                    file,
-                    currentParsingConfig,
-                    new LogParserService.ProgressCallback() {
-                        @Override
-                        public void onProgress(
-                            double progress,
-                            long currentLine,
-                            long totalLines
-                        ) {
-                            updateProgress(currentLine, totalLines);
-                            Platform.runLater(() -> {
-                                progressBar.setProgress(progress);
-                                updateStatus(
-                                    String.format(
-                                        "Loading... %d / %d lines",
-                                        currentLine,
-                                        totalLines
-                                    )
-                                );
-                            });
-                        }
+                        file,
+                        currentParsingConfig,
+                        new LogParserService.ProgressCallback() {
+                            @Override
+                            public void onProgress(
+                                    double progress,
+                                    long currentLine,
+                                    long totalLines
+                            ) {
+                                updateProgress(currentLine, totalLines);
+                                Platform.runLater(() -> {
+                                    progressBar.setProgress(progress);
+                                    updateStatus(
+                                            String.format(
+                                                    "Loading... %d / %d lines",
+                                                    currentLine,
+                                                    totalLines
+                                            )
+                                    );
+                                });
+                            }
 
-                        @Override
-                        public void onComplete(long totalLines) {
-                            Platform.runLater(() -> {
-                                progressBar.setVisible(false);
-                                updateStatus(
-                                    String.format(
-                                        "Loaded %d lines from %s",
-                                        totalLines,
-                                        file.getName()
-                                    )
-                                );
-                            });
+                            @Override
+                            public void onComplete(long totalLines) {
+                                Platform.runLater(() -> {
+                                    progressBar.setVisible(false);
+                                    updateStatus(
+                                            String.format(
+                                                    "Loaded %d lines from %s",
+                                                    totalLines,
+                                                    file.getName()
+                                            )
+                                    );
+                                });
+                            }
                         }
-                    }
                 );
             }
         };
@@ -548,45 +494,31 @@ public class MainController {
             logger.info("Parsing completed, got {} entries", entries.size());
 
             allLogEntries.setAll(entries);
-            logger.info(
-                "Set {} entries to allLogEntries",
-                allLogEntries.size()
-            );
+            logger.info("Set {} entries to allLogEntries", allLogEntries.size());
 
             updateTableColumns(currentParsingConfig);
-            logger.info(
-                "Updated table columns for config: {}",
-                currentParsingConfig.getName()
-            );
+            logger.info("Updated table columns for config: {}", currentParsingConfig.getName());
 
             // Auto-resize columns to fit content
             Platform.runLater(() -> autoResizeColumns(logTableView));
 
             // Force table refresh
             logTableView.refresh();
-            logger.info(
-                "Table refresh called, visible items: {}",
-                logTableView.getItems().size()
-            );
+            logger.info("Table refresh called, visible items: {}", logTableView.getItems().size());
 
             // Add to recent files only if requested
             if (updateRecentFilesList) {
                 RecentFile recentFile = new RecentFile(
-                    file.getAbsolutePath(),
-                    file.getName(),
-                    file.length()
+                        file.getAbsolutePath(),
+                        file.getName(),
+                        file.length()
                 );
                 recentFile.setParsingConfig(currentParsingConfig);
                 recentFileService.save(recentFile);
                 refreshRecentFilesList();
             }
 
-            logger.info(
-                "Loaded {} log entries from {}, table now shows {} items",
-                entries.size(),
-                file.getName(),
-                logTableView.getItems().size()
-            );
+            logger.info("Loaded {} log entries from {}, table now shows {} items", entries.size(), file.getName(), logTableView.getItems().size());
         });
 
         task.setOnFailed(e -> {
@@ -606,10 +538,7 @@ public class MainController {
     private void handleRecentFileSelected(RecentFile recentFile) {
         if (recentFile.isRemote()) {
             // Handle remote file
-            showInfo(
-                "Remote File",
-                "Opening remote files is not yet implemented in this version."
-            );
+            showInfo("Remote File", "Opening remote files is not yet implemented in this version.");
         } else {
             // Handle local file
             File file = new File(recentFile.getFilePath());
@@ -617,10 +546,7 @@ public class MainController {
                 // Open the file but do not reorder the recent files list
                 openLogFile(file, false);
             } else {
-                showError(
-                    "File Not Found",
-                    "The file no longer exists: " + recentFile.getFilePath()
-                );
+                showError("File Not Found", "The file no longer exists: " + recentFile.getFilePath());
             }
         }
     }
@@ -676,7 +602,7 @@ public class MainController {
         task.setOnSucceeded(e -> {
             int resultCount = filteredLogEntries.size();
             updateStatus(
-                String.format("Found %d matching entries", resultCount)
+                    String.format("Found %d matching entries", resultCount)
             );
         });
 
@@ -689,9 +615,7 @@ public class MainController {
     private void clearSearch() {
         searchField.clear();
         filteredLogEntries.setPredicate(p -> true);
-        updateStatus(
-            String.format("Showing all %d entries", allLogEntries.size())
-        );
+        updateStatus(String.format("Showing all %d entries", allLogEntries.size()));
     }
 
     /**
@@ -707,22 +631,7 @@ public class MainController {
         detailLabel.setText("Log Detail - Line " + entry.getLineNumber());
         detailTextArea.clear();
 
-        // Show raw log
-        StringBuilder detail = new StringBuilder();
-        detail.append("=== RAW LOG ===\n");
-        detail.append(entry.getRawLog()).append("\n\n");
-
-        // Show parsed fields if available
-        if (entry.isParsed() && !entry.getParsedFields().isEmpty()) {
-            detail.append("=== PARSED FIELDS ===\n");
-            entry
-                .getParsedFields()
-                .forEach((key, value) -> {
-                    detail.append(key).append(": ").append(value).append("\n");
-                });
-        }
-
-        detailTextArea.replaceText(detail.toString());
+        detailTextArea.replaceText(entry.getRawLog());
     }
 
     /**
@@ -802,10 +711,8 @@ public class MainController {
      */
     private void copyDetailToClipboard() {
         String text = detailTextArea.getText();
-        javafx.scene.input.Clipboard clipboard =
-            javafx.scene.input.Clipboard.getSystemClipboard();
-        javafx.scene.input.ClipboardContent content =
-            new javafx.scene.input.ClipboardContent();
+        javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+        javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
         content.putString(text);
         clipboard.setContent(content);
         updateStatus("Copied to clipboard");
@@ -824,9 +731,7 @@ public class MainController {
      */
     private void handleParsingConfiguration() {
         try {
-            FXMLLoader loader = new FXMLLoader(
-                getClass().getResource("/fxml/ParsingConfigDialog.fxml")
-            );
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ParsingConfigDialog.fxml"));
             Parent root = loader.load();
 
             Stage dialog = new Stage();
@@ -856,12 +761,6 @@ public class MainController {
         boolean visible = showLeftPanelMenuItem.isSelected();
 
         if (!visible) {
-            // Store current divider position before hiding
-            double[] positions = horizontalSplitPane.getDividerPositions();
-            if (positions.length > 0) {
-
-            }
-
             // Hide panel
             leftPanel.setVisible(false);
             leftPanel.setManaged(false);
@@ -990,7 +889,7 @@ public class MainController {
      */
     private void refreshRecentFilesList() {
         recentFilesListView.setItems(
-            FXCollections.observableArrayList(recentFileService.findAll())
+                FXCollections.observableArrayList(recentFileService.findAll())
         );
     }
 
@@ -1002,14 +901,14 @@ public class MainController {
         alert.setTitle("About SeeLoggyPlus");
         alert.setHeaderText("SeeLoggyPlus v1.0.0");
         alert.setContentText(
-            "High-performance log viewer with advanced parsing capabilities.\n\n" +
-                "Features:\n" +
-                "- Custom regex parsing with named groups\n" +
-                "- Local and remote (SSH) file access\n" +
-                "- JSON/XML prettification\n" +
-                "- Text and regex search\n" +
-                "- Performance optimized for large files\n\n" +
-                "© 2024 SeeLoggyPlus"
+                "High-performance log viewer with advanced parsing capabilities.\n\n" +
+                        "Features:\n" +
+                        "- Custom regex parsing with named groups\n" +
+                        "- Local and remote (SSH) file access\n" +
+                        "- JSON/XML prettification\n" +
+                        "- Text and regex search\n" +
+                        "- Performance optimized for large files\n\n" +
+                        "© 2024 SeeLoggyPlus"
         );
         alert.showAndWait();
     }

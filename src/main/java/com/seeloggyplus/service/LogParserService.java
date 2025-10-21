@@ -43,7 +43,7 @@ public class LogParserService {
     /**
      * Parse a log file with progress callback
      */
-    public List<LogEntry> parseFile(File file, ParsingConfig config, ProgressCallback callback) throws IOException {
+    public List<LogEntry>  parseFile(File file, ParsingConfig config, ProgressCallback callback) throws IOException {
         if (!file.exists() || !file.canRead()) {
             throw new IOException("File does not exist or cannot be read: " + file.getAbsolutePath());
         }
@@ -53,49 +53,24 @@ public class LogParserService {
 
         long totalLines = countLines(file);
         long currentLineNumber = 0;
-        StringBuilder unparsedBuffer = new StringBuilder();
-        long unparsedStartLine = 0;
 
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8),
-                8192 * 4)) { // 32KB buffer for better performance
-
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8), 8192 * 4)) {
             String line;
             while ((line = reader.readLine()) != null) {
                 currentLineNumber++;
 
-                // Check if the line matches the pattern
-                boolean matches = (config != null && config.isValid() && config.getCompiledPattern() != null) &&
-                                  config.getCompiledPattern().matcher(line).find();
+                boolean matches = (config != null && config.isValid() && config.getCompiledPattern() != null) && config.getCompiledPattern().matcher(line).find();
 
                 if (matches) {
-                    // If there's anything in the buffer, add it as an unparsed entry
-                    if (unparsedBuffer.length() > 0) {
-                        entries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
-                        unparsedBuffer.setLength(0);
-                        unparsedStartLine = 0;
-                    }
-                    // Add the parsed entry
                     entries.add(parseLine(line, currentLineNumber, config));
                 } else {
-                    // If it doesn't match, append to buffer
-                    if (unparsedBuffer.length() == 0) {
-                        unparsedStartLine = currentLineNumber;
-                    } else {
-                        unparsedBuffer.append("\n");
-                    }
-                    unparsedBuffer.append(line);
+                    entries.add(new LogEntry(currentLineNumber, line));
                 }
 
                 if (callback != null && currentLineNumber % 100 == 0) {
                     double progress = (double) currentLineNumber / totalLines;
                     callback.onProgress(progress, currentLineNumber, totalLines);
                 }
-            }
-
-            // Add any remaining unparsed lines at the end of the file
-            if (unparsedBuffer.length() > 0) {
-                entries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
             }
         }
 
