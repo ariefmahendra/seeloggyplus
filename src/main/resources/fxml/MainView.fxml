@@ -64,15 +64,21 @@
                 <TextField fx:id="searchField" prefWidth="300" promptText="Enter search text or regex..." />
                 <CheckBox fx:id="regexCheckBox" text="Regex" />
                 <CheckBox fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
-                <Button fx:id="searchButton" text="Search">
-                    <font>
-                        <Font size="8.0" />
-                    </font>
+                <Button fx:id="searchButton">
+               <graphic>
+                  <FontAwesomeIconView glyphName="SEARCH" size="12" />
+               </graphic>
+               <tooltip>
+                  <Tooltip text="Search" />
+               </tooltip>
                 </Button>
-                <Button fx:id="clearSearchButton" text="Clear">
-                    <font>
-                        <Font size="8.0" />
-                    </font>
+                <Button fx:id="clearSearchButton">
+               <graphic>
+                  <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
+               </graphic>
+               <tooltip>
+                  <Tooltip text="CLear Table" />
+               </tooltip>
                 </Button>
                 <Separator orientation="VERTICAL" />
                 <Label text="Level:" />
