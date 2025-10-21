@@ -2,6 +2,7 @@ package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.LogEntry;
 import com.seeloggyplus.model.ParsingConfig;
+import com.seeloggyplus.model.Preference;
 import com.seeloggyplus.model.RecentFile;
 import com.seeloggyplus.service.*;
 import com.seeloggyplus.repository.RecentFileRepository;
@@ -13,6 +14,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import javafx.application.Platform;
@@ -134,6 +136,7 @@ public class MainController {
     private ParsingConfigService parsingConfigService;
     private RecentFileService recentFileService;
     private LogParserService logParserService;
+    private PreferenceService preferenceService;
     private SSHService sshService;
     private ObservableList<LogEntry> allLogEntries;
     private FilteredList<LogEntry> filteredLogEntries;
@@ -149,6 +152,7 @@ public class MainController {
 
         parsingConfigService = new ParsingConfigServiceImpl();
         recentFileService = new RecentConfigServiceImpl();
+        preferenceService = new PreferenceServiceImpl();
         logParserService = new LogParserService();
         sshService = new SSHService();
 
@@ -759,6 +763,8 @@ public class MainController {
      */
     private void toggleLeftPanel() {
         boolean visible = showLeftPanelMenuItem.isSelected();
+        String resultVisiblePanel = "";
+
 
         if (!visible) {
             // Hide panel
@@ -769,6 +775,8 @@ public class MainController {
             Platform.runLater(() -> {
                 horizontalSplitPane.setDividerPositions(0.0);
             });
+
+            resultVisiblePanel = "false";
         } else {
             // Show panel
             leftPanel.setVisible(true);
@@ -785,7 +793,11 @@ public class MainController {
                     horizontalSplitPane.setDividerPositions(0.2);
                 }
             });
+
+            resultVisiblePanel = "true";
         }
+
+        preferenceService.saveOrUpdatePreferences(new Preference("left_panel_show", resultVisiblePanel));
     }
 
     /**
@@ -793,14 +805,9 @@ public class MainController {
      */
     private void toggleBottomPanel() {
         boolean visible = showBottomPanelMenuItem.isSelected();
+        String resultVisiblePanel = "";
 
         if (!visible) {
-            // Store current divider position before hiding
-            double[] positions = verticalSplitPane.getDividerPositions();
-            if (positions.length > 0) {
-
-            }
-
             // Hide panel
             bottomPanel.setVisible(false);
             bottomPanel.setManaged(false);
@@ -809,6 +816,8 @@ public class MainController {
             Platform.runLater(() -> {
                 verticalSplitPane.setDividerPositions(1.0);
             });
+
+            resultVisiblePanel = "false";
         } else {
             // Show panel
             bottomPanel.setVisible(true);
@@ -816,7 +825,7 @@ public class MainController {
 
             // Restore divider position
             Platform.runLater(() -> {
-                double savedHeight = 200; // Default value
+                double savedHeight = 200;
                 double totalHeight = verticalSplitPane.getHeight();
                 if (totalHeight > 0) {
                     double position = (totalHeight - savedHeight) / totalHeight;
@@ -825,26 +834,38 @@ public class MainController {
                     verticalSplitPane.setDividerPositions(0.75);
                 }
             });
+
+            resultVisiblePanel = "true";
         }
+
+        preferenceService.saveOrUpdatePreferences(new Preference("bottom_panel_show", resultVisiblePanel));
     }
 
     /**
      * Restore panel visibility from preferences
      */
     private void restorePanelVisibility() {
-        boolean leftVisible = true; // Default value
-        leftPanel.setVisible(leftVisible);
-        leftPanel.setManaged(leftVisible);
-        showLeftPanelMenuItem.setSelected(leftVisible);
+        boolean leftPanelShow = preferenceService.getPreferencesByCode("left_panel_show")
+                .filter(Predicate.not(String::isBlank))
+                .map(Boolean::parseBoolean)
+                .orElse(true);
 
-        boolean bottomVisible = true; // Default value
-        bottomPanel.setVisible(bottomVisible);
-        bottomPanel.setManaged(bottomVisible);
-        showBottomPanelMenuItem.setSelected(bottomVisible);
+        boolean bottomPanelShow = preferenceService.getPreferencesByCode("bottom_panel_show")
+                .filter(Predicate.not(String::isBlank))
+                .map(Boolean::parseBoolean)
+                .orElse(true);
+
+        leftPanel.setVisible(leftPanelShow);
+        leftPanel.setManaged(leftPanelShow);
+        showLeftPanelMenuItem.setSelected(leftPanelShow);
+
+        bottomPanel.setVisible(bottomPanelShow);
+        bottomPanel.setManaged(bottomPanelShow);
+        showBottomPanelMenuItem.setSelected(bottomPanelShow);
 
         // Restore divider positions after scene is shown
         Platform.runLater(() -> {
-            if (leftVisible) {
+            if (leftPanelShow) {
                 double savedWidth = 200; // Default value
                 double totalWidth = horizontalSplitPane.getWidth();
                 if (totalWidth > 0 && savedWidth > 0) {
@@ -855,7 +876,7 @@ public class MainController {
                 horizontalSplitPane.setDividerPositions(0.0);
             }
 
-            if (bottomVisible) {
+            if (bottomPanelShow) {
                 double savedHeight = 200; // Default value
                 double totalHeight = verticalSplitPane.getHeight();
                 if (totalHeight > 0 && savedHeight > 0) {

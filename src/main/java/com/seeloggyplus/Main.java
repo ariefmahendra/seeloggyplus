@@ -1,6 +1,7 @@
 package com.seeloggyplus;
 
 
+import com.seeloggyplus.controller.MainController;
 import com.seeloggyplus.service.PreferenceService;
 import com.seeloggyplus.service.PreferenceServiceImpl;
 import javafx.application.Application;
@@ -43,6 +44,7 @@ public class Main extends Application {
             // Load main view
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
             Parent root = loader.load();
+            MainController mainController = loader.getController();
 
             // Create scene
             Scene scene = new Scene(root);
