@@ -66,9 +66,9 @@ tasks.named('test') {
 }
 
 // Enable preview features if needed
-tasks.withType(JavaCompile) {
+tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    options.compilerArgs << '-Xlint:unchecked'
+    options.compilerArgs << '-lint:unchecked'
     options.deprecation = true
 }
 
