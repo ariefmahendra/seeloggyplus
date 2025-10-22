@@ -43,13 +43,14 @@ public class LogParserService {
     /**
      * Parse a log file with progress callback
      */
-    public List<LogEntry>  parseFile(File file, ParsingConfig config, ProgressCallback callback) throws IOException {
+    public List<LogEntry> parseFile(File file, ParsingConfig config, ProgressCallback callback) throws IOException {
         if (!file.exists() || !file.canRead()) {
             throw new IOException("File does not exist or cannot be read: " + file.getAbsolutePath());
         }
 
         this.currentConfig = config;
         List<LogEntry> entries = new ArrayList<>();
+        StringBuilder unparsedLog = new StringBuilder(1000);
 
         long totalLines = countLines(file);
         long currentLineNumber = 0;
@@ -62,9 +63,16 @@ public class LogParserService {
                 boolean matches = (config != null && config.isValid() && config.getCompiledPattern() != null) && config.getCompiledPattern().matcher(line).find();
 
                 if (matches) {
+                    if (!unparsedLog.isEmpty()) {
+                        if (unparsedLog.length() >= 1000) {
+                            unparsedLog.append("...");
+                        }
+                        entries.add(new LogEntry(currentLineNumber, unparsedLog.toString()));
+                        unparsedLog.setLength(0);
+                    }
                     entries.add(parseLine(line, currentLineNumber, config));
                 } else {
-                    entries.add(new LogEntry(currentLineNumber, line));
+                    unparsedLog.append(line).append("\n");
                 }
 
                 if (callback != null && currentLineNumber % 100 == 0) {
@@ -113,7 +121,7 @@ public class LogParserService {
                     final long startLine = batchStartLine;
 
                     futures.add(executorService.submit(() ->
-                        processBatch(batchToProcess, startLine, config)
+                            processBatch(batchToProcess, startLine, config)
                     ));
 
                     batch.clear();
@@ -126,7 +134,7 @@ public class LogParserService {
                 final List<String> batchToProcess = new ArrayList<>(batch);
                 final long startLine = batchStartLine;
                 futures.add(executorService.submit(() ->
-                    processBatch(batchToProcess, startLine, config)
+                        processBatch(batchToProcess, startLine, config)
                 ));
             }
 
@@ -260,7 +268,7 @@ public class LogParserService {
         if (config == null || !config.isValid()) {
             result.setSuccess(false);
             result.setMessage("Parsing configuration is invalid: " +
-                (config != null ? config.getValidationError() : "null"));
+                    (config != null ? config.getValidationError() : "null"));
             return result;
         }
 
@@ -393,6 +401,7 @@ public class LogParserService {
      */
     public interface ProgressCallback {
         void onProgress(double progress, long currentLine, long totalLines);
+
         void onComplete(long totalLines);
     }
 
