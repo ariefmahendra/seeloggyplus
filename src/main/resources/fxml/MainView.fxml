@@ -64,6 +64,15 @@
                 <TextField fx:id="searchField" prefWidth="300" promptText="Enter search text or regex..." />
                 <CheckBox fx:id="regexCheckBox" text="Regex" />
                 <CheckBox fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
+            <CheckBox fx:id="hideUnparsedCheckBox" text="Hide Unparsed" />
+            <Button fx:id="autoFitButton">
+               <graphic>
+                  <FontAwesomeIconView glyphName="COLUMNS" size="12" />
+               </graphic>
+               <tooltip>
+                  <Tooltip text="Auto Fit Table " />
+               </tooltip>
+            </Button>
                 <Button fx:id="searchButton">
                <graphic>
                   <FontAwesomeIconView glyphName="SEARCH" size="12" />
@@ -103,7 +112,10 @@
 
                 <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS" />
 
-                <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files" />
+                <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files">
+               <graphic>
+                  <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
+               </graphic></Button>
             </VBox>
 
             <!-- Right Panel: Log Viewer and Detail -->

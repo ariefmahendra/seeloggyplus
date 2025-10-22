@@ -1,9 +1,8 @@
 package com.seeloggyplus.controller;
 
-import com.seeloggyplus.model.LogEntry;
-import com.seeloggyplus.model.ParsingConfig;
-import com.seeloggyplus.model.Preference;
-import com.seeloggyplus.model.RecentFile;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.seeloggyplus.model.*;
 import com.seeloggyplus.service.*;
 import com.seeloggyplus.repository.RecentFileRepository;
 import com.seeloggyplus.repository.ParsingConfigRepository;
@@ -110,6 +109,10 @@ public class MainController {
     @FXML
     private ProgressBar progressBar;
     @FXML
+    public CheckBox hideUnparsedCheckBox;
+    @FXML
+    public Button autoFitButton;
+    @FXML
     private TableView<LogEntry> logTableView;
 
     // FXML Components - Bottom Panel (Log Detail)
@@ -138,6 +141,10 @@ public class MainController {
     private LogParserService logParserService;
     private PreferenceService preferenceService;
     private SSHService sshService;
+    private final Cache<LogCacheKey, LogCacheValue> logCache = Caffeine.newBuilder()
+            .maximumSize(5)
+            .build();
+
     private ObservableList<LogEntry> allLogEntries;
     private FilteredList<LogEntry> filteredLogEntries;
     private ParsingConfig currentParsingConfig;
@@ -203,12 +210,8 @@ public class MainController {
      */
     private void setupLeftPanel() {
         // Configure recent files list view
-        recentFilesListView.setCellFactory(listView ->
-                new RecentFileListCell()
-        );
-        recentFilesListView.setItems(
-                FXCollections.observableArrayList(recentFileService.findAll())
-        );
+        recentFilesListView.setCellFactory(listView -> new RecentFileListCell());
+        recentFilesListView.setItems(FXCollections.observableArrayList(recentFileService.findAll()));
 
         // Handle selection
         recentFilesListView
@@ -216,8 +219,7 @@ public class MainController {
                 .selectedItemProperty()
                 .addListener((obs, oldVal, newVal) -> {
                     if (
-                            newVal != null &&
-                                    (currentFile == null || !currentFile.getAbsolutePath().equals(newVal.getFilePath()))
+                            newVal != null && (currentFile == null || !currentFile.getAbsolutePath().equals(newVal.getFilePath()))
                     ) {
                         handleRecentFileSelected(newVal);
                     }
@@ -250,6 +252,7 @@ public class MainController {
         searchButton.setOnAction(e -> performSearch());
         clearSearchButton.setOnAction(e -> clearSearch());
         searchField.setOnAction(e -> performSearch());
+        autoFitButton.setOnAction( e -> autoResizeColumns(logTableView));
 
         // Initialize with default columns
         updateTableColumns(null);
@@ -279,9 +282,7 @@ public class MainController {
     }
 
     private void setupLogLevelFilter() {
-        logLevelFilterComboBox.setItems(FXCollections.observableArrayList(
-                "ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"
-        ));
+        logLevelFilterComboBox.setItems(FXCollections.observableArrayList("ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"));
         logLevelFilterComboBox.getSelectionModel().select("ALL");
         logLevelFilterComboBox.valueProperty().addListener((obs, oldVal, newVal) -> performSearch());
     }
@@ -303,7 +304,6 @@ public class MainController {
         logger.info( "Updating table columns with config: {}", config != null ? config.getName() : "null");
         logTableView.getColumns().clear();
 
-        // Add line number column
         TableColumn<LogEntry, Long> lineCol = new TableColumn<>("Line");
         lineCol.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue().getLineNumber()));
         lineCol.setPrefWidth(80);
@@ -323,29 +323,21 @@ public class MainController {
                 column.setCellValueFactory(cellData -> {
                     LogEntry entry = cellData.getValue();
                     if (entry.isParsed()) {
-                        // Parsed entry, get the specific field
-                        return new SimpleStringProperty(
-                                entry.getField(groupName)
-                        );
+                        return new SimpleStringProperty(entry.getField(groupName));
                     } else {
-                        // Un-parsed entry
                         if (currentIndex == 0) {
-                            // First column, show the whole raw log
                             return new SimpleStringProperty(entry.getRawLog());
                         } else {
-                            // Other columns, show nothing
                             return new SimpleStringProperty("");
                         }
                     }
                 });
 
-                // Set a minimum width for usability; pref width will be set by auto-resizer
                 column.setMinWidth(80);
                 logTableView.getColumns().add(column);
             }
             logger.info("Created {} columns total (including line number)", logTableView.getColumns().size());
         } else {
-            // Default column - show raw log
             logger.warn("Config is null or invalid, using default raw log column");
             TableColumn<LogEntry, String> rawCol = new TableColumn<>("Log Message");
             rawCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getRawLog()));
@@ -370,7 +362,6 @@ public class MainController {
 
         File file = fileChooser.showOpenDialog(menuBar.getScene().getWindow());
         if (file != null) {
-            // Opening a new file should add it to the recent list and reorder
             openLogFile(file, true);
         }
     }
@@ -380,9 +371,7 @@ public class MainController {
      */
     private void handleOpenRemote() {
         try {
-            FXMLLoader loader = new FXMLLoader(
-                    getClass().getResource("/fxml/RemoteFileDialog.fxml")
-            );
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RemoteFileDialog.fxml"));
             Parent root = loader.load();
 
             Stage dialog = new Stage();
@@ -413,7 +402,6 @@ public class MainController {
 
         currentParsingConfig = parsingConfigService.findDefault().orElse(null);
 
-        // If no parsing config exists, create a default one
         if (currentParsingConfig == null) {
             logger.warn("No default parsing config found, creating default");
             currentParsingConfig = new ParsingConfig(
@@ -443,10 +431,31 @@ public class MainController {
             );
         }
 
+        String configId = currentParsingConfig.getRegexPattern();
+        LogCacheKey key = new LogCacheKey(
+                file.getAbsolutePath(),
+                file.lastModified(),
+                file.length(),
+                configId
+        );
+
+        LogCacheValue cachedValue = logCache.getIfPresent(key);
+        if (cachedValue != null){
+            logger.info("Cache hit for file: {}. Loading from memory", file.getName());
+            updateStatus("Loading from cache: " + file.getName());
+
+            displayLogEntries(cachedValue, file, updateRecentFilesList);
+            return;
+        }
+
+        logger.info("Cache miss for file: {}. Parsing...", file.getName());
+
         // Show progress
         progressBar.setVisible(true);
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         updateStatus("Loading file: " + file.getName());
+
+        final ParsingConfig configToUse = this.currentParsingConfig;
 
         // Parse file in background
         Task<List<LogEntry>> task = new Task<>() {
@@ -454,7 +463,7 @@ public class MainController {
             protected List<LogEntry> call() throws Exception {
                 return logParserService.parseFile(
                         file,
-                        currentParsingConfig,
+                        configToUse,
                         new LogParserService.ProgressCallback() {
                             @Override
                             public void onProgress(
@@ -497,6 +506,10 @@ public class MainController {
             List<LogEntry> entries = task.getValue();
             logger.info("Parsing completed, got {} entries", entries.size());
 
+            LogCacheValue newValue = new LogCacheValue(configToUse, entries);
+            logCache.put(key, newValue);
+            logger.info("Stored parsing result in cache for key: {}", key);
+
             allLogEntries.setAll(entries);
             logger.info("Set {} entries to allLogEntries", allLogEntries.size());
 
@@ -522,6 +535,7 @@ public class MainController {
                 refreshRecentFilesList();
             }
 
+            displayLogEntries(newValue, file, updateRecentFilesList);
             logger.info("Loaded {} log entries from {}, table now shows {} items", entries.size(), file.getName(), logTableView.getItems().size());
         });
 
@@ -562,6 +576,7 @@ public class MainController {
         String searchText = searchField.getText();
         boolean isRegex = regexCheckBox.isSelected();
         boolean caseSensitive = caseSensitiveCheckBox.isSelected();
+        boolean hideUnparsed = hideUnparsedCheckBox.isSelected();
         String selectedLevel = logLevelFilterComboBox.getSelectionModel().getSelectedItem();
 
         updateStatus("Searching...");
@@ -571,6 +586,13 @@ public class MainController {
             protected Void call() {
                 Platform.runLater(() -> {
                     filteredLogEntries.setPredicate(entry -> {
+                        // hide unparsed log
+                        if (hideUnparsed){
+                            if (!entry.isParsed()){
+                                return false;
+                            }
+                        }
+
                         // Level filtering
                         if (selectedLevel != null && !selectedLevel.equals("ALL")) {
                             if (!entry.getLevel().equalsIgnoreCase(selectedLevel)) {
@@ -605,9 +627,7 @@ public class MainController {
 
         task.setOnSucceeded(e -> {
             int resultCount = filteredLogEntries.size();
-            updateStatus(
-                    String.format("Found %d matching entries", resultCount)
-            );
+            updateStatus(String.format("Found %d matching entries", resultCount));
         });
 
         new Thread(task).start();
@@ -887,6 +907,47 @@ public class MainController {
                 verticalSplitPane.setDividerPositions(1.0);
             }
         });
+    }
+
+    /**
+     * Method helper for display (from cache or new parse) to UI.
+     */
+    private void displayLogEntries(LogCacheValue cacheValue, File file, boolean updateRecentFilesList) {
+        this.currentParsingConfig = cacheValue.config();
+        List<LogEntry> entries = cacheValue.entries();
+
+        logger.info("Displaying {} entries for {}", entries.size(), file.getName());
+
+        allLogEntries.setAll(entries);
+        updateTableColumns(this.currentParsingConfig);
+
+        Platform.runLater(() -> autoResizeColumns(logTableView));
+
+        logTableView.refresh();
+
+        Platform.runLater(() -> {
+            progressBar.setVisible(false);
+            updateStatus(
+                    String.format(
+                            "Loaded %d lines from %s",
+                            entries.size(),
+                            file.getName()
+                    )
+            );
+        });
+
+        if (updateRecentFilesList) {
+            RecentFile recentFile = new RecentFile(
+                    file.getAbsolutePath(),
+                    file.getName(),
+                    file.length()
+            );
+            recentFile.setParsingConfig(this.currentParsingConfig); // Gunakan config yang dipulihkan
+            recentFileService.save(recentFile);
+            refreshRecentFilesList();
+        }
+
+        logger.info("Loaded {} log entries from {}, table now shows {} items", entries.size(), file.getName(), logTableView.getItems().size());
     }
 
     /**

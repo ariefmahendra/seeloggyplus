@@ -29,6 +29,9 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
 
+    // caching
+    implementation("com.github.ben-manes.caffeine:caffeine:3.2.2")
+
     // SQLite Database
     implementation 'org.xerial:sqlite-jdbc:3.44.1.0'
 

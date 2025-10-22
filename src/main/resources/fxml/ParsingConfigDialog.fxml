@@ -19,7 +19,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<GridPane hgap="15" vgap="10" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.ParsingConfigController">
+<GridPane hgap="15" vgap="10" xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.ParsingConfigController">
 
     <columnConstraints>
         <ColumnConstraints hgrow="SOMETIMES" minWidth="220" prefWidth="280" />
