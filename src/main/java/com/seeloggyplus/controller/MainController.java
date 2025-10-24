@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleStringProperty;
@@ -45,6 +46,7 @@ import org.slf4j.LoggerFactory;
 public class MainController {
 
     private static final Logger logger = LoggerFactory.getLogger(MainController.class);
+    private static final int LAZY_LOAD_BATCH_SIZE = 1000; // Number of entries to load at a time
 
     // FXML Components - MenuBar
     @FXML
@@ -76,6 +78,8 @@ public class MainController {
     @FXML
     private BorderPane mainBorderPane;
     @FXML
+    private BorderPane mainContentPane; // New BorderPane to manage collapsed left panel
+    @FXML
     private SplitPane horizontalSplitPane;
     @FXML
     private SplitPane verticalSplitPane;
@@ -84,9 +88,15 @@ public class MainController {
     @FXML
     private VBox leftPanel;
     @FXML
+    private VBox collapsedLeftPanel; // New VBox for the collapsed left panel
+    @FXML
+    private Button expandLeftPanelButton; // Button to expand the collapsed left panel
+    @FXML
     private ListView<RecentFile> recentFilesListView;
     @FXML
     private Button clearRecentButton;
+    @FXML
+    private Button pinLeftPanelButton;
 
     // FXML Components - Center Panel (Log Table)
     @FXML
@@ -115,6 +125,8 @@ public class MainController {
     public Button autoFitButton;
     @FXML
     private TableView<LogEntry> logTableView;
+    @FXML
+    private Button scrollToBottomButton;
 
     // FXML Components - Bottom Panel (Log Detail)
     @FXML
@@ -146,10 +158,12 @@ public class MainController {
             .maximumSize(5)
             .build();
 
-    private ObservableList<LogEntry> allLogEntries;
-    private FilteredList<LogEntry> filteredLogEntries;
+    private LogEntrySource currentLogEntrySource; // The full source of log entries (can be filtered)
+    private LogEntrySource originalLogEntrySource; // Stores the original, unfiltered log entries
+    private ObservableList<LogEntry> visibleLogEntries; // Only the entries currently displayed in the TableView
     private ParsingConfig currentParsingConfig;
     private File currentFile;
+    private boolean isLeftPanelPinned = true; // Default to pinned
 
     /**
      * Initialize the controller
@@ -165,8 +179,7 @@ public class MainController {
         sshService = new SSHService();
 
         // Initialize data
-        allLogEntries = FXCollections.observableArrayList();
-        filteredLogEntries = new FilteredList<>(allLogEntries, p -> true);
+        visibleLogEntries = FXCollections.observableArrayList();
 
         // Setup UI components
         setupMenuBar();
@@ -228,6 +241,59 @@ public class MainController {
 
         // Clear recent button
         clearRecentButton.setOnAction(e -> handleClearRecentFiles());
+
+        // Pin button action
+        pinLeftPanelButton.setOnAction(e -> handleToggleLeftPanelPin());
+        expandLeftPanelButton.setOnAction(e -> handleToggleLeftPanelPin());
+
+        // Initial display state
+        updateLeftPanelDisplay();
+    }
+
+    /**
+     * Handles toggling the pin state of the left panel.
+     */
+    private void handleToggleLeftPanelPin() {
+        isLeftPanelPinned = !isLeftPanelPinned;
+        updateLeftPanelDisplay();
+    }
+
+    /**
+     * Updates the display of the left panel based on its pinned state.
+     * This method manages visibility, pin icon, and split pane divider positions.
+     */
+    private void updateLeftPanelDisplay() {
+        FontAwesomeIconView currentPinIcon = (FontAwesomeIconView) pinLeftPanelButton.getGraphic();
+        if (isLeftPanelPinned) {
+            currentPinIcon.setGlyphName("THUMB_TACK");
+            leftPanel.setVisible(true);
+            leftPanel.setManaged(true);
+            collapsedLeftPanel.setVisible(false);
+            collapsedLeftPanel.setManaged(false);
+            // Restore divider position
+            Platform.runLater(() -> {
+                double savedWidth = 200; // Default value
+                double totalWidth = horizontalSplitPane.getWidth();
+                if (totalWidth > 0) {
+                    double position = savedWidth / totalWidth;
+                    horizontalSplitPane.setDividerPositions(position);
+                } else {
+                    horizontalSplitPane.setDividerPositions(0.2);
+                }
+            });
+        } else {
+            currentPinIcon.setGlyphName("ARROW_RIGHT"); // Or a suitable unpinned icon
+            leftPanel.setVisible(false);
+            leftPanel.setManaged(false);
+            collapsedLeftPanel.setVisible(true);
+            collapsedLeftPanel.setManaged(true);
+            // Adjust split pane divider to make space for the collapsed panel
+            Platform.runLater(() -> {
+                horizontalSplitPane.setDividerPositions(0.0);
+            });
+        }
+        // Also update the CheckMenuItem in the View menu
+        showLeftPanelMenuItem.setSelected(isLeftPanelPinned);
     }
 
     /**
@@ -235,7 +301,7 @@ public class MainController {
      */
     private void setupCenterPanel() {
         // Configure table view
-        logTableView.setItems(filteredLogEntries);
+        logTableView.setItems(visibleLogEntries);
         // Use UNCONSTRAINED_RESIZE_POLICY to allow horizontal scrolling
         logTableView.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
@@ -254,9 +320,96 @@ public class MainController {
         clearSearchButton.setOnAction(e -> clearSearch());
         searchField.setOnAction(e -> performSearch());
         autoFitButton.setOnAction( e -> autoResizeColumns(logTableView));
+        scrollToBottomButton.setOnAction(e -> handleScrollToBottom());
 
         // Initialize with default columns
         updateTableColumns(null);
+
+        // Add scroll listener for lazy loading
+        logTableView.skinProperty().addListener((obs, oldSkin, newSkin) -> {
+            if (newSkin != null) {
+                ScrollBar verticalBar = (ScrollBar) ((Parent) newSkin.getNode()).lookup(".scroll-bar:vertical");
+                if (verticalBar != null) {
+                    verticalBar.valueProperty().addListener((vObs, oldVal, newVal) -> {
+                        if (newVal.doubleValue() > 0.9) { // When scrolled to 90% of the bottom
+                            loadMoreVisibleEntries();
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    /**
+     * Handles the action to scroll the log table to the very bottom.
+     * This involves loading all remaining entries first.
+     */
+    private void handleScrollToBottom() {
+        if (currentLogEntrySource == null || currentLogEntrySource.getTotalEntries() == 0) {
+            return;
+        }
+
+        updateStatus("Loading all entries to scroll to bottom...");
+        progressBar.setVisible(true);
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        Task<List<LogEntry>> loadAllTask = new Task<>() {
+            @Override
+            protected List<LogEntry> call() throws Exception {
+                int currentSize = visibleLogEntries.size();
+                int totalAvailable = currentLogEntrySource.getTotalEntries();
+                List<LogEntry> remainingEntries = List.of();
+
+                if (currentSize < totalAvailable) {
+                    // Load all remaining entries in one go
+                    remainingEntries = currentLogEntrySource.getEntries(currentSize, totalAvailable - currentSize);
+                }
+                return remainingEntries;
+            }
+        };
+
+        loadAllTask.setOnSucceeded(e -> {
+            Platform.runLater(() -> {
+                List<LogEntry> loadedEntries = loadAllTask.getValue();
+                if (!loadedEntries.isEmpty()) {
+                    visibleLogEntries.addAll(loadedEntries);
+                }
+
+                if (!visibleLogEntries.isEmpty()) {
+                    logTableView.scrollTo(visibleLogEntries.size() - 1);
+                }
+                progressBar.setVisible(false);
+                updateStatus(String.format("Scrolled to bottom. Showing %d of %d entries from %s", visibleLogEntries.size(), currentLogEntrySource.getTotalEntries(), currentFile.getName()));
+            });
+        });
+
+        loadAllTask.setOnFailed(e -> {
+            progressBar.setVisible(false);
+            logger.error("Failed to load all entries for scrolling to bottom", loadAllTask.getException());
+            showError("Scroll Error", "Failed to load all entries to scroll to bottom.");
+            updateStatus("Scroll to bottom failed.");
+        });
+
+        new Thread(loadAllTask).start();
+    }
+
+    /**
+     * Loads more entries into the visibleLogEntries list from the currentLogEntrySource.
+     */
+    private void loadMoreVisibleEntries() {
+        if (currentLogEntrySource == null) {
+            return;
+        }
+
+        int currentSize = visibleLogEntries.size();
+        int totalAvailable = currentLogEntrySource.getTotalEntries();
+
+        if (currentSize < totalAvailable) {
+            List<LogEntry> newEntries = currentLogEntrySource.getEntries(currentSize, LAZY_LOAD_BATCH_SIZE);
+            visibleLogEntries.addAll(newEntries);
+            logger.debug("Loaded {} new entries. Total visible: {} / {}", newEntries.size(), visibleLogEntries.size(), totalAvailable);
+            updateStatus(String.format("Showing %d of %d entries from %s", visibleLogEntries.size(), totalAvailable, currentFile.getName()));
+        }
     }
 
     /**
@@ -305,8 +458,15 @@ public class MainController {
         logger.info( "Updating table columns with config: {}", config != null ? config.getName() : "null");
         logTableView.getColumns().clear();
 
-        TableColumn<LogEntry, Long> lineCol = new TableColumn<>("Line");
-        lineCol.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue().getLineNumber()));
+        TableColumn<LogEntry, String> lineCol = new TableColumn<>("Line");
+        lineCol.setCellValueFactory(cellData -> {
+            LogEntry entry = cellData.getValue();
+            if (entry.getLineNumber() != entry.getEndLineNumber()) {
+                return new SimpleStringProperty(entry.getLineNumber() + "-" + entry.getEndLineNumber());
+            } else {
+                return new SimpleStringProperty(String.valueOf(entry.getLineNumber()));
+            }
+        });
         lineCol.setPrefWidth(80);
         lineCol.setMinWidth(80);
         logTableView.getColumns().add(lineCol);
@@ -494,7 +654,7 @@ public class MainController {
             logger.info("Cache hit for file: {}. Loading from memory", file.getName());
             updateStatus("Loading from cache: " + file.getName());
 
-            displayLogEntries(cachedValue, file, updateRecentFilesList);
+            displayLogEntries(new ListLogEntrySource(cachedValue.entries()), file, updateRecentFilesList);
             return;
         }
 
@@ -511,40 +671,35 @@ public class MainController {
         Task<List<LogEntry>> task = new Task<>() {
             @Override
             protected List<LogEntry> call() throws Exception {
-                return logParserService.parseFile(
+                return logParserService.parseFileParallel(
                         file,
                         configToUse,
                         new LogParserService.ProgressCallback() {
                             @Override
                             public void onProgress(
                                     double progress,
-                                    long currentLine,
-                                    long totalLines
+                                    long bytesProcessed,
+                                    long totalBytes
                             ) {
-                                updateProgress(currentLine, totalLines);
+                                updateProgress(bytesProcessed, totalBytes); // Update Task's internal progress
                                 Platform.runLater(() -> {
                                     progressBar.setProgress(progress);
                                     updateStatus(
                                             String.format(
-                                                    "Loading... %d / %d lines",
-                                                    currentLine,
-                                                    totalLines
+                                                    "Parsing... %.1f%% (%s / %s)",
+                                                    progress * 100,
+                                                    formatBytes(bytesProcessed),
+                                                    formatBytes(totalBytes)
                                             )
                                     );
                                 });
                             }
 
                             @Override
-                            public void onComplete(long totalLines) {
+                            public void onComplete(long totalEntries) {
                                 Platform.runLater(() -> {
                                     progressBar.setVisible(false);
-                                    updateStatus(
-                                            String.format(
-                                                    "Loaded %d lines from %s",
-                                                    totalLines,
-                                                    file.getName()
-                                            )
-                                    );
+                                    // The final status will be set by displayLogEntries
                                 });
                             }
                         }
@@ -560,8 +715,9 @@ public class MainController {
             logCache.put(key, newValue);
             logger.info("Stored parsing result in cache for key: {}", key);
 
-            allLogEntries.setAll(entries);
-            logger.info("Set {} entries to allLogEntries", allLogEntries.size());
+            // Set the new LogEntrySource
+            originalLogEntrySource = new ListLogEntrySource(entries); // Store the original
+            currentLogEntrySource = originalLogEntrySource; // Current source starts as original
 
             updateTableColumns(currentParsingConfig);
             logger.info("Updated table columns for config: {}", currentParsingConfig.getName());
@@ -571,7 +727,6 @@ public class MainController {
 
             // Force table refresh
             logTableView.refresh();
-            logger.info("Table refresh called, visible items: {}", logTableView.getItems().size());
 
             // Add to recent files only if requested
             if (updateRecentFilesList) {
@@ -585,8 +740,8 @@ public class MainController {
                 refreshRecentFilesList();
             }
 
-            displayLogEntries(newValue, file, updateRecentFilesList);
-            logger.info("Loaded {} log entries from {}, table now shows {} items", entries.size(), file.getName(), logTableView.getItems().size());
+            displayLogEntries(currentLogEntrySource, file, updateRecentFilesList);
+            logger.info("Loaded {} log entries from {}, table now shows {} items", entries.size(), file.getName(), visibleLogEntries.size());
         });
 
         task.setOnFailed(e -> {
@@ -623,6 +778,10 @@ public class MainController {
      * Perform search on log entries
      */
     private void performSearch() {
+        if (currentLogEntrySource == null) {
+            return;
+        }
+
         String searchText = searchField.getText();
         boolean isRegex = regexCheckBox.isSelected();
         boolean caseSensitive = caseSensitiveCheckBox.isSelected();
@@ -634,50 +793,66 @@ public class MainController {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
+                // Create a predicate based on search criteria
+                Predicate<LogEntry> searchPredicate = entry -> {
+                    // hide unparsed log
+                    if (hideUnparsed){
+                        if (!entry.isParsed()){
+                            return false;
+                        }
+                    }
+
+                    // Level filtering
+                    if (selectedLevel != null && !selectedLevel.equals("ALL")) {
+                        if (!entry.getLevel().equalsIgnoreCase(selectedLevel)) {
+                            return false;
+                        }
+                    }
+
+                    // Text/Regex filtering
+                    if (searchText == null || searchText.trim().isEmpty()) {
+                        return true; // No text search, only level filter applies
+                    }
+
+                    if (isRegex) {
+                        try {
+                            int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
+                            Pattern pattern = Pattern.compile(searchText, flags);
+                            return pattern.matcher(entry.getRawLog()).find();
+                        } catch (Exception e) {
+                            logger.error("Invalid regex pattern: {}", e.getMessage());
+                            return false; // Invalid regex, so no match
+                        }
+                    } else {
+                        String searchFor = caseSensitive ? searchText : searchText.toLowerCase();
+                        String searchIn = caseSensitive ? entry.getRawLog() : entry.getRawLog().toLowerCase();
+                        return searchIn.contains(searchFor);
+                    }
+                };
+
+                // Apply the filter to the original LogEntrySource
+                LogEntrySource filteredSource = originalLogEntrySource.filter(searchPredicate);
+
                 Platform.runLater(() -> {
-                    filteredLogEntries.setPredicate(entry -> {
-                        // hide unparsed log
-                        if (hideUnparsed){
-                            if (!entry.isParsed()){
-                                return false;
-                            }
-                        }
-
-                        // Level filtering
-                        if (selectedLevel != null && !selectedLevel.equals("ALL")) {
-                            if (!entry.getLevel().equalsIgnoreCase(selectedLevel)) {
-                                return false;
-                            }
-                        }
-
-                        // Text/Regex filtering
-                        if (searchText == null || searchText.trim().isEmpty()) {
-                            return true; // No text search, only level filter applies
-                        }
-
-                        if (isRegex) {
-                            try {
-                                int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
-                                Pattern pattern = Pattern.compile(searchText, flags);
-                                return pattern.matcher(entry.getRawLog()).find();
-                            } catch (Exception e) {
-                                logger.error("Invalid regex pattern: {}", e.getMessage());
-                                return false; // Invalid regex, so no match
-                            }
-                        } else {
-                            String searchFor = caseSensitive ? searchText : searchText.toLowerCase();
-                            String searchIn = caseSensitive ? entry.getRawLog() : entry.getRawLog().toLowerCase();
-                            return searchIn.contains(searchFor);
-                        }
-                    });
+                    // Update the visible entries with the filtered source
+                    currentLogEntrySource = filteredSource; // Update the source for subsequent loads
+                    visibleLogEntries.clear();
+                    loadMoreVisibleEntries(); // Load initial batch of filtered results
+                    updateStatus(String.format("Showing first %d of %d matching entries", visibleLogEntries.size(), currentLogEntrySource.getTotalEntries()));
                 });
                 return null;
             }
         };
 
         task.setOnSucceeded(e -> {
-            int resultCount = filteredLogEntries.size();
-            updateStatus(String.format("Found %d matching entries", resultCount));
+            // Status updated in Platform.runLater inside the task
+        });
+
+        task.setOnFailed(e -> {
+            Throwable ex = task.getException();
+            logger.error("Search failed", ex);
+            showError("Search Failed", ex.getMessage());
+            updateStatus("Search failed");
         });
 
         new Thread(task).start();
@@ -688,8 +863,15 @@ public class MainController {
      */
     private void clearSearch() {
         searchField.clear();
-        filteredLogEntries.setPredicate(p -> true);
-        updateStatus(String.format("Showing all %d entries", allLogEntries.size()));
+        if (originalLogEntrySource != null) {
+            currentLogEntrySource = originalLogEntrySource; // Reset to the original unfiltered source
+            visibleLogEntries.clear();
+            loadMoreVisibleEntries(); // Load initial batch from the original source
+            updateStatus(String.format("Showing %d of %d entries from %s", visibleLogEntries.size(), currentLogEntrySource.getTotalEntries(), currentFile.getName()));
+        } else {
+            visibleLogEntries.clear();
+            updateStatus("Search cleared. No file loaded.");
+        }
     }
 
     /**
@@ -832,42 +1014,9 @@ public class MainController {
      * Toggle left panel visibility
      */
     private void toggleLeftPanel() {
-        boolean visible = showLeftPanelMenuItem.isSelected();
-        String resultVisiblePanel = "";
-
-
-        if (!visible) {
-            // Hide panel
-            leftPanel.setVisible(false);
-            leftPanel.setManaged(false);
-
-            // Adjust split pane divider to expand center panel
-            Platform.runLater(() -> {
-                horizontalSplitPane.setDividerPositions(0.0);
-            });
-
-            resultVisiblePanel = "false";
-        } else {
-            // Show panel
-            leftPanel.setVisible(true);
-            leftPanel.setManaged(true);
-
-            // Restore divider position
-            Platform.runLater(() -> {
-                double savedWidth = 200; // Default value
-                double totalWidth = horizontalSplitPane.getWidth();
-                if (totalWidth > 0) {
-                    double position = savedWidth / totalWidth;
-                    horizontalSplitPane.setDividerPositions(position);
-                } else {
-                    horizontalSplitPane.setDividerPositions(0.2);
-                }
-            });
-
-            resultVisiblePanel = "true";
-        }
-
-        preferenceService.saveOrUpdatePreferences(new Preference("left_panel_show", resultVisiblePanel));
+        isLeftPanelPinned = !isLeftPanelPinned;
+        updateLeftPanelDisplay();
+        preferenceService.saveOrUpdatePreferences(new Preference("left_panel_pinned", String.valueOf(isLeftPanelPinned)));
     }
 
     /**
@@ -915,19 +1064,17 @@ public class MainController {
      * Restore panel visibility from preferences
      */
     private void restorePanelVisibility() {
-        boolean leftPanelShow = preferenceService.getPreferencesByCode("left_panel_show")
+        // Restore left panel pinned state
+        isLeftPanelPinned = preferenceService.getPreferencesByCode("left_panel_pinned")
                 .filter(Predicate.not(String::isBlank))
                 .map(Boolean::parseBoolean)
-                .orElse(true);
+                .orElse(true); // Default to pinned
+        updateLeftPanelDisplay(); // Apply the restored state
 
         boolean bottomPanelShow = preferenceService.getPreferencesByCode("bottom_panel_show")
                 .filter(Predicate.not(String::isBlank))
                 .map(Boolean::parseBoolean)
                 .orElse(true);
-
-        leftPanel.setVisible(leftPanelShow);
-        leftPanel.setManaged(leftPanelShow);
-        showLeftPanelMenuItem.setSelected(leftPanelShow);
 
         bottomPanel.setVisible(bottomPanelShow);
         bottomPanel.setManaged(bottomPanelShow);
@@ -935,7 +1082,7 @@ public class MainController {
 
         // Restore divider positions after scene is shown
         Platform.runLater(() -> {
-            if (leftPanelShow) {
+            if (isLeftPanelPinned) {
                 double savedWidth = 200; // Default value
                 double totalWidth = horizontalSplitPane.getWidth();
                 if (totalWidth > 0 && savedWidth > 0) {
@@ -962,13 +1109,13 @@ public class MainController {
     /**
      * Method helper for display (from cache or new parse) to UI.
      */
-    private void displayLogEntries(LogCacheValue cacheValue, File file, boolean updateRecentFilesList) {
-        this.currentParsingConfig = cacheValue.config();
-        List<LogEntry> entries = cacheValue.entries();
+    private void displayLogEntries(LogEntrySource source, File file, boolean updateRecentFilesList) {
+        this.currentLogEntrySource = source; // Update the current source
+        this.currentParsingConfig = currentParsingConfig; // Keep the current parsing config
 
-        logger.info("Displaying {} entries for {}", entries.size(), file.getName());
+        visibleLogEntries.clear();
+        loadMoreVisibleEntries(); // Load initial batch
 
-        allLogEntries.setAll(entries);
         updateTableColumns(this.currentParsingConfig);
 
         Platform.runLater(() -> autoResizeColumns(logTableView));
@@ -979,25 +1126,27 @@ public class MainController {
             progressBar.setVisible(false);
             updateStatus(
                     String.format(
-                            "Loaded %d lines from %s",
-                            entries.size(),
+                            "Showing first %d of %d entries from %s",
+                            visibleLogEntries.size(),
+                            currentLogEntrySource.getTotalEntries(),
                             file.getName()
                     )
             );
         });
 
+        // Recent file logic remains the same, but ensure currentParsingConfig is set
         if (updateRecentFilesList) {
             RecentFile recentFile = new RecentFile(
                     file.getAbsolutePath(),
                     file.getName(),
                     file.length()
             );
-            recentFile.setParsingConfig(this.currentParsingConfig); // Gunakan config yang dipulihkan
+            recentFile.setParsingConfig(this.currentParsingConfig);
             recentFileService.save(recentFile);
             refreshRecentFilesList();
         }
 
-        logger.info("Loaded {} log entries from {}, table now shows {} items", entries.size(), file.getName(), logTableView.getItems().size());
+        logger.info("Loaded {} log entries from {}, table now shows {} items (Total: {})", visibleLogEntries.size(), file.getName(), visibleLogEntries.size(), currentLogEntrySource.getTotalEntries());
     }
 
     /**
@@ -1050,6 +1199,18 @@ public class MainController {
      */
     private void handleExit() {
         Platform.exit();
+    }
+
+    /**
+     * Formats a byte count into a human-readable string (e.g., 1.2 MB).
+     */
+    private String formatBytes(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+        int exp = (int) (Math.log(bytes) / Math.log(1024));
+        String pre = ("KMGTPE").charAt(exp - 1) + "B";
+        return String.format("%.1f %s", bytes / Math.pow(1024, exp), pre);
     }
 
     /**

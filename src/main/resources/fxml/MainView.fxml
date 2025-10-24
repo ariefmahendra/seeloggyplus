@@ -24,189 +24,227 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<BorderPane fx:id="mainBorderPane" minHeight="400" minWidth="600" prefHeight="800" prefWidth="1200.0"
-            xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.seeloggyplus.controller.MainController">
+<BorderPane fx:id="mainBorderPane" minHeight="400" minWidth="600" prefHeight="800" prefWidth="1200.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
     <top>
         <VBox>
-            <MenuBar fx:id="menuBar">
-                <!-- File Menu -->
-                <Menu fx:id="fileMenu" text="File">
-                    <MenuItem fx:id="openFileMenuItem" accelerator="Ctrl+O" text="Open File..."/>
-                    <MenuItem fx:id="openRemoteMenuItem" accelerator="Ctrl+R" text="Open Remote File..."/>
-                    <SeparatorMenuItem/>
-                    <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit"/>
-                </Menu>
-
-                <!-- View Menu -->
-                <Menu fx:id="viewMenu" text="View">
-                    <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel"/>
-                    <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel"/>
-                    <SeparatorMenuItem/>
-                    <MenuItem accelerator="F5" text="Refresh"/>
-                </Menu>
-
-                <!-- Settings Menu -->
-                <Menu fx:id="settingsMenu" text="Settings">
-                    <MenuItem fx:id="parsingConfigMenuItem" accelerator="Ctrl+P" text="Parsing Configuration..."/>
-                    <SeparatorMenuItem/>
-                    <MenuItem text="Preferences..."/>
-                </Menu>
-
-                <!-- Help Menu -->
-                <Menu fx:id="helpMenu" text="Help">
-                    <MenuItem fx:id="aboutMenuItem" text="About"/>
-                    <MenuItem text="Documentation"/>
-                </Menu>
-            </MenuBar>
 
             <!-- Toolbar -->
             <ToolBar fx:id="toolBar">
-                <Label text="Search:"/>
+                <Label text="Search:" />
+               <MenuBar fx:id="menuBar">
+                   <!-- File Menu -->
+                   <Menu fx:id="fileMenu" text="File">
+                       <MenuItem fx:id="openFileMenuItem" accelerator="Ctrl+O" text="Open File..." />
+                       <MenuItem fx:id="openRemoteMenuItem" accelerator="Ctrl+R" text="Open Remote File..." />
+                       <SeparatorMenuItem />
+                       <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit" />
+                   </Menu>
+   
+                   <!-- View Menu -->
+                   <Menu fx:id="viewMenu" text="View">
+                       <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel" />
+                       <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel" />
+                       <SeparatorMenuItem />
+                       <MenuItem accelerator="F5" text="Refresh" />
+                   </Menu>
+   
+                   <!-- Settings Menu -->
+                   <Menu fx:id="settingsMenu" text="Settings">
+                       <MenuItem fx:id="parsingConfigMenuItem" accelerator="Ctrl+P" text="Parsing Configuration..." />
+                       <SeparatorMenuItem />
+                       <MenuItem text="Preferences..." />
+                   </Menu>
+   
+                   <!-- Help Menu -->
+                   <Menu fx:id="helpMenu" text="Help">
+                       <MenuItem fx:id="aboutMenuItem" text="About" />
+                       <MenuItem text="Documentation" />
+                   </Menu>
+               </MenuBar>
                 <TextField fx:id="searchField" prefWidth="300" promptText="Enter search text or regex...">
                     <font>
-                        <Font size="10.0"/>
+                        <Font size="10.0" />
                     </font>
                 </TextField>
-                <CheckBox fx:id="regexCheckBox" text="Regex"/>
-                <CheckBox fx:id="caseSensitiveCheckBox" text="Case Sensitive"/>
-                <CheckBox fx:id="hideUnparsedCheckBox" text="Hide Unparsed"/>
+                <CheckBox fx:id="regexCheckBox" text="Regex" />
+                <CheckBox fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
+                <CheckBox fx:id="hideUnparsedCheckBox" text="Hide Unparsed" />
                 <Button fx:id="autoFitButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="COLUMNS" size="12"/>
+                        <FontAwesomeIconView glyphName="COLUMNS" size="12" />
                     </graphic>
                     <tooltip>
-                        <Tooltip text="Auto Fit Table "/>
+                        <Tooltip text="Auto Fit Table " />
                     </tooltip>
                 </Button>
                 <Button fx:id="searchButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="SEARCH" size="12"/>
+                        <FontAwesomeIconView glyphName="SEARCH" size="12" />
                     </graphic>
                     <tooltip>
-                        <Tooltip text="Search"/>
+                        <Tooltip text="Search" />
                     </tooltip>
                 </Button>
                 <Button fx:id="clearSearchButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12"/>
+                        <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
                     </graphic>
                     <tooltip>
-                        <Tooltip text="CLear Table"/>
+                        <Tooltip text="Clear Search" />
                     </tooltip>
                 </Button>
-                <Separator orientation="VERTICAL"/>
-                <Label text="Level:"/>
-                <ComboBox fx:id="logLevelFilterComboBox" prefHeight="16.0" prefWidth="85.0" promptText="All Levels"
-                          styleClass="small-combo-box" stylesheets="@../style/components.css"/>
+                <Button fx:id="scrollToBottomButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="ARROW_DOWN" size="12" />
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Scroll to Bottom" />
+                    </tooltip>
+                </Button>
+                <Separator orientation="VERTICAL" />
+                <Label text="Level:" />
+                <ComboBox fx:id="logLevelFilterComboBox" prefHeight="16.0" prefWidth="85.0" promptText="All Levels" styleClass="small-combo-box" stylesheets="@../style/components.css" />
             </ToolBar>
         </VBox>
     </top>
 
     <!-- Center: Main Content -->
     <center>
-        <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
-            <!-- Left Panel: Recent Files -->
-            <VBox fx:id="leftPanel" minWidth="200" prefWidth="250" spacing="5">
-                <padding>
-                    <Insets bottom="5" left="5" right="5" top="5"/>
-                </padding>
-
-                <Label text="Recent Log Files">
-                    <font>
-                        <Font name="System Bold" size="12.0"/>
-                    </font>
-                </Label>
-
-                <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS"/>
-
-                <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12"/>
-                    </graphic>
-                </Button>
-            </VBox>
-
-            <!-- Right Panel: Log Viewer and Detail -->
-            <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
-                <!-- Center Panel: Log Table -->
-                <VBox fx:id="centerPanel" spacing="5">
+        <BorderPane fx:id="mainContentPane" xmlns="http://javafx.com/javafx">
+            <!-- Collapsed Left Panel (appears when leftPanel is unpinned) -->
+            <left>
+                <VBox fx:id="collapsedLeftPanel" alignment="TOP_CENTER" spacing="10" visible="false" managed="false" prefWidth="20">
                     <padding>
-                        <Insets bottom="5" left="5" right="5" top="5"/>
+                        <Insets bottom="5" left="5" right="5" top="5" />
                     </padding>
 
-                    <TableView fx:id="logTableView" stylesheets="@../style/highlight.css" VBox.vgrow="ALWAYS">
-                        <placeholder>
-                            <Label text="No log file loaded. Open a file to view logs."/>
-                        </placeholder>
-                    </TableView>
+                    <Button fx:id="expandLeftPanelButton" rotate="90">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="ANGLE_DOUBLE_RIGHT" size="12" />
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Expand Recent Files" />
+                        </tooltip>
+                    </Button>
                 </VBox>
+            </left>
 
-                <!-- Bottom Panel: Log Detail -->
-                <VBox fx:id="bottomPanel" minHeight="150" prefHeight="200" spacing="5">
-                    <padding>
-                        <Insets bottom="5" left="5" right="5" top="5"/>
-                    </padding>
+            <center>
+                <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
+                    <!-- Left Panel: Recent Files -->
+                    <VBox fx:id="leftPanel" minWidth="200" prefWidth="250" spacing="5">
+                        <padding>
+                            <Insets bottom="5" left="5" right="5" top="5" />
+                        </padding>
 
-                    <HBox alignment="CENTER_LEFT" spacing="10">
-                        <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS">
-                            <font>
-                                <Font name="System Bold" size="12.0"/>
-                            </font>
-                        </Label>
-
-                        <HBox fx:id="detailButtonsBox" alignment="CENTER_LEFT" spacing="5">
-                            <Button fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
+                        <HBox spacing="5">
+                            <Label prefHeight="18.0" prefWidth="294.0" text="Recent Log Files" HBox.hgrow="ALWAYS">
+                                <font>
+                                    <Font name="System Bold" size="12.0" />
+                                </font>
+                            </Label>
+                     <Separator prefWidth="200.0" />
+                            <Button fx:id="pinLeftPanelButton" styleClass="icon-button">
                                 <graphic>
-                                    <FontAwesomeIconView glyphName="INDENT" size="12"/>
+                                    <FontAwesomeIconView glyphName="THUMB_TACK" size="12" />
                                 </graphic>
                                 <tooltip>
-                                    <Tooltip text="Prettify JSON"/>
-                                </tooltip>
-                            </Button>
-                            <Button fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
-                                <graphic>
-                                    <FontAwesomeIconView glyphName="CODE" size="12"/>
-                                </graphic>
-                                <tooltip>
-                                    <Tooltip text="Prettify XML"/>
-                                </tooltip>
-                            </Button>
-                            <Button fx:id="copyButton">
-                                <graphic>
-                                    <FontAwesomeIconView glyphName="COPY" size="12"/>
-                                </graphic>
-                                <tooltip>
-                                    <Tooltip text="Copy"/>
-                                </tooltip>
-                            </Button>
-                            <Button fx:id="clearDetailButton">
-                                <graphic>
-                                    <FontAwesomeIconView glyphName="CLOSE" size="12"/>
-                                </graphic>
-                                <tooltip>
-                                    <Tooltip text="Clear"/>
+                                    <Tooltip text="Pin/Unpin Left Panel" />
                                 </tooltip>
                             </Button>
                         </HBox>
-                    </HBox>
 
-                    <!-- CodeArea will be added programmatically in controller -->
-                    <!-- Placeholder for detail text area -->
-                </VBox>
-            </SplitPane>
-        </SplitPane>
+                        <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS" />
+
+                        <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files">
+                            <graphic>
+                                <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
+                            </graphic>
+                        </Button>
+                    </VBox>
+
+                    <!-- Right Panel: Log Viewer and Detail -->
+                    <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
+                        <!-- Center Panel: Log Table -->
+                        <VBox fx:id="centerPanel" spacing="5">
+                            <padding>
+                                <Insets bottom="5" left="5" right="5" top="5" />
+                            </padding>
+
+                            <TableView fx:id="logTableView" stylesheets="@../style/highlight.css" VBox.vgrow="ALWAYS">
+                                <placeholder>
+                                    <Label text="No log file loaded. Open a file to view logs." />
+                                </placeholder>
+                            </TableView>
+                        </VBox>
+
+                        <!-- Bottom Panel: Log Detail -->
+                        <VBox fx:id="bottomPanel" minHeight="150" prefHeight="200" spacing="5">
+                            <padding>
+                                <Insets bottom="5" left="5" right="5" top="5" />
+                            </padding>
+
+                            <HBox alignment="CENTER_LEFT" spacing="10">
+                                <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS">
+                                    <font>
+                                        <Font name="System Bold" size="12.0" />
+                                    </font>
+                                </Label>
+
+                                <HBox fx:id="detailButtonsBox" alignment="CENTER_LEFT" spacing="5">
+                                    <Button fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
+                                        <graphic>
+                                            <FontAwesomeIconView glyphName="INDENT" size="12" />
+                                        </graphic>
+                                        <tooltip>
+                                            <Tooltip text="Prettify JSON" />
+                                        </tooltip>
+                                    </Button>
+                                    <Button fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
+                                        <graphic>
+                                            <FontAwesomeIconView glyphName="CODE" size="12" />
+                                        </graphic>
+                                        <tooltip>
+                                            <Tooltip text="Prettify XML" />
+                                        </tooltip>
+                                    </Button>
+                                    <Button fx:id="copyButton">
+                                        <graphic>
+                                            <FontAwesomeIconView glyphName="COPY" size="12" />
+                                        </graphic>
+                                        <tooltip>
+                                            <Tooltip text="Copy" />
+                                        </tooltip>
+                                    </Button>
+                                    <Button fx:id="clearDetailButton">
+                                        <graphic>
+                                            <FontAwesomeIconView glyphName="CLOSE" size="12" />
+                                        </graphic>
+                                        <tooltip>
+                                            <Tooltip text="Clear" />
+                                        </tooltip>
+                                    </Button>
+                                </HBox>
+                            </HBox>
+
+                            <!-- CodeArea will be added programmatically in controller -->
+                            <!-- Placeholder for detail text area -->
+                        </VBox>
+                    </SplitPane>
+                </SplitPane>
+            </center>
+        </BorderPane>
     </center>
 
     <!-- Bottom: Status Bar -->
     <bottom>
         <HBox alignment="CENTER_LEFT" spacing="10">
             <padding>
-                <Insets bottom="5" left="10" right="10" top="5"/>
+                <Insets bottom="5" left="10" right="10" top="5" />
             </padding>
 
-            <Label fx:id="statusLabel" text="Ready" HBox.hgrow="ALWAYS"/>
-            <ProgressBar fx:id="progressBar" prefWidth="200" visible="false"/>
+            <Label fx:id="statusLabel" text="Ready" HBox.hgrow="ALWAYS" />
+            <ProgressBar fx:id="progressBar" prefWidth="200" visible="false" />
         </HBox>
     </bottom>
 

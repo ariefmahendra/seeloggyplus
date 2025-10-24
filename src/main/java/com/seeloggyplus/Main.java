@@ -184,6 +184,7 @@ public class Main extends Application {
     public void stop() throws Exception {
         cleanup();
         super.stop();
+        System.exit(0);
         logger.info("SeeLoggyPlus application stopped");
     }
 

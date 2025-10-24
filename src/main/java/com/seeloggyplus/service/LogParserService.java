@@ -7,12 +7,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -49,85 +51,56 @@ public class LogParserService {
         this.currentConfig = config;
 
         final long fileSize = file.length();
-        final int DEFAULT_INITIAL_CAP = 1024;
-        List<LogEntry> entries = new ArrayList<>(DEFAULT_INITIAL_CAP);
-
+        List<LogEntry> entries = new ArrayList<>();
         Pattern pattern = (config != null && config.isValid()) ? config.getCompiledPattern() : null;
-        Matcher matcher = (pattern != null) ? pattern.matcher("") : null;
 
-        // **PERBAIKAN LOGIKA 1: Deklarasikan buffer di LUAR loop**
-        // Ini akan mengumpulkan baris-baris yang tidak ter-parse
-        StringBuilder unparsedLinesBuffer = new StringBuilder(4096);
+        long bytesRead = 0L; // Declare bytesRead outside the try block
+        int lineNumber = 0;
+        StringBuilder unparsedBuffer = new StringBuilder();
+        long unparsedStartLine = -1;
 
-        long bytesReadTotal = 0L;
-        long lastCallbackBytes = 0L;
-        // Update progress setiap ~2MB atau lebih (lebih jarang lebih baik)
-        final long CALLBACK_BYTES_INTERVAL = 2 * 1024 * 1024; // 2MB
-
-        int currentLineNumber = 0;
-
-        // **PERBAIKAN PERFORMA: Gunakan BufferedReader**
-        // Ini adalah cara idiomatik dan tercepat untuk membaca file teks baris per baris.
         try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
-
             String line;
             while ((line = reader.readLine()) != null) {
-                currentLineNumber++;
+                lineNumber++;
+                bytesRead += line.getBytes(StandardCharsets.UTF_8).length + 1; // +1 for newline
 
-                // Estimasi progres (ini tidak sempurna tapi jauh lebih cepat)
-                // Kita mengorbankan akurasi demi kecepatan.
-                // +1 untuk karakter newline (estimasi)
-                bytesReadTotal += line.length(); // Perkiraan kasar, panjang char != panjang byte
+                Matcher matcher = (pattern != null) ? pattern.matcher(line) : null;
 
-                // Alternatif estimasi yang lebih akurat tapi sedikit lebih lambat:
-                // bytesReadTotal += line.getBytes(StandardCharsets.UTF_8).length + 1;
-
-                boolean matches = false;
-                if (matcher != null) {
-                    matcher.reset(line);
-                    matches = matcher.find();
-                }
-
-                if (matches) {
-                    // 1. Flush buffer unparsed (jika ada)
-                    if (!unparsedLinesBuffer.isEmpty()) {
-                        entries.add(new LogEntry(currentLineNumber - 1, unparsedLinesBuffer.toString()));
-                        unparsedLinesBuffer.setLength(0);
+                if (matcher != null && matcher.find()) {
+                    // If there's content in the unparsed buffer, flush it first
+                    if (!unparsedBuffer.isEmpty()) {
+                        entries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
+                        unparsedBuffer.setLength(0);
                     }
 
-                    entries.add(new LogEntry(currentLineNumber, line, matcher, config.getGroupNames()));
+                    // Add the successfully parsed entry
+                    entries.add(new LogEntry(lineNumber, line, matcher, config.getGroupNames()));
+                    unparsedStartLine = -1; // Reset unparsed line tracking
 
                 } else {
-                    unparsedLinesBuffer.append(line).append('\n');
+                    // Line did not match, append to the unparsed buffer
+                    if (unparsedBuffer.isEmpty()) {
+                        unparsedStartLine = lineNumber; // Mark the start of this unparsed block
+                    }
+                    unparsedBuffer.append(line).append(System.lineSeparator());
                 }
 
-                // Kirim progress callback secara berkala
-                if (callback != null && (bytesReadTotal - lastCallbackBytes) >= CALLBACK_BYTES_INTERVAL) {
-                    double progress = fileSize > 0 ? (double) bytesReadTotal / fileSize : 0.0;
-                    // Pastikan progres tidak lebih dari 1.0 (karena estimasi)
-                    progress = Math.min(progress, 1.0);
-
-                    lastCallbackBytes = bytesReadTotal;
-
-                    // Catatan: 'totalLines' tidak diketahui, jadi kami kirim '0' atau 'fileSize'
-                    // Kode Anda sebelumnya mengirim fileSize sebagai totalLines, jadi kita teruskan:
-                    callback.onProgress(progress, currentLineNumber, fileSize);
+                if (callback != null && lineNumber % 1000 == 0) { // Update progress every 1000 lines
+                    double progress = fileSize > 0 ? (double) bytesRead / fileSize : 0.0;
+                    callback.onProgress(progress, bytesRead, fileSize); // Use bytesRead consistently
                 }
             }
 
-            // **PERBAIKAN LOGIKA 4: Flush sisa buffer di akhir file**
-            if (unparsedLinesBuffer.length() > 0) {
-                entries.add(new LogEntry(currentLineNumber, unparsedLinesBuffer.toString()));
+            // After the loop, if there's anything left in the unparsed buffer, add it
+            if (!unparsedBuffer.isEmpty()) {
+                entries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
             }
-
-        } catch (IOException e) {
-            logger.error("Error reading file: {}", file.getAbsolutePath(), e);
-            throw e;
         }
 
         if (callback != null) {
-            // Kirim progress final
-            callback.onProgress(1.0, currentLineNumber, fileSize);
+            // Final progress update should use the actual bytes read and total file size
+            callback.onProgress(1.0, bytesRead, fileSize);
             callback.onComplete(entries.size());
         }
 
@@ -142,119 +115,156 @@ public class LogParserService {
         if (!file.exists() || !file.canRead()) {
             throw new IOException("File does not exist or cannot be read: " + file.getAbsolutePath());
         }
-
         this.currentConfig = config;
-        List<LogEntry> rawEntries = Collections.synchronizedList(new ArrayList<>());
+        long fileSize = file.length();
 
-        long totalLines = countLines(file);
-        long[] currentLineCount = {0};
+        // Step 1: Pre-calculate line offsets to determine chunk boundaries and starting line numbers
+        Map<Long, Long> lineStartOffsets = preCalculateLineOffsets(file);
+        List<ChunkInfo> chunkInfos = new ArrayList<>();
 
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8),
-                8192 * 4)) {
+        long totalLines = lineStartOffsets.size();
+        long linesPerChunk = totalLines / MAX_THREADS;
 
-            List<String> batch = new ArrayList<>(BATCH_SIZE);
-            List<Future<List<LogEntry>>> futures = new ArrayList<>();
-            String line;
-            long batchStartLine = 1;
+        long currentLine = 1;
+        for (int i = 0; i < MAX_THREADS; i++) {
+            long chunkStartLine = currentLine;
+            long chunkEndLine = (i == MAX_THREADS - 1) ? totalLines : Math.min(totalLines, currentLine + linesPerChunk - 1);
 
-            while ((line = reader.readLine()) != null) {
-                batch.add(line);
+            long startByte = lineStartOffsets.get(chunkStartLine);
+            long endByte = (chunkEndLine == totalLines) ? fileSize : lineStartOffsets.get(chunkEndLine + 1) - 1; // End byte is just before the next line starts
 
-                if (batch.size() >= BATCH_SIZE) {
-                    final List<String> batchToProcess = new ArrayList<>(batch);
-                    final long startLine = batchStartLine;
+            chunkInfos.add(new ChunkInfo(startByte, endByte, chunkStartLine));
+            currentLine = chunkEndLine + 1;
+        }
 
-                    futures.add(executorService.submit(() ->
-                            processBatch(batchToProcess, startLine, config)
-                    ));
+        // Step 2: Submit chunks for parallel processing
+        List<Future<List<LogEntry>>> futures = new ArrayList<>();
+        AtomicLong bytesProcessed = new AtomicLong(0);
 
-                    batch.clear();
-                    batchStartLine += BATCH_SIZE;
+        for (ChunkInfo chunk : chunkInfos) {
+            futures.add(executorService.submit(() -> {
+                List<LogEntry> chunkEntries = processChunk(file, chunk, config);
+                bytesProcessed.addAndGet(chunk.endByte() - chunk.startByte());
+                if (callback != null) {
+                    double progress = (double) bytesProcessed.get() / fileSize;
+                    callback.onProgress(progress, bytesProcessed.get(), fileSize);
                 }
-            }
+                return chunkEntries;
+            }));
+        }
 
-            // Process remaining lines
-            if (!batch.isEmpty()) {
-                final List<String> batchToProcess = new ArrayList<>(batch);
-                final long startLine = batchStartLine;
-                futures.add(executorService.submit(() ->
-                        processBatch(batchToProcess, startLine, config)
-                ));
-            }
-
-            // Collect results
-            for (Future<List<LogEntry>> future : futures) {
-                try {
-                    rawEntries.addAll(future.get());
-                    currentLineCount[0] += BATCH_SIZE;
-
-                    if (callback != null) {
-                        double progress = Math.min(1.0, (double) currentLineCount[0] / totalLines);
-                        callback.onProgress(progress, currentLineCount[0], totalLines);
-                    }
-                } catch (InterruptedException | ExecutionException e) {
-                    logger.error("Error processing batch", e);
-                }
+        // Step 3: Collect results in order
+        List<LogEntry> allEntries = new ArrayList<>();
+        for (Future<List<LogEntry>> future : futures) {
+            try {
+                allEntries.addAll(future.get());
+            } catch (InterruptedException | ExecutionException e) {
+                logger.error("Error processing a file chunk", e);
             }
         }
 
-        // Sort entries by line number to maintain order
-        rawEntries.sort(Comparator.comparingLong(LogEntry::getLineNumber));
-
-        // Post-process to combine non-matching lines
-        List<LogEntry> combinedEntries = new ArrayList<>();
-        StringBuilder unparsedBuffer = new StringBuilder();
-        long unparsedStartLine = 0;
-
-        for (LogEntry entry : rawEntries) {
-            if (entry.isParsed()) {
-                // If there's anything in the buffer, add it as an unparsed entry
-                if (unparsedBuffer.length() > 0) {
-                    combinedEntries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
-                    unparsedBuffer.setLength(0);
-                    unparsedStartLine = 0;
-                }
-                // Add the parsed entry
-                combinedEntries.add(entry);
-            } else {
-                // If it doesn't match, append to buffer
-                if (unparsedBuffer.length() == 0) {
-                    unparsedStartLine = entry.getLineNumber();
-                } else {
-                    unparsedBuffer.append("\n");
-                }
-                unparsedBuffer.append(entry.getRawLog());
-            }
-        }
-
-        // Add any remaining unparsed lines at the end
-        if (unparsedBuffer.length() > 0) {
-            combinedEntries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
-        }
+        // Step 4: Post-process to combine non-matching lines
+        List<LogEntry> combinedEntries = combineUnparsedEntries(allEntries);
 
         if (callback != null) {
             callback.onComplete(combinedEntries.size());
         }
 
-        logger.info("Parsed {} lines from file in parallel: {}", combinedEntries.size(), file.getName());
+        logger.info("Parsed {} entries in parallel from file: {}", combinedEntries.size(), file.getName());
         return combinedEntries;
     }
 
-    /**
-     * Process a batch of lines
-     */
-    private List<LogEntry> processBatch(List<String> lines, long startLine, ParsingConfig config) {
-        List<LogEntry> entries = new ArrayList<>(lines.size());
-        long lineNumber = startLine;
-
-        for (String line : lines) {
-            LogEntry entry = parseLine(line, lineNumber++, config);
-            entries.add(entry);
+    private List<LogEntry> processBatch(List<LineWithNumber> batch, ParsingConfig config) {
+        List<LogEntry> entries = new ArrayList<>(batch.size());
+        for (LineWithNumber lineWithNumber : batch) {
+            entries.add(parseLine(lineWithNumber.line(), lineWithNumber.lineNumber(), config));
         }
-
         return entries;
     }
+
+    private List<LogEntry> combineUnparsedEntries(List<LogEntry> rawEntries) {
+        if (rawEntries.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<LogEntry> combined = new ArrayList<>();
+        StringBuilder unparsedBuffer = new StringBuilder();
+        long unparsedStartLine = -1;
+        long unparsedEndLine = -1;
+
+        for (LogEntry entry : rawEntries) {
+            if (entry.isParsed()) {
+                if (unparsedBuffer.length() > 0) {
+                    combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedBuffer.toString()));
+                    unparsedBuffer.setLength(0);
+                }
+                combined.add(entry);
+                unparsedStartLine = -1;
+                unparsedEndLine = -1;
+            } else {
+                if (unparsedStartLine == -1) {
+                    unparsedStartLine = entry.getLineNumber();
+                }
+                unparsedEndLine = entry.getLineNumber(); // Update end line with current entry's line number
+                if (unparsedBuffer.length() > 0) {
+                    unparsedBuffer.append(System.lineSeparator());
+                }
+                unparsedBuffer.append(entry.getRawLog());
+            }
+        }
+
+        if (unparsedBuffer.length() > 0) {
+            combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedBuffer.toString()));
+        }
+        return combined;
+    }
+
+    private List<LogEntry> processChunk(File file, ChunkInfo chunkInfo, ParsingConfig config) {
+        List<LogEntry> entries = new ArrayList<>();
+        long currentLineNumber = chunkInfo.startLineNumber();
+        try (FileInputStream fis = new FileInputStream(file); FileChannel channel = fis.getChannel()) {
+            channel.position(chunkInfo.startByte());
+            BufferedReader reader = new BufferedReader(Channels.newReader(channel, StandardCharsets.UTF_8));
+
+            String line;
+            // Read lines until the end of the chunk or end of file
+            while ((line = reader.readLine()) != null && channel.position() <= chunkInfo.endByte()) {
+                entries.add(parseLine(line, currentLineNumber++, config));
+            }
+
+        } catch (IOException e) {
+            logger.error("Error processing file chunk", e);
+        }
+        return entries;
+    }
+
+    /**
+     * Pre-calculates the starting byte offset for each line in the file.
+     * This is used to accurately determine chunk boundaries and starting line numbers for parallel processing.
+     */
+    private Map<Long, Long> preCalculateLineOffsets(File file) throws IOException {
+        Map<Long, Long> lineStartOffsets = new TreeMap<>(); // TreeMap to keep keys sorted
+        long currentByteOffset = 0;
+        long currentLineNumber = 1;
+
+        try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+            String line;
+            lineStartOffsets.put(currentLineNumber, currentByteOffset); // Offset for line 1
+
+            while ((line = reader.readLine()) != null) {
+                currentByteOffset += (line.getBytes(StandardCharsets.UTF_8).length + System.lineSeparator().getBytes(StandardCharsets.UTF_8).length);
+                currentLineNumber++;
+                lineStartOffsets.put(currentLineNumber, currentByteOffset);
+            }
+        }
+        return lineStartOffsets;
+    }
+
+    // Helper record for batch processing
+    private record LineWithNumber(long lineNumber, String line) {}
+
+    // Helper record for parallel chunk processing
+    private record ChunkInfo(long startByte, long endByte, long startLineNumber) {}
 
     /**
      * Parse a single line with the given configuration
@@ -445,9 +455,9 @@ public class LogParserService {
      * Progress callback interface
      */
     public interface ProgressCallback {
-        void onProgress(double progress, long currentLine, long totalLines);
+        void onProgress(double progress, long bytesProcessed, long totalBytes);
 
-        void onComplete(long totalLines);
+        void onComplete(long totalEntries);
     }
 
     /**

@@ -13,6 +13,7 @@ import java.util.regex.Matcher;
 public class LogEntry {
 
     private final long lineNumber;
+    private final long endLineNumber; // New field to store the end line number for combined entries
     private final String rawLog;
     private final Map<String, String> parsedFields;
     private LocalDateTime timestamp;
@@ -22,36 +23,49 @@ public class LogEntry {
     private String logger;
     private boolean isParsed;
 
+    // Constructor for unparsed single lines
     public LogEntry(long lineNumber, String rawLog) {
-        this.lineNumber = lineNumber;
-        this.rawLog = rawLog;
-        this.parsedFields = new HashMap<>();
-        this.isParsed = false;
+        this(lineNumber, lineNumber, rawLog, new HashMap<>(), false);
     }
 
+    // Constructor for combined unparsed lines
+    public LogEntry(long startLineNumber, long endLineNumber, String rawLog) {
+        this(startLineNumber, endLineNumber, rawLog, new HashMap<>(), false);
+    }
+
+    // Constructor for parsed lines
     public LogEntry(long lineNumber, String rawLog, Matcher matcher, List<String> groupNames) {
-        this(lineNumber, rawLog, createMapFromMatcher(matcher, groupNames));
+        this(lineNumber, lineNumber, rawLog, createMapFromMatcher(matcher, groupNames), true);
     }
 
+    // Constructor for parsed lines with pre-existing map
     public LogEntry(long lineNumber, String rawLog, Map<String, String> parsedFields) {
+        this(lineNumber, lineNumber, rawLog, parsedFields, true);
+    }
+
+    // Private common constructor
+    private LogEntry(long lineNumber, long endLineNumber, String rawLog, Map<String, String> parsedFields, boolean isParsed) {
         this.lineNumber = lineNumber;
+        this.endLineNumber = endLineNumber;
         this.rawLog = rawLog;
         this.parsedFields = new HashMap<>(parsedFields);
-        this.isParsed = true;
+        this.isParsed = isParsed;
 
-        // Extract common fields
-        this.level = parsedFields.getOrDefault("level", "");
-        this.message = parsedFields.getOrDefault("message", "");
-        this.thread = parsedFields.getOrDefault("thread", "");
-        this.logger = parsedFields.getOrDefault("logger", "");
+        if (isParsed) {
+            // Extract common fields
+            this.level = parsedFields.getOrDefault("level", "");
+            this.message = parsedFields.getOrDefault("message", "");
+            this.thread = parsedFields.getOrDefault("thread", "");
+            this.logger = parsedFields.getOrDefault("logger", "");
 
-        // Parse timestamp if available
-        String timestampStr = parsedFields.get("timestamp");
-        if (timestampStr != null) {
-            try {
-                this.timestamp = LocalDateTime.parse(timestampStr);
-            } catch (Exception e) {
-                this.timestamp = null;
+            // Parse timestamp if available
+            String timestampStr = parsedFields.get("timestamp");
+            if (timestampStr != null) {
+                try {
+                    this.timestamp = LocalDateTime.parse(timestampStr);
+                } catch (Exception e) {
+                    this.timestamp = null;
+                }
             }
         }
     }
@@ -59,6 +73,10 @@ public class LogEntry {
     // Getters
     public long getLineNumber() {
         return lineNumber;
+    }
+
+    public long getEndLineNumber() {
+        return endLineNumber;
     }
 
     public String getRawLog() {

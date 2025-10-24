@@ -523,22 +523,23 @@ public class ParsingConfigController {
         if (configSnapshot == null || selectedConfig == null) {
             return false;
         }
-        // Compare default status
+
+        // Compare default status first
         if (selectedConfig.isDefault() != configSnapshot.isDefault()) {
             return true;
         }
 
-        // Normalize for nulls and line endings (CRLF to LF) before comparing.
-        String snapshotName = (configSnapshot.getName() == null) ? "" : configSnapshot.getName().replace("\r\n", "\n");
-        String currentName = (nameField.getText() == null) ? "" : nameField.getText().replace("\r\n", "\n");
+        // Normalize strings for reliable comparison: handle nulls and trim whitespace.
+        String snapshotName = Optional.ofNullable(configSnapshot.getName()).orElse("").trim();
+        String currentName = Optional.ofNullable(nameField.getText()).orElse("").trim();
 
-        String snapshotDesc = (configSnapshot.getDescription() == null) ? "" : configSnapshot.getDescription().replace("\r\n", "\n");
-        String currentDesc = (descriptionArea.getText() == null) ? "" : descriptionArea.getText().replace("\r\n", "\n");
+        String snapshotDesc = Optional.ofNullable(configSnapshot.getDescription()).orElse("").trim();
+        String currentDesc = Optional.ofNullable(descriptionArea.getText()).orElse("").trim();
 
-        String snapshotPattern = (configSnapshot.getRegexPattern() == null) ? "" : configSnapshot.getRegexPattern().replace("\r\n", "\n");
-        String currentPattern = (regexPatternArea.getText() == null) ? "" : regexPatternArea.getText().replace("\r\n", "\n");
+        String snapshotPattern = Optional.ofNullable(configSnapshot.getRegexPattern()).orElse("").trim();
+        String currentPattern = Optional.ofNullable(regexPatternArea.getText()).orElse("").trim();
 
-        // Compare the normalized strings.
+        // Compare the normalized, trimmed strings.
         return !Objects.equals(snapshotName, currentName) ||
                !Objects.equals(snapshotDesc, currentDesc) ||
                !Objects.equals(snapshotPattern, currentPattern);
