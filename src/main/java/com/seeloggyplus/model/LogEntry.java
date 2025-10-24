@@ -2,7 +2,9 @@ package com.seeloggyplus.model;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 
 /**
  * Model class representing a single log entry
@@ -25,6 +27,10 @@ public class LogEntry {
         this.rawLog = rawLog;
         this.parsedFields = new HashMap<>();
         this.isParsed = false;
+    }
+
+    public LogEntry(long lineNumber, String rawLog, Matcher matcher, List<String> groupNames) {
+        this(lineNumber, rawLog, createMapFromMatcher(matcher, groupNames));
     }
 
     public LogEntry(long lineNumber, String rawLog, Map<String, String> parsedFields) {
@@ -128,6 +134,14 @@ public class LogEntry {
 
     public void addFields(Map<String, String> fields) {
         parsedFields.putAll(fields);
+    }
+
+    private static Map<String, String> createMapFromMatcher(Matcher matcher, List<String> groupNames) {
+        Map<String, String> fields = new HashMap<>();
+        for (String groupName : groupNames) {
+            fields.put(groupName, matcher.group(groupName));
+        }
+        return fields;
     }
 
     /**

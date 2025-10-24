@@ -30,6 +30,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -333,6 +334,54 @@ public class MainController {
                     }
                 });
 
+                if ("level".equalsIgnoreCase(groupName)) {
+                    column.setCellFactory(col -> new TableCell<LogEntry, String>() {
+                        private final String[] LEVEL_CLASSES = {
+                                "log-level-error", "log-level-warn", "log-level-info",
+                                "log-level-debug", "log-level-trace", "log-level-fatal"
+                        };
+
+                        @Override
+                        protected void updateItem(String item, boolean empty) {
+                            super.updateItem(item, empty);
+
+                            if (item == null || empty) {
+                                setText(null);
+                                getStyleClass().removeAll(LEVEL_CLASSES);
+                            } else {
+                                setText(item);
+
+                                getStyleClass().removeAll(LEVEL_CLASSES);
+
+                                switch (item.toUpperCase()) {
+                                    case "ERROR":
+                                        getStyleClass().add("log-level-error");
+                                        break;
+                                    case "FATAL":
+                                        getStyleClass().add("log-level-fatal");
+                                        break;
+                                    case "WARN":
+                                    case "WARNING":
+                                        getStyleClass().add("log-level-warn");
+                                        break;
+                                    case "INFO":
+                                        getStyleClass().add("log-level-info");
+                                        break;
+                                    case "DEBUG":
+                                        getStyleClass().add("log-level-debug");
+                                        break;
+                                    case "TRACE":
+                                        getStyleClass().add("log-level-trace");
+                                        break;
+                                    default:
+                                        // Tidak ada style khusus
+                                        break;
+                                }
+                            }
+                        }
+                    });
+                }
+
                 column.setMinWidth(80);
                 logTableView.getColumns().add(column);
             }
@@ -346,6 +395,7 @@ public class MainController {
             logger.info("Created 2 columns (line number + raw log)");
         }
     }
+
 
     /**
      * Handle open file action

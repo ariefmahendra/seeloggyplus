@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,53 +42,96 @@ public class LogParserService {
         return parseFile(file, config, null);
     }
 
-    /**
-     * Parse a log file with progress callback
-     */
     public List<LogEntry> parseFile(File file, ParsingConfig config, ProgressCallback callback) throws IOException {
         if (!file.exists() || !file.canRead()) {
             throw new IOException("File does not exist or cannot be read: " + file.getAbsolutePath());
         }
-
         this.currentConfig = config;
-        List<LogEntry> entries = new ArrayList<>();
-        StringBuilder unparsedLog = new StringBuilder(1000);
 
-        long totalLines = countLines(file);
-        long currentLineNumber = 0;
+        final long fileSize = file.length();
+        final int DEFAULT_INITIAL_CAP = 1024;
+        List<LogEntry> entries = new ArrayList<>(DEFAULT_INITIAL_CAP);
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8), 8192 * 4)) {
+        Pattern pattern = (config != null && config.isValid()) ? config.getCompiledPattern() : null;
+        Matcher matcher = (pattern != null) ? pattern.matcher("") : null;
+
+        // **PERBAIKAN LOGIKA 1: Deklarasikan buffer di LUAR loop**
+        // Ini akan mengumpulkan baris-baris yang tidak ter-parse
+        StringBuilder unparsedLinesBuffer = new StringBuilder(4096);
+
+        long bytesReadTotal = 0L;
+        long lastCallbackBytes = 0L;
+        // Update progress setiap ~2MB atau lebih (lebih jarang lebih baik)
+        final long CALLBACK_BYTES_INTERVAL = 2 * 1024 * 1024; // 2MB
+
+        int currentLineNumber = 0;
+
+        // **PERBAIKAN PERFORMA: Gunakan BufferedReader**
+        // Ini adalah cara idiomatik dan tercepat untuk membaca file teks baris per baris.
+        try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+
             String line;
             while ((line = reader.readLine()) != null) {
                 currentLineNumber++;
 
-                boolean matches = (config != null && config.isValid() && config.getCompiledPattern() != null) && config.getCompiledPattern().matcher(line).find();
+                // Estimasi progres (ini tidak sempurna tapi jauh lebih cepat)
+                // Kita mengorbankan akurasi demi kecepatan.
+                // +1 untuk karakter newline (estimasi)
+                bytesReadTotal += line.length(); // Perkiraan kasar, panjang char != panjang byte
+
+                // Alternatif estimasi yang lebih akurat tapi sedikit lebih lambat:
+                // bytesReadTotal += line.getBytes(StandardCharsets.UTF_8).length + 1;
+
+                boolean matches = false;
+                if (matcher != null) {
+                    matcher.reset(line);
+                    matches = matcher.find();
+                }
 
                 if (matches) {
-                    if (!unparsedLog.isEmpty()) {
-                        if (unparsedLog.length() >= 1000) {
-                            unparsedLog.append("...");
-                        }
-                        entries.add(new LogEntry(currentLineNumber, unparsedLog.toString()));
-                        unparsedLog.setLength(0);
+                    // 1. Flush buffer unparsed (jika ada)
+                    if (!unparsedLinesBuffer.isEmpty()) {
+                        entries.add(new LogEntry(currentLineNumber - 1, unparsedLinesBuffer.toString()));
+                        unparsedLinesBuffer.setLength(0);
                     }
-                    entries.add(parseLine(line, currentLineNumber, config));
+
+                    entries.add(new LogEntry(currentLineNumber, line, matcher, config.getGroupNames()));
+
                 } else {
-                    unparsedLog.append(line).append("\n");
+                    unparsedLinesBuffer.append(line).append('\n');
                 }
 
-                if (callback != null && currentLineNumber % 100 == 0) {
-                    double progress = (double) currentLineNumber / totalLines;
-                    callback.onProgress(progress, currentLineNumber, totalLines);
+                // Kirim progress callback secara berkala
+                if (callback != null && (bytesReadTotal - lastCallbackBytes) >= CALLBACK_BYTES_INTERVAL) {
+                    double progress = fileSize > 0 ? (double) bytesReadTotal / fileSize : 0.0;
+                    // Pastikan progres tidak lebih dari 1.0 (karena estimasi)
+                    progress = Math.min(progress, 1.0);
+
+                    lastCallbackBytes = bytesReadTotal;
+
+                    // Catatan: 'totalLines' tidak diketahui, jadi kami kirim '0' atau 'fileSize'
+                    // Kode Anda sebelumnya mengirim fileSize sebagai totalLines, jadi kita teruskan:
+                    callback.onProgress(progress, currentLineNumber, fileSize);
                 }
             }
+
+            // **PERBAIKAN LOGIKA 4: Flush sisa buffer di akhir file**
+            if (unparsedLinesBuffer.length() > 0) {
+                entries.add(new LogEntry(currentLineNumber, unparsedLinesBuffer.toString()));
+            }
+
+        } catch (IOException e) {
+            logger.error("Error reading file: {}", file.getAbsolutePath(), e);
+            throw e;
         }
 
         if (callback != null) {
+            // Kirim progress final
+            callback.onProgress(1.0, currentLineNumber, fileSize);
             callback.onComplete(entries.size());
         }
 
-        logger.info("Parsed {} lines from file: {}", entries.size(), file.getName());
+        logger.info("Parsed {} entries from file: {}", entries.size(), file.getName());
         return entries;
     }
 

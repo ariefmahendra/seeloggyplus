@@ -1,0 +1,43 @@
+/* ERROR */
+.log-level-error {
+    -fx-text-fill: #D32F2F;
+    -fx-font-weight: bold;
+}
+
+.log-level-fatal {
+    -fx-text-fill: #D32F2F;
+    -fx-font-weight: bold;
+}
+
+/* WARN / WARNING */
+.log-level-warn {
+    -fx-text-fill: #F57F17;
+    -fx-font-weight: bold;
+}
+
+/* INFO */
+.log-level-info {
+    -fx-text-fill: #1976D2;
+    -fx-font-weight: bold;
+}
+
+/* DEBUG */
+.log-level-debug {
+    -fx-text-fill: #546E7A;
+    -fx-font-weight: bold;
+}
+
+/* TRACE */
+.log-level-trace {
+    -fx-text-fill: #757575;
+    -fx-font-weight: bold;
+}
+
+.table-row-cell:selected .log-level-error,
+.table-row-cell:selected .log-level-fatal,
+.table-row-cell:selected .log-level-warn,
+.table-row-cell:selected .log-level-info,
+.table-row-cell:selected .log-level-debug,
+.table-row-cell:selected .log-level-trace {
+    -fx-text-fill: white;
+}
