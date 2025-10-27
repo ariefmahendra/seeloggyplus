@@ -27,40 +27,40 @@
 <BorderPane fx:id="mainBorderPane" minHeight="400" minWidth="600" prefHeight="800" prefWidth="1200.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
     <top>
         <VBox>
+            <MenuBar fx:id="menuBar">
+                <!-- File Menu -->
+                <Menu fx:id="fileMenu" text="File">
+                    <MenuItem fx:id="openFileMenuItem" accelerator="Ctrl+O" text="Open File..." />
+                    <MenuItem fx:id="openRemoteMenuItem" accelerator="Ctrl+R" text="Open Remote File..." />
+                    <SeparatorMenuItem />
+                    <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit" />
+                </Menu>
+
+                <!-- View Menu -->
+                <Menu fx:id="viewMenu" text="View">
+                    <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel" />
+                    <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel" />
+                    <SeparatorMenuItem />
+                    <MenuItem accelerator="F5" text="Refresh" />
+                </Menu>
+
+                <!-- Settings Menu -->
+                <Menu fx:id="settingsMenu" text="Settings">
+                    <MenuItem fx:id="parsingConfigMenuItem" accelerator="Ctrl+P" text="Parsing Configuration..." />
+                    <SeparatorMenuItem />
+                    <MenuItem text="Preferences..." />
+                </Menu>
+
+                <!-- Help Menu -->
+                <Menu fx:id="helpMenu" text="Help">
+                    <MenuItem fx:id="aboutMenuItem" text="About" />
+                    <MenuItem text="Documentation" />
+                </Menu>
+            </MenuBar>
 
             <!-- Toolbar -->
             <ToolBar fx:id="toolBar">
                 <Label text="Search:" />
-               <MenuBar fx:id="menuBar">
-                   <!-- File Menu -->
-                   <Menu fx:id="fileMenu" text="File">
-                       <MenuItem fx:id="openFileMenuItem" accelerator="Ctrl+O" text="Open File..." />
-                       <MenuItem fx:id="openRemoteMenuItem" accelerator="Ctrl+R" text="Open Remote File..." />
-                       <SeparatorMenuItem />
-                       <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit" />
-                   </Menu>
-   
-                   <!-- View Menu -->
-                   <Menu fx:id="viewMenu" text="View">
-                       <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel" />
-                       <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel" />
-                       <SeparatorMenuItem />
-                       <MenuItem accelerator="F5" text="Refresh" />
-                   </Menu>
-   
-                   <!-- Settings Menu -->
-                   <Menu fx:id="settingsMenu" text="Settings">
-                       <MenuItem fx:id="parsingConfigMenuItem" accelerator="Ctrl+P" text="Parsing Configuration..." />
-                       <SeparatorMenuItem />
-                       <MenuItem text="Preferences..." />
-                   </Menu>
-   
-                   <!-- Help Menu -->
-                   <Menu fx:id="helpMenu" text="Help">
-                       <MenuItem fx:id="aboutMenuItem" text="About" />
-                       <MenuItem text="Documentation" />
-                   </Menu>
-               </MenuBar>
                 <TextField fx:id="searchField" prefWidth="300" promptText="Enter search text or regex...">
                     <font>
                         <Font size="10.0" />
@@ -75,6 +75,14 @@
                     </graphic>
                     <tooltip>
                         <Tooltip text="Auto Fit Table " />
+                    </tooltip>
+                </Button>
+                <Button fx:id="refreshButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="REFRESH" size="12" />
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Reload Log" />
                     </tooltip>
                 </Button>
                 <Button fx:id="searchButton">
@@ -113,14 +121,14 @@
         <BorderPane fx:id="mainContentPane" xmlns="http://javafx.com/javafx">
             <!-- Collapsed Left Panel (appears when leftPanel is unpinned) -->
             <left>
-                <VBox fx:id="collapsedLeftPanel" alignment="TOP_CENTER" spacing="10" visible="false" managed="false" prefWidth="20">
+                <VBox fx:id="collapsedLeftPanel" alignment="TOP_CENTER" managed="false" prefWidth="20" spacing="10" visible="false">
                     <padding>
                         <Insets bottom="5" left="5" right="5" top="5" />
                     </padding>
 
                     <Button fx:id="expandLeftPanelButton" rotate="90">
                         <graphic>
-                            <FontAwesomeIconView glyphName="ANGLE_DOUBLE_RIGHT" size="12" />
+                            <FontAwesomeIconView glyphName="ANGLE_DOUBLE_UP" size="12" />
                         </graphic>
                         <tooltip>
                             <Tooltip text="Expand Recent Files" />
@@ -143,10 +151,10 @@
                                     <Font name="System Bold" size="12.0" />
                                 </font>
                             </Label>
-                     <Separator prefWidth="200.0" />
-                            <Button fx:id="pinLeftPanelButton" styleClass="icon-button">
+                            <Separator prefWidth="200.0" HBox.hgrow="ALWAYS" />
+                            <Button fx:id="pinLeftPanelButton">
                                 <graphic>
-                                    <FontAwesomeIconView glyphName="THUMB_TACK" size="12" />
+                                    <FontAwesomeIconView glyphName="ANGLE_DOUBLE_LEFT" size="12" />
                                 </graphic>
                                 <tooltip>
                                     <Tooltip text="Pin/Unpin Left Panel" />

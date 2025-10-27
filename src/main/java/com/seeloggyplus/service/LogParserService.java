@@ -26,10 +26,10 @@ import java.util.stream.Stream;
 public class LogParserService {
 
     private static final Logger logger = LoggerFactory.getLogger(LogParserService.class);
-    private static final int BATCH_SIZE = 1000;
     private static final int MAX_THREADS = Runtime.getRuntime().availableProcessors();
+    private static final int maxEntryUnparsed = 10000;
 
-    private ExecutorService executorService;
+    private final ExecutorService executorService;
     private ParsingConfig currentConfig;
 
     public LogParserService() {
@@ -77,7 +77,6 @@ public class LogParserService {
                     // Add the successfully parsed entry
                     entries.add(new LogEntry(lineNumber, line, matcher, config.getGroupNames()));
                     unparsedStartLine = -1; // Reset unparsed line tracking
-
                 } else {
                     // Line did not match, append to the unparsed buffer
                     if (unparsedBuffer.isEmpty()) {
@@ -174,27 +173,19 @@ public class LogParserService {
         return combinedEntries;
     }
 
-    private List<LogEntry> processBatch(List<LineWithNumber> batch, ParsingConfig config) {
-        List<LogEntry> entries = new ArrayList<>(batch.size());
-        for (LineWithNumber lineWithNumber : batch) {
-            entries.add(parseLine(lineWithNumber.line(), lineWithNumber.lineNumber(), config));
-        }
-        return entries;
-    }
-
     private List<LogEntry> combineUnparsedEntries(List<LogEntry> rawEntries) {
         if (rawEntries.isEmpty()) {
             return Collections.emptyList();
         }
 
         List<LogEntry> combined = new ArrayList<>();
-        StringBuilder unparsedBuffer = new StringBuilder();
+        StringBuilder unparsedBuffer = new StringBuilder(1000);
         long unparsedStartLine = -1;
         long unparsedEndLine = -1;
 
         for (LogEntry entry : rawEntries) {
             if (entry.isParsed()) {
-                if (unparsedBuffer.length() > 0) {
+                if (!unparsedBuffer.isEmpty()) {
                     combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedBuffer.toString()));
                     unparsedBuffer.setLength(0);
                 }
@@ -206,14 +197,16 @@ public class LogParserService {
                     unparsedStartLine = entry.getLineNumber();
                 }
                 unparsedEndLine = entry.getLineNumber(); // Update end line with current entry's line number
-                if (unparsedBuffer.length() > 0) {
-                    unparsedBuffer.append(System.lineSeparator());
+                if (unparsedBuffer.length() < maxEntryUnparsed){
+                    if (!unparsedBuffer.isEmpty()) {
+                        unparsedBuffer.append(System.lineSeparator());
+                    }
+                    unparsedBuffer.append(entry.getRawLog());
                 }
-                unparsedBuffer.append(entry.getRawLog());
             }
         }
 
-        if (unparsedBuffer.length() > 0) {
+        if (!unparsedBuffer.isEmpty()) {
             combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedBuffer.toString()));
         }
         return combined;
@@ -222,6 +215,7 @@ public class LogParserService {
     private List<LogEntry> processChunk(File file, ChunkInfo chunkInfo, ParsingConfig config) {
         List<LogEntry> entries = new ArrayList<>();
         long currentLineNumber = chunkInfo.startLineNumber();
+        int countUnparsedLine = 0;
         try (FileInputStream fis = new FileInputStream(file); FileChannel channel = fis.getChannel()) {
             channel.position(chunkInfo.startByte());
             BufferedReader reader = new BufferedReader(Channels.newReader(channel, StandardCharsets.UTF_8));
@@ -229,7 +223,20 @@ public class LogParserService {
             String line;
             // Read lines until the end of the chunk or end of file
             while ((line = reader.readLine()) != null && channel.position() <= chunkInfo.endByte()) {
-                entries.add(parseLine(line, currentLineNumber++, config));
+                currentLineNumber++;
+                LogEntry logEntry = parseLine(line, currentLineNumber, config);
+
+                if (!logEntry.isParsed()){
+                    countUnparsedLine++;
+                } else {
+                    countUnparsedLine = 0;
+                }
+
+                if (countUnparsedLine > maxEntryUnparsed && !logEntry.isParsed()){
+                    break;
+                }
+
+                entries.add(logEntry);
             }
 
         } catch (IOException e) {
@@ -260,11 +267,12 @@ public class LogParserService {
         return lineStartOffsets;
     }
 
-    // Helper record for batch processing
-    private record LineWithNumber(long lineNumber, String line) {}
-
     // Helper record for parallel chunk processing
-    private record ChunkInfo(long startByte, long endByte, long startLineNumber) {}
+    private record ChunkInfo(
+            long startByte,
+            long endByte,
+            long startLineNumber
+    ) {}
 
     /**
      * Parse a single line with the given configuration

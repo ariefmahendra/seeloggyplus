@@ -48,6 +48,7 @@ public class MainController {
     private static final Logger logger = LoggerFactory.getLogger(MainController.class);
     private static final int LAZY_LOAD_BATCH_SIZE = 1000; // Number of entries to load at a time
 
+
     // FXML Components - MenuBar
     @FXML
     private MenuBar menuBar;
@@ -127,6 +128,8 @@ public class MainController {
     private TableView<LogEntry> logTableView;
     @FXML
     private Button scrollToBottomButton;
+    @FXML
+    private Button refreshButton;
 
     // FXML Components - Bottom Panel (Log Detail)
     @FXML
@@ -321,6 +324,8 @@ public class MainController {
         searchField.setOnAction(e -> performSearch());
         autoFitButton.setOnAction( e -> autoResizeColumns(logTableView));
         scrollToBottomButton.setOnAction(e -> handleScrollToBottom());
+        refreshButton.setOnAction(e -> handleRecentFileSelected(recentFilesListView.getSelectionModel().getSelectedItem()));
+
 
         // Initialize with default columns
         updateTableColumns(null);
