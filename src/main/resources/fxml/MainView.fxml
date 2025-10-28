@@ -109,6 +109,14 @@
                         <Tooltip text="Scroll to Bottom" />
                     </tooltip>
                 </Button>
+                <Button fx:id="loginLdap" onAction="#onLoginButtonClick">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="SIGN_IN" size="12" />
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Login Ldap" />
+                    </tooltip>
+                </Button>
                 <Separator orientation="VERTICAL" />
                 <Label text="Level:" />
                 <ComboBox fx:id="logLevelFilterComboBox" prefHeight="16.0" prefWidth="85.0" promptText="All Levels" styleClass="small-combo-box" stylesheets="@../style/components.css" />

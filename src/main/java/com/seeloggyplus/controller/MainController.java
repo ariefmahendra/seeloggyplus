@@ -4,10 +4,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.seeloggyplus.model.*;
 import com.seeloggyplus.service.*;
-import com.seeloggyplus.repository.RecentFileRepository;
-import com.seeloggyplus.repository.ParsingConfigRepository;
-import com.seeloggyplus.repository.ParsingConfigRepositoryImpl;
-import com.seeloggyplus.repository.RecentFileRepositoryImpl;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,12 +14,11 @@ import java.util.regex.Pattern;
 
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
-import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -31,7 +26,6 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
-import javafx.scene.text.TextFlow;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -47,7 +41,6 @@ public class MainController {
 
     private static final Logger logger = LoggerFactory.getLogger(MainController.class);
     private static final int LAZY_LOAD_BATCH_SIZE = 1000; // Number of entries to load at a time
-
 
     // FXML Components - MenuBar
     @FXML
@@ -198,6 +191,23 @@ public class MainController {
         // Set default status
         updateStatus("Ready");
         progressBar.setVisible(false);
+    }
+
+    @FXML
+    public void onLoginButtonClick(ActionEvent actionEvent) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/LoginLdapDialog.fxml"));
+            Parent root = loader.load();
+
+            Scene scene = new Scene(root);
+
+            Stage stage = new Stage();
+            stage.setScene(scene);
+            stage.show();
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+
     }
 
     /**
@@ -776,6 +786,8 @@ public class MainController {
             } else {
                 showError("File Not Found", "The file no longer exists: " + recentFile.getFilePath());
             }
+            performSearch();
+            autoResizeColumns(logTableView);
         }
     }
 

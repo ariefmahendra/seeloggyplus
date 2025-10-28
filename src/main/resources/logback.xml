@@ -63,5 +63,4 @@
     <logger name="org.hibernate" level="WARN"/>
     <logger name="com.jcraft.jsch" level="WARN"/>
     <logger name="javafx" level="WARN"/>
-
 </configuration>

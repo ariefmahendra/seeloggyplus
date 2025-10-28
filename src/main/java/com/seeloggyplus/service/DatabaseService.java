@@ -1,5 +1,10 @@
 package com.seeloggyplus.service;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.FileSystem;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -10,13 +15,27 @@ import org.slf4j.LoggerFactory;
 
 public class DatabaseService {
     private static final Logger logger = LoggerFactory.getLogger(DatabaseService.class);
-    private static final String DATABASE_URL = "jdbc:sqlite:seeloggyplus.db";
     private static DatabaseService instance;
     private Connection connection;
 
     private DatabaseService() {
         try {
-            connection = DriverManager.getConnection(DATABASE_URL);
+            Path dbPath = Path.of(System.getProperty("user.home"), "/.seeloggyplus", "/data", "seeloggyplus.db");
+
+            if (!Files.exists(dbPath)){
+                File dbFile = new File(dbPath.toUri());
+                File parentDir = dbFile.getParentFile();
+                if (parentDir != null && !parentDir.exists()) {
+                    boolean resultMkdir = parentDir.mkdirs();
+                    if (!resultMkdir){
+                        logger.info("Failed create directory and file db path");
+                    }
+                    logger.info("Success create directory and file db path");
+                }
+            }
+
+            String resultPath = String.format("jdbc:sqlite:%s", dbPath.toAbsolutePath());
+            connection = DriverManager.getConnection(resultPath);
             logger.info("Database connection established.");
             createTables();
         } catch (SQLException e) {
