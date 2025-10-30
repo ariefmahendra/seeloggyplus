@@ -4,7 +4,7 @@ import com.seeloggyplus.exceptions.LdapException;
 import com.unboundid.ldap.sdk.*;
 
 public class LdapAuthenticator {
-    private final String ldapHost = "10.100.0.43";
+    private final String ldapHost = "192.168.12.134";
     private final int ldapPort = 389;
 
     private final String searchUserDN = "cn=admin,dc=jellyfish,dc=work,dc=gd";

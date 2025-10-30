@@ -2,11 +2,12 @@ package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.ParsingConfig;
 import com.seeloggyplus.service.LogParserService;
+
 import java.util.Objects;
 import java.util.Optional;
 
 import com.seeloggyplus.service.ParsingConfigService;
-import com.seeloggyplus.service.ParsingConfigServiceImpl;
+import com.seeloggyplus.service.impl.ParsingConfigServiceImpl;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -137,51 +138,51 @@ public class ParsingConfigController {
         configListView.setCellFactory(listView -> new ConfigListCell());
 
         configListView
-            .getSelectionModel()
-            .selectedItemProperty()
-            .addListener((obs, oldVal, newVal) -> {
-                if (oldVal == newVal) {
-                    return; // No change in selection
-                }
+                .getSelectionModel()
+                .selectedItemProperty()
+                .addListener((obs, oldVal, newVal) -> {
+                    if (oldVal == newVal) {
+                        return; // No change in selection
+                    }
 
-                // Check for unsaved changes before switching away from a config
-                if (oldVal != null && isDirty()) {
-                    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-                    alert.setTitle("Unsaved Changes");
-                    alert.setHeaderText(
-                        "You have unsaved changes for '" + oldVal.getName() + "'."
-                    );
-                    alert.setContentText("Do you want to save them before switching?");
+                    // Check for unsaved changes before switching away from a config
+                    if (oldVal != null && isDirty()) {
+                        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                        alert.setTitle("Unsaved Changes");
+                        alert.setHeaderText(
+                                "You have unsaved changes for '" + oldVal.getName() + "'."
+                        );
+                        alert.setContentText("Do you want to save them before switching?");
 
-                    ButtonType saveBtn = new ButtonType("Save");
-                    ButtonType dontSaveBtn = new ButtonType("Don't Save");
-                    ButtonType cancelBtn = new ButtonType(
-                        "Cancel",
-                        ButtonBar.ButtonData.CANCEL_CLOSE
-                    );
-                    alert.getButtonTypes().setAll(saveBtn, dontSaveBtn, cancelBtn);
+                        ButtonType saveBtn = new ButtonType("Save");
+                        ButtonType dontSaveBtn = new ButtonType("Don't Save");
+                        ButtonType cancelBtn = new ButtonType(
+                                "Cancel",
+                                ButtonBar.ButtonData.CANCEL_CLOSE
+                        );
+                        alert.getButtonTypes().setAll(saveBtn, dontSaveBtn, cancelBtn);
 
-                    Optional<ButtonType> result = alert.showAndWait();
+                        Optional<ButtonType> result = alert.showAndWait();
 
-                    if (result.isPresent()) {
-                        if (result.get() == saveBtn) {
-                            saveCurrentConfig();
-                        } else if (result.get() == cancelBtn) {
-                            // Revert selection safely without re-triggering the listener cascade
+                        if (result.isPresent()) {
+                            if (result.get() == saveBtn) {
+                                saveCurrentConfig();
+                            } else if (result.get() == cancelBtn) {
+                                // Revert selection safely without re-triggering the listener cascade
+                                Platform.runLater(() -> configListView.getSelectionModel().select(oldVal));
+                                return;
+                            }
+                            // If "Don't Save", proceed to load the new value
+                        } else {
+                            // Dialog was closed without a choice (e.g., 'X' button), treat as cancel
                             Platform.runLater(() -> configListView.getSelectionModel().select(oldVal));
                             return;
                         }
-                        // If "Don't Save", proceed to load the new value
-                    } else {
-                        // Dialog was closed without a choice (e.g., 'X' button), treat as cancel
-                        Platform.runLater(() -> configListView.getSelectionModel().select(oldVal));
-                        return;
                     }
-                }
 
-                // If we are here, it's safe to load the new config
-                loadConfigToEditor(newVal);
-            });
+                    // If we are here, it's safe to load the new config
+                    loadConfigToEditor(newVal);
+                });
     }
 
     /**
@@ -190,28 +191,28 @@ public class ParsingConfigController {
     private void setupDetailPanel() {
         nameField.textProperty().addListener((obs, o, n) -> updateButtonStates());
         descriptionArea
-            .textProperty()
-            .addListener((obs, o, n) -> updateButtonStates());
+                .textProperty()
+                .addListener((obs, o, n) -> updateButtonStates());
         regexPatternArea
-            .textProperty()
-            .addListener((obs, o, n) -> {
-                validatePattern();
-                updateButtonStates();
-            });
+                .textProperty()
+                .addListener((obs, o, n) -> {
+                    validatePattern();
+                    updateButtonStates();
+                });
 
         groupNamesListView.setCellFactory(listView ->
-            new ListCell<String>() {
-                @Override
-                protected void updateItem(String item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty || item == null) {
-                        setText(null);
-                        setGraphic(null);
-                    } else {
-                        setText("• " + item);
+                new ListCell<>() {
+                    @Override
+                    protected void updateItem(String item, boolean empty) {
+                        super.updateItem(item, empty);
+                        if (empty || item == null) {
+                            setText(null);
+                            setGraphic(null);
+                        } else {
+                            setText("• " + item);
+                        }
                     }
                 }
-            }
         );
     }
 
@@ -220,14 +221,14 @@ public class ParsingConfigController {
      */
     private void setupTestPanel() {
         fieldNameColumn.setCellValueFactory(
-            new PropertyValueFactory<>("fieldName")
+                new PropertyValueFactory<>("fieldName")
         );
         fieldValueColumn.setCellValueFactory(
-            new PropertyValueFactory<>("fieldValue")
+                new PropertyValueFactory<>("fieldValue")
         );
 
         sampleLogArea.setPromptText(
-            "Enter a sample log line to test the regex pattern..."
+                "Enter a sample log line to test the regex pattern..."
         );
         testParsingButton.setOnAction(e -> handleTestParsing());
     }
@@ -304,7 +305,7 @@ public class ParsingConfigController {
             validationLabel.setText("✓ Pattern is valid");
             validationLabel.getStyleClass().setAll("validation-success");
             groupNamesListView.setItems(
-                FXCollections.observableArrayList(tempConfig.getGroupNames())
+                    FXCollections.observableArrayList(tempConfig.getGroupNames())
             );
         } else {
             validationLabel.setText("✗ " + tempConfig.getValidationError());
@@ -334,8 +335,8 @@ public class ParsingConfigController {
 
         ParsingConfig testConfig = new ParsingConfig("Test", pattern);
         LogParserService.TestResult result = logParserService.testParsing(
-            sampleLog,
-            testConfig
+                sampleLog,
+                testConfig
         );
 
         if (result.isSuccess()) {
@@ -344,8 +345,8 @@ public class ParsingConfigController {
 
             ObservableList<ParsedField> fields = FXCollections.observableArrayList();
             result
-                .getParsedFields()
-                .forEach((key, value) -> fields.add(new ParsedField(key, value)));
+                    .getParsedFields()
+                    .forEach((key, value) -> fields.add(new ParsedField(new SimpleStringProperty(key), new SimpleStringProperty(value))));
             previewTableView.setItems(fields);
         } else {
             testResultLabel.setText("✗ " + result.getMessage());
@@ -361,10 +362,7 @@ public class ParsingConfigController {
         ParsingConfig newConfig = new ParsingConfig();
         newConfig.setName("New Configuration");
         newConfig.setDescription("Enter description here");
-        newConfig.setRegexPattern(
-            "(?<timestamp>\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?<level>\\w+)\\s+(?<message>.*)"
-        );
-
+        newConfig.setRegexPattern("(?<timestamp>\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?<level>\\w+)\\s+(?<message>.*)");
         configList.add(newConfig);
         configListView.getSelectionModel().select(newConfig);
     }
@@ -389,7 +387,7 @@ public class ParsingConfigController {
         alert.setTitle("Delete Configuration");
         alert.setHeaderText("Delete parsing configuration?");
         alert.setContentText(
-            "Are you sure you want to delete '" + selected.getName() + "'?"
+                "Are you sure you want to delete '" + selected.getName() + "'?"
         );
 
         Optional<ButtonType> result = alert.showAndWait();
@@ -439,7 +437,7 @@ public class ParsingConfigController {
         }
 
         configListView.refresh();
-        updateButtonStates(); // Mark as dirty since default status changed
+        updateButtonStates();
     }
 
     /**
@@ -449,15 +447,15 @@ public class ParsingConfigController {
         if (isDirty()) {
             saveCurrentConfig();
         }
-        // Persist all changes made in the session
-        for (int i = 0; i < configList.size(); i++) {
-            ParsingConfig config = configList.get(i);
-            if (config.getId() == 0) {
+
+        for (ParsingConfig config : configList) {
+            if (config.getId() == null) {
                 parsingConfigService.save(config);
             } else {
                 parsingConfigService.update(config);
             }
         }
+
         closeDialog();
     }
 
@@ -468,10 +466,9 @@ public class ParsingConfigController {
         if (isDirty()) {
             saveCurrentConfig();
         }
-        // After applying, persist the changes immediately
-        for (int i = 0; i < configList.size(); i++) {
-            ParsingConfig config = configList.get(i);
-            if (config.getId() == 0) {
+
+        for (ParsingConfig config : configList) {
+            if (config.getId() == null) {
                 parsingConfigService.save(config);
             } else {
                 parsingConfigService.update(config);
@@ -490,7 +487,7 @@ public class ParsingConfigController {
             alert.setContentText("Are you sure you want to discard your changes?");
             Optional<ButtonType> result = alert.showAndWait();
             if (result.isEmpty() || result.get() != ButtonType.OK) {
-                return; // User cancelled, so don't close
+                return;
             }
         }
         closeDialog();
@@ -541,8 +538,8 @@ public class ParsingConfigController {
 
         // Compare the normalized, trimmed strings.
         return !Objects.equals(snapshotName, currentName) ||
-               !Objects.equals(snapshotDesc, currentDesc) ||
-               !Objects.equals(snapshotPattern, currentPattern);
+                !Objects.equals(snapshotDesc, currentDesc) ||
+                !Objects.equals(snapshotPattern, currentPattern);
     }
 
     /**
@@ -581,7 +578,6 @@ public class ParsingConfigController {
      * Custom list cell for parsing configurations
      */
     private static class ConfigListCell extends ListCell<ParsingConfig> {
-
         private final VBox vbox = new VBox(2);
         private final Label nameLabel = new Label();
         private final Label descLabel = new Label();
@@ -601,7 +597,7 @@ public class ParsingConfigController {
                 setGraphic(null);
             } else {
                 nameLabel.setText(
-                    item.getName() + (item.isDefault() ? " (Default)" : "")
+                        item.getName() + (item.isDefault() ? " (Default)" : "")
                 );
                 descLabel.setText(item.getDescription());
 
@@ -609,7 +605,7 @@ public class ParsingConfigController {
                 statusLabel.getStyleClass().removeAll("validation-success", "validation-error");
                 if (item.isValid()) {
                     statusLabel.setText(
-                        "✓ " + item.getGroupNames().size() + " groups"
+                            "✓ " + item.getGroupNames().size() + " groups"
                     );
                     statusLabel.getStyleClass().add("validation-success");
                 } else {
@@ -625,30 +621,5 @@ public class ParsingConfigController {
     /**
      * Helper class for parsed field display
      */
-    public static class ParsedField {
-
-        private final SimpleStringProperty fieldName;
-        private final SimpleStringProperty fieldValue;
-
-        public ParsedField(String fieldName, String fieldValue) {
-            this.fieldName = new SimpleStringProperty(fieldName);
-            this.fieldValue = new SimpleStringProperty(fieldValue);
-        }
-
-        public String getFieldName() {
-            return fieldName.get();
-        }
-
-        public SimpleStringProperty fieldNameProperty() {
-            return fieldName;
-        }
-
-        public String getFieldValue() {
-            return fieldValue.get();
-        }
-
-        public SimpleStringProperty fieldValueProperty() {
-            return fieldValue;
-        }
-    }
+    public record ParsedField(SimpleStringProperty fieldName, SimpleStringProperty fieldValue){}
 }

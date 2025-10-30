@@ -25,6 +25,9 @@ dependencies {
     // SSH Connection
     implementation 'com.jcraft:jsch:0.1.55'
 
+    // development
+    implementation 'org.projectlombok:lombok:1.18.42'
+
     // JSON Processing
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'

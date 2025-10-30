@@ -1,4 +1,4 @@
-package com.seeloggyplus.service;
+package com.seeloggyplus.util;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -11,9 +11,9 @@ import org.slf4j.LoggerFactory;
  * Service for prettifying and formatting JSON strings
  * Provides JSON validation, formatting, and minification
  */
-public class JsonPrettifyService {
+public class JsonPrettify {
 
-    private static final Logger logger = LoggerFactory.getLogger(JsonPrettifyService.class);
+    private static final Logger logger = LoggerFactory.getLogger(JsonPrettify.class);
     private static final Gson PRETTY_GSON = new GsonBuilder()
             .setPrettyPrinting()
             .serializeNulls()

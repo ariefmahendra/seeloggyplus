@@ -6,18 +6,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * High-performance log parser service
@@ -30,81 +27,9 @@ public class LogParserService {
     private static final int maxEntryUnparsed = 10000;
 
     private final ExecutorService executorService;
-    private ParsingConfig currentConfig;
 
     public LogParserService() {
         this.executorService = Executors.newFixedThreadPool(MAX_THREADS);
-    }
-
-    /**
-     * Parse a log file with the given configuration
-     * Uses lazy loading for performance with large files
-     */
-    public List<LogEntry> parseFile(File file, ParsingConfig config) throws IOException {
-        return parseFile(file, config, null);
-    }
-
-    public List<LogEntry> parseFile(File file, ParsingConfig config, ProgressCallback callback) throws IOException {
-        if (!file.exists() || !file.canRead()) {
-            throw new IOException("File does not exist or cannot be read: " + file.getAbsolutePath());
-        }
-        this.currentConfig = config;
-
-        final long fileSize = file.length();
-        List<LogEntry> entries = new ArrayList<>();
-        Pattern pattern = (config != null && config.isValid()) ? config.getCompiledPattern() : null;
-
-        long bytesRead = 0L; // Declare bytesRead outside the try block
-        int lineNumber = 0;
-        StringBuilder unparsedBuffer = new StringBuilder();
-        long unparsedStartLine = -1;
-
-        try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                lineNumber++;
-                bytesRead += line.getBytes(StandardCharsets.UTF_8).length + 1; // +1 for newline
-
-                Matcher matcher = (pattern != null) ? pattern.matcher(line) : null;
-
-                if (matcher != null && matcher.find()) {
-                    // If there's content in the unparsed buffer, flush it first
-                    if (!unparsedBuffer.isEmpty()) {
-                        entries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
-                        unparsedBuffer.setLength(0);
-                    }
-
-                    // Add the successfully parsed entry
-                    entries.add(new LogEntry(lineNumber, line, matcher, config.getGroupNames()));
-                    unparsedStartLine = -1; // Reset unparsed line tracking
-                } else {
-                    // Line did not match, append to the unparsed buffer
-                    if (unparsedBuffer.isEmpty()) {
-                        unparsedStartLine = lineNumber; // Mark the start of this unparsed block
-                    }
-                    unparsedBuffer.append(line).append(System.lineSeparator());
-                }
-
-                if (callback != null && lineNumber % 1000 == 0) { // Update progress every 1000 lines
-                    double progress = fileSize > 0 ? (double) bytesRead / fileSize : 0.0;
-                    callback.onProgress(progress, bytesRead, fileSize); // Use bytesRead consistently
-                }
-            }
-
-            // After the loop, if there's anything left in the unparsed buffer, add it
-            if (!unparsedBuffer.isEmpty()) {
-                entries.add(new LogEntry(unparsedStartLine, unparsedBuffer.toString()));
-            }
-        }
-
-        if (callback != null) {
-            // Final progress update should use the actual bytes read and total file size
-            callback.onProgress(1.0, bytesRead, fileSize);
-            callback.onComplete(entries.size());
-        }
-
-        logger.info("Parsed {} entries from file: {}", entries.size(), file.getName());
-        return entries;
     }
 
     /**
@@ -114,10 +39,9 @@ public class LogParserService {
         if (!file.exists() || !file.canRead()) {
             throw new IOException("File does not exist or cannot be read: " + file.getAbsolutePath());
         }
-        this.currentConfig = config;
+
         long fileSize = file.length();
 
-        // Step 1: Pre-calculate line offsets to determine chunk boundaries and starting line numbers
         Map<Long, Long> lineStartOffsets = preCalculateLineOffsets(file);
         List<ChunkInfo> chunkInfos = new ArrayList<>();
 
@@ -136,7 +60,6 @@ public class LogParserService {
             currentLine = chunkEndLine + 1;
         }
 
-        // Step 2: Submit chunks for parallel processing
         List<Future<List<LogEntry>>> futures = new ArrayList<>();
         AtomicLong bytesProcessed = new AtomicLong(0);
 
@@ -152,7 +75,6 @@ public class LogParserService {
             }));
         }
 
-        // Step 3: Collect results in order
         List<LogEntry> allEntries = new ArrayList<>();
         for (Future<List<LogEntry>> future : futures) {
             try {
@@ -162,7 +84,6 @@ public class LogParserService {
             }
         }
 
-        // Step 4: Post-process to combine non-matching lines
         List<LogEntry> combinedEntries = combineUnparsedEntries(allEntries);
 
         if (callback != null) {
@@ -221,7 +142,6 @@ public class LogParserService {
             BufferedReader reader = new BufferedReader(Channels.newReader(channel, StandardCharsets.UTF_8));
 
             String line;
-            // Read lines until the end of the chunk or end of file
             while ((line = reader.readLine()) != null && channel.position() <= chunkInfo.endByte()) {
                 currentLineNumber++;
                 LogEntry logEntry = parseLine(line, currentLineNumber, config);
@@ -406,57 +326,6 @@ public class LogParserService {
         }
 
         return results;
-    }
-
-    /**
-     * Count lines in file efficiently
-     */
-    private long countLines(File file) throws IOException {
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
-            long count = 0;
-            while (reader.readLine() != null) {
-                count++;
-            }
-            return count;
-        }
-    }
-
-    /**
-     * Get file preview (first N lines)
-     */
-    public List<String> getFilePreview(File file, int maxLines) throws IOException {
-        List<String> preview = new ArrayList<>();
-
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
-            String line;
-            int count = 0;
-
-            while ((line = reader.readLine()) != null && count < maxLines) {
-                preview.add(line);
-                count++;
-            }
-        }
-
-        return preview;
-    }
-
-    /**
-     * Shutdown executor service
-     */
-    public void shutdown() {
-        if (executorService != null && !executorService.isShutdown()) {
-            executorService.shutdown();
-            try {
-                if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                    executorService.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                executorService.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
     }
 
     /**

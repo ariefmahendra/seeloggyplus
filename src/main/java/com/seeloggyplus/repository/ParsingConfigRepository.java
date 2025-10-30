@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ParsingConfigRepository {
-    Optional<ParsingConfig> findById(int id);
+    Optional<ParsingConfig> findById(String id);
     List<ParsingConfig> findAll();
     void save(ParsingConfig config);
     void update(ParsingConfig config);

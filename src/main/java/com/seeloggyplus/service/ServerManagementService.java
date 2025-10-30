@@ -6,7 +6,7 @@ import java.util.List;
 
 public interface ServerManagementService {
     void saveServer(SSHServer server);
-    void deleteServer(Long id);
-    void updateServerLastUsed(Long id);
+    void deleteServer(String id);
+    void updateServerLastUsed(String id);
     List<SSHServer> getAllServers();
 }

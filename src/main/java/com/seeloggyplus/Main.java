@@ -1,9 +1,8 @@
 package com.seeloggyplus;
 
 
-import com.seeloggyplus.controller.MainController;
 import com.seeloggyplus.service.PreferenceService;
-import com.seeloggyplus.service.PreferenceServiceImpl;
+import com.seeloggyplus.service.impl.PreferenceServiceImpl;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Rectangle2D;

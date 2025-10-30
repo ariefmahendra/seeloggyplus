@@ -1,4 +1,4 @@
-package com.seeloggyplus.service;
+package com.seeloggyplus.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,9 +19,9 @@ import java.io.StringWriter;
  * Service for prettifying and formatting XML strings
  * Provides XML validation, formatting, and minification
  */
-public class XmlPrettifyService {
+public class XmlPrettify {
 
-    private static final Logger logger = LoggerFactory.getLogger(XmlPrettifyService.class);
+    private static final Logger logger = LoggerFactory.getLogger(XmlPrettify.class);
 
     /**
      * Prettify XML string with indentation

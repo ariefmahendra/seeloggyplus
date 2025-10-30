@@ -2,15 +2,15 @@ package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.RecentFile;
 import com.seeloggyplus.model.SSHServer;
-import com.seeloggyplus.service.DatabaseService;
 import com.seeloggyplus.service.SSHService;
+
 import java.io.File;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
 import com.seeloggyplus.service.ServerManagementService;
-import com.seeloggyplus.service.ServerManagementServiceImpl;
+import com.seeloggyplus.service.impl.ServerManagementServiceImpl;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 public class RemoteFileDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(
-        RemoteFileDialogController.class
+            RemoteFileDialogController.class
     );
 
     // FXML Components - Connection Tab
@@ -69,18 +69,6 @@ public class RemoteFileDialogController {
 
     @FXML
     private PasswordField passwordField;
-
-    @FXML
-    private CheckBox usePrivateKeyCheckBox;
-
-    @FXML
-    private TextField privateKeyPathField;
-
-    @FXML
-    private Button browseKeyButton;
-
-    @FXML
-    private PasswordField passphraseField;
 
     @FXML
     private CheckBox savePasswordCheckBox;
@@ -179,31 +167,31 @@ public class RemoteFileDialogController {
 
         // Custom cell factory to display server name
         savedServersComboBox.setCellFactory(listView ->
-            new ListCell<SSHServer>() {
-                @Override
-                protected void updateItem(SSHServer item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty || item == null) {
-                        setText(null);
-                    } else {
-                        setText(item.getDisplayString());
+                new ListCell<SSHServer>() {
+                    @Override
+                    protected void updateItem(SSHServer item, boolean empty) {
+                        super.updateItem(item, empty);
+                        if (empty || item == null) {
+                            setText(null);
+                        } else {
+                            setText(item.getDisplayString());
+                        }
                     }
                 }
-            }
         );
 
         savedServersComboBox.setButtonCell(
-            new ListCell<SSHServer>() {
-                @Override
-                protected void updateItem(SSHServer item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty || item == null) {
-                        setText("Select a saved server...");
-                    } else {
-                        setText(item.getDisplayString());
+                new ListCell<SSHServer>() {
+                    @Override
+                    protected void updateItem(SSHServer item, boolean empty) {
+                        super.updateItem(item, empty);
+                        if (empty || item == null) {
+                            setText("Select a saved server...");
+                        } else {
+                            setText(item.getDisplayString());
+                        }
                     }
                 }
-            }
         );
 
         // Setup buttons
@@ -228,24 +216,6 @@ public class RemoteFileDialogController {
         // Default port
         portField.setText("22");
 
-        // Toggle private key fields
-        usePrivateKeyCheckBox
-            .selectedProperty()
-            .addListener((obs, oldVal, newVal) -> {
-                privateKeyPathField.setDisable(!newVal);
-                browseKeyButton.setDisable(!newVal);
-                passphraseField.setDisable(!newVal);
-                passwordField.setDisable(newVal);
-            });
-
-        // Initially disable private key fields
-        privateKeyPathField.setDisable(true);
-        browseKeyButton.setDisable(true);
-        passphraseField.setDisable(true);
-
-        // Browse for private key
-        browseKeyButton.setOnAction(e -> browsePrivateKey());
-
         // Connection status
         connectionStatusLabel.setText("Not connected");
         connectionStatusLabel.setStyle("-fx-text-fill: gray;");
@@ -261,17 +231,17 @@ public class RemoteFileDialogController {
     private void setupRemoteBrowser() {
         // Configure table columns
         fileNameColumn.setCellValueFactory(cellData ->
-            new SimpleStringProperty(cellData.getValue().getName())
+                new SimpleStringProperty(cellData.getValue().getName())
         );
 
         fileSizeColumn.setCellValueFactory(cellData ->
-            new SimpleStringProperty(cellData.getValue().getFormattedSize())
+                new SimpleStringProperty(cellData.getValue().getFormattedSize())
         );
 
         fileTypeColumn.setCellValueFactory(cellData ->
-            new SimpleStringProperty(
-                cellData.getValue().isDirectory() ? "Directory" : "File"
-            )
+                new SimpleStringProperty(
+                        cellData.getValue().isDirectory() ? "Directory" : "File"
+                )
         );
 
         remoteFilesTable.setItems(remoteFiles);
@@ -280,8 +250,8 @@ public class RemoteFileDialogController {
         remoteFilesTable.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2) {
                 SSHService.RemoteFileInfo selected = remoteFilesTable
-                    .getSelectionModel()
-                    .getSelectedItem();
+                        .getSelectionModel()
+                        .getSelectedItem();
                 if (selected != null && selected.isDirectory()) {
                     navigateToRemoteDirectory(selected.getPath());
                 }
@@ -290,12 +260,12 @@ public class RemoteFileDialogController {
 
         // Setup navigation buttons
         goButton.setOnAction(e ->
-            navigateToRemoteDirectory(remotePathField.getText())
+                navigateToRemoteDirectory(remotePathField.getText())
         );
         parentDirButton.setOnAction(e -> navigateToParentDirectory());
 
         remotePathField.setOnAction(e ->
-            navigateToRemoteDirectory(remotePathField.getText())
+                navigateToRemoteDirectory(remotePathField.getText())
         );
     }
 
@@ -320,31 +290,18 @@ public class RemoteFileDialogController {
      * Handle load server from saved servers
      */
     private void handleLoadServer() {
-        SSHServer server = savedServersComboBox
-            .getSelectionModel()
-            .getSelectedItem();
+        SSHServer server = savedServersComboBox.getSelectionModel().getSelectedItem();
         if (server == null) {
-            showError(
-                "No Server Selected",
-                "Please select a server from the dropdown"
-            );
+            showError("No Server Selected", "Please select a server from the dropdown");
             return;
         }
 
-        // Load server details into form
         hostField.setText(server.getHost());
         portField.setText(String.valueOf(server.getPort()));
         usernameField.setText(server.getUsername());
 
-        if (server.isUsePrivateKey()) {
-            usePrivateKeyCheckBox.setSelected(true);
-            privateKeyPathField.setText(server.getPrivateKeyPath());
-            passphraseField.setText(server.getPassphrase());
-        } else {
-            usePrivateKeyCheckBox.setSelected(false);
-            if (server.isSavePassword() && server.hasPassword()) {
-                passwordField.setText(server.getPassword());
-            }
+        if (server.isSavePassword()) {
+            passwordField.setText(server.getPassword());
         }
 
         if (server.getDefaultPath() != null) {
@@ -373,14 +330,13 @@ public class RemoteFileDialogController {
             return;
         }
 
-        // Ask for server name
         TextInputDialog dialog = new TextInputDialog();
         dialog.setTitle("Save Server");
         dialog.setHeaderText("Enter a name for this server");
         dialog.setContentText("Server Name:");
 
         Optional<String> result = dialog.showAndWait();
-        if (!result.isPresent() || result.get().trim().isEmpty()) {
+        if (result.isEmpty() || result.get().trim().isEmpty()) {
             return;
         }
 
@@ -390,15 +346,8 @@ public class RemoteFileDialogController {
             int port = Integer.parseInt(portStr);
 
             SSHServer server = new SSHServer(name, host, port, username);
-            server.setPassword(
-                savePasswordCheckBox.isSelected()
-                    ? passwordField.getText()
-                    : null
-            );
+            server.setPassword(savePasswordCheckBox.isSelected() ? passwordField.getText() : null);
             server.setSavePassword(savePasswordCheckBox.isSelected());
-            server.setUsePrivateKey(usePrivateKeyCheckBox.isSelected());
-            server.setPrivateKeyPath(privateKeyPathField.getText());
-            server.setPassphrase(passphraseField.getText());
             server.setDefaultPath(remotePathField.getText());
 
             if (!server.isValid()) {
@@ -425,23 +374,16 @@ public class RemoteFileDialogController {
      * Handle delete server
      */
     private void handleDeleteServer() {
-        SSHServer server = savedServersComboBox
-            .getSelectionModel()
-            .getSelectedItem();
+        SSHServer server = savedServersComboBox.getSelectionModel().getSelectedItem();
         if (server == null) {
-            showError(
-                "No Server Selected",
-                "Please select a server from the dropdown"
-            );
+            showError("No Server Selected", "Please select a server from the dropdown");
             return;
         }
 
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Delete Server");
         alert.setHeaderText("Delete SSH Server?");
-        alert.setContentText(
-            "Are you sure you want to delete '" + server.getName() + "'?"
-        );
+        alert.setContentText("Are you sure you want to delete '" + server.getName() + "'?");
 
         Optional<ButtonType> result = alert.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
@@ -461,9 +403,6 @@ public class RemoteFileDialogController {
         String portStr = portField.getText();
         String username = usernameField.getText();
         String password = passwordField.getText();
-        boolean useKey = usePrivateKeyCheckBox.isSelected();
-        String keyPath = privateKeyPathField.getText();
-        String passphrase = passphraseField.getText();
 
         // Validation
         if (host == null || host.trim().isEmpty()) {
@@ -484,13 +423,8 @@ public class RemoteFileDialogController {
             return;
         }
 
-        if (!useKey && (password == null || password.isEmpty())) {
+        if (password == null || password.isEmpty()) {
             showError("Invalid Input", "Password is required");
-            return;
-        }
-
-        if (useKey && (keyPath == null || keyPath.trim().isEmpty())) {
-            showError("Invalid Input", "Private key path is required");
             return;
         }
 
@@ -502,17 +436,7 @@ public class RemoteFileDialogController {
         Task<Boolean> connectTask = new Task<>() {
             @Override
             protected Boolean call() {
-                if (useKey) {
-                    return sshService.connectWithKey(
-                        host,
-                        port,
-                        username,
-                        keyPath,
-                        passphrase
-                    );
-                } else {
-                    return sshService.connect(host, port, username, password);
-                }
+                return sshService.connect(host, port, username, password);
             }
         };
 
@@ -521,46 +445,34 @@ public class RemoteFileDialogController {
             if (success) {
                 isConnected = true;
                 connectionStatusLabel.setText("Connected to " + host);
-                connectionStatusLabel.setStyle(
-                    "-fx-text-fill: green; -fx-font-weight: bold;"
-                );
+                connectionStatusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
                 remoteBrowserPane.setDisable(false);
                 disconnectButton.setDisable(false);
                 connectButton.setDisable(true);
 
-                // Update last used timestamp if this is a saved server
                 if (currentServer != null && currentServer.getId() != null) {
-                    serverManagementService.updateServerLastUsed(
-                        currentServer.getId()
-                    );
+                    serverManagementService.updateServerLastUsed(currentServer.getId());
                 }
 
-                // Load initial directory
                 String startPath = remotePathField.getText();
                 if (startPath == null || startPath.trim().isEmpty()) {
                     startPath = "/";
                 }
+
                 navigateToRemoteDirectory(startPath);
 
                 logger.info("Successfully connected to {}@{}", username, host);
             } else {
                 connectionStatusLabel.setText("Connection failed");
-                connectionStatusLabel.setStyle(
-                    "-fx-text-fill: red; -fx-font-weight: bold;"
-                );
+                connectionStatusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
                 connectButton.setDisable(false);
-                showError(
-                    "Connection Failed",
-                    "Failed to connect to SSH server. Please check your credentials."
-                );
+                showError("Connection Failed", "Failed to connect to SSH server. Please check your credentials.");
             }
         });
 
         connectTask.setOnFailed(e -> {
             connectionStatusLabel.setText("Connection error");
-            connectionStatusLabel.setStyle(
-                "-fx-text-fill: red; -fx-font-weight: bold;"
-            );
+            connectionStatusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
             connectButton.setDisable(false);
             Throwable ex = connectTask.getException();
             logger.error("Connection failed", ex);
@@ -615,10 +527,7 @@ public class RemoteFileDialogController {
         task.setOnFailed(e -> {
             Throwable ex = task.getException();
             logger.error("Failed to list remote directory", ex);
-            showError(
-                "Directory Error",
-                "Failed to list directory: " + ex.getMessage()
-            );
+            showError("Directory Error", "Failed to list directory: " + ex.getMessage());
         });
 
         new Thread(task).start();
@@ -632,41 +541,12 @@ public class RemoteFileDialogController {
             return;
         }
 
-        String parentPath = currentRemotePath.substring(
-            0,
-            currentRemotePath.lastIndexOf('/')
-        );
+        String parentPath = currentRemotePath.substring(0, currentRemotePath.lastIndexOf('/'));
         if (parentPath.isEmpty()) {
             parentPath = "/";
         }
 
         navigateToRemoteDirectory(parentPath);
-    }
-
-    /**
-     * Browse for private key file
-     */
-    private void browsePrivateKey() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Select Private Key");
-        fileChooser
-            .getExtensionFilters()
-            .addAll(
-                new FileChooser.ExtensionFilter(
-                    "Private Key Files",
-                    "*.pem",
-                    "*.key",
-                    "*.ppk"
-                ),
-                new FileChooser.ExtensionFilter("All Files", "*.*")
-            );
-
-        File file = fileChooser.showOpenDialog(
-            browseKeyButton.getScene().getWindow()
-        );
-        if (file != null) {
-            privateKeyPathField.setText(file.getAbsolutePath());
-        }
     }
 
     /**
@@ -676,15 +556,13 @@ public class RemoteFileDialogController {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Select Log File");
         fileChooser
-            .getExtensionFilters()
-            .addAll(
-                new FileChooser.ExtensionFilter("Log Files", "*.log", "*.txt"),
-                new FileChooser.ExtensionFilter("All Files", "*.*")
-            );
+                .getExtensionFilters()
+                .addAll(
+                        new FileChooser.ExtensionFilter("Log Files", "*.log", "*.txt"),
+                        new FileChooser.ExtensionFilter("All Files", "*.*")
+                );
 
-        File file = fileChooser.showOpenDialog(
-            browseLocalButton.getScene().getWindow()
-        );
+        File file = fileChooser.showOpenDialog(browseLocalButton.getScene().getWindow());
         if (file != null) {
             selectedLocalFile = file;
             localFilePathField.setText(file.getAbsolutePath());
@@ -698,7 +576,6 @@ public class RemoteFileDialogController {
         Tab selectedTab = tabPane.getSelectionModel().getSelectedItem();
 
         if (selectedTab == localTab) {
-            // Local file selected
             if (selectedLocalFile != null && selectedLocalFile.exists()) {
                 if (onLocalFileSelected != null) {
                     onLocalFileSelected.accept(selectedLocalFile);
@@ -708,10 +585,9 @@ public class RemoteFileDialogController {
                 showError("No File Selected", "Please select a local file");
             }
         } else if (selectedTab == remoteTab) {
-            // Remote file selected
             SSHService.RemoteFileInfo selected = remoteFilesTable
-                .getSelectionModel()
-                .getSelectedItem();
+                    .getSelectionModel()
+                    .getSelectedItem();
 
             if (selected == null) {
                 showError("No File Selected", "Please select a remote file");
@@ -720,20 +596,20 @@ public class RemoteFileDialogController {
 
             if (selected.isDirectory()) {
                 showError(
-                    "Invalid Selection",
-                    "Please select a file, not a directory"
+                        "Invalid Selection",
+                        "Please select a file, not a directory"
                 );
                 return;
             }
 
-            // Create RecentFile for remote file
-            selectedRemoteFile = new RecentFile(
-                selected.getName(),
-                hostField.getText(),
-                Integer.parseInt(portField.getText()),
-                usernameField.getText(),
-                selected.getPath()
-            );
+//            // Create RecentFile for remote file
+//            selectedRemoteFile = new RecentFile(
+//                    selected.getName(),
+//                    hostField.getText(),
+//                    Integer.parseInt(portField.getText()),
+//                    usernameField.getText(),
+//                    selected.getPath()
+//            );
 
             if (onRemoteFileSelected != null) {
                 onRemoteFileSelected.accept(selectedRemoteFile);
@@ -782,28 +658,5 @@ public class RemoteFileDialogController {
             alert.setContentText(message);
             alert.showAndWait();
         });
-    }
-
-    /**
-     * Set callback for local file selection
-     */
-    public void setOnLocalFileSelected(Consumer<File> callback) {
-        this.onLocalFileSelected = callback;
-    }
-
-    /**
-     * Set callback for remote file selection
-     */
-    public void setOnRemoteFileSelected(Consumer<RecentFile> callback) {
-        this.onRemoteFileSelected = callback;
-    }
-
-    /**
-     * Cleanup resources
-     */
-    public void cleanup() {
-        if (isConnected) {
-            handleDisconnect();
-        }
     }
 }

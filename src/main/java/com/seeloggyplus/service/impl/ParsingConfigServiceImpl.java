@@ -1,11 +1,13 @@
-package com.seeloggyplus.service;
+package com.seeloggyplus.service.impl;
 
 import com.seeloggyplus.model.ParsingConfig;
 import com.seeloggyplus.repository.ParsingConfigRepository;
-import com.seeloggyplus.repository.ParsingConfigRepositoryImpl;
+import com.seeloggyplus.repository.impl.ParsingConfigRepositoryImpl;
+import com.seeloggyplus.service.ParsingConfigService;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 public class ParsingConfigServiceImpl implements ParsingConfigService {
 
@@ -16,7 +18,7 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
     }
 
     @Override
-    public Optional<ParsingConfig> findById(int id) {
+    public Optional<ParsingConfig> findById(String id) {
         return parsingConfigRepository.findById(id);
     }
 
@@ -27,6 +29,7 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
 
     @Override
     public void save(ParsingConfig config) {
+        config.setId(UUID.randomUUID().toString());
         parsingConfigRepository.save(config);
     }
 

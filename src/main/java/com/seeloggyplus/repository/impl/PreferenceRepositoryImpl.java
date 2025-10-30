@@ -1,7 +1,8 @@
-package com.seeloggyplus.repository;
+package com.seeloggyplus.repository.impl;
 
 import com.seeloggyplus.model.Preference;
-import com.seeloggyplus.service.DatabaseService;
+import com.seeloggyplus.repository.PreferenceRepository;
+import com.seeloggyplus.config.DatabaseConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +16,7 @@ import java.util.Optional;
 
 public class PreferenceRepositoryImpl implements PreferenceRepository {
     private static final Logger logger = LoggerFactory.getLogger(PreferenceRepositoryImpl.class);
-    private final Connection connection = DatabaseService.getInstance().getConnection();
+    private final Connection connection = DatabaseConfig.getInstance().getConnection();
 
     @Override
     public void savePreferences(Preference preferences) {

@@ -1,6 +1,7 @@
-package com.seeloggyplus.service;
+package com.seeloggyplus.service.impl;
 
 import com.seeloggyplus.model.LogEntry;
+import com.seeloggyplus.service.LogEntrySource;
 
 import java.util.List;
 import java.util.function.Predicate;
@@ -10,10 +11,10 @@ import java.util.stream.Collectors;
  * An implementation of LogEntrySource that wraps a List<LogEntry>.
  * This is suitable when all log entries are already in memory.
  */
-public class ListLogEntrySource implements LogEntrySource {
+public class ListLogEntrySourceImpl implements LogEntrySource {
     private final List<LogEntry> allEntries;
 
-    public ListLogEntrySource(List<LogEntry> allEntries) {
+    public ListLogEntrySourceImpl(List<LogEntry> allEntries) {
         this.allEntries = allEntries;
     }
 
@@ -37,6 +38,6 @@ public class ListLogEntrySource implements LogEntrySource {
         List<LogEntry> filteredList = allEntries.stream()
                 .filter(predicate)
                 .collect(Collectors.toList());
-        return new ListLogEntrySource(filteredList);
+        return new ListLogEntrySourceImpl(filteredList);
     }
 }

@@ -2,6 +2,7 @@ package com.seeloggyplus.controller;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.seeloggyplus.dto.RecentFilesDto;
 import com.seeloggyplus.model.*;
 import com.seeloggyplus.service.*;
 
@@ -12,13 +13,15 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import com.seeloggyplus.service.impl.*;
+import com.seeloggyplus.util.JsonPrettify;
+import com.seeloggyplus.util.XmlPrettify;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
-import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -86,7 +89,7 @@ public class MainController {
     @FXML
     private Button expandLeftPanelButton; // Button to expand the collapsed left panel
     @FXML
-    private ListView<RecentFile> recentFilesListView;
+    private ListView<RecentFilesDto> recentFilesListView;
     @FXML
     private Button clearRecentButton;
     @FXML
@@ -149,6 +152,8 @@ public class MainController {
     private RecentFileService recentFileService;
     private LogParserService logParserService;
     private PreferenceService preferenceService;
+    private LogFileService logFileService;
+
     private SSHService sshService;
     private final Cache<LogCacheKey, LogCacheValue> logCache = Caffeine.newBuilder()
             .maximumSize(5)
@@ -173,6 +178,7 @@ public class MainController {
         preferenceService = new PreferenceServiceImpl();
         logParserService = new LogParserService();
         sshService = new SSHService();
+        logFileService = new LogFileServiceImpl();
 
         // Initialize data
         visibleLogEntries = FXCollections.observableArrayList();
@@ -194,7 +200,7 @@ public class MainController {
     }
 
     @FXML
-    public void onLoginButtonClick(ActionEvent actionEvent) {
+    public void onLoginButtonClick() {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/LoginLdapDialog.fxml"));
             Parent root = loader.load();
@@ -203,9 +209,9 @@ public class MainController {
 
             Stage stage = new Stage();
             stage.setScene(scene);
-            stage.show();
+            stage.showAndWait();
         } catch (IOException e){
-            e.printStackTrace();
+            logger.error("Failed to open LDAP login dialog", e);
         }
 
     }
@@ -246,7 +252,7 @@ public class MainController {
                 .selectedItemProperty()
                 .addListener((obs, oldVal, newVal) -> {
                     if (
-                            newVal != null && (currentFile == null || !currentFile.getAbsolutePath().equals(newVal.getFilePath()))
+                            newVal != null && (currentFile == null || !currentFile.getAbsolutePath().equals(newVal.logFile().getFilePath()))
                     ) {
                         handleRecentFileSelected(newVal);
                     }
@@ -343,7 +349,7 @@ public class MainController {
         // Add scroll listener for lazy loading
         logTableView.skinProperty().addListener((obs, oldSkin, newSkin) -> {
             if (newSkin != null) {
-                ScrollBar verticalBar = (ScrollBar) ((Parent) newSkin.getNode()).lookup(".scroll-bar:vertical");
+                ScrollBar verticalBar = (ScrollBar) newSkin.getNode().lookup(".scroll-bar:vertical");
                 if (verticalBar != null) {
                     verticalBar.valueProperty().addListener((vObs, oldVal, newVal) -> {
                         if (newVal.doubleValue() > 0.9) { // When scrolled to 90% of the bottom
@@ -380,6 +386,7 @@ public class MainController {
                     remainingEntries = currentLogEntrySource.getEntries(currentSize, totalAvailable - currentSize);
                 }
                 return remainingEntries;
+
             }
         };
 
@@ -549,7 +556,6 @@ public class MainController {
                                         getStyleClass().add("log-level-trace");
                                         break;
                                     default:
-                                        // Tidak ada style khusus
                                         break;
                                 }
                             }
@@ -587,7 +593,7 @@ public class MainController {
 
         File file = fileChooser.showOpenDialog(menuBar.getScene().getWindow());
         if (file != null) {
-            openLogFile(file, true);
+            openLocalLogFile(file, true);
         }
     }
 
@@ -622,70 +628,41 @@ public class MainController {
      * @param file                  The file to open
      * @param updateRecentFilesList true if the file should be added to the top of the recent files list
      */
-    private void openLogFile(File file, boolean updateRecentFilesList) {
+    private void openLocalLogFile(File file, boolean updateRecentFilesList) {
         currentFile = file;
-
         currentParsingConfig = parsingConfigService.findDefault().orElse(null);
 
         if (currentParsingConfig == null) {
             logger.warn("No default parsing config found, creating default");
-            currentParsingConfig = new ParsingConfig(
-                    "Default",
-                    "Default log parsing configuration",
-                    "(?<timestamp>\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?<level>\\w+)\\s+(?<message>.*)"
-            );
-            // Validate the pattern to extract group names
-            if (!currentParsingConfig.validatePattern()) {
-                logger.error(
-                        "Failed to validate default parsing config: {}",
-                        currentParsingConfig.getValidationError()
-                );
-                // Use a simpler pattern as fallback
-                currentParsingConfig = new ParsingConfig(
-                        "Simple Default",
-                        "Simple default configuration",
-                        "(?<line>.*)"
-                );
-                currentParsingConfig.validatePattern();
-            }
-            currentParsingConfig.setDefault(true);
-            parsingConfigService.save(currentParsingConfig);
-            logger.info(
-                    "Created default parsing config with {} groups",
-                    currentParsingConfig.getGroupNames().size()
-            );
-        }
-
-        String configId = currentParsingConfig.getRegexPattern();
-        LogCacheKey key = new LogCacheKey(
-                file.getAbsolutePath(),
-                file.lastModified(),
-                file.length(),
-                configId
-        );
-
-        LogCacheValue cachedValue = logCache.getIfPresent(key);
-        if (cachedValue != null){
-            logger.info("Cache hit for file: {}. Loading from memory", file.getName());
-            updateStatus("Loading from cache: " + file.getName());
-
-            displayLogEntries(new ListLogEntrySource(cachedValue.entries()), file, updateRecentFilesList);
+            showInfo("Log Parsing Configuration", "Parsing Configuration Not Ready, Please Setup First");
             return;
         }
 
-        logger.info("Cache miss for file: {}. Parsing...", file.getName());
+        LogFile logFileByPathAndName = logFileService.getLogFileByPathAndName(currentFile.getName(), currentFile.getAbsolutePath());
+        if (logFileByPathAndName == null){
+            logger.info("LogFile not found in database, creating new entry for file: {}", currentFile.getAbsolutePath());
+            logFileByPathAndName = new LogFile();
+            logFileByPathAndName.setName(currentFile.getName());
+            logFileByPathAndName.setFilePath(currentFile.getAbsolutePath());
+            logFileByPathAndName.setRemote(false);
+            logFileByPathAndName.setParsingConfigurationID(currentParsingConfig.getId());
+            logFileByPathAndName.setModified(String.valueOf(currentFile.lastModified()));
+            logFileByPathAndName.setSize(String.valueOf(currentFile.length()));
 
-        // Show progress
+            logFileService.insertLogFile(logFileByPathAndName);
+        }
+
+        logger.info("Cache miss for file: {}. Parsing...", file.getName());
         progressBar.setVisible(true);
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         updateStatus("Loading file: " + file.getName());
 
         final ParsingConfig configToUse = this.currentParsingConfig;
+        final LogFile finalLogFile = logFileByPathAndName;
 
-        // Parse file in background
         Task<List<LogEntry>> task = new Task<>() {
             @Override
-            protected List<LogEntry> call() throws Exception {
+            protected List<LogEntry> call() throws IOException {
                 return logParserService.parseFileParallel(
                         file,
                         configToUse,
@@ -696,7 +673,7 @@ public class MainController {
                                     long bytesProcessed,
                                     long totalBytes
                             ) {
-                                updateProgress(bytesProcessed, totalBytes); // Update Task's internal progress
+                                updateProgress(bytesProcessed, totalBytes);
                                 Platform.runLater(() -> {
                                     progressBar.setProgress(progress);
                                     updateStatus(
@@ -714,7 +691,6 @@ public class MainController {
                             public void onComplete(long totalEntries) {
                                 Platform.runLater(() -> {
                                     progressBar.setVisible(false);
-                                    // The final status will be set by displayLogEntries
                                 });
                             }
                         }
@@ -726,32 +702,20 @@ public class MainController {
             List<LogEntry> entries = task.getValue();
             logger.info("Parsing completed, got {} entries", entries.size());
 
-            LogCacheValue newValue = new LogCacheValue(configToUse, entries);
-            logCache.put(key, newValue);
-            logger.info("Stored parsing result in cache for key: {}", key);
-
-            // Set the new LogEntrySource
-            originalLogEntrySource = new ListLogEntrySource(entries); // Store the original
-            currentLogEntrySource = originalLogEntrySource; // Current source starts as original
+            originalLogEntrySource = new ListLogEntrySourceImpl(entries);
+            currentLogEntrySource = originalLogEntrySource;
 
             updateTableColumns(currentParsingConfig);
             logger.info("Updated table columns for config: {}", currentParsingConfig.getName());
 
-            // Auto-resize columns to fit content
             Platform.runLater(() -> autoResizeColumns(logTableView));
 
-            // Force table refresh
             logTableView.refresh();
 
             // Add to recent files only if requested
             if (updateRecentFilesList) {
-                RecentFile recentFile = new RecentFile(
-                        file.getAbsolutePath(),
-                        file.getName(),
-                        file.length()
-                );
-                recentFile.setParsingConfig(currentParsingConfig);
-                recentFileService.save(recentFile);
+                RecentFile recentFile = new RecentFile();
+                recentFileService.save(finalLogFile, recentFile);
                 refreshRecentFilesList();
             }
 
@@ -773,18 +737,15 @@ public class MainController {
     /**
      * Handle recent file selected
      */
-    private void handleRecentFileSelected(RecentFile recentFile) {
-        if (recentFile.isRemote()) {
-            // Handle remote file
+    private void handleRecentFileSelected(RecentFilesDto recentFile) {
+        if (recentFile.logFile().isRemote()) {
             showInfo("Remote File", "Opening remote files is not yet implemented in this version.");
         } else {
-            // Handle local file
-            File file = new File(recentFile.getFilePath());
+            File file = new File(recentFile.logFile().getFilePath());
             if (file.exists()) {
-                // Open the file but do not reorder the recent files list
-                openLogFile(file, false);
+                openLocalLogFile(file, false);
             } else {
-                showError("File Not Found", "The file no longer exists: " + recentFile.getFilePath());
+                showError("File Not Found", "The file no longer exists: " + recentFile.logFile().getFilePath());
             }
             performSearch();
             autoResizeColumns(logTableView);
@@ -917,13 +878,13 @@ public class MainController {
 
         while (true) {
             String remainingText = newTextBuilder.substring(offset);
-            String extractedJson = JsonPrettifyService.extractJson(remainingText);
+            String extractedJson = JsonPrettify.extractJson(remainingText);
 
             if (extractedJson == null) {
                 break; // No more JSON found
             }
 
-            String prettifiedJson = JsonPrettifyService.prettify(extractedJson);
+            String prettifiedJson = JsonPrettify.prettify(extractedJson);
 
             int start = newTextBuilder.indexOf(extractedJson, offset);
             if (start == -1) {
@@ -953,13 +914,13 @@ public class MainController {
 
         while (true) {
             String remainingText = newTextBuilder.substring(offset);
-            String extractedXml = XmlPrettifyService.extractXml(remainingText);
+            String extractedXml = XmlPrettify.extractXml(remainingText);
 
             if (extractedXml == null) {
                 break; // No more XML found
             }
 
-            String prettifiedXml = XmlPrettifyService.prettify(extractedXml);
+            String prettifiedXml = XmlPrettify.prettify(extractedXml);
 
             int start = newTextBuilder.indexOf(extractedXml, offset);
             if (start == -1) {
@@ -1019,7 +980,7 @@ public class MainController {
             // Refresh current file if one is loaded.
             // Re-adding to recents will update the parsing config and move it to the top.
             if (currentFile != null) {
-                openLogFile(currentFile, true);
+                openLocalLogFile(currentFile, true);
             }
         } catch (IOException e) {
             logger.error("Failed to open parsing configuration dialog", e);
@@ -1041,7 +1002,6 @@ public class MainController {
      */
     private void toggleBottomPanel() {
         boolean visible = showBottomPanelMenuItem.isSelected();
-        String resultVisiblePanel = "";
 
         if (!visible) {
             // Hide panel
@@ -1049,11 +1009,7 @@ public class MainController {
             bottomPanel.setManaged(false);
 
             // Adjust split pane divider to expand center panel
-            Platform.runLater(() -> {
-                verticalSplitPane.setDividerPositions(1.0);
-            });
-
-            resultVisiblePanel = "false";
+            Platform.runLater(() -> verticalSplitPane.setDividerPositions(1.0));
         } else {
             // Show panel
             bottomPanel.setVisible(true);
@@ -1070,11 +1026,9 @@ public class MainController {
                     verticalSplitPane.setDividerPositions(0.75);
                 }
             });
-
-            resultVisiblePanel = "true";
         }
 
-        preferenceService.saveOrUpdatePreferences(new Preference("bottom_panel_show", resultVisiblePanel));
+        preferenceService.saveOrUpdatePreferences(new Preference("bottom_panel_show", String.valueOf(visible)));
     }
 
     /**
@@ -1102,7 +1056,7 @@ public class MainController {
             if (isLeftPanelPinned) {
                 double savedWidth = 200; // Default value
                 double totalWidth = horizontalSplitPane.getWidth();
-                if (totalWidth > 0 && savedWidth > 0) {
+                if (totalWidth > 0) {
                     double position = savedWidth / totalWidth;
                     horizontalSplitPane.setDividerPositions(position);
                 }
@@ -1113,7 +1067,7 @@ public class MainController {
             if (bottomPanelShow) {
                 double savedHeight = 200; // Default value
                 double totalHeight = verticalSplitPane.getHeight();
-                if (totalHeight > 0 && savedHeight > 0) {
+                if (totalHeight > 0) {
                     double position = (totalHeight - savedHeight) / totalHeight;
                     verticalSplitPane.setDividerPositions(position);
                 }
@@ -1127,11 +1081,10 @@ public class MainController {
      * Method helper for display (from cache or new parse) to UI.
      */
     private void displayLogEntries(LogEntrySource source, File file, boolean updateRecentFilesList) {
-        this.currentLogEntrySource = source; // Update the current source
-        this.currentParsingConfig = currentParsingConfig; // Keep the current parsing config
+        this.currentLogEntrySource = source;
 
         visibleLogEntries.clear();
-        loadMoreVisibleEntries(); // Load initial batch
+        loadMoreVisibleEntries();
 
         updateTableColumns(this.currentParsingConfig);
 
@@ -1151,16 +1104,14 @@ public class MainController {
             );
         });
 
-        // Recent file logic remains the same, but ensure currentParsingConfig is set
+        // Recent file logic: save to database if requested
         if (updateRecentFilesList) {
-            RecentFile recentFile = new RecentFile(
-                    file.getAbsolutePath(),
-                    file.getName(),
-                    file.length()
-            );
-            recentFile.setParsingConfig(this.currentParsingConfig);
-            recentFileService.save(recentFile);
-            refreshRecentFilesList();
+            LogFile logFile = logFileService.getLogFileByPathAndName(file.getName(), file.getAbsolutePath());
+            if (logFile != null) {
+                RecentFile recentFile = new RecentFile();
+                recentFileService.save(logFile, recentFile);
+                refreshRecentFilesList();
+            }
         }
 
         logger.info("Loaded {} log entries from {}, table now shows {} items (Total: {})", visibleLogEntries.size(), file.getName(), visibleLogEntries.size(), currentLogEntrySource.getTotalEntries());
@@ -1310,10 +1261,10 @@ public class MainController {
     /**
      * Custom list cell for recent files
      */
-    private static class RecentFileListCell extends ListCell<RecentFile> {
+    private static class RecentFileListCell extends ListCell<RecentFilesDto> {
 
         @Override
-        protected void updateItem(RecentFile item, boolean empty) {
+        protected void updateItem(RecentFilesDto item, boolean empty) {
             super.updateItem(item, empty);
 
             if (empty || item == null) {
@@ -1321,10 +1272,11 @@ public class MainController {
                 setGraphic(null);
             } else {
                 VBox vbox = new VBox(2);
-                Label nameLabel = new Label(item.getFileName());
+                LogFile logFile = item.logFile();
+                Label nameLabel = new Label(logFile.getName());
                 nameLabel.setStyle("-fx-font-weight: bold;");
-                Label pathLabel = new Label(item.getFullPathDisplay());
-                Label sizeLabel = new Label(item.getFormattedFileSize());
+                Label pathLabel = new Label(logFile.getFilePath());
+                Label sizeLabel = new Label(logFile.getSize() + " bytes");
                 vbox.getChildren().addAll(nameLabel, pathLabel, sizeLabel);
                 setGraphic(vbox);
             }

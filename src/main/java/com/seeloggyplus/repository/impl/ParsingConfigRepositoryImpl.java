@@ -1,7 +1,8 @@
-package com.seeloggyplus.repository;
+package com.seeloggyplus.repository.impl;
 
 import com.seeloggyplus.model.ParsingConfig;
-import com.seeloggyplus.service.DatabaseService;
+import com.seeloggyplus.repository.ParsingConfigRepository;
+import com.seeloggyplus.config.DatabaseConfig;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -16,13 +17,13 @@ import org.slf4j.LoggerFactory;
 public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
 
     private static final Logger logger = LoggerFactory.getLogger(ParsingConfigRepositoryImpl.class);
-    private final Connection connection = DatabaseService.getInstance().getConnection();
+    private final Connection connection = DatabaseConfig.getInstance().getConnection();
 
     @Override
-    public Optional<ParsingConfig> findById(int id) {
+    public Optional<ParsingConfig> findById(String id) {
         String sql = "SELECT * FROM parsing_configs WHERE id = ?";
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
-            preparedStatement.setInt(1, id);
+            preparedStatement.setString(1, id);
             ResultSet rs = preparedStatement.executeQuery();
             if (rs.next()) {
                 return Optional.of(mapRowToParsingConfig(rs));
@@ -57,14 +58,6 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
             preparedStatement.setString(3, config.getRegexPattern());
             preparedStatement.setBoolean(4, config.isDefault());
             preparedStatement.executeUpdate();
-
-            try (Statement stmt = connection.createStatement()) {
-                ResultSet rs = stmt.executeQuery("SELECT last_insert_rowid()");
-                if (rs.next()) {
-                    config.setId(rs.getInt(1));
-                }
-            }
-
         } catch (SQLException e) {
             logger.error("Error saving parsing config: {}", config.getName(), e);
         }
@@ -78,7 +71,7 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
             preparedStatement.setString(2, config.getDescription());
             preparedStatement.setString(3, config.getRegexPattern());
             preparedStatement.setBoolean(4, config.isDefault());
-            preparedStatement.setInt(5, config.getId());
+            preparedStatement.setString(5, config.getId());
             preparedStatement.executeUpdate();
         } catch (SQLException e) {
             logger.error("Error updating parsing config: {}", config.getName(), e);
@@ -89,7 +82,7 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
     public void delete(ParsingConfig config) {
         String sql = "DELETE FROM parsing_configs WHERE id = ?";
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
-            preparedStatement.setInt(1, config.getId());
+            preparedStatement.setString(1, config.getId());
             preparedStatement.executeUpdate();
         } catch (SQLException e) {
             logger.error("Error deleting parsing config: {}", config.getName(), e);
@@ -112,7 +105,7 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
 
     private ParsingConfig mapRowToParsingConfig(ResultSet rs) throws SQLException {
         ParsingConfig config = new ParsingConfig();
-        config.setId(rs.getInt("id"));
+        config.setId(rs.getString("id"));
         config.setName(rs.getString("name"));
         config.setDescription(rs.getString("description"));
         config.setRegexPattern(rs.getString("regex_pattern"));

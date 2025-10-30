@@ -1,8 +1,6 @@
-package com.seeloggyplus.service;
+package com.seeloggyplus.config;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -10,15 +8,17 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DatabaseService {
-    private static final Logger logger = LoggerFactory.getLogger(DatabaseService.class);
-    private static DatabaseService instance;
+@Getter
+public class DatabaseConfig {
+    private static final Logger logger = LoggerFactory.getLogger(DatabaseConfig.class);
+    private static DatabaseConfig instance;
     private Connection connection;
 
-    private DatabaseService() {
+    private DatabaseConfig() {
         try {
             Path dbPath = Path.of(System.getProperty("user.home"), "/.seeloggyplus", "/data", "seeloggyplus.db");
 
@@ -43,20 +43,16 @@ public class DatabaseService {
         }
     }
 
-    public static synchronized DatabaseService getInstance() {
+    public static synchronized DatabaseConfig getInstance() {
         if (instance == null) {
-            instance = new DatabaseService();
+            instance = new DatabaseConfig();
         }
         return instance;
     }
 
-    public Connection getConnection() {
-        return connection;
-    }
-
     private void createTables() {
         String createParsingConfigTable = "CREATE TABLE IF NOT EXISTS parsing_configs ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + "id TEXT PRIMARY KEY,"
                 + "name TEXT NOT NULL UNIQUE,"
                 + "description TEXT,"
                 + "regex_pattern TEXT NOT NULL,"
@@ -64,15 +60,12 @@ public class DatabaseService {
                 + ");";
 
         String createSshServerTable = "CREATE TABLE IF NOT EXISTS ssh_servers ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + "id TEXT PRIMARY KEY,"
                 + "name TEXT NOT NULL UNIQUE,"
                 + "host TEXT NOT NULL,"
                 + "port INTEGER NOT NULL,"
                 + "username TEXT NOT NULL,"
                 + "password TEXT,"
-                + "use_private_key BOOLEAN NOT NULL DEFAULT 0,"
-                + "private_key_path TEXT,"
-                + "passphrase TEXT,"
                 + "default_path TEXT,"
                 + "created_at TEXT NOT NULL,"
                 + "last_used TEXT,"
@@ -84,10 +77,29 @@ public class DatabaseService {
                 + "value TEXT"
                 + ");";
 
+        String createLogFileTable = "CREATE TABLE IF NOT EXISTS log_files (" +
+                "id TEXT PRIMARY KEY," +
+                "name TEXT NOT NULL," +
+                "file_path TEXT NOT NULL," +
+                "size TEXT," +
+                "modified TEXT" +
+                "is_remote BOOLEAN DEFAULT 0," +
+                "ssh_server_id TEXT," +
+                "parsing_configuration_id" +
+                ");";
+
+        String createRecentFiles = "CREATE TABLE IF NOT EXISTS recent_files (" +
+                "id TEXT PRIMARY KEY," +
+                "file_id TEXT," +
+                "last_opened DATE" +
+                ");";
+
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(createParsingConfigTable);
             stmt.execute(createSshServerTable);
             stmt.execute(createPreferencesTable);
+            stmt.execute(createLogFileTable);
+            stmt.execute(createRecentFiles);
             logger.info("Tables created or already exist.");
         } catch (SQLException e) {
             logger.error("Failed to create tables.", e);

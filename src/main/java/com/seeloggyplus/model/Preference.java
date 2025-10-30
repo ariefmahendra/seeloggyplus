@@ -1,30 +1,21 @@
 package com.seeloggyplus.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Setter
+@Getter
+@AllArgsConstructor
+@NoArgsConstructor
 public class Preference {
+    private String id;
     private String code;
     private String value;
 
     public Preference(String code, String value) {
         this.code = code;
-        this.value = value;
-    }
-
-    public Preference() {
-    }
-
-    public String getCode() {
-        return code;
-    }
-
-    public void setCode(String code) {
-        this.code = code;
-    }
-
-    public String getValue() {
-        return value;
-    }
-
-    public void setValue(String value) {
         this.value = value;
     }
 }

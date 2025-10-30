@@ -1,13 +1,15 @@
-package com.seeloggyplus.service;
+package com.seeloggyplus.service.impl;
 
 import com.seeloggyplus.model.Preference;
 import com.seeloggyplus.repository.PreferenceRepository;
-import com.seeloggyplus.repository.PreferenceRepositoryImpl;
+import com.seeloggyplus.repository.impl.PreferenceRepositoryImpl;
+import com.seeloggyplus.service.PreferenceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 public class PreferenceServiceImpl implements PreferenceService {
     private static final Logger logger = LoggerFactory.getLogger(PreferenceServiceImpl.class);
@@ -20,6 +22,8 @@ public class PreferenceServiceImpl implements PreferenceService {
     @Override
     public void savePreferences(Preference preferences) {
         logger.info("Starting Save Preferences");
+        String id = UUID.randomUUID().toString();
+        preferences.setId(id);
         preferencesRepository.savePreferences(preferences);
         logger.info("Finish save preferences");
     }
