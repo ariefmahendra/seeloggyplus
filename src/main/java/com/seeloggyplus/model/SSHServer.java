@@ -30,11 +30,12 @@ public class SSHServer {
     private boolean savePassword;
 
     public SSHServer(String name, String host, int port, String username) {
-        this();
         this.name = name;
         this.host = host;
         this.port = port;
         this.username = username;
+        this.savePassword = false;
+        this.createdAt = LocalDateTime.now();
     }
 
     /**

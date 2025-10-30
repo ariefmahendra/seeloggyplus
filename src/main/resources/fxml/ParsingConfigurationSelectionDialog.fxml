@@ -74,9 +74,9 @@
         </VBox>
     </content>
 
-<!--    <VBox>-->
-<!--        <Button text="Select" fx:id="selectButton" defaultButton="true" />-->
-<!--        <Button text="Cancel" fx:id="cancelButton"/>-->
-<!--    </VBox>-->
+    <buttonTypes>
+        <ButtonType fx:constant="OK" />
+        <ButtonType fx:constant="CANCEL" />
+    </buttonTypes>
 
 </DialogPane>

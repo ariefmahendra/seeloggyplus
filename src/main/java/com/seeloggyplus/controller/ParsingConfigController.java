@@ -298,15 +298,30 @@ public class ParsingConfigController {
             return;
         }
 
+        // Create temp config and set pattern
         ParsingConfig tempConfig = new ParsingConfig();
         tempConfig.setRegexPattern(pattern);
 
+        // IMPORTANT: Call validatePattern() to extract named groups
+        tempConfig.validatePattern();
+
+        // Now check if valid and display results
         if (tempConfig.isValid()) {
             validationLabel.setText("✓ Pattern is valid");
             validationLabel.getStyleClass().setAll("validation-success");
-            groupNamesListView.setItems(
-                    FXCollections.observableArrayList(tempConfig.getGroupNames())
-            );
+
+            // Display extracted group names in the list
+            if (tempConfig.getGroupNames() != null && !tempConfig.getGroupNames().isEmpty()) {
+                groupNamesListView.setItems(
+                        FXCollections.observableArrayList(tempConfig.getGroupNames())
+                );
+                logger.info("Detected {} named groups: {}",
+                    tempConfig.getGroupNames().size(),
+                    tempConfig.getGroupNames());
+            } else {
+                groupNamesListView.getItems().clear();
+                logger.warn("No named groups detected in pattern");
+            }
         } else {
             validationLabel.setText("✗ " + tempConfig.getValidationError());
             validationLabel.getStyleClass().setAll("validation-error");
@@ -346,12 +361,15 @@ public class ParsingConfigController {
             ObservableList<ParsedField> fields = FXCollections.observableArrayList();
             result
                     .getParsedFields()
-                    .forEach((key, value) -> fields.add(new ParsedField(new SimpleStringProperty(key), new SimpleStringProperty(value))));
+                    .forEach((key, value) -> fields.add(new ParsedField(key, value)));
             previewTableView.setItems(fields);
+
+            logger.info("Test parsing successful, displaying {} fields", fields.size());
         } else {
             testResultLabel.setText("✗ " + result.getMessage());
             testResultLabel.getStyleClass().setAll("validation-error");
             previewTableView.getItems().clear();
+            logger.warn("Test parsing failed: {}", result.getMessage());
         }
     }
 
@@ -619,7 +637,31 @@ public class ParsingConfigController {
     }
 
     /**
-     * Helper class for parsed field display
+     * Helper class for parsed field display in preview table
      */
-    public record ParsedField(SimpleStringProperty fieldName, SimpleStringProperty fieldValue){}
+    public static class ParsedField {
+        private final SimpleStringProperty fieldName;
+        private final SimpleStringProperty fieldValue;
+
+        public ParsedField(String fieldName, String fieldValue) {
+            this.fieldName = new SimpleStringProperty(fieldName);
+            this.fieldValue = new SimpleStringProperty(fieldValue);
+        }
+
+        public String getFieldName() {
+            return fieldName.get();
+        }
+
+        public SimpleStringProperty fieldNameProperty() {
+            return fieldName;
+        }
+
+        public String getFieldValue() {
+            return fieldValue.get();
+        }
+
+        public SimpleStringProperty fieldValueProperty() {
+            return fieldValue;
+        }
+    }
 }

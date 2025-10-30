@@ -21,38 +21,38 @@ import org.slf4j.LoggerFactory;
 
 public class RecentFileRepositoryImpl implements RecentFileRepository {
     private static final Logger logger = LoggerFactory.getLogger(RecentFileRepositoryImpl.class);
-    private final Connection connection = DatabaseConfig.getInstance().getConnection();
 
     public RecentFileRepositoryImpl() {
+    }
+
+    private Connection getConnection() {
+        return DatabaseConfig.getInstance().getConnection();
     }
 
     @Override
     public List<RecentFilesDto> findAll() {
         List<RecentFilesDto> recentFiles = new ArrayList<>();
-        String sql = "SELECT" +
-                "    lf.id AS file_id," +
-                "    lf.name AS file_name," +
-                "    lf.file_path," +
-                "    lf.size," +
-                "    lf.modified," +
-                "    lf.is_remote," +
-                "    lf.ssh_server_id,"+
-                "    lf.parsing_config_id,"+
-                "    pc.id AS config_id," +
-                "    pc.name AS config_name," +
-                "    pc.description AS config_description," +
-                "    pc.regex_pattern," +
-                "    pc.is_default" +
-                "FROM" +
-                "    recent_files AS rf" +
-                "JOIN" +
-                "    log_files AS lf ON rf.file_id = lf.id" +
-                "LEFT JOIN" +
-                "    parsing_configs AS pc ON lf.parsing_config_id = pc.id" +
-                "ORDER BY" +
-                "    rf.last_opened DESC;";
+        String sql = "SELECT " +
+                "lf.id AS file_id, " +
+                "lf.name AS file_name, " +
+                "lf.file_path, " +
+                "lf.size, " +
+                "lf.modified, " +
+                "lf.is_remote, " +
+                "lf.ssh_server_id, " +
+                "lf.parsing_configuration_id AS parsing_config_id, " +
+                "pc.id AS config_id, " +
+                "pc.name AS config_name, " +
+                "pc.description AS config_description, " +
+                "pc.regex_pattern, " +
+                "pc.is_default " +
+                "FROM recent_files rf " +
+                "JOIN log_files lf ON rf.file_id = lf.id " +
+                "LEFT JOIN parsing_configs pc ON lf.parsing_configuration_id = pc.id " +
+                "ORDER BY rf.last_opened DESC";
 
-        try (Statement stmt = connection.createStatement();
+        Connection conn = getConnection();
+        try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
                 recentFiles.add(mapRowToRecentFileDto(rs));
@@ -66,11 +66,19 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
     @Override
     public void save(RecentFile recentFile) {
         String sql = "INSERT OR REPLACE INTO recent_files (id, file_id, last_opened) VALUES (?, ?, ?)";
-        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        Connection conn = getConnection();
+        try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
             preparedStatement.setString(1, recentFile.getId());
             preparedStatement.setString(2, recentFile.getFileId());
-            preparedStatement.setString(3, recentFile.getLastOpened().toString());
+
+            // Handle null lastOpened with current timestamp as fallback
+            String lastOpenedStr = recentFile.getLastOpened() != null
+                ? recentFile.getLastOpened().toString()
+                : java.time.LocalDateTime.now().toString();
+            preparedStatement.setString(3, lastOpenedStr);
+
             preparedStatement.executeUpdate();
+            logger.info("Successfully saved recent file: {}", recentFile.getFileId());
         } catch (SQLException e) {
             logger.error("Error saving recent file: {}", recentFile.getId(), e);
         }
@@ -79,7 +87,8 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
     @Override
     public void deleteAll() {
         String sql = "DELETE FROM recent_files";
-        try (Statement stmt = connection.createStatement()) {
+        Connection conn = getConnection();
+        try (Statement stmt = conn.createStatement()) {
             stmt.executeUpdate(sql);
         } catch (SQLException e) {
             logger.error("Error deleting all recent files", e);

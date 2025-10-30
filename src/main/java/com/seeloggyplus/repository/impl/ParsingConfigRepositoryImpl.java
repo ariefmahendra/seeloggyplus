@@ -110,6 +110,10 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
         config.setDescription(rs.getString("description"));
         config.setRegexPattern(rs.getString("regex_pattern"));
         config.setDefault(rs.getBoolean("is_default"));
+
+        // IMPORTANT: Validate pattern to extract group names and set isValid flag
+        config.validatePattern();
+
         return config;
     }
 }

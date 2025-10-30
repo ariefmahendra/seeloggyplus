@@ -1,6 +1,5 @@
 package com.seeloggyplus.repository;
 
-import com.seeloggyplus.exceptions.database.ConflictException;
 import com.seeloggyplus.exceptions.database.FatalDatabaseException;
 import com.seeloggyplus.exceptions.database.NotFoundException;
 import com.seeloggyplus.model.LogFile;

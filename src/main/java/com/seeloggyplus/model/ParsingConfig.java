@@ -46,6 +46,11 @@ public class ParsingConfig {
      * Validates the regex pattern and extracts named groups
      */
     public void validatePattern() {
+        // Initialize groupNames if null
+        if (this.groupNames == null) {
+            this.groupNames = new ArrayList<>();
+        }
+
         if (regexPattern == null || regexPattern.trim().isEmpty()) {
             this.isValid = false;
             this.validationError = "Regex pattern cannot be empty";
@@ -69,6 +74,9 @@ public class ParsingConfig {
         } catch (PatternSyntaxException e) {
             this.isValid = false;
             this.validationError = "Invalid regex pattern: " + e.getMessage();
+            if (this.groupNames == null) {
+                this.groupNames = new ArrayList<>();
+            }
             this.groupNames.clear();
             this.compiledPattern = null;
         }

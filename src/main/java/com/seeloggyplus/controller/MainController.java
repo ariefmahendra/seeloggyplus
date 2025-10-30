@@ -8,6 +8,7 @@ import com.seeloggyplus.service.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -582,6 +583,7 @@ public class MainController {
      * Handle open file action
      */
     private void handleOpenFile() {
+        // First, show file chooser to select log file
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Open Log File");
         fileChooser
@@ -592,9 +594,21 @@ public class MainController {
                 );
 
         File file = fileChooser.showOpenDialog(menuBar.getScene().getWindow());
-        if (file != null) {
-            openLocalLogFile(file, true);
+        if (file == null) {
+            logger.info("No file selected, operation cancelled");
+            return;
         }
+
+        // After file is selected, show parsing configuration selection dialog
+        ParsingConfig selectedConfig = showParsingConfigSelectionDialog();
+
+        if (selectedConfig == null) {
+            logger.info("No parsing configuration selected, operation cancelled");
+            return;
+        }
+
+        // Now open and parse the file with selected configuration
+        openLocalLogFile(file, true, selectedConfig);
     }
 
     /**
@@ -623,42 +637,63 @@ public class MainController {
     }
 
     /**
-     * Open and parse log file
+     * Open and parse log file (uses default parsing config)
      *
      * @param file                  The file to open
      * @param updateRecentFilesList true if the file should be added to the top of the recent files list
      */
     private void openLocalLogFile(File file, boolean updateRecentFilesList) {
-        currentFile = file;
-        currentParsingConfig = parsingConfigService.findDefault().orElse(null);
+        ParsingConfig defaultConfig = parsingConfigService.findDefault().orElse(null);
 
-        if (currentParsingConfig == null) {
-            logger.warn("No default parsing config found, creating default");
+        if (defaultConfig == null) {
+            logger.warn("No default parsing config found");
             showInfo("Log Parsing Configuration", "Parsing Configuration Not Ready, Please Setup First");
             return;
         }
 
-        LogFile logFileByPathAndName = logFileService.getLogFileByPathAndName(currentFile.getName(), currentFile.getAbsolutePath());
-        if (logFileByPathAndName == null){
-            logger.info("LogFile not found in database, creating new entry for file: {}", currentFile.getAbsolutePath());
-            logFileByPathAndName = new LogFile();
-            logFileByPathAndName.setName(currentFile.getName());
-            logFileByPathAndName.setFilePath(currentFile.getAbsolutePath());
-            logFileByPathAndName.setRemote(false);
-            logFileByPathAndName.setParsingConfigurationID(currentParsingConfig.getId());
-            logFileByPathAndName.setModified(String.valueOf(currentFile.lastModified()));
-            logFileByPathAndName.setSize(String.valueOf(currentFile.length()));
+        openLocalLogFile(file, updateRecentFilesList, defaultConfig);
+    }
 
-            logFileService.insertLogFile(logFileByPathAndName);
+    /**
+     * Open and parse log file with specified parsing configuration
+     *
+     * @param file                  The file to open
+     * @param updateRecentFilesList true if the file should be added to the top of the recent files list
+     * @param parsingConfig         The parsing configuration to use
+     */
+    private void openLocalLogFile(File file, boolean updateRecentFilesList, ParsingConfig parsingConfig) {
+        if (file == null || !file.exists()) {
+            logger.error("File does not exist: {}", file);
+            showError("File Error", "The selected file does not exist or cannot be accessed.");
+            return;
         }
 
-        logger.info("Cache miss for file: {}. Parsing...", file.getName());
+        if (parsingConfig == null) {
+            logger.warn("Parsing config is null");
+            showInfo("Log Parsing Configuration", "Parsing Configuration Not Ready. Please Setup First.");
+            return;
+        }
+
+        currentFile = file;
+        currentParsingConfig = parsingConfig;
+
+        // Step 1: Get or create LogFile record in database
+        LogFile logFile = getOrCreateLogFile(file, parsingConfig);
+
+        if (logFile == null) {
+            logger.error("Failed to get or create log file record for: {}", file.getAbsolutePath());
+            showError("Database Error", "Failed to save log file information to database.");
+            return;
+        }
+
+        // Step 2: Start parsing process
+        logger.info("Starting to parse file: {} with config: {}", file.getName(), parsingConfig.getName());
         progressBar.setVisible(true);
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         updateStatus("Loading file: " + file.getName());
 
         final ParsingConfig configToUse = this.currentParsingConfig;
-        final LogFile finalLogFile = logFileByPathAndName;
+        final LogFile finalLogFile = logFile;
 
         Task<List<LogEntry>> task = new Task<>() {
             @Override
@@ -715,8 +750,11 @@ public class MainController {
             // Add to recent files only if requested
             if (updateRecentFilesList) {
                 RecentFile recentFile = new RecentFile();
+                recentFile.setFileId(finalLogFile.getId());
+                recentFile.setLastOpened(LocalDateTime.now());
                 recentFileService.save(finalLogFile, recentFile);
                 refreshRecentFilesList();
+                logger.info("Added file to recent files: {}", file.getName());
             }
 
             displayLogEntries(currentLogEntrySource, file, updateRecentFilesList);
@@ -735,6 +773,127 @@ public class MainController {
     }
 
     /**
+     * Get existing LogFile from database or create new one
+     * This method handles both insert and update scenarios
+     *
+     * @param file the physical file
+     * @param parsingConfig the parsing configuration to use
+     * @return LogFile entity or null if failed
+     */
+    private LogFile getOrCreateLogFile(File file, ParsingConfig parsingConfig) {
+        try {
+            // Try to find existing LogFile record
+            LogFile existingLogFile = logFileService.getLogFileByPathAndName(file.getName(), file.getAbsolutePath());
+
+            if (existingLogFile != null) {
+                // Update existing record with new metadata
+                logger.info("LogFile found in database, updating metadata for: {}", file.getAbsolutePath());
+                existingLogFile.setSize(String.valueOf(file.length()));
+                existingLogFile.setModified(String.valueOf(file.lastModified()));
+                existingLogFile.setParsingConfigurationID(parsingConfig.getId());
+
+                try {
+                    logFileService.updateLogFile(existingLogFile);
+                    logger.info("Successfully updated LogFile: {}", existingLogFile.getId());
+                    return existingLogFile;
+                } catch (Exception ex) {
+                    logger.error("Failed to update LogFile, will use existing data", ex);
+                    // Return existing data even if update fails
+                    return existingLogFile;
+                }
+            } else {
+                // Create new LogFile record
+                logger.info("LogFile not found in database, creating new entry for: {}", file.getAbsolutePath());
+                LogFile newLogFile = new LogFile();
+                newLogFile.setName(file.getName());
+                newLogFile.setFilePath(file.getAbsolutePath());
+                newLogFile.setRemote(false);
+                newLogFile.setSshServerID(null);
+                newLogFile.setParsingConfigurationID(parsingConfig.getId());
+                newLogFile.setModified(String.valueOf(file.lastModified()));
+                newLogFile.setSize(String.valueOf(file.length()));
+
+                logFileService.insertLogFile(newLogFile);
+                logger.info("Successfully created LogFile with ID: {}", newLogFile.getId());
+                return newLogFile;
+            }
+        } catch (Exception ex) {
+            logger.error("Error in getOrCreateLogFile for: {}", file.getAbsolutePath(), ex);
+            return null;
+        }
+    }
+
+    /**
+     * Show parsing configuration selection dialog and return selected config
+     * @return Selected ParsingConfig or null if cancelled
+     */
+    private ParsingConfig showParsingConfigSelectionDialog() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ParsingConfigurationSelectionDialog.fxml"));
+            DialogPane dialogPane = loader.load();
+
+            ParsingConfigurationSelectionDialogController controller = loader.getController();
+
+            // Create Dialog with the loaded DialogPane
+            Dialog<ButtonType> dialog = new Dialog<>();
+            dialog.setTitle("Select Parsing Configuration");
+            dialog.initModality(Modality.APPLICATION_MODAL);
+            dialog.initOwner(menuBar.getScene().getWindow());
+            dialog.setDialogPane(dialogPane);
+
+            // Show dialog and wait for result
+            Optional<ButtonType> result = dialog.showAndWait();
+
+            // Check if OK was pressed and selection is valid
+            if (result.isPresent() && result.get() == ButtonType.OK) {
+                if (controller.isValidSelection()) {
+                    ParsingConfig selected = controller.getSelectedConfig();
+                    logger.info("Selected parsing configuration: {}", selected != null ? selected.getName() : "null");
+                    return selected;
+                } else {
+                    logger.info("Invalid configuration selected");
+                    return null;
+                }
+            }
+
+            logger.info("Dialog cancelled or closed");
+            return null;
+        } catch (IOException e) {
+            logger.error("Failed to open parsing configuration selection dialog", e);
+            showError("Failed to open dialog", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Handle parsing configuration
+     */
+    private void handleParsingConfiguration() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ParsingConfigDialog.fxml"));
+            Parent root = loader.load();
+
+            Stage dialog = new Stage();
+            dialog.initOwner(menuBar.getScene().getWindow());
+            Scene scene = new Scene(root);
+            dialog.setScene(scene);
+            dialog.setWidth(1000);
+            dialog.setHeight(800);
+
+            dialog.showAndWait();
+
+            // Refresh current file if one is loaded.
+            // Re-adding to recents will update the parsing config and move it to the top.
+            if (currentFile != null) {
+                openLocalLogFile(currentFile, true);
+            }
+        } catch (IOException e) {
+            logger.error("Failed to open parsing configuration dialog", e);
+            showError("Failed to open parsing configuration", e.getMessage());
+        }
+    }
+
+    /**
      * Handle recent file selected
      */
     private void handleRecentFileSelected(RecentFilesDto recentFile) {
@@ -742,11 +901,39 @@ public class MainController {
             showInfo("Remote File", "Opening remote files is not yet implemented in this version.");
         } else {
             File file = new File(recentFile.logFile().getFilePath());
-            if (file.exists()) {
-                openLocalLogFile(file, false);
-            } else {
+            if (!file.exists()) {
                 showError("File Not Found", "The file no longer exists: " + recentFile.logFile().getFilePath());
+                return;
             }
+
+            // Get parsing config from the recent file DTO (already loaded from database)
+            ParsingConfig parsingConfig = recentFile.parsingConfig();
+
+            if (parsingConfig == null) {
+                // If no config associated, try to get from LogFile record
+                String parsingConfigId = recentFile.logFile().getParsingConfigurationID();
+                if (parsingConfigId != null && !parsingConfigId.isEmpty()) {
+                    parsingConfig = parsingConfigService.findById(parsingConfigId).orElse(null);
+                }
+            }
+
+            if (parsingConfig == null) {
+                // Fallback: show dialog to select parsing config
+                logger.warn("No parsing config associated with file: {}, showing selection dialog", file.getName());
+                parsingConfig = showParsingConfigSelectionDialog();
+
+                if (parsingConfig == null) {
+                    logger.info("No parsing configuration selected for recent file, operation cancelled");
+                    return;
+                }
+            }
+
+            logger.info("Opening recent file: {} with parsing config: {}", file.getName(), parsingConfig.getName());
+
+            // Open file with the associated parsing config
+            // Don't update recent files list (already in recent files)
+            openLocalLogFile(file, false, parsingConfig);
+
             performSearch();
             autoResizeColumns(logTableView);
         }
@@ -960,33 +1147,6 @@ public class MainController {
         detailLabel.setText("Log Detail");
     }
 
-    /**
-     * Handle parsing configuration
-     */
-    private void handleParsingConfiguration() {
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ParsingConfigDialog.fxml"));
-            Parent root = loader.load();
-
-            Stage dialog = new Stage();
-            dialog.initOwner(menuBar.getScene().getWindow());
-            Scene scene = new Scene(root);
-            dialog.setScene(scene);
-            dialog.setWidth(1000);
-            dialog.setHeight(800);
-
-            dialog.showAndWait();
-
-            // Refresh current file if one is loaded.
-            // Re-adding to recents will update the parsing config and move it to the top.
-            if (currentFile != null) {
-                openLocalLogFile(currentFile, true);
-            }
-        } catch (IOException e) {
-            logger.error("Failed to open parsing configuration dialog", e);
-            showError("Failed to open parsing configuration", e.getMessage());
-        }
-    }
 
     /**
      * Toggle left panel visibility

@@ -3,6 +3,7 @@ package com.seeloggyplus.controller;
 import com.seeloggyplus.model.ParsingConfig;
 import com.seeloggyplus.service.ParsingConfigService;
 import com.seeloggyplus.service.impl.ParsingConfigServiceImpl;
+import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -17,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import java.net.URL;
 import java.util.List;
 import java.util.ResourceBundle;
-import java.util.stream.Collectors;
 
 /**
  * Controller untuk ParsingConfigurationSelectionDialog
@@ -54,11 +54,6 @@ public class ParsingConfigurationSelectionDialogController implements Initializa
     @FXML
     private TextArea detailPatternTextArea;
 
-    @FXML
-    private Button selectButton;
-
-    @FXML
-    private Button cancelButton;
 
     private ParsingConfigService parsingConfigService;
     private ObservableList<ParsingConfig> configList;
@@ -133,6 +128,18 @@ public class ParsingConfigurationSelectionDialogController implements Initializa
             configTableView.setItems(filteredList);
 
             logger.info("Loaded {} parsing configurations", configs.size());
+
+            // Show message if no configurations available
+            if (configs.isEmpty()) {
+                Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                    alert.setTitle("No Parsing Configurations");
+                    alert.setHeaderText("No parsing configurations available");
+                    alert.setContentText("Please create a parsing configuration first.\n\n" +
+                            "Go to Settings → Parsing Configuration to create one.");
+                    alert.showAndWait();
+                });
+            }
         } catch (Exception e) {
             logger.error("Error loading configurations", e);
             showError("Error loading configurations", e.getMessage());
@@ -140,7 +147,7 @@ public class ParsingConfigurationSelectionDialogController implements Initializa
     }
 
     /**
-     * Setup event handlers untuk table selection dan buttons
+     * Setup event handlers untuk table selection
      */
     private void setupEventHandlers() {
         // Handle table row selection
@@ -148,22 +155,13 @@ public class ParsingConfigurationSelectionDialogController implements Initializa
             if (newVal != null) {
                 selectedConfig = newVal;
                 displayConfigDetails(newVal);
-                selectButton.setDisable(false);
             }
         });
 
-        // Handle Select button
-        selectButton.setOnAction(event -> {
-            if (selectedConfig != null) {
-                selectConfig();
-            }
-        });
-        selectButton.setDisable(true);
-
-        // Handle Cancel button
-        cancelButton.setOnAction(event -> {
-            cancelSelection();
-        });
+        // Select first row by default if available
+        if (!configTableView.getItems().isEmpty()) {
+            configTableView.getSelectionModel().selectFirst();
+        }
     }
 
     /**
@@ -192,39 +190,20 @@ public class ParsingConfigurationSelectionDialogController implements Initializa
     }
 
     /**
-     * Handle selection of parsing configuration
+     * Validate selected configuration before returning
      */
-    private void selectConfig() {
+    public boolean isValidSelection() {
         if (selectedConfig == null) {
-            showWarning("No Configuration Selected", "Please select a parsing configuration");
-            return;
+            return false;
         }
 
         if (!selectedConfig.isValid()) {
             showWarning("Invalid Configuration",
                 "The selected configuration is invalid:\n" + selectedConfig.getValidationError());
-            return;
+            return false;
         }
 
-        logger.info("Selected parsing configuration: {}", selectedConfig.getName());
-        // Close dialog with result
-        Dialog<?> dialog = (Dialog<?>) selectButton.getScene().getWindow().getProperties().get("dialog");
-        if (dialog != null) {
-            dialog.setResult(selectedConfig);
-            dialog.close();
-        }
-    }
-
-    /**
-     * Handle cancellation
-     */
-    private void cancelSelection() {
-        logger.info("Selection cancelled");
-        Dialog<?> dialog = (Dialog<?>) cancelButton.getScene().getWindow().getProperties().get("dialog");
-        if (dialog != null) {
-            dialog.setResult(null);
-            dialog.close();
-        }
+        return true;
     }
 
     /**

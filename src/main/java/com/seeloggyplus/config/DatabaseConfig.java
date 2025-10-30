@@ -82,16 +82,19 @@ public class DatabaseConfig {
                 "name TEXT NOT NULL," +
                 "file_path TEXT NOT NULL," +
                 "size TEXT," +
-                "modified TEXT" +
+                "modified TEXT," +
                 "is_remote BOOLEAN DEFAULT 0," +
                 "ssh_server_id TEXT," +
-                "parsing_configuration_id" +
+                "parsing_configuration_id TEXT," +
+                "FOREIGN KEY (ssh_server_id) REFERENCES ssh_servers(id) ON DELETE SET NULL," +
+                "FOREIGN KEY (parsing_configuration_id) REFERENCES parsing_configs(id) ON DELETE SET NULL" +
                 ");";
 
         String createRecentFiles = "CREATE TABLE IF NOT EXISTS recent_files (" +
                 "id TEXT PRIMARY KEY," +
-                "file_id TEXT," +
-                "last_opened DATE" +
+                "file_id TEXT NOT NULL UNIQUE," +
+                "last_opened TEXT NOT NULL," +
+                "FOREIGN KEY (file_id) REFERENCES log_files(id) ON DELETE CASCADE" +
                 ");";
 
         try (Statement stmt = connection.createStatement()) {
