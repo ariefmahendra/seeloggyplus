@@ -32,6 +32,7 @@ public class ParsingConfig {
     private boolean isValid;
     private String validationError;
     private boolean isDefault;
+    private String timestampFormat; // Format for timestamp parsing (e.g., "yyyy-MM-dd HH:mm:ss.SSS")
 
     public ParsingConfig(String name, String regexPattern) {
         this.name = name;
@@ -115,6 +116,51 @@ public class ParsingConfig {
     }
 
     /**
+     * Auto-detect timestamp format from regex pattern
+     * Analyzes the timestamp group pattern to determine the best format
+     */
+    public String autoDetectTimestampFormat() {
+        if (regexPattern == null || regexPattern.isEmpty()) {
+            return null;
+        }
+        
+        // Extract timestamp group pattern from regex
+        Pattern timestampGroupPattern = Pattern.compile("\\(\\?<timestamp>([^)]+)\\)");
+        Matcher matcher = timestampGroupPattern.matcher(regexPattern);
+        
+        if (!matcher.find()) {
+            return null; // No timestamp group found
+        }
+        
+        String timestampPattern = matcher.group(1);
+        
+        // Common pattern mappings (regex pattern → date format)
+        // Check from most specific to least specific
+        if (timestampPattern.contains("\\d{4}") && timestampPattern.contains("\\d{2}") && timestampPattern.contains("\\.\\d{3}")) {
+            // Has year (4 digits), month/day (2 digits), and milliseconds
+            if (timestampPattern.indexOf("\\d{4}") < timestampPattern.indexOf("\\d{2}")) {
+                // Year comes first: yyyy-MM-dd HH:mm:ss.SSS
+                return "yyyy-MM-dd HH:mm:ss.SSS";
+            } else {
+                // Day comes first: dd-MM-yyyy HH:mm:ss.SSS
+                return "dd-MM-yyyy HH:mm:ss.SSS";
+            }
+        } else if (timestampPattern.contains("\\d{4}") && timestampPattern.contains("\\d{2}")) {
+            // Has year and month/day, no milliseconds
+            if (timestampPattern.indexOf("\\d{4}") < timestampPattern.indexOf("\\d{2}")) {
+                // Year first: yyyy-MM-dd HH:mm:ss
+                return "yyyy-MM-dd HH:mm:ss";
+            } else {
+                // Day first: dd-MM-yyyy HH:mm:ss
+                return "dd-MM-yyyy HH:mm:ss";
+            }
+        }
+        
+        // Default fallback
+        return "yyyy-MM-dd HH:mm:ss.SSS";
+    }
+    
+    /**
      * Create a copy of this configuration
      */
     public ParsingConfig copy() {
@@ -122,6 +168,7 @@ public class ParsingConfig {
         copy.name = this.name;
         copy.description = this.description;
         copy.regexPattern = this.regexPattern;
+        copy.timestampFormat = this.timestampFormat;
         copy.isDefault = false;
         copy.validatePattern();
         return copy;

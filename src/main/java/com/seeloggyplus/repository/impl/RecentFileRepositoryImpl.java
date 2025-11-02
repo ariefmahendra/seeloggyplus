@@ -6,6 +6,7 @@ import com.seeloggyplus.model.ParsingConfig;
 import com.seeloggyplus.model.RecentFile;
 import com.seeloggyplus.repository.RecentFileRepository;
 import com.seeloggyplus.config.DatabaseConfig;
+import com.seeloggyplus.util.FileUtils;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -45,7 +46,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 "pc.name AS config_name, " +
                 "pc.description AS config_description, " +
                 "pc.regex_pattern, " +
-                "pc.is_default " +
+                "pc.timestamp_format " +
                 "FROM recent_files rf " +
                 "JOIN log_files lf ON rf.file_id = lf.id " +
                 "LEFT JOIN parsing_configs pc ON lf.parsing_configuration_id = pc.id " +
@@ -105,21 +106,37 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
 
     private RecentFilesDto mapRowToRecentFileDto(ResultSet rs) throws SQLException{
         LogFile logFile = new LogFile();
-        ParsingConfig parsingConfig = new ParsingConfig();
 
+        // Populate LogFile from ResultSet
         logFile.setId(rs.getString("file_id"));
         logFile.setName(rs.getString("file_name"));
         logFile.setFilePath(rs.getString("file_path"));
-        logFile.setSize(rs.getString("size"));
+
+        // Convert size from bytes to human readable format
+        String sizeInBytes = rs.getString("size");
+        logFile.setSize(FileUtils.formatFileSize(sizeInBytes));
+
         logFile.setModified(rs.getString("modified"));
         logFile.setRemote(rs.getBoolean("is_remote"));
         logFile.setSshServerID(rs.getString("ssh_server_id"));
         logFile.setParsingConfigurationID(rs.getString("parsing_config_id"));
 
-        parsingConfig.setId(rs.getString("config_id"));
-        parsingConfig.setName(rs.getString("config_name"));
-        parsingConfig.setDescription(rs.getString("config_description"));
-        parsingConfig.setRegexPattern(rs.getString("regex_pattern"));
+        // Handle ParsingConfig - check if it exists in database (LEFT JOIN may return null)
+        ParsingConfig parsingConfig = null;
+        String configId = rs.getString("config_id");
+
+        if (configId != null && !configId.isEmpty()) {
+            // Config exists - populate it
+            parsingConfig = new ParsingConfig();
+            parsingConfig.setId(configId);
+            parsingConfig.setName(rs.getString("config_name"));
+            parsingConfig.setDescription(rs.getString("config_description"));
+            parsingConfig.setRegexPattern(rs.getString("regex_pattern"));
+            parsingConfig.setTimestampFormat(rs.getString("timestamp_format"));
+
+            // IMPORTANT: Validate pattern to extract group names and compile regex
+            parsingConfig.validatePattern();
+        }
 
         return new RecentFilesDto(logFile, parsingConfig);
     }

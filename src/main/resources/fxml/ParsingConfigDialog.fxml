@@ -95,8 +95,6 @@
                     <Tooltip text="Duplicate selected configuration" />
                 </tooltip>
             </Button>
-            <Region HBox.hgrow="ALWAYS" />
-            <Button fx:id="setDefaultButton" text="Set as Default" />
             <padding>
                 <Insets left="10.0" />
             </padding>
@@ -121,11 +119,25 @@
                     <TextField fx:id="nameField" promptText="Enter configuration name" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" GridPane.rowIndex="0" />
                     <Label text="Description:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
                     <TextArea fx:id="descriptionArea" promptText="A brief summary of the pattern" wrapText="true" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" GridPane.rowIndex="1" />
+                    <Label text="Timestamp Format:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                    <HBox spacing="5" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                        <TextField fx:id="timestampFormatField" promptText="yyyy-MM-dd HH:mm:ss.SSS" HBox.hgrow="ALWAYS">
+                            <tooltip>
+                                <Tooltip text="Date/time format for parsing timestamp (e.g., yyyy-MM-dd HH:mm:ss.SSS)" />
+                            </tooltip>
+                        </TextField>
+                        <Button fx:id="autoDetectFormatButton" text="Auto-Detect">
+                            <tooltip>
+                                <Tooltip text="Auto-detect timestamp format from regex pattern" />
+                            </tooltip>
+                        </Button>
+                    </HBox>
                     <columnConstraints>
                         <ColumnConstraints />
                         <ColumnConstraints />
                     </columnConstraints>
                     <rowConstraints>
+                        <RowConstraints />
                         <RowConstraints />
                         <RowConstraints />
                     </rowConstraints>

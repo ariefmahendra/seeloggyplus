@@ -56,7 +56,7 @@ public class DatabaseConfig {
                 + "name TEXT NOT NULL UNIQUE,"
                 + "description TEXT,"
                 + "regex_pattern TEXT NOT NULL,"
-                + "is_default BOOLEAN NOT NULL DEFAULT 0"
+                + "timestamp_format TEXT"
                 + ");";
 
         String createSshServerTable = "CREATE TABLE IF NOT EXISTS ssh_servers ("
@@ -104,8 +104,40 @@ public class DatabaseConfig {
             stmt.execute(createLogFileTable);
             stmt.execute(createRecentFiles);
             logger.info("Tables created or already exist.");
+            
+            // Migration: Add timestamp_format column if not exists
+            migrateTimestampFormat();
         } catch (SQLException e) {
             logger.error("Failed to create tables.", e);
+        }
+    }
+    
+    /**
+     * Migration: Add timestamp_format column to existing parsing_configs table
+     */
+    private void migrateTimestampFormat() {
+        String checkColumn = "PRAGMA table_info(parsing_configs)";
+        boolean columnExists = false;
+        
+        try (Statement stmt = connection.createStatement();
+             var rs = stmt.executeQuery(checkColumn)) {
+            while (rs.next()) {
+                String columnName = rs.getString("name");
+                if ("timestamp_format".equals(columnName)) {
+                    columnExists = true;
+                    break;
+                }
+            }
+            
+            if (!columnExists) {
+                String addColumn = "ALTER TABLE parsing_configs ADD COLUMN timestamp_format TEXT";
+                stmt.execute(addColumn);
+                logger.info("✅ Migration: Added timestamp_format column to parsing_configs table");
+            } else {
+                logger.debug("timestamp_format column already exists in parsing_configs table");
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to migrate timestamp_format column", e);
         }
     }
 }

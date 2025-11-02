@@ -51,12 +51,13 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
 
     @Override
     public void save(ParsingConfig config) {
-        String sql = "INSERT INTO parsing_configs(name, description, regex_pattern, is_default) VALUES(?,?,?,?)";
+        String sql = "INSERT INTO parsing_configs(id, name, description, regex_pattern, timestamp_format) VALUES(?,?,?,?,?)";
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
-            preparedStatement.setString(1, config.getName());
-            preparedStatement.setString(2, config.getDescription());
-            preparedStatement.setString(3, config.getRegexPattern());
-            preparedStatement.setBoolean(4, config.isDefault());
+            preparedStatement.setString(1, config.getId());
+            preparedStatement.setString(2, config.getName());
+            preparedStatement.setString(3, config.getDescription());
+            preparedStatement.setString(4, config.getRegexPattern());
+            preparedStatement.setString(5, config.getTimestampFormat());
             preparedStatement.executeUpdate();
         } catch (SQLException e) {
             logger.error("Error saving parsing config: {}", config.getName(), e);
@@ -65,12 +66,12 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
 
     @Override
     public void update(ParsingConfig config) {
-        String sql = "UPDATE parsing_configs SET name = ?, description = ?, regex_pattern = ?, is_default = ? WHERE id = ?";
+        String sql = "UPDATE parsing_configs SET name = ?, description = ?, regex_pattern = ?, timestamp_format = ? WHERE id = ?";
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
             preparedStatement.setString(1, config.getName());
             preparedStatement.setString(2, config.getDescription());
             preparedStatement.setString(3, config.getRegexPattern());
-            preparedStatement.setBoolean(4, config.isDefault());
+            preparedStatement.setString(4, config.getTimestampFormat());
             preparedStatement.setString(5, config.getId());
             preparedStatement.executeUpdate();
         } catch (SQLException e) {
@@ -91,15 +92,9 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
 
     @Override
     public Optional<ParsingConfig> findDefault() {
-        String sql = "SELECT * FROM parsing_configs WHERE is_default = 1";
-        try (PreparedStatement prepareStatement = connection.prepareStatement(sql)) {
-            ResultSet rs = prepareStatement.executeQuery();
-            if (rs.next()) {
-                return Optional.of(mapRowToParsingConfig(rs));
-            }
-        } catch (SQLException e) {
-            logger.error("Error finding default parsing config", e);
-        }
+        // Default config feature has been removed - each file has its own associated config
+        // Return empty Optional for backward compatibility
+        logger.debug("findDefault() called but default config feature is no longer used");
         return Optional.empty();
     }
 
@@ -109,7 +104,7 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
         config.setName(rs.getString("name"));
         config.setDescription(rs.getString("description"));
         config.setRegexPattern(rs.getString("regex_pattern"));
-        config.setDefault(rs.getBoolean("is_default"));
+        config.setTimestampFormat(rs.getString("timestamp_format"));
 
         // IMPORTANT: Validate pattern to extract group names and set isValid flag
         config.validatePattern();

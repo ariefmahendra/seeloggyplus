@@ -1,43 +1,72 @@
-/* ERROR */
-.log-level-error {
-    -fx-text-fill: #D32F2F;
-    -fx-font-weight: bold;
-}
+/* ============================================
+   Professional Log Level Colors
+   Based on industry standards (IntelliJ, VSCode, LogExpert)
+   ============================================ */
 
+/* FATAL - Bright Red with Dark Background (Most Critical) */
 .log-level-fatal {
-    -fx-text-fill: #D32F2F;
+    -fx-background-color: #8B0000;  /* Dark red background */
+    -fx-text-fill: #FFFFFF;          /* White text */
     -fx-font-weight: bold;
+    -fx-padding: 2 4 2 4;
 }
 
-/* WARN / WARNING */
+/* ERROR - Red (Critical) */
+.log-level-error {
+    -fx-background-color: #CC0000;  /* Red background */
+    -fx-text-fill: #FFFFFF;          /* White text */
+    -fx-font-weight: bold;
+    -fx-padding: 2 4 2 4;
+}
+
+/* WARN / WARNING - Orange/Yellow (Attention) */
 .log-level-warn {
-    -fx-text-fill: #F57F17;
+    -fx-background-color: #FF8C00;  /* Dark orange background */
+    -fx-text-fill: #000000;          /* Black text for contrast */
     -fx-font-weight: bold;
+    -fx-padding: 2 4 2 4;
 }
 
-/* INFO */
+/* INFO - Blue/Cyan (Informational) */
 .log-level-info {
-    -fx-text-fill: #1976D2;
-    -fx-font-weight: bold;
+    -fx-background-color: #1E90FF;  /* Dodger blue background */
+    -fx-text-fill: #FFFFFF;          /* White text */
+    -fx-font-weight: normal;
+    -fx-padding: 2 4 2 4;
 }
 
-/* DEBUG */
+/* DEBUG - Green/Gray (Development) */
 .log-level-debug {
-    -fx-text-fill: #546E7A;
-    -fx-font-weight: bold;
+    -fx-background-color: #808080;  /* Gray background */
+    -fx-text-fill: #FFFFFF;          /* White text */
+    -fx-font-weight: normal;
+    -fx-padding: 2 4 2 4;
 }
 
-/* TRACE */
+/* TRACE - Light Gray (Verbose) */
 .log-level-trace {
-    -fx-text-fill: #757575;
-    -fx-font-weight: bold;
+    -fx-background-color: #A9A9A9;  /* Light gray background */
+    -fx-text-fill: #000000;          /* Black text */
+    -fx-font-weight: normal;
+    -fx-padding: 2 4 2 4;
 }
 
-.table-row-cell:selected .log-level-error,
+/* Selected row - keep colors visible but slightly muted */
 .table-row-cell:selected .log-level-fatal,
+.table-row-cell:selected .log-level-error,
 .table-row-cell:selected .log-level-warn,
 .table-row-cell:selected .log-level-info,
 .table-row-cell:selected .log-level-debug,
 .table-row-cell:selected .log-level-trace {
-    -fx-text-fill: white;
+    -fx-opacity: 0.8;  /* Slightly transparent when selected */
+}
+
+/* Hover effect for better UX */
+.table-row-cell:hover .log-level-fatal,
+.table-row-cell:hover .log-level-error,
+.table-row-cell:hover .log-level-warn,
+.table-row-cell:hover .log-level-info,
+.table-row-cell:hover .log-level-debug,
+.table-row-cell:hover .log-level-trace {
+    -fx-opacity: 0.9;
 }

@@ -79,7 +79,12 @@ public class LogParserService {
         for (Future<List<LogEntry>> future : futures) {
             try {
                 allEntries.addAll(future.get());
-            } catch (InterruptedException | ExecutionException e) {
+            } catch (InterruptedException e) {
+                // This is NORMAL when task is cancelled by user
+                logger.info("⚠️ Parsing interrupted (task cancelled by user)");
+                Thread.currentThread().interrupt(); // Restore interrupt status
+                break; // Stop processing remaining chunks
+            } catch (ExecutionException e) {
                 logger.error("Error processing a file chunk", e);
             }
         }
@@ -143,7 +148,7 @@ public class LogParserService {
 
             String line;
             while ((line = reader.readLine()) != null && channel.position() <= chunkInfo.endByte()) {
-                currentLineNumber++;
+                // FIXED: Parse FIRST, then increment (so line 1 stays line 1)
                 LogEntry logEntry = parseLine(line, currentLineNumber, config);
 
                 if (!logEntry.isParsed()){
@@ -157,6 +162,7 @@ public class LogParserService {
                 }
 
                 entries.add(logEntry);
+                currentLineNumber++;  // Increment AFTER parsing
             }
 
         } catch (IOException e) {

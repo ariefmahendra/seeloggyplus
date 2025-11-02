@@ -43,14 +43,18 @@ public class ParsingConfigController {
     @FXML
     private Button duplicateButton;
 
-    @FXML
-    private Button setDefaultButton;
 
     @FXML
     private TextField nameField;
 
     @FXML
     private TextArea descriptionArea;
+    
+    @FXML
+    private TextField timestampFormatField;
+    
+    @FXML
+    private Button autoDetectFormatButton;
 
     @FXML
     private TextArea regexPatternArea;
@@ -193,6 +197,9 @@ public class ParsingConfigController {
         descriptionArea
                 .textProperty()
                 .addListener((obs, o, n) -> updateButtonStates());
+        timestampFormatField
+                .textProperty()
+                .addListener((obs, o, n) -> updateButtonStates());
         regexPatternArea
                 .textProperty()
                 .addListener((obs, o, n) -> {
@@ -241,7 +248,7 @@ public class ParsingConfigController {
         editButton.setOnAction(e -> handleEdit());
         deleteButton.setOnAction(e -> handleDelete());
         duplicateButton.setOnAction(e -> handleDuplicate());
-        setDefaultButton.setOnAction(e -> handleSetDefault());
+        autoDetectFormatButton.setOnAction(e -> handleAutoDetectFormat());
 
         saveButton.setOnAction(e -> handleSave());
         cancelButton.setOnAction(e -> handleCancel());
@@ -261,6 +268,7 @@ public class ParsingConfigController {
             nameField.setText(config.getName());
             descriptionArea.setText(config.getDescription());
             regexPatternArea.setText(config.getRegexPattern());
+            timestampFormatField.setText(config.getTimestampFormat() != null ? config.getTimestampFormat() : "");
 
             setEditorDisabled(false);
             validatePattern();
@@ -279,6 +287,7 @@ public class ParsingConfigController {
         nameField.clear();
         descriptionArea.clear();
         regexPatternArea.clear();
+        timestampFormatField.clear();
         groupNamesListView.getItems().clear();
         validationLabel.setText("");
         previewTableView.getItems().clear();
@@ -361,7 +370,7 @@ public class ParsingConfigController {
             ObservableList<ParsedField> fields = FXCollections.observableArrayList();
             result
                     .getParsedFields()
-                    .forEach((key, value) -> fields.add(new ParsedField(key, value)));
+                     .forEach((key, value) -> fields.add(new ParsedField(key, value)));
             previewTableView.setItems(fields);
 
             logger.info("Test parsing successful, displaying {} fields", fields.size());
@@ -437,26 +446,47 @@ public class ParsingConfigController {
 
         logger.info("Duplicated parsing configuration: {}", selected.getName());
     }
-
+    
     /**
-     * Handle set as default
+     * Handle auto-detect timestamp format from regex pattern
      */
-    private void handleSetDefault() {
-        ParsingConfig selected = configListView.getSelectionModel().getSelectedItem();
-        if (selected == null) {
+    private void handleAutoDetectFormat() {
+        String regexPattern = regexPatternArea.getText();
+        if (regexPattern == null || regexPattern.trim().isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Auto-Detect Format");
+            alert.setHeaderText("Cannot auto-detect timestamp format");
+            alert.setContentText("Please enter a regex pattern first.");
+            alert.showAndWait();
             return;
         }
-
-        configList.forEach(config -> config.setDefault(false));
-        selected.setDefault(true);
-
-        for (ParsingConfig config : configList) {
-            parsingConfigService.update(config);
+        
+        // Create temp config to use autoDetect method
+        ParsingConfig tempConfig = new ParsingConfig();
+        tempConfig.setRegexPattern(regexPattern);
+        
+        String detectedFormat = tempConfig.autoDetectTimestampFormat();
+        
+        if (detectedFormat != null) {
+            timestampFormatField.setText(detectedFormat);
+            logger.info("✅ Auto-detected timestamp format: {}", detectedFormat);
+            
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Auto-Detect Format");
+            alert.setHeaderText("Timestamp format detected!");
+            alert.setContentText("Detected format: " + detectedFormat + "\n\nYou can modify this if needed.");
+            alert.showAndWait();
+        } else {
+            logger.warn("⚠️ Could not auto-detect timestamp format from pattern");
+            
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Auto-Detect Format");
+            alert.setHeaderText("Could not detect timestamp format");
+            alert.setContentText("No timestamp group found in the pattern, or pattern is not recognized.\n\nPlease enter the format manually (e.g., yyyy-MM-dd HH:mm:ss.SSS)");
+            alert.showAndWait();
         }
-
-        configListView.refresh();
-        updateButtonStates();
     }
+
 
     /**
      * Handle save
@@ -522,6 +552,7 @@ public class ParsingConfigController {
         selectedConfig.setName(nameField.getText());
         selectedConfig.setDescription(descriptionArea.getText());
         selectedConfig.setRegexPattern(regexPatternArea.getText());
+        selectedConfig.setTimestampFormat(timestampFormatField.getText().trim().isEmpty() ? null : timestampFormatField.getText().trim());
 
         configSnapshot = selectedConfig.copy();
 
@@ -553,11 +584,15 @@ public class ParsingConfigController {
 
         String snapshotPattern = Optional.ofNullable(configSnapshot.getRegexPattern()).orElse("").trim();
         String currentPattern = Optional.ofNullable(regexPatternArea.getText()).orElse("").trim();
+        
+        String snapshotTimestamp = Optional.ofNullable(configSnapshot.getTimestampFormat()).orElse("").trim();
+        String currentTimestamp = Optional.ofNullable(timestampFormatField.getText()).orElse("").trim();
 
         // Compare the normalized, trimmed strings.
         return !Objects.equals(snapshotName, currentName) ||
                 !Objects.equals(snapshotDesc, currentDesc) ||
-                !Objects.equals(snapshotPattern, currentPattern);
+                !Objects.equals(snapshotPattern, currentPattern) ||
+                !Objects.equals(snapshotTimestamp, currentTimestamp);
     }
 
     /**
@@ -570,7 +605,6 @@ public class ParsingConfigController {
         editButton.setDisable(!hasSelection);
         deleteButton.setDisable(!hasSelection || configList.size() <= 1);
         duplicateButton.setDisable(!hasSelection);
-        setDefaultButton.setDisable(!hasSelection);
 
         saveButton.setDisable(!hasChanges);
         applyButton.setDisable(!hasChanges);
@@ -580,6 +614,8 @@ public class ParsingConfigController {
         nameField.setDisable(disabled);
         descriptionArea.setDisable(disabled);
         regexPatternArea.setDisable(disabled);
+        timestampFormatField.setDisable(disabled);
+        autoDetectFormatButton.setDisable(disabled);
         testParsingButton.setDisable(disabled);
         sampleLogArea.setDisable(disabled);
     }
@@ -614,9 +650,7 @@ public class ParsingConfigController {
                 setText(null);
                 setGraphic(null);
             } else {
-                nameLabel.setText(
-                        item.getName() + (item.isDefault() ? " (Default)" : "")
-                );
+                nameLabel.setText(item.getName());
                 descLabel.setText(item.getDescription());
 
                 // Clear old validation styles and apply new ones
