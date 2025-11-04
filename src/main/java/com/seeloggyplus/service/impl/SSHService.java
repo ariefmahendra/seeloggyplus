@@ -257,10 +257,13 @@ public class SSHService {
                     SftpATTRS attrs = entry.getAttrs();
                     RemoteFileInfo fileInfo = new RemoteFileInfo();
                     fileInfo.setName(filename);
-                    fileInfo.setPath(remotePath + "/" + filename);
+                    fileInfo.setPath(remotePath.endsWith("/") ? remotePath + filename : remotePath + "/" + filename);
                     fileInfo.setSize(attrs.getSize());
                     fileInfo.setDirectory(attrs.isDir());
                     fileInfo.setModifiedTime(attrs.getMTime() * 1000L); // Convert to milliseconds
+                    fileInfo.setPermissions(attrs.getPermissionsString());
+                    fileInfo.setOwner(String.valueOf(attrs.getUId()));
+                    fileInfo.setGroup(String.valueOf(attrs.getGId()));
                     files.add(fileInfo);
                 }
             }
@@ -394,12 +397,15 @@ public class SSHService {
     /**
      * Remote file information class
      */
-    public static class RemoteFileInfo {
+    public static class RemoteFileInfo implements Comparable<RemoteFileInfo> {
         private String name;
         private String path;
         private long size;
         private boolean isDirectory;
         private long modifiedTime;
+        private String permissions;
+        private String owner;
+        private String group;
 
         public String getName() {
             return name;
@@ -441,16 +447,102 @@ public class SSHService {
             this.modifiedTime = modifiedTime;
         }
 
+        public String getPermissions() {
+            return permissions;
+        }
+
+        public void setPermissions(String permissions) {
+            this.permissions = permissions;
+        }
+
+        public String getOwner() {
+            return owner;
+        }
+
+        public void setOwner(String owner) {
+            this.owner = owner;
+        }
+
+        public String getGroup() {
+            return group;
+        }
+
+        public void setGroup(String group) {
+            this.group = group;
+        }
+
+        public java.time.LocalDateTime getModified() {
+            if (modifiedTime > 0) {
+                return java.time.LocalDateTime.ofInstant(
+                    java.time.Instant.ofEpochMilli(modifiedTime), 
+                    java.time.ZoneId.systemDefault()
+                );
+            }
+            return null;
+        }
+
+        public boolean isFile() {
+            return !isDirectory;
+        }
+
+        public boolean isLogFile() {
+            if (!isFile()) {
+                return false;
+            }
+            String lowerName = name.toLowerCase();
+            return lowerName.endsWith(".log") || 
+                   lowerName.endsWith(".txt") ||
+                   lowerName.contains(".log.");
+        }
+
+        public String getTypeDescription() {
+            if (isDirectory) {
+                return "Folder";
+            }
+            String ext = getExtension();
+            if (!ext.isEmpty()) {
+                return ext.toUpperCase() + " File";
+            }
+            return "File";
+        }
+
+        public String getExtension() {
+            if (isDirectory) {
+                return "";
+            }
+            int lastDot = name.lastIndexOf('.');
+            if (lastDot > 0 && lastDot < name.length() - 1) {
+                return name.substring(lastDot + 1).toLowerCase();
+            }
+            return "";
+        }
+
         public String getFormattedSize() {
+            if (isDirectory) {
+                return "-";
+            }
             if (size < 1024) {
                 return size + " B";
             } else if (size < 1024 * 1024) {
-                return String.format("%.2f KB", size / 1024.0);
+                return String.format("%.1f KB", size / 1024.0);
             } else if (size < 1024 * 1024 * 1024) {
-                return String.format("%.2f MB", size / (1024.0 * 1024.0));
+                return String.format("%.1f MB", size / (1024.0 * 1024.0));
             } else {
-                return String.format("%.2f GB", size / (1024.0 * 1024.0 * 1024.0));
+                return String.format("%.1f GB", size / (1024.0 * 1024.0 * 1024.0));
             }
+        }
+
+        @Override
+        public int compareTo(RemoteFileInfo other) {
+            // Directories first
+            if (this.isDirectory && !other.isDirectory) {
+                return -1;
+            }
+            if (!this.isDirectory && other.isDirectory) {
+                return 1;
+            }
+            // Then by name
+            return this.name.compareToIgnoreCase(other.name);
         }
 
         @Override

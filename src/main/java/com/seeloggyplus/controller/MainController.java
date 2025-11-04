@@ -62,6 +62,8 @@ public class MainController {
     @FXML
     private MenuItem parsingConfigMenuItem;
     @FXML
+    private MenuItem serverManagementMenuItem;
+    @FXML
     private MenuItem aboutMenuItem;
 
     // FXML Components - Main Layout
@@ -243,6 +245,7 @@ public class MainController {
 
         // Settings Menu
         parsingConfigMenuItem.setOnAction(e -> handleParsingConfiguration());
+        serverManagementMenuItem.setOnAction(e -> handleServerManagement());
 
         // Help Menu
         aboutMenuItem.setOnAction(e -> handleAbout());
@@ -558,6 +561,12 @@ public class MainController {
             List<String> groupNames = config.getGroupNames();
             logger.info( "Config has {} named groups: {}", groupNames.size(), groupNames);
 
+            // Determine where to place unparsed entries
+            int unparsedColumnIndex = determineUnparsedColumnIndex(groupNames);
+            logger.info("Unparsed entries will be displayed in column index: {} ({})", 
+                unparsedColumnIndex, 
+                unparsedColumnIndex < groupNames.size() ? groupNames.get(unparsedColumnIndex) : "N/A");
+
             for (int i = 0; i < groupNames.size(); i++) {
                 final int currentIndex = i;
                 final String groupName = groupNames.get(i);
@@ -569,7 +578,7 @@ public class MainController {
                     if (entry.isParsed()) {
                         return new SimpleStringProperty(entry.getField(groupName));
                     } else {
-                        if (currentIndex == 0) {
+                        if (currentIndex == unparsedColumnIndex) {
                             return new SimpleStringProperty(entry.getRawLog());
                         } else {
                             return new SimpleStringProperty("");
@@ -577,101 +586,8 @@ public class MainController {
                     }
                 });
 
-                if (currentIndex == 0) {
-                    column.setCellFactory(col -> new TableCell<>() {
-                        private static final int MAX_LINES_DISPLAY = 10;
-                        private static final int MAX_CHARS_PER_LINE = 200;
-                        private static final int MAX_TOTAL_CHARS = 2000;
-
-                        private Label contentLabel = null;
-
-                        @Override
-                        protected void updateItem(String item, boolean empty) {
-                            super.updateItem(item, empty);
-
-                            if (item == null || empty) {
-                                setText(null);
-                                setGraphic(null);
-                                contentLabel = null;
-                            } else {
-                                LogEntry entry = getTableRow() != null ? getTableRow().getItem() : null;
-
-                                if (entry != null && !entry.isParsed()) {
-                                    String displayText = formatUnparsedContent(item);
-
-                                    if (contentLabel == null) {
-                                        contentLabel = new Label();
-                                        contentLabel.setWrapText(true);
-                                        contentLabel.setMaxWidth(Double.MAX_VALUE);
-                                    }
-
-                                    contentLabel.setText(displayText);
-
-                                    contentLabel.setStyle("-fx-padding: 5px;");
-
-                                    setText(null);
-                                    setGraphic(contentLabel);
-                                } else {
-                                    setText(item);
-                                    setGraphic(null);
-                                    contentLabel = null;
-                                }
-                            }
-                        }
-
-                        /**
-                         * Format unparsed content with intelligent truncation
-                         * - Shows first N lines
-                         * - Limits line length
-                         * - Adds "... (X more lines)" indicator
-                         */
-                        private String formatUnparsedContent(String rawContent) {
-                            if (rawContent == null || rawContent.isEmpty()) {
-                                return rawContent;
-                            }
-
-                            // Split into lines
-                            String[] lines = rawContent.split("\\r?\\n");
-
-                            if (lines.length == 1 && rawContent.length() <= MAX_CHARS_PER_LINE) {
-                                return rawContent;
-                            }
-
-                            StringBuilder display = new StringBuilder();
-                            int totalChars = 0;
-                            int displayedLines = 0;
-
-                            for (int i = 0; i < lines.length && displayedLines < MAX_LINES_DISPLAY; i++) {
-                                String line = lines[i];
-                                if (totalChars + line.length() > MAX_TOTAL_CHARS) {
-                                    break;
-                                }
-
-                                if (line.length() > MAX_CHARS_PER_LINE) {
-                                    line = line.substring(0, MAX_CHARS_PER_LINE) + "...";
-                                }
-
-                                if (displayedLines > 0) {
-                                    display.append("\n");
-                                }
-                                display.append(line);
-
-                                totalChars += line.length();
-                                displayedLines++;
-                            }
-
-                            int remainingLines = lines.length - displayedLines;
-                            if (remainingLines > 0) {
-                                display.append("\n... (");
-                                display.append(remainingLines);
-                                display.append(" more line");
-                                if (remainingLines > 1) display.append("s");
-                                display.append(")");
-                            }
-
-                            return display.toString();
-                        }
-                    });
+                if (currentIndex == unparsedColumnIndex) {
+                    column.setCellFactory(col -> new UnparsedContentCell());
                 }
 
                 if ("level".equalsIgnoreCase(groupName)) {
@@ -752,6 +668,79 @@ public class MainController {
             logTableView.getColumns().add(rawCol);
             logger.info("Created 2 columns (line number + raw log)");
         }
+    }
+
+    /**
+     * Determine the column index where unparsed entries should be displayed.
+     * Uses efficient single-pass algorithm for optimal performance.
+     * 
+     * Priority:
+     * 1. If "message" related column exists (message, messages, msg, log_message, etc.), use that
+     * 2. If first column is "level", use second column (index 1)
+     * 3. Otherwise, use first column (index 0)
+     */
+    /**
+     * Highly optimized column detection for unparsed entries.
+     * Single-pass O(n) with minimal allocations and string operations.
+     */
+    private int determineUnparsedColumnIndex(List<String> groupNames) {
+        if (groupNames == null || groupNames.isEmpty()) {
+            return 0;
+        }
+
+        final int size = groupNames.size();
+        int partialMatchIndex = -1;
+         
+        // Single-pass: exact match check with switch-like performance
+        for (int i = 0; i < size; i++) {
+            String name = groupNames.get(i);
+            int len = name.length();
+            
+            // Quick length-based pre-filter to avoid toLowerCase() when possible
+            if (len >= 3 && len <= 11) {
+                char firstChar = name.charAt(0);
+                
+                // Exact match check with optimized string comparison
+                if (firstChar == 'm' || firstChar == 'M') {
+                    if (len == 7 && name.equalsIgnoreCase("message")) {
+                        return i;
+                    }
+                    if (len == 3 && name.equalsIgnoreCase("msg")) {
+                        return i;
+                    }
+                    if (len == 8 && name.equalsIgnoreCase("messages")) {
+                        return i;
+                    }
+                }
+                
+                // Partial match check (only if no exact match found yet)
+                if (partialMatchIndex == -1) {
+                    String lower = name.toLowerCase();
+                    if ((firstChar == 'm' || firstChar == 'M') && 
+                        (lower.contains("message") || lower.contains("msg"))) {
+                        partialMatchIndex = i;
+                    } else if ((firstChar == 't' || firstChar == 'T') && lower.contains("text")) {
+                        partialMatchIndex = i;
+                    } else if ((firstChar == 'c' || firstChar == 'C') && lower.contains("content")) {
+                        partialMatchIndex = i;
+                    }
+                }
+            }
+        }
+        
+        // Return partial match if found
+        if (partialMatchIndex != -1) {
+            return partialMatchIndex;
+        }
+
+        // Check if first column is "level" - avoid it for unparsed entries
+        String firstName = groupNames.get(0);
+        if (firstName.length() == 5 && firstName.equalsIgnoreCase("level")) {
+            return size > 1 ? 1 : 0;
+        }
+
+        // Default: use first column
+        return 0;
     }
 
     private static TableColumn<LogEntry, String> getLogEntryStringTableLineColumn() {
@@ -1098,6 +1087,10 @@ public class MainController {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ParsingConfigDialog.fxml"));
             Parent root = loader.load();
+            
+            // Get controller and set callback
+            ParsingConfigController controller = loader.getController();
+            controller.setOnConfigChangedCallback(this::handleParsingConfigChanged);
 
             Stage dialog = new Stage();
             dialog.initOwner(menuBar.getScene().getWindow());
@@ -1113,6 +1106,97 @@ public class MainController {
             logger.error("Failed to open parsing configuration dialog", e);
             showError("Failed to open parsing configuration", e.getMessage());
         }
+    }
+    
+    /**
+     * Handle server management dialog
+     */
+    private void handleServerManagement() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ServerManagementDialog.fxml"));
+            Parent root = loader.load();
+
+            Stage dialog = new Stage();
+            dialog.setTitle("SSH Server Management");
+            dialog.initOwner(menuBar.getScene().getWindow());
+            dialog.setScene(new Scene(root));
+            dialog.showAndWait();
+
+            logger.info("Server management dialog closed");
+        } catch (IOException e) {
+            logger.error("Failed to open server management dialog", e);
+            showError("Failed to open server management", e.getMessage());
+        }
+    }
+    
+    /**
+     * Handle parsing configuration changes from ParsingConfigDialog
+     * Re-parse current file with updated configuration if file is loaded
+     */
+    private void handleParsingConfigChanged() {
+        logger.info("Parsing configuration changed, checking if current file needs re-parsing");
+        
+        if (currentFile == null || currentParsingConfig == null) {
+            logger.info("No file currently loaded, skipping re-parse");
+            return;
+        }
+        
+        // Reload current parsing config from database (it may have been updated)
+        Optional<ParsingConfig> updatedConfigOpt = parsingConfigService.findById(currentParsingConfig.getId());
+        
+        if (updatedConfigOpt.isEmpty()) {
+            logger.warn("Current parsing config no longer exists in database");
+            showInfo("Configuration Deleted", 
+                "The current parsing configuration has been deleted. Please reload the file with a new configuration.");
+            return;
+        }
+        
+        ParsingConfig updatedConfig = updatedConfigOpt.get();
+        
+        // Check if config actually changed
+        if (configsAreEqual(currentParsingConfig, updatedConfig)) {
+            logger.info("Configuration unchanged, no need to re-parse");
+            return;
+        }
+        
+        // Ask user if they want to re-parse with new configuration
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Parsing Configuration Changed");
+        alert.setHeaderText("The parsing configuration has been updated.");
+        alert.setContentText(String.format(
+            "Current file: %s\nCurrent config: %s\n\nDo you want to re-parse the file with the updated configuration?",
+            currentFile.getName(),
+            updatedConfig.getName()
+        ));
+        
+        ButtonType reParseButton = new ButtonType("Re-parse Now");
+        ButtonType laterButton = new ButtonType("Later", ButtonBar.ButtonData.CANCEL_CLOSE);
+        alert.getButtonTypes().setAll(reParseButton, laterButton);
+        
+        Optional<ButtonType> result = alert.showAndWait();
+        
+        if (result.isPresent() && result.get() == reParseButton) {
+            logger.info("User chose to re-parse file with updated configuration");
+            // Re-parse file with updated config
+            openLocalLogFile(currentFile, false, updatedConfig);
+        } else {
+            logger.info("User chose not to re-parse file");
+            updateStatus("Configuration updated. Reload file to apply changes.");
+        }
+    }
+    
+    /**
+     * Compare two ParsingConfig objects for equality (by content, not reference)
+     */
+    private boolean configsAreEqual(ParsingConfig config1, ParsingConfig config2) {
+        if (config1 == null || config2 == null) {
+            return config1 == config2;
+        }
+        
+        return Objects.equals(config1.getName(), config2.getName()) &&
+               Objects.equals(config1.getRegexPattern(), config2.getRegexPattern()) &&
+               Objects.equals(config1.getDescription(), config2.getDescription()) &&
+               Objects.equals(config1.getTimestampFormat(), config2.getTimestampFormat());
     }
 
     /**
@@ -1294,86 +1378,112 @@ public class MainController {
     /**
      * Perform search on log entries
      */
+    /**
+     * High-performance search with optimized regex compilation and string matching.
+     * Caches compiled patterns and pre-processes search strings for maximum efficiency.
+     */
     private void performSearch() {
         if (currentLogEntrySource == null) {
             return;
         }
 
-        String searchText = searchField.getText();
-        boolean isRegex = regexCheckBox.isSelected();
-        boolean caseSensitive = caseSensitiveCheckBox.isSelected();
-        boolean hideUnparsed = hideUnparsedCheckBox.isSelected();
-        String selectedLevel = logLevelFilterComboBox.getSelectionModel().getSelectedItem();
-        String dateTimeFrom = dateTimeFromField.getText();
-        String dateTimeTo = dateTimeToField.getText();
+        final String searchText = searchField.getText();
+        final boolean isRegex = regexCheckBox.isSelected();
+        final boolean caseSensitive = caseSensitiveCheckBox.isSelected();
+        final boolean hideUnparsed = hideUnparsedCheckBox.isSelected();
+        final String selectedLevel = logLevelFilterComboBox.getSelectionModel().getSelectedItem();
+        final String dateTimeFrom = dateTimeFromField.getText();
+        final String dateTimeTo = dateTimeToField.getText();
 
-        logger.info("Performing search - Level: {}, Text: '{}', Regex: {}, CaseSensitive: {}, HideUnparsed: {}, DateFrom: '{}', DateTo: '{}'", selectedLevel, searchText, isRegex, caseSensitive, hideUnparsed, dateTimeFrom, dateTimeTo);
+        logger.info("Search - Level: {}, Text: '{}', Regex: {}, CaseSensitive: {}, HideUnparsed: {}", 
+            selectedLevel, searchText, isRegex, caseSensitive, hideUnparsed);
         
         updateStatus("Searching...");
 
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
-                LocalDateTime filterFrom = parseDateTimeFilter(dateTimeFrom);
-                LocalDateTime filterTo = parseDateTimeFilter(dateTimeTo);
-
+                // Pre-parse date filters once (not per entry)
+                final LocalDateTime filterFrom = parseDateTimeFilter(dateTimeFrom);
+                final LocalDateTime filterTo = parseDateTimeFilter(dateTimeTo);
+                final boolean hasDateFilter = filterFrom != null || filterTo != null;
+                
+                // Pre-compile regex pattern once (not per entry) - CRITICAL OPTIMIZATION
+                final Pattern regexPattern;
+                if (isRegex && searchText != null && !searchText.trim().isEmpty()) {
+                    try {
+                        int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
+                        regexPattern = Pattern.compile(searchText, flags);
+                    } catch (Exception e) {
+                        logger.error("Invalid regex pattern: {}", e.getMessage());
+                        Platform.runLater(() -> {
+                            showError("Invalid Regex", "Pattern compilation failed: " + e.getMessage());
+                            updateStatus("Invalid regex pattern");
+                        });
+                        return null;
+                    }
+                } else {
+                    regexPattern = null;
+                }
+                
+                // Pre-process text search (once, not per entry)
+                final String searchTextLower = (!isRegex && searchText != null && !caseSensitive) 
+                    ? searchText.toLowerCase() : searchText;
+                final boolean hasTextSearch = searchText != null && !searchText.trim().isEmpty();
+                
+                // Pre-process level filter
+                final boolean hasLevelFilter = selectedLevel != null && !selectedLevel.equals("ALL");
+                final boolean filterUnparsedOnly = "UNPARSED".equals(selectedLevel);
+                
+                // Build optimized predicate with early exits
                 Predicate<LogEntry> searchPredicate = entry -> {
-                    if (hideUnparsed){
-                        if (!entry.isParsed()){
-                            return false;
-                        }
+                    // Fast path: hideUnparsed check (cheapest check first)
+                    if (hideUnparsed && !entry.isParsed()) {
+                        return false;
                     }
-
-                    if (filterFrom != null || filterTo != null) {
-                        LocalDateTime entryTime = parseEntryTimestamp(entry);
-                        if (entryTime != null) {
-                            if (filterFrom != null && entryTime.isBefore(filterFrom)) {
-                                return false;
-                            }
-                            if (filterTo != null && entryTime.isAfter(filterTo)) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-
-                    if (selectedLevel != null && !selectedLevel.equals("ALL")) {
-                        if (selectedLevel.equals("UNPARSED")) {
+                    
+                    // Level filter check (second cheapest)
+                    if (hasLevelFilter) {
+                        if (filterUnparsedOnly) {
                             return !entry.isParsed();
                         }
-
                         if (!entry.isParsed()) {
                             return false;
                         }
-                        
                         String entryLevel = entry.getLevel();
-                        if (entryLevel == null || entryLevel.isEmpty()) {
-                            return false;
-                        }
-                        if (!entryLevel.equalsIgnoreCase(selectedLevel)) {
+                        if (entryLevel == null || !entryLevel.equalsIgnoreCase(selectedLevel)) {
                             return false;
                         }
                     }
-
-                    if (searchText == null || searchText.trim().isEmpty()) {
-                        return true;
-                    }
-
-                    if (isRegex) {
-                        try {
-                            int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
-                            Pattern pattern = Pattern.compile(searchText, flags);
-                            return pattern.matcher(entry.getRawLog()).find();
-                        } catch (Exception e) {
-                            logger.error("Invalid regex pattern: {}", e.getMessage());
+                    
+                    // Date filter check (medium cost)
+                    if (hasDateFilter) {
+                        LocalDateTime entryTime = parseEntryTimestamp(entry);
+                        if (entryTime == null) {
                             return false;
                         }
-                    } else {
-                        String searchFor = caseSensitive ? searchText : searchText.toLowerCase();
-                        String searchIn = caseSensitive ? entry.getRawLog() : entry.getRawLog().toLowerCase();
-                        return searchIn.contains(searchFor);
+                        if (filterFrom != null && entryTime.isBefore(filterFrom)) {
+                            return false;
+                        }
+                        if (filterTo != null && entryTime.isAfter(filterTo)) {
+                            return false;
+                        }
                     }
+                    
+                    // Text search (most expensive, checked last)
+                    if (hasTextSearch) {
+                        if (isRegex) {
+                            return regexPattern.matcher(entry.getRawLog()).find();
+                        } else {
+                            if (caseSensitive) {
+                                return entry.getRawLog().contains(searchTextLower);
+                            } else {
+                                return entry.getRawLog().toLowerCase().contains(searchTextLower);
+                            }
+                        }
+                    }
+                    
+                    return true;
                 };
 
                 LogEntrySource filteredSource = originalLogEntrySource.filter(searchPredicate);
@@ -1388,11 +1498,11 @@ public class MainController {
                     if (filteredEntries.isEmpty()) {
                         updateStatus("No matching entries found");
                     } else {
-                        updateStatus(String.format("📍 Showing %,d matching entries (filtered from %,d total)", filteredEntries.size(), originalLogEntrySource.getTotalEntries()));
+                        updateStatus(String.format("📍 Found %,d of %,d entries", 
+                            filteredEntries.size(), originalLogEntrySource.getTotalEntries()));
                     }
 
                     autoResizeColumns(logTableView);
-                    logger.debug("Auto-fit table columns after search/filter");
 
                     if (!visibleLogEntries.isEmpty()) {
                         logTableView.scrollTo(0);
@@ -1401,10 +1511,6 @@ public class MainController {
                 return null;
             }
         };
-
-        task.setOnSucceeded(e -> {
-
-        });
 
         task.setOnFailed(e -> {
             Throwable ex = task.getException();
@@ -2059,6 +2165,114 @@ public class MainController {
                 vbox.getChildren().addAll(nameLabel, pathLabel, sizeLabel);
                 setGraphic(vbox);
             }
+        }
+    }
+
+    /**
+     * High-performance TableCell for unparsed content display.
+     * Optimized for minimal memory allocation and fast rendering.
+     */
+    private static class UnparsedContentCell extends TableCell<LogEntry, String> {
+        private static final int MAX_LINES_DISPLAY = 10;
+        private static final int MAX_CHARS_PER_LINE = 200;
+        private static final int MAX_TOTAL_CHARS = 2000;
+        private static final String STYLE_UNPARSED = "-fx-padding: 5px;";
+
+        private Label contentLabel;
+
+        @Override
+        protected void updateItem(String item, boolean empty) {
+            super.updateItem(item, empty);
+
+            if (item == null || empty) {
+                setText(null);
+                setGraphic(null);
+                return;
+            }
+
+            TableRow<LogEntry> row = getTableRow();
+            if (row == null) {
+                setText(item);
+                setGraphic(null);
+                return;
+            }
+
+            LogEntry entry = row.getItem();
+            if (entry == null || entry.isParsed()) {
+                setText(item);
+                setGraphic(null);
+                return;
+            }
+
+            // Unparsed entry - use Label with wrapping
+            if (contentLabel == null) {
+                contentLabel = new Label();
+                contentLabel.setWrapText(true);
+                contentLabel.setMaxWidth(Double.MAX_VALUE);
+                contentLabel.setStyle(STYLE_UNPARSED);
+            }
+
+            contentLabel.setText(formatUnparsedContent(item));
+            setText(null);
+            setGraphic(contentLabel);
+        }
+
+        /**
+         * Format unparsed content with intelligent truncation for optimal performance.
+         * Avoids excessive string operations.
+         */
+        private String formatUnparsedContent(String rawContent) {
+            if (rawContent == null || rawContent.isEmpty()) {
+                return rawContent;
+            }
+
+            int contentLength = rawContent.length();
+            if (contentLength <= MAX_CHARS_PER_LINE && rawContent.indexOf('\n') == -1) {
+                return rawContent;
+            }
+
+            // Split into lines (reuse array)
+            String[] lines = rawContent.split("\\r?\\n", MAX_LINES_DISPLAY + 1);
+            
+            if (lines.length == 1 && contentLength <= MAX_CHARS_PER_LINE) {
+                return rawContent;
+            }
+
+            // Pre-allocate StringBuilder with estimated capacity
+            StringBuilder display = new StringBuilder(Math.min(contentLength, MAX_TOTAL_CHARS));
+            int totalChars = 0;
+            int displayedLines = 0;
+
+            for (int i = 0; i < lines.length && displayedLines < MAX_LINES_DISPLAY; i++) {
+                String line = lines[i];
+                int lineLength = line.length();
+                
+                if (totalChars + lineLength > MAX_TOTAL_CHARS) {
+                    break;
+                }
+
+                if (displayedLines > 0) {
+                    display.append('\n');
+                }
+
+                if (lineLength > MAX_CHARS_PER_LINE) {
+                    display.append(line, 0, MAX_CHARS_PER_LINE).append("...");
+                    totalChars += MAX_CHARS_PER_LINE + 3;
+                } else {
+                    display.append(line);
+                    totalChars += lineLength;
+                }
+
+                displayedLines++;
+            }
+
+            int remainingLines = lines.length - displayedLines;
+            if (remainingLines > 0) {
+                display.append("\n... (").append(remainingLines)
+                       .append(remainingLines > 1 ? " more lines)" : " more line)");
+            }
+
+            return display.toString();
         }
     }
 }

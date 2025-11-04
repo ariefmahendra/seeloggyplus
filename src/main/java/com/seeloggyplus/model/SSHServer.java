@@ -18,6 +18,13 @@ import java.util.Objects;
 @NoArgsConstructor
 public class SSHServer {
 
+    public enum ConnectionStatus {
+        UNKNOWN,      // Not tested yet
+        CONNECTED,    // Successfully connected
+        DISCONNECTED, // Failed to connect
+        TESTING       // Currently testing connection
+    }
+
     private String id;
     private String name;
     private String host;
@@ -28,6 +35,9 @@ public class SSHServer {
     private LocalDateTime createdAt;
     private LocalDateTime lastUsed;
     private boolean savePassword;
+    
+    // Transient field - not stored in database
+    private transient ConnectionStatus connectionStatus = ConnectionStatus.UNKNOWN;
 
     public SSHServer(String name, String host, int port, String username) {
         this.name = name;

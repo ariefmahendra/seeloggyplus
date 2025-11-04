@@ -47,6 +47,7 @@
                 <!-- Settings Menu -->
                 <Menu fx:id="settingsMenu" text="Settings">
                     <MenuItem fx:id="parsingConfigMenuItem" accelerator="Ctrl+P" text="Parsing Configuration..." />
+                    <MenuItem fx:id="serverManagementMenuItem" accelerator="Ctrl+M" text="Server Management..." />
                     <SeparatorMenuItem />
                     <MenuItem text="Preferences..." />
                 </Menu>

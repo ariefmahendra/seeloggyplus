@@ -98,6 +98,8 @@ public class ParsingConfigController {
     private ObservableList<ParsingConfig> configList;
     private ParsingConfig selectedConfig;
     private ParsingConfig configSnapshot; // Snapshot of the config when editing starts
+    
+    private Runnable onConfigChangedCallback; // Callback to notify parent when config changes
 
     @FXML
     public void initialize() {
@@ -131,6 +133,24 @@ public class ParsingConfigController {
             configListView.getSelectionModel().selectFirst();
         } else {
             setEditorDisabled(true);
+        }
+    }
+    
+    /**
+     * Set callback to be invoked when parsing configuration changes
+     * @param callback Runnable to execute when config is saved/updated
+     */
+    public void setOnConfigChangedCallback(Runnable callback) {
+        this.onConfigChangedCallback = callback;
+    }
+    
+    /**
+     * Notify parent controller that configuration has changed
+     */
+    private void notifyConfigChanged() {
+        if (onConfigChangedCallback != null) {
+            logger.debug("Notifying parent controller of config changes");
+            onConfigChangedCallback.run();
         }
     }
 
@@ -503,6 +523,10 @@ public class ParsingConfigController {
                 parsingConfigService.update(config);
             }
         }
+        
+        // Notify parent controller of changes
+        notifyConfigChanged();
+        logger.info("Configuration saved and parent notified");
 
         closeDialog();
     }
@@ -522,6 +546,10 @@ public class ParsingConfigController {
                 parsingConfigService.update(config);
             }
         }
+        
+        // Notify parent controller of changes
+        notifyConfigChanged();
+        logger.info("Configuration applied and parent notified");
     }
 
     /**
