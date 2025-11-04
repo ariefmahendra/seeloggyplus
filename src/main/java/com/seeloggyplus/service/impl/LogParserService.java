@@ -1,7 +1,9 @@
-package com.seeloggyplus.service;
+package com.seeloggyplus.service.impl;
 
 import com.seeloggyplus.model.LogEntry;
 import com.seeloggyplus.model.ParsingConfig;
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,10 +82,9 @@ public class LogParserService {
             try {
                 allEntries.addAll(future.get());
             } catch (InterruptedException e) {
-                // This is NORMAL when task is cancelled by user
-                logger.info("⚠️ Parsing interrupted (task cancelled by user)");
-                Thread.currentThread().interrupt(); // Restore interrupt status
-                break; // Stop processing remaining chunks
+                logger.info("Parsing interrupted (task cancelled by user)");
+                Thread.currentThread().interrupt();
+                break;
             } catch (ExecutionException e) {
                 logger.error("Error processing a file chunk", e);
             }
@@ -106,13 +107,14 @@ public class LogParserService {
 
         List<LogEntry> combined = new ArrayList<>();
         StringBuilder unparsedBuffer = new StringBuilder(1000);
+        Map<String, String> unparsedMap = new HashMap<>();
         long unparsedStartLine = -1;
         long unparsedEndLine = -1;
 
         for (LogEntry entry : rawEntries) {
             if (entry.isParsed()) {
                 if (!unparsedBuffer.isEmpty()) {
-                    combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedBuffer.toString()));
+                    combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedMap.put("message", unparsedBuffer.toString())));
                     unparsedBuffer.setLength(0);
                 }
                 combined.add(entry);
@@ -122,7 +124,7 @@ public class LogParserService {
                 if (unparsedStartLine == -1) {
                     unparsedStartLine = entry.getLineNumber();
                 }
-                unparsedEndLine = entry.getLineNumber(); // Update end line with current entry's line number
+                unparsedEndLine = entry.getLineNumber();
                 if (unparsedBuffer.length() < maxEntryUnparsed){
                     if (!unparsedBuffer.isEmpty()) {
                         unparsedBuffer.append(System.lineSeparator());
@@ -148,7 +150,6 @@ public class LogParserService {
 
             String line;
             while ((line = reader.readLine()) != null && channel.position() <= chunkInfo.endByte()) {
-                // FIXED: Parse FIRST, then increment (so line 1 stays line 1)
                 LogEntry logEntry = parseLine(line, currentLineNumber, config);
 
                 if (!logEntry.isParsed()){
@@ -162,7 +163,7 @@ public class LogParserService {
                 }
 
                 entries.add(logEntry);
-                currentLineNumber++;  // Increment AFTER parsing
+                currentLineNumber++;
             }
 
         } catch (IOException e) {
@@ -233,7 +234,6 @@ public class LogParserService {
 
                 return new LogEntry(lineNumber, line, fields);
             } else {
-                // Pattern didn't match, return raw entry
                 return new LogEntry(lineNumber, line);
             }
         } catch (Exception e) {
@@ -346,6 +346,8 @@ public class LogParserService {
     /**
      * Test result class
      */
+    @Getter
+    @Setter
     public static class TestResult {
         private boolean success;
         private String message;
@@ -357,36 +359,5 @@ public class LogParserService {
             this.groupNames = new ArrayList<>();
         }
 
-        public boolean isSuccess() {
-            return success;
-        }
-
-        public void setSuccess(boolean success) {
-            this.success = success;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public void setMessage(String message) {
-            this.message = message;
-        }
-
-        public Map<String, String> getParsedFields() {
-            return parsedFields;
-        }
-
-        public void setParsedFields(Map<String, String> parsedFields) {
-            this.parsedFields = parsedFields;
-        }
-
-        public List<String> getGroupNames() {
-            return groupNames;
-        }
-
-        public void setGroupNames(List<String> groupNames) {
-            this.groupNames = groupNames;
-        }
     }
 }

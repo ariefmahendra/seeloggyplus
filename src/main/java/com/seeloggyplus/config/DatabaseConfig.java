@@ -132,7 +132,7 @@ public class DatabaseConfig {
             if (!columnExists) {
                 String addColumn = "ALTER TABLE parsing_configs ADD COLUMN timestamp_format TEXT";
                 stmt.execute(addColumn);
-                logger.info("✅ Migration: Added timestamp_format column to parsing_configs table");
+                logger.info("Migration: Added timestamp_format column to parsing_configs table");
             } else {
                 logger.debug("timestamp_format column already exists in parsing_configs table");
             }

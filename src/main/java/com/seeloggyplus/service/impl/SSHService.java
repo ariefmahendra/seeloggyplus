@@ -1,4 +1,4 @@
-package com.seeloggyplus.service;
+package com.seeloggyplus.service.impl;
 
 import com.jcraft.jsch.*;
 import org.slf4j.Logger;

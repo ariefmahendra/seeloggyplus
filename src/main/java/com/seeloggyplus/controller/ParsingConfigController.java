@@ -1,7 +1,7 @@
 package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.ParsingConfig;
-import com.seeloggyplus.service.LogParserService;
+import com.seeloggyplus.service.impl.LogParserService;
 
 import java.util.Objects;
 import java.util.Optional;

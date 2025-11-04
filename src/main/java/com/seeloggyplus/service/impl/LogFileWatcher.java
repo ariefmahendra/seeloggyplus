@@ -1,4 +1,4 @@
-package com.seeloggyplus.service;
+package com.seeloggyplus.service.impl;
 
 import javafx.application.Platform;
 import org.slf4j.Logger;
@@ -10,7 +10,6 @@ import java.nio.file.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 /**
  * File watcher service using Java NIO WatchService

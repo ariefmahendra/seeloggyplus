@@ -2,7 +2,7 @@ package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.RecentFile;
 import com.seeloggyplus.model.SSHServer;
-import com.seeloggyplus.service.SSHService;
+import com.seeloggyplus.service.impl.SSHService;
 
 import java.io.File;
 import java.util.List;

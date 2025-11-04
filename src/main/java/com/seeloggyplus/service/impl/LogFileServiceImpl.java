@@ -61,7 +61,7 @@ public class LogFileServiceImpl implements LogFileService {
         try {
             return logFileRepository.findById(id);
         } catch (NotFoundException ex){
-            logger.warn("Log file not found by id: {}", id);
+            logger.warn("get log file by id not found : {}", id);
             return null;
         } catch (FatalDatabaseException ex) {
             logger.error("Database error when getting log file by id: {}", id, ex);
@@ -80,7 +80,7 @@ public class LogFileServiceImpl implements LogFileService {
             logFileRepository.deleteById(id);
             logger.info("Successfully deleted log file with id: {}", id);
         } catch (NotFoundException ex){
-            logger.warn("Log file not found by id: {}", id);
+            logger.warn("get log file by id for delete log not found: {}", id);
             throw new RuntimeException("Log file not found", ex);
         } catch (FatalDatabaseException ex) {
             logger.error("Database error when deleting log file by id: {}", id, ex);

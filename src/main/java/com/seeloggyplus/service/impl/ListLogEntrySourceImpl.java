@@ -11,13 +11,7 @@ import java.util.stream.Collectors;
  * An implementation of LogEntrySource that wraps a List<LogEntry>.
  * This is suitable when all log entries are already in memory.
  */
-public class ListLogEntrySourceImpl implements LogEntrySource {
-    private final List<LogEntry> allEntries;
-
-    public ListLogEntrySourceImpl(List<LogEntry> allEntries) {
-        this.allEntries = allEntries;
-    }
-
+public record ListLogEntrySourceImpl(List<LogEntry> allEntries) implements LogEntrySource {
     @Override
     public int getTotalEntries() {
         return allEntries.size();
@@ -28,16 +22,14 @@ public class ListLogEntrySourceImpl implements LogEntrySource {
         int fromIndex = Math.min(offset, allEntries.size());
         int toIndex = Math.min(offset + limit, allEntries.size());
         if (fromIndex > toIndex) {
-            return List.of(); // Return empty list if range is invalid
+            return List.of();
         }
         return allEntries.subList(fromIndex, toIndex);
     }
 
     @Override
     public LogEntrySource filter(Predicate<LogEntry> predicate) {
-        List<LogEntry> filteredList = allEntries.stream()
-                .filter(predicate)
-                .collect(Collectors.toList());
+        List<LogEntry> filteredList = allEntries.stream().filter(predicate).collect(Collectors.toList());
         return new ListLogEntrySourceImpl(filteredList);
     }
 }

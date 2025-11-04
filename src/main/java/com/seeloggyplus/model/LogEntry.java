@@ -1,5 +1,8 @@
 package com.seeloggyplus.model;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -12,15 +15,22 @@ import java.util.regex.Matcher;
  */
 public class LogEntry {
 
+    // Getters
+    @Getter
     private final long lineNumber;
-    private final long endLineNumber; // New field to store the end line number for combined entries
+    @Getter
+    private final long endLineNumber;
+    @Getter
     private final String rawLog;
     private final Map<String, String> parsedFields;
+    @Getter
     private LocalDateTime timestamp;
     private String level;
     private String message;
     private String thread;
     private String logger;
+    @Setter
+    @Getter
     private boolean isParsed;
 
     // Constructor for unparsed single lines
@@ -30,7 +40,7 @@ public class LogEntry {
 
     // Constructor for combined unparsed lines
     public LogEntry(long startLineNumber, long endLineNumber, String rawLog) {
-        this(startLineNumber, endLineNumber, rawLog, new HashMap<>(), false);
+        this(startLineNumber, endLineNumber, rawLog, createUnparsedFieldMap(rawLog), false);
     }
 
     // Constructor for parsed lines
@@ -67,20 +77,9 @@ public class LogEntry {
                     this.timestamp = null;
                 }
             }
+        } else {
+            this.message = rawLog;
         }
-    }
-
-    // Getters
-    public long getLineNumber() {
-        return lineNumber;
-    }
-
-    public long getEndLineNumber() {
-        return endLineNumber;
-    }
-
-    public String getRawLog() {
-        return rawLog;
     }
 
     public Map<String, String> getParsedFields() {
@@ -89,10 +88,6 @@ public class LogEntry {
 
     public String getField(String fieldName) {
         return parsedFields.get(fieldName);
-    }
-
-    public LocalDateTime getTimestamp() {
-        return timestamp;
     }
 
     public void setTimestamp(LocalDateTime timestamp) {
@@ -138,14 +133,6 @@ public class LogEntry {
         parsedFields.put("logger", logger);
     }
 
-    public boolean isParsed() {
-        return isParsed;
-    }
-
-    public void setParsed(boolean parsed) {
-        isParsed = parsed;
-    }
-
     public void addField(String key, String value) {
         parsedFields.put(key, value);
     }
@@ -159,6 +146,12 @@ public class LogEntry {
         for (String groupName : groupNames) {
             fields.put(groupName, matcher.group(groupName));
         }
+        return fields;
+    }
+
+    private static Map<String, String> createUnparsedFieldMap(String rawLog) {
+        Map<String, String> fields = new HashMap<>();
+        fields.put("unparsed", rawLog);
         return fields;
     }
 
@@ -200,7 +193,7 @@ public class LogEntry {
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + (int) (lineNumber ^ (lineNumber >>> 32));
+        result = prime * result + Long.hashCode(lineNumber);
         result = prime * result + ((rawLog == null) ? 0 : rawLog.hashCode());
         return result;
     }
