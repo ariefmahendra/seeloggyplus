@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.seeloggyplus.controller.RemoteFileBrowserDialogController"
+            prefWidth="1000" prefHeight="700">
+    
+    <!-- Top: Connection Info & Navigation -->
+    <top>
+        <VBox>
+            <!-- Connection Info Bar -->
+            <HBox spacing="10">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+                <FontAwesomeIconView glyphName="SERVER" size="16"/>
+                <Label fx:id="serverInfoLabel" text="Connecting..."/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="connectionStatusLabel" text="●"/>
+                <Button fx:id="disconnectButton" text="Disconnect">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="SIGN_OUT" size="14"/>
+                    </graphic>
+                </Button>
+            </HBox>
+            
+            <!-- Navigation Bar -->
+            <ToolBar>
+                <Button fx:id="backButton" disable="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="ARROW_LEFT" size="14"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Back"/>
+                    </tooltip>
+                </Button>
+                
+                <Button fx:id="forwardButton" disable="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="ARROW_RIGHT" size="14"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Forward"/>
+                    </tooltip>
+                </Button>
+                
+                <Button fx:id="upButton" disable="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="ARROW_UP" size="14"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Up to parent directory"/>
+                    </tooltip>
+                </Button>
+                
+                <Separator orientation="VERTICAL"/>
+                
+                <Button fx:id="homeButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="HOME" size="14"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Home directory"/>
+                    </tooltip>
+                </Button>
+                
+                <Button fx:id="refreshButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="REFRESH" size="14"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Refresh"/>
+                    </tooltip>
+                </Button>
+                
+                <Separator orientation="VERTICAL"/>
+                
+                <Label text="Path:"/>
+                <TextField fx:id="pathField" HBox.hgrow="ALWAYS" promptText="/var/log"/>
+                <Button fx:id="goButton" text="Go"/>
+            </ToolBar>
+            
+            <!-- Search Bar -->
+            <HBox spacing="10">
+                <padding>
+                    <Insets top="5" right="10" bottom="5" left="10"/>
+                </padding>
+                <FontAwesomeIconView glyphName="SEARCH" size="16"/>
+                <TextField fx:id="searchField" promptText="Search files..." HBox.hgrow="ALWAYS"/>
+                <ComboBox fx:id="filterComboBox" promptText="Filter"/>
+            </HBox>
+        </VBox>
+    </top>
+    
+    <!-- Center: File Table -->
+    <center>
+        <TableView fx:id="fileTable" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn fx:id="iconColumn" text="" prefWidth="40" minWidth="40" maxWidth="40" sortable="false"/>
+                <TableColumn fx:id="nameColumn" text="Name" prefWidth="300" minWidth="150"/>
+                <TableColumn fx:id="sizeColumn" text="Size" prefWidth="100" minWidth="80"/>
+                <TableColumn fx:id="typeColumn" text="Type" prefWidth="100" minWidth="80"/>
+                <TableColumn fx:id="permissionsColumn" text="Permissions" prefWidth="100" minWidth="90"/>
+                <TableColumn fx:id="ownerColumn" text="Owner" prefWidth="100" minWidth="80"/>
+                <TableColumn fx:id="modifiedColumn" text="Modified" prefWidth="150" minWidth="120"/>
+            </columns>
+            <placeholder>
+                <VBox alignment="CENTER" spacing="10">
+                    <FontAwesomeIconView glyphName="FOLDER_OPEN" size="48"/>
+                    <Label text="No files or folders"/>
+                    <Label text="This directory is empty or you don't have permission to view it"/>
+                </VBox>
+            </placeholder>
+        </TableView>
+    </center>
+    
+    <!-- Bottom: Status & Actions -->
+    <bottom>
+        <VBox>
+            <Separator/>
+            
+            <!-- Status Bar -->
+            <HBox spacing="10">
+                <padding>
+                    <Insets top="5" right="10" bottom="5" left="10"/>
+                </padding>
+                <Label fx:id="statusLabel" text="Ready"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="fileCountLabel" text="0 items"/>
+                <Separator orientation="VERTICAL"/>
+                <ProgressIndicator fx:id="progressIndicator" visible="false" prefWidth="20" prefHeight="20"/>
+                <Label fx:id="loadingLabel" text="" visible="false"/>
+            </HBox>
+            
+            <!-- Action Buttons -->
+            <HBox spacing="10" alignment="CENTER_RIGHT">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+                <Button text="Download Selected" fx:id="downloadButton" disable="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="DOWNLOAD" size="14"/>
+                    </graphic>
+                </Button>
+                
+                <Button text="Open Log File" fx:id="openButton" disable="true" defaultButton="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="FILE_TEXT" size="14"/>
+                    </graphic>
+                </Button>
+                
+                <Button text="Cancel" fx:id="cancelButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="TIMES" size="14"/>
+                    </graphic>
+                </Button>
+            </HBox>
+        </VBox>
+    </bottom>
+</BorderPane>
