@@ -22,34 +22,47 @@ javafx {
 }
 
 dependencies {
-    // JavaFX (handled by plugin)
-
     // SSH Connection
     implementation 'com.jcraft:jsch:0.1.55'
+
+    // Lombok - proper configuration for annotation processing
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
+    testCompileOnly 'org.projectlombok:lombok:1.18.34'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
 
     // JSON Processing
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
 
+    // caching
+    implementation("com.github.ben-manes.caffeine:caffeine:3.2.2")
+
     // SQLite Database
     implementation 'org.xerial:sqlite-jdbc:3.44.1.0'
 
     // XML Processing
-    implementation 'dom4j:dom4j:1.6.1'
+    implementation 'org.dom4j:dom4j:2.2.0'
 
     // Logging
     implementation 'org.slf4j:slf4j-api:2.0.9'
-    implementation 'ch.qos.logback:logback-classic:1.4.11'
+    implementation 'ch.qos.logback:logback-classic:1.5.19'
 
     // Apache Commons for file operations
-    implementation 'commons-io:commons-io:2.13.0'
-    implementation 'org.apache.commons:commons-lang3:3.13.0'
+    implementation 'commons-io:commons-io:2.14.0'
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
 
     // ControlsFX for advanced UI components
     implementation 'org.controlsfx:controlsfx:11.1.2'
 
     // RichTextFX for better text display
     implementation 'org.fxmisc.richtext:richtextfx:0.11.2'
+
+    // FontAwesomeFX for icons
+    implementation 'de.jensd:fontawesomefx-fontawesome:4.7.0-9.1.2'
+
+    // LDAP
+    implementation 'com.unboundid:unboundid-ldapsdk:7.0.3'
 
     // Testing
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
@@ -65,14 +78,14 @@ tasks.named('test') {
 }
 
 // Enable preview features if needed
-tasks.withType(JavaCompile) {
+tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs << '-Xlint:unchecked'
     options.deprecation = true
 }
 
 // Create fat JAR
-task fatJar(type: Jar) {
+tasks.register('fatJar', Jar) {
     archiveBaseName = "${project.name}-all"
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     manifest {

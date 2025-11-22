@@ -104,3 +104,6 @@ hs_err_pid*
 # Build output
 target/
 *.class
+
+# Database files
+./seeloggyplus.db

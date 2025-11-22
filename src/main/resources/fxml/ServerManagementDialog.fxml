@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.seeloggyplus.controller.ServerManagementDialogController"
+            prefWidth="950" prefHeight="650">
+    
+    <!-- Top Toolbar -->
+    <top>
+        <VBox>
+            <ToolBar>
+                <Button fx:id="addServerButton" text="Add Server">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="PLUS" size="14"/>
+                    </graphic>
+                </Button>
+                
+                <Button fx:id="editServerButton" text="Edit">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="EDIT" size="14"/>
+                    </graphic>
+                </Button>
+                
+                <Button fx:id="deleteServerButton" text="Delete">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="TRASH" size="14"/>
+                    </graphic>
+                </Button>
+                
+                <Separator orientation="VERTICAL"/>
+                
+                <Button fx:id="testConnectionButton" text="Test Connection">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="CHECK_CIRCLE" size="14"/>
+                    </graphic>
+                </Button>
+                
+                <Region HBox.hgrow="ALWAYS"/>
+                
+                <Button fx:id="refreshButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="REFRESH" size="14"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Refresh"/>
+                    </tooltip>
+                </Button>
+            </ToolBar>
+            
+            <!-- Search Bar -->
+            <HBox spacing="10">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+                <FontAwesomeIconView glyphName="SEARCH" size="16"/>
+                <TextField fx:id="searchField" promptText="Search servers..." HBox.hgrow="ALWAYS"/>
+                <Button text="Clear" fx:id="clearSearchButton"/>
+            </HBox>
+        </VBox>
+    </top>
+    
+    <!-- Center: Server List -->
+    <center>
+        <TableView fx:id="serverTable" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn fx:id="statusColumn" text="Status" prefWidth="60" minWidth="60" maxWidth="60" sortable="false"/>
+                <TableColumn fx:id="nameColumn" text="Name" prefWidth="150" minWidth="100"/>
+                <TableColumn fx:id="hostColumn" text="Host" prefWidth="200" minWidth="150"/>
+                <TableColumn fx:id="portColumn" text="Port" prefWidth="70" minWidth="60" maxWidth="80"/>
+                <TableColumn fx:id="usernameColumn" text="Username" prefWidth="120" minWidth="80"/>
+                <TableColumn fx:id="defaultPathColumn" text="Default Path" prefWidth="200" minWidth="150"/>
+                <TableColumn fx:id="lastUsedColumn" text="Last Used" prefWidth="150" minWidth="120"/>
+            </columns>
+            <placeholder>
+                <VBox alignment="CENTER" spacing="10">
+                    <FontAwesomeIconView glyphName="SERVER" size="48"/>
+                    <Label text="No SSH servers configured"/>
+                    <Label text="Click 'Add Server' to create a new SSH server configuration"/>
+                </VBox>
+            </placeholder>
+        </TableView>
+    </center>
+    
+    <!-- Bottom: Details Panel -->
+    <bottom>
+        <VBox>
+            <padding>
+                <Insets top="15" right="15" bottom="15" left="15"/>
+            </padding>
+            
+            <Label text="Server Details">
+                <padding>
+                    <Insets bottom="10"/>
+                </padding>
+            </Label>
+            
+            <Separator/>
+            
+            <GridPane hgap="15" vgap="8">
+                <padding>
+                    <Insets top="10"/>
+                </padding>
+                <columnConstraints>
+                    <ColumnConstraints minWidth="100" prefWidth="120"/>
+                    <ColumnConstraints hgrow="ALWAYS"/>
+                    <ColumnConstraints minWidth="100" prefWidth="120"/>
+                    <ColumnConstraints hgrow="ALWAYS"/>
+                </columnConstraints>
+                
+                <Label text="Name:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                <Label fx:id="detailNameLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                
+                <Label text="Host:" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+                <Label fx:id="detailHostLabel" text="-" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
+                
+                <Label text="Username:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                <Label fx:id="detailUsernameLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                
+                <Label text="Port:" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
+                <Label fx:id="detailPortLabel" text="-" GridPane.columnIndex="3" GridPane.rowIndex="1"/>
+                
+                <Label text="Default Path:" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                <Label fx:id="detailPathLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="2" GridPane.columnSpan="3"/>
+                
+                <Label text="Created:" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+                <Label fx:id="detailCreatedLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
+                
+                <Label text="Last Used:" GridPane.columnIndex="2" GridPane.rowIndex="3"/>
+                <Label fx:id="detailLastUsedLabel" text="-" GridPane.columnIndex="3" GridPane.rowIndex="3"/>
+            </GridPane>
+            
+            <HBox spacing="10" alignment="CENTER_RIGHT">
+                <padding>
+                    <Insets top="15"/>
+                </padding>
+                <Button text="Close" fx:id="closeButton" prefWidth="100"/>
+            </HBox>
+        </VBox>
+    </bottom>
+</BorderPane>

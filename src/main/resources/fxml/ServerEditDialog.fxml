@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
+
+<VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.seeloggyplus.controller.ServerEditDialogController"
+      prefWidth="500" prefHeight="450">
+    
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+    
+    <VBox spacing="15" VBox.vgrow="ALWAYS">
+        <!-- Server Name -->
+        <VBox spacing="5">
+            <Label text="Server Name:"/>
+            <TextField fx:id="nameField" promptText="e.g., Production Server"/>
+            <Label fx:id="nameErrorLabel" managed="false" visible="false"/>
+        </VBox>
+        
+        <!-- Host -->
+        <VBox spacing="5">
+            <HBox spacing="5">
+                <Label text="Host:"/>
+                <Label text="*"/>
+            </HBox>
+            <TextField fx:id="hostField" promptText="e.g., 192.168.1.100 or server.com"/>
+            <Label fx:id="hostErrorLabel" managed="false" visible="false"/>
+        </VBox>
+        
+        <!-- Port -->
+        <VBox spacing="5">
+            <HBox spacing="5">
+                <Label text="Port:"/>
+                <Label text="*"/>
+            </HBox>
+            <TextField fx:id="portField" text="22" promptText="22"/>
+            <Label fx:id="portErrorLabel" managed="false" visible="false"/>
+        </VBox>
+        
+        <!-- Username -->
+        <VBox spacing="5">
+            <HBox spacing="5">
+                <Label text="Username:"/>
+                <Label text="*"/>
+            </HBox>
+            <TextField fx:id="usernameField" promptText="SSH username"/>
+            <Label fx:id="usernameErrorLabel" managed="false" visible="false"/>
+        </VBox>
+        
+        <!-- Password -->
+        <VBox spacing="5">
+            <Label text="Password:"/>
+            <HBox spacing="10">
+                <PasswordField fx:id="passwordField" promptText="SSH password" HBox.hgrow="ALWAYS"/>
+                <Button fx:id="showPasswordButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="EYE" size="14"/>
+                    </graphic>
+                </Button>
+            </HBox>
+            <CheckBox fx:id="savePasswordCheckBox" text="Save password (stored encrypted)"/>
+        </VBox>
+        
+        <!-- Default Path -->
+        <VBox spacing="5">
+            <Label text="Default Path:"/>
+            <TextField fx:id="defaultPathField" text="/" promptText="/var/log"/>
+            <Label text="Starting directory when browsing files"/>
+        </VBox>
+        
+        <Region VBox.vgrow="ALWAYS"/>
+        
+        <!-- Buttons -->
+        <HBox spacing="10" alignment="CENTER_RIGHT">
+            <Button text="Test Connection" fx:id="testButton" prefWidth="120"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button text="Cancel" fx:id="cancelButton" prefWidth="100"/>
+            <Button text="Save" fx:id="saveButton" prefWidth="100" defaultButton="true"/>
+        </HBox>
+    </VBox>
+</VBox>
