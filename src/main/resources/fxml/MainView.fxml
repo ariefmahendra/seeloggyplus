@@ -149,14 +149,6 @@
                         <Tooltip text="Scroll to Bottom" />
                     </tooltip>
                 </Button>
-                <Button fx:id="loginLdap" onAction="#onLoginButtonClick">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="SIGN_IN" size="12" />
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Login Ldap" />
-                    </tooltip>
-                </Button>
             </ToolBar>
         </VBox>
     </top>

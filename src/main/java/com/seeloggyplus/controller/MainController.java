@@ -201,23 +201,6 @@ public class MainController {
         progressBar.setVisible(false);
     }
 
-    @FXML
-    public void onLoginButtonClick() {
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/LoginLdapDialog.fxml"));
-            Parent root = loader.load();
-
-            Scene scene = new Scene(root);
-
-            Stage stage = new Stage();
-            stage.setScene(scene);
-            stage.showAndWait();
-        } catch (IOException e){
-            logger.error("Failed to open LDAP login dialog", e);
-        }
-
-    }
-
     /**
      * Setup menu bar actions
      */

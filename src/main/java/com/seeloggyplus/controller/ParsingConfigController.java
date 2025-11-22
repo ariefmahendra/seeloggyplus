@@ -31,7 +31,6 @@ public class ParsingConfigController {
 
     private static final Logger logger = LoggerFactory.getLogger(ParsingConfigController.class);
 
-
     @FXML
     private ListView<ParsingConfig> configListView;
     @FXML
@@ -531,7 +530,7 @@ public class ParsingConfigController {
         try {
             ObjectMapper mapper = new ObjectMapper();
 
-           List<ParsingConfig> importedConfigs = List.of(
+            List<ParsingConfig> importedConfigs = List.of(
                     mapper.readValue(file, ParsingConfig[].class)
             );
 
