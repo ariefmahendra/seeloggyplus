@@ -24,7 +24,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<BorderPane fx:id="mainBorderPane" minHeight="400" minWidth="600" prefHeight="800" prefWidth="1200.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
+<BorderPane fx:id="mainBorderPane" minHeight="400" minWidth="600" prefHeight="800" prefWidth="1200.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
     <top>
         <VBox>
             <MenuBar fx:id="menuBar">
@@ -313,9 +313,6 @@
                                             </Button>
                                         </HBox>
                                     </HBox>
-
-                                    <!-- CodeArea will be added programmatically in controller -->
-                                    <!-- Placeholder for detail text area -->
                                 </VBox>
                             </SplitPane>
                         </center>
