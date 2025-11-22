@@ -1,0 +1,16 @@
+.small-combo-box .list-cell {
+    -fx-font-size: 12px;
+}
+
+.small-combo-box .button {
+    -fx-font-size: 12px;
+}
+
+/* ============================================
+   TableView Styling
+   ============================================ */
+
+/* Ensure table cells align to top for multi-line content */
+.table-view .table-cell {
+    -fx-alignment: TOP_LEFT;
+}

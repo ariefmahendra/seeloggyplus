@@ -1,5 +1,10 @@
 package com.seeloggyplus.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,11 +17,13 @@ import java.util.regex.PatternSyntaxException;
  * Model class for log parsing configuration using regex patterns with named groups
  * The named groups in the regex pattern will be used as column headers in the log table viewer
  */
-public class ParsingConfig implements Serializable {
 
-    private static final long serialVersionUID = 1L;
-
-    private int id;
+@Setter
+@Getter
+@AllArgsConstructor
+@NoArgsConstructor
+public class ParsingConfig {
+    private String id;
     private String name;
     private String description;
     private String regexPattern;
@@ -25,15 +32,7 @@ public class ParsingConfig implements Serializable {
     private boolean isValid;
     private String validationError;
     private boolean isDefault;
-
-    public ParsingConfig() {
-        this.name = "New Configuration";
-        this.description = "";
-        this.regexPattern = "";
-        this.groupNames = new ArrayList<>();
-        this.isValid = false;
-        this.isDefault = false;
-    }
+    private String timestampFormat; // Format for timestamp parsing (e.g., "yyyy-MM-dd HH:mm:ss.SSS")
 
     public ParsingConfig(String name, String regexPattern) {
         this.name = name;
@@ -44,25 +43,21 @@ public class ParsingConfig implements Serializable {
         validatePattern();
     }
 
-    public ParsingConfig(String name, String description, String regexPattern) {
-        this.name = name;
-        this.description = description;
-        this.regexPattern = regexPattern;
-        this.groupNames = new ArrayList<>();
-        this.isDefault = false;
-        validatePattern();
-    }
-
     /**
      * Validates the regex pattern and extracts named groups
      */
-    public boolean validatePattern() {
+    public void validatePattern() {
+        // Initialize groupNames if null
+        if (this.groupNames == null) {
+            this.groupNames = new ArrayList<>();
+        }
+
         if (regexPattern == null || regexPattern.trim().isEmpty()) {
             this.isValid = false;
             this.validationError = "Regex pattern cannot be empty";
             this.groupNames.clear();
             this.compiledPattern = null;
-            return false;
+            return;
         }
 
         try {
@@ -72,18 +67,19 @@ public class ParsingConfig implements Serializable {
             if (groupNames.isEmpty()) {
                 this.isValid = false;
                 this.validationError = "Pattern must contain at least one named group. Use (?<groupName>...) syntax";
-                return false;
+                return;
             }
 
             this.isValid = true;
             this.validationError = null;
-            return true;
         } catch (PatternSyntaxException e) {
             this.isValid = false;
             this.validationError = "Invalid regex pattern: " + e.getMessage();
+            if (this.groupNames == null) {
+                this.groupNames = new ArrayList<>();
+            }
             this.groupNames.clear();
             this.compiledPattern = null;
-            return false;
         }
     }
 
@@ -120,106 +116,50 @@ public class ParsingConfig implements Serializable {
     }
 
     /**
-     * Test the pattern against a sample log line
+     * Auto-detect timestamp format from regex pattern
+     * Analyzes the timestamp group pattern to determine the best format
      */
-    public boolean testPattern(String sampleLog) {
-        if (!isValid || compiledPattern == null) {
-            return false;
+    public String autoDetectTimestampFormat() {
+        if (regexPattern == null || regexPattern.isEmpty()) {
+            return null;
         }
-
-        try {
-            Matcher matcher = compiledPattern.matcher(sampleLog);
-            return matcher.find();
-        } catch (Exception e) {
-            return false;
+        
+        // Extract timestamp group pattern from regex
+        Pattern timestampGroupPattern = Pattern.compile("\\(\\?<timestamp>([^)]+)\\)");
+        Matcher matcher = timestampGroupPattern.matcher(regexPattern);
+        
+        if (!matcher.find()) {
+            return null; // No timestamp group found
         }
-    }
-
-    /**
-     * Parse a log line and extract named group values
-     */
-    public java.util.Map<String, String> parse(String logLine) {
-        java.util.Map<String, String> result = new java.util.HashMap<>();
-
-        if (!isValid || compiledPattern == null || logLine == null) {
-            return result;
-        }
-
-        try {
-            Matcher matcher = compiledPattern.matcher(logLine);
-            if (matcher.find()) {
-                for (String groupName : groupNames) {
-                    try {
-                        String value = matcher.group(groupName);
-                        result.put(groupName, value != null ? value : "");
-                    } catch (IllegalArgumentException e) {
-                        // Group doesn't exist in this match
-                        result.put(groupName, "");
-                    }
-                }
+        
+        String timestampPattern = matcher.group(1);
+        
+        // Common pattern mappings (regex pattern → date format)
+        // Check from most specific to least specific
+        if (timestampPattern.contains("\\d{4}") && timestampPattern.contains("\\d{2}") && timestampPattern.contains("\\.\\d{3}")) {
+            // Has year (4 digits), month/day (2 digits), and milliseconds
+            if (timestampPattern.indexOf("\\d{4}") < timestampPattern.indexOf("\\d{2}")) {
+                // Year comes first: yyyy-MM-dd HH:mm:ss.SSS
+                return "yyyy-MM-dd HH:mm:ss.SSS";
+            } else {
+                // Day comes first: dd-MM-yyyy HH:mm:ss.SSS
+                return "dd-MM-yyyy HH:mm:ss.SSS";
             }
-        } catch (Exception e) {
-            // Return empty map on error
+        } else if (timestampPattern.contains("\\d{4}") && timestampPattern.contains("\\d{2}")) {
+            // Has year and month/day, no milliseconds
+            if (timestampPattern.indexOf("\\d{4}") < timestampPattern.indexOf("\\d{2}")) {
+                // Year first: yyyy-MM-dd HH:mm:ss
+                return "yyyy-MM-dd HH:mm:ss";
+            } else {
+                // Day first: dd-MM-yyyy HH:mm:ss
+                return "dd-MM-yyyy HH:mm:ss";
+            }
         }
-
-        return result;
+        
+        // Default fallback
+        return "yyyy-MM-dd HH:mm:ss.SSS";
     }
-
-    // Getters and Setters
-
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getRegexPattern() {
-        return regexPattern;
-    }
-
-    public void setRegexPattern(String regexPattern) {
-        this.regexPattern = regexPattern;
-        validatePattern();
-    }
-
-    public List<String> getGroupNames() {
-        return new ArrayList<>(groupNames);
-    }
-
-    public boolean isValid() {
-        return isValid;
-    }
-
-    public String getValidationError() {
-        return validationError;
-    }
-
-    public boolean isDefault() {
-        return isDefault;
-    }
-
-    public void setDefault(boolean isDefault) {
-        this.isDefault = isDefault;
-    }
-
+    
     /**
      * Create a copy of this configuration
      */
@@ -228,6 +168,7 @@ public class ParsingConfig implements Serializable {
         copy.name = this.name;
         copy.description = this.description;
         copy.regexPattern = this.regexPattern;
+        copy.timestampFormat = this.timestampFormat;
         copy.isDefault = false;
         copy.validatePattern();
         return copy;
@@ -250,56 +191,5 @@ public class ParsingConfig implements Serializable {
     @Override
     public int hashCode() {
         return Objects.hash(name, regexPattern);
-    }
-
-    /**
-     * Factory method to create common log format configurations
-     */
-    public static ParsingConfig createDefaultConfig() {
-        ParsingConfig config = new ParsingConfig();
-        config.setName("Default Log Format");
-        config.setDescription("Standard log format with timestamp, level, logger, and message");
-        config.setRegexPattern(
-            "(?<timestamp>\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}[,.]\\d{3})\\s+" +
-            "(?<level>TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\\s+" +
-            "\\[(?<thread>[^\\]]+)\\]\\s+" +
-            "(?<logger>[^\\s]+)\\s+-\\s+" +
-            "(?<message>.*)"
-        );
-        config.setDefault(true);
-        config.validatePattern();
-        return config;
-    }
-
-    public static ParsingConfig createApacheAccessLogConfig() {
-        ParsingConfig config = new ParsingConfig();
-        config.setName("Apache Access Log");
-        config.setDescription("Apache/Nginx access log format");
-        config.setRegexPattern(
-            "(?<ip>[\\d.]+)\\s+" +
-            "(?<identity>\\S+)\\s+" +
-            "(?<user>\\S+)\\s+" +
-            "\\[(?<timestamp>[^\\]]+)\\]\\s+" +
-            "\"(?<method>\\S+)\\s+(?<path>\\S+)\\s+(?<protocol>\\S+)\"\\s+" +
-            "(?<status>\\d+)\\s+" +
-            "(?<size>\\S+)\\s+" +
-            "\"(?<referer>[^\"]*)\"\\s+" +
-            "\"(?<useragent>[^\"]*)\""
-        );
-        config.validatePattern();
-        return config;
-    }
-
-    public static ParsingConfig createJsonLogConfig() {
-        ParsingConfig config = new ParsingConfig();
-        config.setName("JSON Log Format");
-        config.setDescription("Structured JSON log format");
-        config.setRegexPattern(
-            "\\{.*\"timestamp\"\\s*:\\s*\"(?<timestamp>[^\"]+)\".*" +
-            "\"level\"\\s*:\\s*\"(?<level>[^\"]+)\".*" +
-            "\"message\"\\s*:\\s*\"(?<message>[^\"]+)\".*\\}"
-        );
-        config.validatePattern();
-        return config;
     }
 }
