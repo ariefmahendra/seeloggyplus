@@ -48,10 +48,6 @@ public class MainController {
     @FXML
     private MenuBar menuBar;
     @FXML
-    private MenuItem openFileMenuItem;
-    @FXML
-    private MenuItem openRemoteMenuItem;
-    @FXML
     private MenuItem exitMenuItem;
     @FXML
     private Menu viewMenu;
@@ -227,8 +223,7 @@ public class MainController {
      */
     private void setupMenuBar() {
         // File Menu
-        openFileMenuItem.setOnAction(e -> handleOpenFile());
-        openRemoteMenuItem.setOnAction(e -> handleOpenRemote());
+        // The new unified openMenuItem is handled by onAction="#handleOpen" in the FXML
         exitMenuItem.setOnAction(e -> handleExit());
 
         // View Menu
@@ -764,53 +759,144 @@ public class MainController {
 
 
     /**
-     * Handle open file action
+     * Handle open file action from the unified file manager.
+     * This method is called from the FXML by the "Open..." menu item.
      */
-    private void handleOpenFile() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Open Log File");
-        fileChooser
-                .getExtensionFilters()
-                .addAll(
-                        new FileChooser.ExtensionFilter("Log Files", "*.log", "*.txt"),
-                        new FileChooser.ExtensionFilter("All Files", "*.*")
-                );
+    @FXML
+    public void handleOpen() {
+        try {
+            // Get main stage and save its state before showing a modal dialog
+            Stage mainStage = (Stage) menuBar.getScene().getWindow();
+            boolean wasMaximized = mainStage.isMaximized();
+            double oldX = mainStage.getX();
+            double oldY = mainStage.getY();
+            double oldWidth = mainStage.getWidth();
+            double oldHeight = mainStage.getHeight();
 
-        File file = fileChooser.showOpenDialog(menuBar.getScene().getWindow());
-        if (file == null) {
-            logger.info("No file selected, operation cancelled");
-            return;
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
+            Parent root = loader.load();
+            UnifiedFileManagerDialogController controller = loader.getController();
+
+            Stage dialog = new Stage();
+            dialog.setTitle("Open File");
+            dialog.initModality(Modality.APPLICATION_MODAL);
+            dialog.initOwner(mainStage);
+            dialog.setScene(new Scene(root));
+
+            // Show the modal dialog and wait for it to close
+            dialog.showAndWait();
+
+            // After dialog closes, restore the main stage's state
+            // This is a workaround for a common bug in some Linux window managers
+            Platform.runLater(() -> {
+                if (wasMaximized) {
+                    mainStage.setMaximized(true);
+                } else {
+                    mainStage.setX(oldX);
+                    mainStage.setY(oldY);
+                    mainStage.setWidth(oldWidth);
+                    mainStage.setHeight(oldHeight);
+                }
+            });
+
+            FileInfo selectedFile = controller.getSelectedFile();
+            SSHService sshService = controller.getSshService(); // Get the active SSH service
+
+            if (selectedFile == null) {
+                logger.info("No file selected from UnifiedFileManagerDialog, operation cancelled.");
+                if (sshService != null) {
+                    sshService.disconnect();
+                }
+                return;
+            }
+
+            // The parsing config dialog is also modal, so we need to wrap it too.
+            ParsingConfig selectedConfig = showParsingConfigSelectionDialog();
+            if (selectedConfig == null) {
+                logger.info("No parsing configuration selected, operation cancelled.");
+                if (sshService != null) {
+                    sshService.disconnect(); // Disconnect if we're not proceeding
+                }
+                return;
+            }
+
+            if (selectedFile.getSourceType() == FileInfo.SourceType.LOCAL) {
+                openLocalLogFile(new File(selectedFile.getPath()), true, selectedConfig);
+            } else {
+                openRemoteLogFile(selectedFile, sshService, selectedConfig);
+            }
+
+        } catch (IOException e) {
+            logger.error("Failed to open Unified File Manager", e);
+            showError("Error Opening File Browser", "Could not open the file browser: " + e.getMessage());
         }
-
-        ParsingConfig selectedConfig = showParsingConfigSelectionDialog();
-
-        if (selectedConfig == null) {
-            logger.info("No parsing configuration selected, operation cancelled");
-            return;
-        }
-
-        openLocalLogFile(file, true, selectedConfig);
     }
 
     /**
-     * Handle open remote file action
+     * Downloads a remote file to a temporary local path and then opens it.
+     *
+     * @param remoteFile     The FileInfo object for the remote file.
+     * @param sshService     The active SSHService connection.
+     * @param parsingConfig  The parsing configuration to use.
      */
-    private void handleOpenRemote() {
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RemoteFileDialog.fxml"));
-            Parent root = loader.load();
-
-            Stage dialog = new Stage();
-            dialog.setTitle("Open Remote File");
-            dialog.initModality(Modality.APPLICATION_MODAL);
-            dialog.initOwner(menuBar.getScene().getWindow());
-            dialog.setScene(new Scene(root));
-
-            dialog.showAndWait();
-        } catch (IOException e) {
-            logger.error("Failed to open remote file dialog", e);
-            showError("Failed to open remote file dialog", e.getMessage());
+    private void openRemoteLogFile(FileInfo remoteFile, SSHService sshService, ParsingConfig parsingConfig) {
+        if (sshService == null || !sshService.isConnected()) {
+            showError("Connection Error", "SSH connection is not active. Please re-select the file.");
+            return;
         }
+
+        updateStatus("Downloading remote file: " + remoteFile.getName());
+        progressBar.setVisible(true);
+        progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+
+        Task<File> downloadTask = new Task<>() {
+            @Override
+            protected File call() throws Exception {
+                // Create a temporary file to store the remote log
+                String tempDir = System.getProperty("java.io.tmpdir");
+                // Sanitize the file name to avoid path traversal issues
+                String sanitizedName = new File(remoteFile.getName()).getName();
+                File localTmpFile = new File(tempDir, "seeloggyplus-" + System.currentTimeMillis() + "-" + sanitizedName);
+                
+                logger.info("Downloading remote file {} to temporary path {}", remoteFile.getPath(), localTmpFile.getAbsolutePath());
+
+                boolean success = sshService.downloadFile(remoteFile.getPath(), localTmpFile.getAbsolutePath());
+
+                if (!success) {
+                    throw new IOException("Failed to download file from server.");
+                }
+
+                logger.info("Remote file downloaded successfully.");
+                return localTmpFile;
+            }
+        };
+
+        downloadTask.setOnSucceeded(e -> {
+            File localFile = downloadTask.getValue();
+            updateStatus("Download complete. Opening file: " + localFile.getName());
+            progressBar.setVisible(false);
+
+            // Now open the downloaded local file
+            openLocalLogFile(localFile, true, parsingConfig);
+
+            // Disconnect the SSH service as its job is done for this file
+            if (sshService != null) {
+                sshService.disconnect();
+            }
+        });
+
+        downloadTask.setOnFailed(e -> {
+            progressBar.setVisible(false);
+            Throwable ex = downloadTask.getException();
+            logger.error("Failed to download remote file", ex);
+            showError("Remote File Error", "Failed to download file: " + ex.getMessage());
+            updateStatus("Failed to download remote file.");
+            if (sshService != null) {
+                sshService.disconnect();
+            }
+        });
+
+        new Thread(downloadTask).start();
     }
 
 
@@ -1058,7 +1144,7 @@ public class MainController {
             dialog.initOwner(menuBar.getScene().getWindow());
             dialog.setDialogPane(dialogPane);
 
-            Optional<ButtonType> result = dialog.showAndWait();
+            Optional<ButtonType> result = showAndWaitAndRestore(dialog);
 
             if (result.isPresent() && result.get() == ButtonType.OK) {
                 if (controller.isValidSelection()) {
@@ -1085,6 +1171,13 @@ public class MainController {
      */
     private void handleParsingConfiguration() {
         try {
+            Stage mainStage = (Stage) menuBar.getScene().getWindow();
+            boolean wasMaximized = mainStage.isMaximized();
+            double oldX = mainStage.getX();
+            double oldY = mainStage.getY();
+            double oldWidth = mainStage.getWidth();
+            double oldHeight = mainStage.getHeight();
+
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ParsingConfigDialog.fxml"));
             Parent root = loader.load();
             
@@ -1093,13 +1186,26 @@ public class MainController {
             controller.setOnConfigChangedCallback(this::handleParsingConfigChanged);
 
             Stage dialog = new Stage();
-            dialog.initOwner(menuBar.getScene().getWindow());
+            dialog.setTitle("Parsing Configuration");
+            dialog.initOwner(mainStage);
+            dialog.initModality(Modality.APPLICATION_MODAL);
             Scene scene = new Scene(root);
             dialog.setScene(scene);
             dialog.setWidth(1000);
             dialog.setHeight(800);
 
             dialog.showAndWait();
+
+            Platform.runLater(() -> {
+                if (wasMaximized) {
+                    mainStage.setMaximized(true);
+                } else {
+                    mainStage.setX(oldX);
+                    mainStage.setY(oldY);
+                    mainStage.setWidth(oldWidth);
+                    mainStage.setHeight(oldHeight);
+                }
+            });
 
             logger.info("Parsing config dialog closed, returning to previous view");
         } catch (IOException e) {
@@ -1113,14 +1219,34 @@ public class MainController {
      */
     private void handleServerManagement() {
         try {
+            Stage mainStage = (Stage) menuBar.getScene().getWindow();
+            boolean wasMaximized = mainStage.isMaximized();
+            double oldX = mainStage.getX();
+            double oldY = mainStage.getY();
+            double oldWidth = mainStage.getWidth();
+            double oldHeight = mainStage.getHeight();
+
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ServerManagementDialog.fxml"));
             Parent root = loader.load();
 
             Stage dialog = new Stage();
             dialog.setTitle("SSH Server Management");
-            dialog.initOwner(menuBar.getScene().getWindow());
+            dialog.initOwner(mainStage);
+            dialog.initModality(Modality.APPLICATION_MODAL);
             dialog.setScene(new Scene(root));
+
             dialog.showAndWait();
+
+            Platform.runLater(() -> {
+                if (wasMaximized) {
+                    mainStage.setMaximized(true);
+                } else {
+                    mainStage.setX(oldX);
+                    mainStage.setY(oldY);
+                    mainStage.setWidth(oldWidth);
+                    mainStage.setHeight(oldHeight);
+                }
+            });
 
             logger.info("Server management dialog closed");
         } catch (IOException e) {
@@ -1960,7 +2086,7 @@ public class MainController {
         alert.setHeaderText("Clear all recent files?");
         alert.setContentText("This action cannot be undone.");
 
-        Optional<ButtonType> result = alert.showAndWait();
+        Optional<ButtonType> result = showAndWaitAndRestore(alert);
         if (result.isPresent() && result.get() == ButtonType.OK) {
             recentFileService.deleteAll();
             refreshRecentFilesList();
@@ -1996,7 +2122,7 @@ public class MainController {
                         
                         © 2024 SeeLoggyPlus"""
         );
-        alert.showAndWait();
+        showAndWaitAndRestore(alert);
     }
 
     /**
@@ -2039,7 +2165,7 @@ public class MainController {
             alert.setTitle("Error");
             alert.setHeaderText(title);
             alert.setContentText(message);
-            alert.showAndWait();
+            showAndWaitAndRestore(alert);
         });
     }
 
@@ -2052,7 +2178,7 @@ public class MainController {
             alert.setTitle("Information");
             alert.setHeaderText(title);
             alert.setContentText(message);
-            alert.showAndWait();
+            showAndWaitAndRestore(alert);
         });
     }
 
@@ -2142,6 +2268,49 @@ public class MainController {
         
         long duration = System.currentTimeMillis() - startTime;
         logger.info("Auto-fit completed in {}ms", duration);
+    }
+
+    /**
+     * Shows a modal dialog and restores the main stage's state afterwards.
+     * This is a workaround for a common bug on some Linux window managers where
+     * the main stage shrinks after a modal dialog is closed.
+     *
+     * @param dialog The dialog to show and wait for.
+     * @param <T> The result type of the dialog.
+     * @return An Optional containing the dialog result.
+     */
+    private <T> Optional<T> showAndWaitAndRestore(Dialog<T> dialog) {
+        Stage mainStage = (Stage) menuBar.getScene().getWindow();
+        boolean wasMaximized = mainStage.isMaximized();
+        double oldX = mainStage.getX();
+        double oldY = mainStage.getY();
+        double oldWidth = mainStage.getWidth();
+        double oldHeight = mainStage.getHeight();
+
+        // Ensure the dialog has an owner, which is crucial for modality behavior
+        if (dialog.getOwner() == null) {
+            dialog.initOwner(mainStage);
+        }
+
+        Optional<T> result = dialog.showAndWait();
+
+        Platform.runLater(() -> {
+            if (wasMaximized) {
+                mainStage.setMaximized(true);
+            } else {
+                // Check if the stage was unintentionally moved or resized
+                if (mainStage.getX() != oldX || mainStage.getY() != oldY ||
+                    mainStage.getWidth() != oldWidth || mainStage.getHeight() != oldHeight) {
+                    
+                    mainStage.setX(oldX);
+                    mainStage.setY(oldY);
+                    mainStage.setWidth(oldWidth);
+                    mainStage.setHeight(oldHeight);
+                }
+            }
+        });
+
+        return result;
     }
 
     /**

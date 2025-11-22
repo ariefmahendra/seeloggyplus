@@ -30,8 +30,7 @@
             <MenuBar fx:id="menuBar">
                 <!-- File Menu -->
                 <Menu fx:id="fileMenu" text="File">
-                    <MenuItem fx:id="openFileMenuItem" accelerator="Ctrl+O" text="Open File..." />
-                    <MenuItem fx:id="openRemoteMenuItem" accelerator="Ctrl+R" text="Open Remote File..." />
+                    <MenuItem fx:id="openMenuItem" accelerator="Ctrl+O" onAction="#handleOpen" text="Open..." />
                     <SeparatorMenuItem />
                     <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit" />
                 </Menu>

@@ -33,12 +33,6 @@
                 
                 <Separator orientation="VERTICAL"/>
                 
-                <Button fx:id="connectButton" text="Connect">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="PLUG" size="14"/>
-                    </graphic>
-                </Button>
-                
                 <Button fx:id="testConnectionButton" text="Test Connection">
                     <graphic>
                         <FontAwesomeIconView glyphName="CHECK_CIRCLE" size="14"/>

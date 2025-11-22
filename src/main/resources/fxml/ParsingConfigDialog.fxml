@@ -147,6 +147,7 @@
             <!-- Regex Pattern Section -->
             <VBox spacing="5">
                 <Label text="Regex Pattern" />
+                <Label style="-fx-font-size: 11px; -fx-text-fill: #888;" text="Group names in the regular expression will be used as column headers. Example: (?&lt;columnName&gt;regex)" wrapText="true" />
                 <TextArea fx:id="regexPatternArea" prefRowCount="6" wrapText="true" VBox.vgrow="ALWAYS" />
                 <HBox alignment="CENTER_LEFT">
                     <Label fx:id="validationLabel" />

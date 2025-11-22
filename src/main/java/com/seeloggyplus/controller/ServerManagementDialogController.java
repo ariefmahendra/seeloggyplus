@@ -4,6 +4,7 @@ import com.seeloggyplus.model.SSHServer;
 import com.seeloggyplus.service.ServerManagementService;
 import com.seeloggyplus.service.impl.SSHService;
 import com.seeloggyplus.service.impl.ServerManagementServiceImpl;
+import com.seeloggyplus.util.PasswordPromptDialog;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
@@ -49,7 +50,6 @@ public class ServerManagementDialogController {
     @FXML private Button addServerButton;
     @FXML private Button editServerButton;
     @FXML private Button deleteServerButton;
-    @FXML private Button connectButton;
     @FXML private Button testConnectionButton;
     @FXML private Button refreshButton;
     @FXML private Button clearSearchButton;
@@ -183,7 +183,6 @@ public class ServerManagementDialogController {
         addServerButton.setOnAction(e -> handleAddServer());
         editServerButton.setOnAction(e -> handleEditServer());
         deleteServerButton.setOnAction(e -> handleDeleteServer());
-        connectButton.setOnAction(e -> handleConnect());
         testConnectionButton.setOnAction(e -> handleTestConnection());
         refreshButton.setOnAction(e -> loadServers());
         closeButton.setOnAction(e -> handleClose());
@@ -322,7 +321,8 @@ public class ServerManagementDialogController {
             dialog.initModality(Modality.APPLICATION_MODAL);
             dialog.initOwner(addServerButton.getScene().getWindow());
             dialog.setScene(new Scene(root));
-            dialog.showAndWait();
+            
+            showAndWaitAndRestore(dialog);
             
             if (controller.isSaved()) {
                 loadServers();
@@ -355,7 +355,8 @@ public class ServerManagementDialogController {
             dialog.initModality(Modality.APPLICATION_MODAL);
             dialog.initOwner(editServerButton.getScene().getWindow());
             dialog.setScene(new Scene(root));
-            dialog.showAndWait();
+
+            showAndWaitAndRestore(dialog);
             
             if (controller.isSaved()) {
                 loadServers();
@@ -381,46 +382,11 @@ public class ServerManagementDialogController {
         alert.setContentText(String.format("Are you sure you want to delete '%s'?\nThis action cannot be undone.", 
             selected.getDisplayString()));
 
-        Optional<ButtonType> result = alert.showAndWait();
+        Optional<ButtonType> result = showAndWaitAndRestore(alert);
         if (result.isPresent() && result.get() == ButtonType.OK) {
             serverService.deleteServer(selected.getId());
             loadServers();
             logger.info("Deleted server: {}", selected.getDisplayString());
-        }
-    }
-
-    /**
-     * Handle connect action - opens file browser
-     */
-    private void handleConnect() {
-        SSHServer selected = serverTable.getSelectionModel().getSelectedItem();
-        if (selected == null || !selected.isValid()) {
-            showError("Invalid Server", "Please select a valid server configuration");
-            return;
-        }
-
-        selectedForConnection = selected;
-        
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RemoteFileBrowserDialog.fxml"));
-            Parent root = loader.load();
-            
-            RemoteFileBrowserDialogController controller = loader.getController();
-            controller.setServer(selected);
-            
-            Stage dialog = new Stage();
-            dialog.setTitle("Remote File Browser - " + selected.getDisplayString());
-            dialog.initModality(Modality.APPLICATION_MODAL);
-            dialog.initOwner(connectButton.getScene().getWindow());
-            dialog.setScene(new Scene(root));
-            dialog.showAndWait();
-            
-            // Update last used timestamp
-            serverService.updateServerLastUsed(selected.getId());
-            
-        } catch (IOException e) {
-            logger.error("Failed to open file browser", e);
-            showError("Connection Error", "Failed to open file browser: " + e.getMessage());
         }
     }
 
@@ -438,6 +404,20 @@ public class ServerManagementDialogController {
             return;
         }
 
+        // Prompt for password if it's not saved
+        String password = selected.getPassword();
+        if (password == null || password.isBlank()) {
+            PasswordPromptDialog prompt = new PasswordPromptDialog(selected.getHost(), selected.getUsername());
+            Optional<String> result = showAndWaitAndRestore(prompt);
+            if (result.isPresent()) {
+                password = result.get();
+            } else {
+                logger.info("User cancelled password prompt for test connection.");
+                return; // Abort test
+            }
+        }
+        final String finalPassword = password;
+
         // Set status to TESTING
         selected.setConnectionStatus(SSHServer.ConnectionStatus.TESTING);
         serverTable.refresh();
@@ -447,7 +427,7 @@ public class ServerManagementDialogController {
             protected Boolean call() {
                 try {
                     return SSHService.testConnection(selected.getHost(), selected.getPort(), 
-                        selected.getUsername(), selected.getPassword()).get();
+                        selected.getUsername(), finalPassword).get();
                 } catch (Exception e) {
                     logger.error("Connection test failed", e);
                     return false;
@@ -465,13 +445,13 @@ public class ServerManagementDialogController {
             serverTable.refresh();
             
             // Show result dialog
-            Alert result = new Alert(success ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR);
-            result.setTitle("Connection Test");
-            result.setHeaderText(success ? "Connection Successful" : "Connection Failed");
-            result.setContentText(success ? 
+            Alert resultDialog = new Alert(success ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR);
+            resultDialog.setTitle("Connection Test");
+            resultDialog.setHeaderText(success ? "Connection Successful" : "Connection Failed");
+            resultDialog.setContentText(success ? 
                 "Successfully connected to " + selected.getDisplayString() :
                 "Failed to connect. Please check your credentials and network connection.");
-            result.showAndWait();
+            showAndWaitAndRestore(resultDialog);
         });
 
         task.setOnFailed(e -> {
@@ -516,7 +496,6 @@ public class ServerManagementDialogController {
         boolean hasSelection = serverTable.getSelectionModel().getSelectedItem() != null;
         editServerButton.setDisable(!hasSelection);
         deleteServerButton.setDisable(!hasSelection);
-        connectButton.setDisable(!hasSelection);
         testConnectionButton.setDisable(!hasSelection);
     }
 
@@ -537,11 +516,65 @@ public class ServerManagementDialogController {
             alert.setTitle("Error");
             alert.setHeaderText(title);
             alert.setContentText(message);
-            alert.showAndWait();
+            showAndWaitAndRestore(alert);
         });
     }
 
     public SSHServer getSelectedServer() {
         return selectedForConnection;
+    }
+
+    // --- Window State Restoration Workaround ---
+
+    private Stage getUltimateOwner(Stage stage) {
+        Stage owner = stage;
+        while (owner.getOwner() != null) {
+            owner = (Stage) owner.getOwner();
+        }
+        return owner;
+    }
+    
+    private void showAndWaitAndRestore(Stage dialog) {
+        Stage owner = getUltimateOwner((Stage) dialog.getOwner());
+        boolean wasMaximized = owner.isMaximized();
+        double oldX = owner.getX(), oldY = owner.getY(), oldW = owner.getWidth(), oldH = owner.getHeight();
+
+        dialog.showAndWait();
+
+        Platform.runLater(() -> {
+            if (wasMaximized) {
+                owner.setMaximized(true);
+            } else {
+                owner.setX(oldX);
+                owner.setY(oldY);
+                owner.setWidth(oldW);
+                owner.setHeight(oldH);
+            }
+        });
+    }
+
+    private <T> Optional<T> showAndWaitAndRestore(Dialog<T> dialog) {
+        Stage owner = getUltimateOwner((Stage) dialog.getOwner());
+        boolean wasMaximized = owner.isMaximized();
+        double oldX = owner.getX(), oldY = owner.getY(), oldW = owner.getWidth(), oldH = owner.getHeight();
+
+        if (dialog.getOwner() == null) {
+            dialog.initOwner(owner);
+        }
+
+        Optional<T> result = dialog.showAndWait();
+
+        Platform.runLater(() -> {
+            if (wasMaximized) {
+                owner.setMaximized(true);
+            } else {
+                owner.setX(oldX);
+                owner.setY(oldY);
+                owner.setWidth(oldW);
+                owner.setHeight(oldH);
+            }
+        });
+
+        return result;
     }
 }

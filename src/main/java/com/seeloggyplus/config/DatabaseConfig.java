@@ -97,12 +97,21 @@ public class DatabaseConfig {
                 "FOREIGN KEY (file_id) REFERENCES log_files(id) ON DELETE CASCADE" +
                 ");";
 
+        String createFavoriteFoldersTable = "CREATE TABLE IF NOT EXISTS favorite_folders (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "name TEXT NOT NULL," +
+                "path TEXT NOT NULL," +
+                "locationId TEXT NOT NULL," +
+                "UNIQUE(path, locationId)" +
+                ");";
+
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(createParsingConfigTable);
             stmt.execute(createSshServerTable);
             stmt.execute(createPreferencesTable);
             stmt.execute(createLogFileTable);
             stmt.execute(createRecentFiles);
+            stmt.execute(createFavoriteFoldersTable);
             logger.info("Tables created or already exist.");
             
             // Migration: Add timestamp_format column if not exists
