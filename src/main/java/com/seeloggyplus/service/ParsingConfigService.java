@@ -12,4 +12,5 @@ public interface ParsingConfigService {
     void update(ParsingConfig config);
     void delete(ParsingConfig config);
     Optional<ParsingConfig> findDefault();
+
 }

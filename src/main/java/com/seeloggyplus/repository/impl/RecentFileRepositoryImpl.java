@@ -16,6 +16,7 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,6 +95,61 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
         } catch (SQLException e) {
             logger.error("Error deleting all recent files", e);
         }
+    }
+
+    @Override
+    public RecentFilesDto findById(String id) {
+        RecentFilesDto recentFileDto = null;
+        String sql = "SELECT " +
+                "lf.id AS file_id, " +
+                "lf.name AS file_name, " +
+                "lf.file_path, " +
+                "lf.size, " +
+                "lf.modified, " +
+                "lf.is_remote, " +
+                "lf.ssh_server_id, " +
+                "lf.parsing_configuration_id AS parsing_config_id, " +
+                "pc.id AS config_id, " +
+                "pc.name AS config_name, " +
+                "pc.description AS config_description, " +
+                "pc.regex_pattern, " +
+                "pc.timestamp_format " +
+                "FROM recent_files rf " +
+                "JOIN log_files lf ON rf.file_id = lf.id " +
+                "LEFT JOIN parsing_configs pc ON lf.parsing_configuration_id = pc.id " +
+                "WHERE rf.id = ?";
+
+        Connection conn = getConnection();
+        try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
+            preparedStatement.setString(1, id);
+            try (ResultSet rs = preparedStatement.executeQuery()) {
+                if (rs.next()) {
+                    recentFileDto = mapRowToRecentFileDto(rs);
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error finding recent file by id: {}", id, e);
+        }
+        return recentFileDto;
+    }
+
+    @Override
+    public Optional<RecentFile> findByFileId(String fileId) {
+        RecentFile recentFile = null;
+        String sql = "SELECT id, file_id, last_opened FROM recent_files WHERE file_id = ?";
+
+        Connection conn = getConnection();
+        try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
+            preparedStatement.setString(1, fileId);
+            try (ResultSet rs = preparedStatement.executeQuery()) {
+                if (rs.next()) {
+                    recentFile = mapRowToRecentFile(rs);
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error finding recent file by fileId: {}", fileId, e);
+        }
+        return Optional.ofNullable(recentFile);
     }
 
     private RecentFile mapRowToRecentFile(ResultSet rs) throws SQLException {

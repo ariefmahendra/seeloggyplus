@@ -2,7 +2,6 @@ package com.seeloggyplus.dto;
 
 import com.seeloggyplus.model.LogFile;
 import com.seeloggyplus.model.ParsingConfig;
-import com.seeloggyplus.model.SSHServer;
 
 public record RecentFilesDto(
         LogFile logFile,

@@ -46,4 +46,10 @@ public interface LogFileService {
      * @throws IllegalArgumentException if name or filePath is null or empty
      */
     LogFile getLogFileByPathAndName(String name, String filePath);
+
+    /**
+     * Delete all log file records
+     * @throws RuntimeException if database error occurs
+     */
+    void deleteAllLogFiles();
 }

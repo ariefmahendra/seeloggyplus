@@ -21,7 +21,6 @@ public class LogFileServiceImpl implements LogFileService {
 
     @Override
     public void insertLogFile(LogFile logFile) {
-        // Validation
         if (logFile == null) {
             logger.error("Cannot insert null log file");
             throw new IllegalArgumentException("LogFile cannot be null");
@@ -132,6 +131,17 @@ public class LogFileServiceImpl implements LogFileService {
         } catch (FatalDatabaseException ex) {
             logger.error("Database error when getting log file by path and name: {}", ex.getMessage(), ex);
             throw new RuntimeException("Failed to get log file by path and name", ex);
+        }
+    }
+
+    @Override
+    public void deleteAllLogFiles() {
+        try {
+            logFileRepository.deleteAll();
+            logger.info("Successfully deleted all log files");
+        } catch (FatalDatabaseException ex) {
+            logger.error("Database error when deleting all log files", ex);
+            throw new RuntimeException("Failed to delete all log files", ex);
         }
     }
 }

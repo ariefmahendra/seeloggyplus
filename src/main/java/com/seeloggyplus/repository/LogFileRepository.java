@@ -10,4 +10,5 @@ public interface LogFileRepository {
     void deleteById(String id) throws FatalDatabaseException, NotFoundException;
     void update(LogFile logFile) throws FatalDatabaseException, NotFoundException;
     LogFile findByPathAndName(String filePath, String name) throws FatalDatabaseException, NotFoundException;
+    void deleteAll() throws FatalDatabaseException;
 }

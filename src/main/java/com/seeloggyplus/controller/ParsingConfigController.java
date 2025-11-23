@@ -1,8 +1,13 @@
 package com.seeloggyplus.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.seeloggyplus.model.ParsingConfig;
 import com.seeloggyplus.service.impl.LogParserService;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -16,97 +21,77 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Controller for Parsing Configuration Dialog Allows users to create, edit, and
- * test regex patterns with named groups
- */
 public class ParsingConfigController {
 
     private static final Logger logger = LoggerFactory.getLogger(ParsingConfigController.class);
 
     @FXML
     private ListView<ParsingConfig> configListView;
-
     @FXML
     private Button addButton;
-
     @FXML
     private Button editButton;
-
     @FXML
     private Button deleteButton;
-
     @FXML
     private Button duplicateButton;
-
-
+    @FXML
+    private Button importConfigurationButton;
+    @FXML
+    private Button exportConfigurationButton;
     @FXML
     private TextField nameField;
-
     @FXML
     private TextArea descriptionArea;
-    
     @FXML
     private TextField timestampFormatField;
-    
     @FXML
     private Button autoDetectFormatButton;
-
     @FXML
     private TextArea regexPatternArea;
-
     @FXML
     private Label validationLabel;
-
     @FXML
     private ListView<String> groupNamesListView;
-
     @FXML
     private TextArea sampleLogArea;
-
     @FXML
     private Button testParsingButton;
-
     @FXML
     private TableView<ParsedField> previewTableView;
-
     @FXML
     private TableColumn<ParsedField, String> fieldNameColumn;
-
     @FXML
     private TableColumn<ParsedField, String> fieldValueColumn;
-
     @FXML
     private Label testResultLabel;
-
     @FXML
     private Button saveButton;
-
     @FXML
     private Button cancelButton;
-
     @FXML
     private Button applyButton;
 
     private ParsingConfigService parsingConfigService;
-
     private LogParserService logParserService;
     private ObservableList<ParsingConfig> configList;
     private ParsingConfig selectedConfig;
-    private ParsingConfig configSnapshot; // Snapshot of the config when editing starts
-    
-    private Runnable onConfigChangedCallback; // Callback to notify parent when config changes
+    private ParsingConfig configSnapshot;
+
+    @Setter
+    private Runnable onConfigChangedCallback;
 
     @FXML
     public void initialize() {
         logger.info("Initializing ParsingConfigController");
 
         parsingConfigService = new ParsingConfigServiceImpl();
-
         logParserService = new LogParserService();
         configList = FXCollections.observableArrayList(parsingConfigService.findAll());
 
@@ -115,15 +100,13 @@ public class ParsingConfigController {
         setupTestPanel();
         setupButtons();
 
-        // Add a listener to the window's close request to check for unsaved changes
         Platform.runLater(() -> {
             Stage stage = (Stage) cancelButton.getScene().getWindow();
             stage.setOnCloseRequest(event -> {
                 if (isDirty()) {
-                    handleCancel(); // Will show dialog if dirty
-                    event.consume(); // Consume event to prevent auto-close
+                    handleCancel();
+                    event.consume();
                 } else {
-                    // No changes, just close
                     closeDialog();
                 }
             });
@@ -135,18 +118,7 @@ public class ParsingConfigController {
             setEditorDisabled(true);
         }
     }
-    
-    /**
-     * Set callback to be invoked when parsing configuration changes
-     * @param callback Runnable to execute when config is saved/updated
-     */
-    public void setOnConfigChangedCallback(Runnable callback) {
-        this.onConfigChangedCallback = callback;
-    }
-    
-    /**
-     * Notify parent controller that configuration has changed
-     */
+
     private void notifyConfigChanged() {
         if (onConfigChangedCallback != null) {
             logger.debug("Notifying parent controller of config changes");
@@ -154,36 +126,27 @@ public class ParsingConfigController {
         }
     }
 
-    /**
-     * Setup configuration list view and its selection listener.
-     */
     private void setupConfigList() {
         configListView.setItems(configList);
         configListView.setCellFactory(listView -> new ConfigListCell());
-
+        configListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         configListView
                 .getSelectionModel()
                 .selectedItemProperty()
                 .addListener((obs, oldVal, newVal) -> {
                     if (oldVal == newVal) {
-                        return; // No change in selection
+                        return;
                     }
 
-                    // Check for unsaved changes before switching away from a config
                     if (oldVal != null && isDirty()) {
                         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
                         alert.setTitle("Unsaved Changes");
-                        alert.setHeaderText(
-                                "You have unsaved changes for '" + oldVal.getName() + "'."
-                        );
+                        alert.setHeaderText("You have unsaved changes for '" + oldVal.getName() + "'.");
                         alert.setContentText("Do you want to save them before switching?");
 
                         ButtonType saveBtn = new ButtonType("Save");
                         ButtonType dontSaveBtn = new ButtonType("Don't Save");
-                        ButtonType cancelBtn = new ButtonType(
-                                "Cancel",
-                                ButtonBar.ButtonData.CANCEL_CLOSE
-                        );
+                        ButtonType cancelBtn = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
                         alert.getButtonTypes().setAll(saveBtn, dontSaveBtn, cancelBtn);
 
                         Optional<ButtonType> result = alert.showAndWait();
@@ -192,26 +155,18 @@ public class ParsingConfigController {
                             if (result.get() == saveBtn) {
                                 saveCurrentConfig();
                             } else if (result.get() == cancelBtn) {
-                                // Revert selection safely without re-triggering the listener cascade
                                 Platform.runLater(() -> configListView.getSelectionModel().select(oldVal));
                                 return;
                             }
-                            // If "Don't Save", proceed to load the new value
                         } else {
-                            // Dialog was closed without a choice (e.g., 'X' button), treat as cancel
                             Platform.runLater(() -> configListView.getSelectionModel().select(oldVal));
                             return;
                         }
                     }
-
-                    // If we are here, it's safe to load the new config
                     loadConfigToEditor(newVal);
                 });
     }
 
-    /**
-     * Setup detail panel listeners.
-     */
     private void setupDetailPanel() {
         nameField.textProperty().addListener((obs, o, n) -> updateButtonStates());
         descriptionArea
@@ -243,9 +198,6 @@ public class ParsingConfigController {
         );
     }
 
-    /**
-     * Setup test panel
-     */
     private void setupTestPanel() {
         fieldNameColumn.setCellValueFactory(
                 new PropertyValueFactory<>("fieldName")
@@ -260,9 +212,6 @@ public class ParsingConfigController {
         testParsingButton.setOnAction(e -> handleTestParsing());
     }
 
-    /**
-     * Setup buttons
-     */
     private void setupButtons() {
         addButton.setOnAction(e -> handleAdd());
         editButton.setOnAction(e -> handleEdit());
@@ -273,13 +222,12 @@ public class ParsingConfigController {
         saveButton.setOnAction(e -> handleSave());
         cancelButton.setOnAction(e -> handleCancel());
         applyButton.setOnAction(e -> handleApply());
+        exportConfigurationButton.setOnAction(e -> handleExportParsingConfig());
+        importConfigurationButton.setOnAction(e -> handleImportParsingConfig());
 
         updateButtonStates();
     }
 
-    /**
-     * Load configuration to editor
-     */
     private void loadConfigToEditor(ParsingConfig config) {
         this.selectedConfig = config;
         if (config != null) {
@@ -297,12 +245,9 @@ public class ParsingConfigController {
             clearEditor();
             setEditorDisabled(true);
         }
-        updateButtonStates(); // Update buttons based on new state (no changes initially)
+        updateButtonStates();
     }
 
-    /**
-     * Clear editor fields
-     */
     private void clearEditor() {
         nameField.clear();
         descriptionArea.clear();
@@ -314,9 +259,6 @@ public class ParsingConfigController {
         testResultLabel.setText("");
     }
 
-    /**
-     * Validate regex pattern
-     */
     private void validatePattern() {
         String pattern = regexPatternArea.getText();
 
@@ -327,26 +269,18 @@ public class ParsingConfigController {
             return;
         }
 
-        // Create temp config and set pattern
         ParsingConfig tempConfig = new ParsingConfig();
         tempConfig.setRegexPattern(pattern);
 
-        // IMPORTANT: Call validatePattern() to extract named groups
         tempConfig.validatePattern();
 
-        // Now check if valid and display results
         if (tempConfig.isValid()) {
             validationLabel.setText("✓ Pattern is valid");
             validationLabel.getStyleClass().setAll("validation-success");
 
-            // Display extracted group names in the list
             if (tempConfig.getGroupNames() != null && !tempConfig.getGroupNames().isEmpty()) {
-                groupNamesListView.setItems(
-                        FXCollections.observableArrayList(tempConfig.getGroupNames())
-                );
-                logger.info("Detected {} named groups: {}",
-                    tempConfig.getGroupNames().size(),
-                    tempConfig.getGroupNames());
+                groupNamesListView.setItems(FXCollections.observableArrayList(tempConfig.getGroupNames()));
+                logger.info("Detected {} named groups: {}", tempConfig.getGroupNames().size(), tempConfig.getGroupNames());
             } else {
                 groupNamesListView.getItems().clear();
                 logger.warn("No named groups detected in pattern");
@@ -358,9 +292,6 @@ public class ParsingConfigController {
         }
     }
 
-    /**
-     * Handle test parsing
-     */
     private void handleTestParsing() {
         String sampleLog = sampleLogArea.getText();
         String pattern = regexPatternArea.getText();
@@ -378,11 +309,7 @@ public class ParsingConfigController {
         }
 
         ParsingConfig testConfig = new ParsingConfig("Test", pattern);
-        LogParserService.TestResult result = logParserService.testParsing(
-                sampleLog,
-                testConfig
-        );
-
+        LogParserService.TestResult result = logParserService.testParsing(sampleLog, testConfig);
         if (result.isSuccess()) {
             testResultLabel.setText("✓ Pattern matched successfully!");
             testResultLabel.getStyleClass().setAll("validation-success");
@@ -390,7 +317,7 @@ public class ParsingConfigController {
             ObservableList<ParsedField> fields = FXCollections.observableArrayList();
             result
                     .getParsedFields()
-                     .forEach((key, value) -> fields.add(new ParsedField(key, value)));
+                    .forEach((key, value) -> fields.add(new ParsedField(key, value)));
             previewTableView.setItems(fields);
 
             logger.info("Test parsing successful, displaying {} fields", fields.size());
@@ -402,9 +329,6 @@ public class ParsingConfigController {
         }
     }
 
-    /**
-     * Handle add new configuration
-     */
     private void handleAdd() {
         ParsingConfig newConfig = new ParsingConfig();
         newConfig.setName("New Configuration");
@@ -414,45 +338,51 @@ public class ParsingConfigController {
         configListView.getSelectionModel().select(newConfig);
     }
 
-    /**
-     * Handle edit configuration
-     */
     private void handleEdit() {
         nameField.requestFocus();
     }
 
-    /**
-     * Handle delete configuration
-     */
     private void handleDelete() {
-        ParsingConfig selected = configListView.getSelectionModel().getSelectedItem();
-        if (selected == null) {
+        ObservableList<ParsingConfig> selectedItems = configListView.getSelectionModel().getSelectedItems();
+        if (selectedItems == null || selectedItems.isEmpty()) {
             return;
         }
 
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Delete Configuration");
-        alert.setHeaderText("Delete parsing configuration?");
-        alert.setContentText(
-                "Are you sure you want to delete '" + selected.getName() + "'?"
-        );
-
-        Optional<ButtonType> result = alert.showAndWait();
+        List<ParsingConfig> itemToDelete = List.copyOf(selectedItems);
+        Optional<ButtonType> result = getButtonType(itemToDelete, selectedItems);
         if (result.isPresent() && result.get() == ButtonType.OK) {
-            parsingConfigService.delete(selected);
-            configList.remove(selected);
+            for (ParsingConfig item : itemToDelete) {
+                parsingConfigService.delete(item);
+                logger.info("Delete parsing configuration successfully");
+            }
+
+            configList.removeAll(itemToDelete);
+
             if (!configList.isEmpty()) {
+                configListView.getSelectionModel().clearSelection();
                 configListView.getSelectionModel().selectFirst();
             } else {
                 clearEditor();
             }
-            logger.info("Deleted parsing configuration: {}", selected.getName());
         }
     }
 
-    /**
-     * Handle duplicate configuration
-     */
+    private Optional<ButtonType> getButtonType(List<ParsingConfig> itemToDelete, ObservableList<ParsingConfig> selectedItems) {
+        int countDataParsingConfig = itemToDelete.size();
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Delete Configuration");
+        alert.setHeaderText("Delete parsing configuration?");
+
+        if (countDataParsingConfig == 1) {
+            alert.setContentText("Are you sure you want to delete " + selectedItems.get(0).getName() + "?");
+        } else {
+            alert.setContentText("Are you sure you want to delete " + countDataParsingConfig + " configurations?");
+        }
+
+        return alert.showAndWait();
+    }
+
     private void handleDuplicate() {
         ParsingConfig selected = configListView.getSelectionModel().getSelectedItem();
         if (selected == null) {
@@ -466,10 +396,7 @@ public class ParsingConfigController {
 
         logger.info("Duplicated parsing configuration: {}", selected.getName());
     }
-    
-    /**
-     * Handle auto-detect timestamp format from regex pattern
-     */
+
     private void handleAutoDetectFormat() {
         String regexPattern = regexPatternArea.getText();
         if (regexPattern == null || regexPattern.trim().isEmpty()) {
@@ -480,25 +407,24 @@ public class ParsingConfigController {
             alert.showAndWait();
             return;
         }
-        
-        // Create temp config to use autoDetect method
+
         ParsingConfig tempConfig = new ParsingConfig();
         tempConfig.setRegexPattern(regexPattern);
-        
+
         String detectedFormat = tempConfig.autoDetectTimestampFormat();
-        
+
         if (detectedFormat != null) {
             timestampFormatField.setText(detectedFormat);
-            logger.info("✅ Auto-detected timestamp format: {}", detectedFormat);
-            
+            logger.info("Auto-detected timestamp format: {}", detectedFormat);
+
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
             alert.setTitle("Auto-Detect Format");
             alert.setHeaderText("Timestamp format detected!");
             alert.setContentText("Detected format: " + detectedFormat + "\n\nYou can modify this if needed.");
             alert.showAndWait();
         } else {
-            logger.warn("⚠️ Could not auto-detect timestamp format from pattern");
-            
+            logger.warn("Could not auto-detect timestamp format from pattern");
+
             Alert alert = new Alert(Alert.AlertType.WARNING);
             alert.setTitle("Auto-Detect Format");
             alert.setHeaderText("Could not detect timestamp format");
@@ -507,10 +433,6 @@ public class ParsingConfigController {
         }
     }
 
-
-    /**
-     * Handle save
-     */
     private void handleSave() {
         if (isDirty()) {
             saveCurrentConfig();
@@ -523,7 +445,7 @@ public class ParsingConfigController {
                 parsingConfigService.update(config);
             }
         }
-        
+
         // Notify parent controller of changes
         notifyConfigChanged();
         logger.info("Configuration saved and parent notified");
@@ -531,9 +453,6 @@ public class ParsingConfigController {
         closeDialog();
     }
 
-    /**
-     * Handle apply
-     */
     private void handleApply() {
         if (isDirty()) {
             saveCurrentConfig();
@@ -546,15 +465,11 @@ public class ParsingConfigController {
                 parsingConfigService.update(config);
             }
         }
-        
-        // Notify parent controller of changes
+
         notifyConfigChanged();
         logger.info("Configuration applied and parent notified");
     }
 
-    /**
-     * Handle cancel
-     */
     private void handleCancel() {
         if (isDirty()) {
             Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
@@ -569,9 +484,92 @@ public class ParsingConfigController {
         closeDialog();
     }
 
-    /**
-     * Save current configuration being edited to the object in the list
-     */
+    private void handleExportParsingConfig() {
+        ObservableList<ParsingConfig> selectedItems = configListView.getSelectionModel().getSelectedItems();
+        if (selectedItems == null || selectedItems.isEmpty()) {
+            return;
+        }
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Export Parsing Configurations");
+        fileChooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("JSON Files", "*.json")
+        );
+
+        if (selectedItems.size() == 1) {
+            fileChooser.setInitialFileName(selectedItems.get(0).getName().replaceAll("\\s+", "_") + "_config.json");
+        } else {
+            fileChooser.setInitialFileName("parsing_configurations_export.json");
+        }
+
+        File file = fileChooser.showSaveDialog(exportConfigurationButton.getScene().getWindow());
+        if (file != null) {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                mapper.enable(SerializationFeature.INDENT_OUTPUT);
+                mapper.writeValue(file, selectedItems);
+                logger.info("Exported {} parsing configurations to {}", selectedItems.size(), file.getAbsolutePath());
+            } catch (IOException ex) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Export Error");
+                alert.setHeaderText("Error exporting parsing configurations");
+                alert.setContentText("An error occurred while exporting: " + ex.getMessage());
+                alert.showAndWait();
+                logger.error("Error exporting parsing configurations", ex);
+            }
+        }
+    }
+
+    private void handleImportParsingConfig() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Import Parsing Configurations");
+        fileChooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("JSON Files", "*.json")
+        );
+        File file = fileChooser.showOpenDialog(importConfigurationButton.getScene().getWindow());
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+
+            List<ParsingConfig> importedConfigs = List.of(
+                    mapper.readValue(file, ParsingConfig[].class)
+            );
+
+            int importedCount = 0;
+            for (ParsingConfig config : importedConfigs) {
+                boolean exists = configList.stream().anyMatch(existing -> existing.getName().equalsIgnoreCase(config.getName()));
+                if (!exists) {
+                    configList.add(config);
+                    parsingConfigService.save(config);
+                    importedCount++;
+                } else {
+                    logger.warn("Skipped importing duplicate configuration: {}", config.getName());
+                }
+            }
+
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            if (importedCount > 0) {
+                alert.setTitle("Import Successful");
+                alert.setHeaderText("Parsing Configurations Imported");
+                alert.setContentText("Successfully imported " + importedCount + " configurations.");
+                alert.showAndWait();
+                logger.info("Imported {} parsing configurations from {}", importedCount, file.getAbsolutePath());
+            } else {
+                alert.setTitle("Import Result");
+                alert.setHeaderText("No New Configurations Imported");
+                alert.setContentText("All configurations in the file already exist.");
+                alert.showAndWait();
+                logger.info("No new parsing configurations were imported from {}", file.getAbsolutePath());
+            }
+        } catch (IOException ex) {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Import Error");
+            alert.setHeaderText("Error importing parsing configurations");
+            alert.setContentText("An error occurred while importing: " + ex.getMessage());
+            alert.showAndWait();
+            logger.error("Error importing parsing configurations", ex);
+        }
+    }
+
     private void saveCurrentConfig() {
         if (selectedConfig == null) {
             return;
@@ -590,9 +588,6 @@ public class ParsingConfigController {
         logger.info("Applied changes to configuration object: {}", selectedConfig.getName());
     }
 
-    /**
-     * Checks if the current editor fields differ from the snapshot.
-     */
     private boolean isDirty() {
         if (configSnapshot == null || selectedConfig == null) {
             return false;
@@ -612,7 +607,7 @@ public class ParsingConfigController {
 
         String snapshotPattern = Optional.ofNullable(configSnapshot.getRegexPattern()).orElse("").trim();
         String currentPattern = Optional.ofNullable(regexPatternArea.getText()).orElse("").trim();
-        
+
         String snapshotTimestamp = Optional.ofNullable(configSnapshot.getTimestampFormat()).orElse("").trim();
         String currentTimestamp = Optional.ofNullable(timestampFormatField.getText()).orElse("").trim();
 
@@ -623,9 +618,6 @@ public class ParsingConfigController {
                 !Objects.equals(snapshotTimestamp, currentTimestamp);
     }
 
-    /**
-     * Update button states based on selection and modification
-     */
     private void updateButtonStates() {
         boolean hasSelection = selectedConfig != null;
         boolean hasChanges = isDirty();
@@ -648,17 +640,12 @@ public class ParsingConfigController {
         sampleLogArea.setDisable(disabled);
     }
 
-    /**
-     * Close dialog
-     */
     private void closeDialog() {
         Stage stage = (Stage) cancelButton.getScene().getWindow();
         stage.close();
     }
 
-    /**
-     * Custom list cell for parsing configurations
-     */
+
     private static class ConfigListCell extends ListCell<ParsingConfig> {
         private final VBox vbox = new VBox(2);
         private final Label nameLabel = new Label();
@@ -681,7 +668,6 @@ public class ParsingConfigController {
                 nameLabel.setText(item.getName());
                 descLabel.setText(item.getDescription());
 
-                // Clear old validation styles and apply new ones
                 statusLabel.getStyleClass().removeAll("validation-success", "validation-error");
                 if (item.isValid()) {
                     statusLabel.setText(
@@ -698,32 +684,9 @@ public class ParsingConfigController {
         }
     }
 
-    /**
-     * Helper class for parsed field display in preview table
-     */
-    public static class ParsedField {
-        private final SimpleStringProperty fieldName;
-        private final SimpleStringProperty fieldValue;
-
+    public record ParsedField(SimpleStringProperty fieldName, SimpleStringProperty fieldValue) {
         public ParsedField(String fieldName, String fieldValue) {
-            this.fieldName = new SimpleStringProperty(fieldName);
-            this.fieldValue = new SimpleStringProperty(fieldValue);
-        }
-
-        public String getFieldName() {
-            return fieldName.get();
-        }
-
-        public SimpleStringProperty fieldNameProperty() {
-            return fieldName;
-        }
-
-        public String getFieldValue() {
-            return fieldValue.get();
-        }
-
-        public SimpleStringProperty fieldValueProperty() {
-            return fieldValue;
+            this(new SimpleStringProperty(fieldName), new SimpleStringProperty(fieldValue));
         }
     }
 }

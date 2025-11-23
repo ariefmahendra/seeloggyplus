@@ -1,10 +1,10 @@
-package com.seeloggyplus.service;
+package com.seeloggyplus.repository;
 
 import com.seeloggyplus.model.SSHServerModel;
 
 import java.util.List;
 
-public interface ServerManagementService {
+public interface ServerManagementRepository {
     void saveServer(SSHServerModel server);
     void deleteServer(String id);
     void updateServerLastUsed(String id);

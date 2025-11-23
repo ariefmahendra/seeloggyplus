@@ -11,12 +11,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-/**
- * File watcher service using Java NIO WatchService
- * Monitors log files for changes and notifies listeners (like 'tail -f' in Linux)
- *
- * Based on: https://docs.oracle.com/javase/tutorial/essential/io/notification.html
- */
 public class LogFileWatcher {
 
     private static final Logger logger = LoggerFactory.getLogger(LogFileWatcher.class);

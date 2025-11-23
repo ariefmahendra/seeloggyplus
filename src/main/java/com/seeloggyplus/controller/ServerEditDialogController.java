@@ -1,12 +1,14 @@
 package com.seeloggyplus.controller;
 
-import com.seeloggyplus.model.SSHServer;
+import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.service.ServerManagementService;
-import com.seeloggyplus.service.impl.SSHService;
+import com.seeloggyplus.service.impl.SSHServiceImpl;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.stage.Stage;
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,14 +37,19 @@ public class ServerEditDialogController {
     @FXML private Button cancelButton;
     @FXML private Button showPasswordButton;
 
+    @Setter
     private ServerManagementService serverService;
-    private SSHServer editingServer;
+    private SSHServiceImpl sshService;
+    private SSHServerModel sshServer;
+    @Getter
     private boolean saved = false;
     private boolean passwordVisible = false;
     private TextField passwordTextField;
 
     @FXML
     public void initialize() {
+        sshService = new SSHServiceImpl();
+
         setupPasswordField();
         setupValidation();
         setupEventHandlers();
@@ -53,31 +60,24 @@ public class ServerEditDialogController {
      * Ensures both fields have identical size and layout properties
      */
     private void setupPasswordField() {
-        // Create TextField with identical properties as PasswordField
         passwordTextField = new TextField();
         passwordTextField.setPromptText(passwordField.getPromptText());
         passwordTextField.setManaged(false);
         passwordTextField.setVisible(false);
-        
-        // Copy size constraints from PasswordField
+
         passwordTextField.setPrefWidth(passwordField.getPrefWidth());
         passwordTextField.setMinWidth(passwordField.getMinWidth());
         passwordTextField.setMaxWidth(passwordField.getMaxWidth());
         passwordTextField.setPrefHeight(passwordField.getPrefHeight());
         passwordTextField.setMinHeight(passwordField.getMinHeight());
         passwordTextField.setMaxHeight(passwordField.getMaxHeight());
-        
-        // Bind text bidirectionally
+
         passwordTextField.textProperty().bindBidirectional(passwordField.textProperty());
-        
-        // Add TextField to the same parent at same position
+
         var parent = passwordField.getParent();
-        if (parent instanceof javafx.scene.layout.HBox) {
-            javafx.scene.layout.HBox hbox = (javafx.scene.layout.HBox) parent;
+        if (parent instanceof javafx.scene.layout.HBox hbox) {
             int index = hbox.getChildren().indexOf(passwordField);
             hbox.getChildren().add(index, passwordTextField);
-            
-            // Ensure both fields have same HBox.hgrow property
             javafx.scene.layout.HBox.setHgrow(passwordTextField, javafx.scene.layout.HBox.getHgrow(passwordField));
         }
     }
@@ -95,12 +95,8 @@ public class ServerEditDialogController {
         showPasswordButton.setOnAction(e -> togglePasswordVisibility());
     }
 
-    public void setServerService(ServerManagementService service) {
-        this.serverService = service;
-    }
-
-    public void setServer(SSHServer server) {
-        this.editingServer = server;
+    public void setServer(SSHServerModel server) {
+        this.sshServer = server;
         nameField.setText(server.getName());
         hostField.setText(server.getHost());
         portField.setText(String.valueOf(server.getPort()));
@@ -111,7 +107,7 @@ public class ServerEditDialogController {
     }
 
     private void handleTest() {
-        if (!validateFields()) {
+        if (validateFields()) {
             return;
         }
 
@@ -125,11 +121,9 @@ public class ServerEditDialogController {
             @Override
             protected Boolean call() {
                 try {
-                    return SSHService.testConnection(hostField.getText(), 
-                        Integer.parseInt(portField.getText()), 
-                        usernameField.getText(), 
-                        passwordField.getText()).get();
+                    return sshService.connect(hostField.getText(), Integer.parseInt(portField.getText()), usernameField.getText(), passwordField.getText());
                 } catch (Exception e) {
+                    logger.error("Connection test failed", e);
                     return false;
                 }
             }
@@ -152,15 +146,15 @@ public class ServerEditDialogController {
     }
 
     private void handleSave() {
-        if (!validateFields()) {
+        if (validateFields()) {
             return;
         }
 
-        SSHServer server;
-        if (editingServer != null) {
-            server = editingServer;
+        SSHServerModel server;
+        if (sshServer != null) {
+            server = sshServer;
         } else {
-            server = new SSHServer();
+            server = new SSHServerModel();
             server.setId(UUID.randomUUID().toString());
             server.setCreatedAt(LocalDateTime.now());
         }
@@ -224,9 +218,7 @@ public class ServerEditDialogController {
      * Update password button icon
      */
     private void updatePasswordButtonIcon(String iconName) {
-        if (showPasswordButton.getGraphic() instanceof de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView) {
-            de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView icon = 
-                (de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView) showPasswordButton.getGraphic();
+        if (showPasswordButton.getGraphic() instanceof de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView icon) {
             icon.setGlyphName(iconName);
         }
     }
@@ -255,7 +247,7 @@ public class ServerEditDialogController {
             valid = false;
         }
 
-        return valid;
+        return !valid;
     }
 
     private void showError(Label label, String message) {
@@ -273,9 +265,5 @@ public class ServerEditDialogController {
     private void closeDialog() {
         Stage stage = (Stage) saveButton.getScene().getWindow();
         stage.close();
-    }
-
-    public boolean isSaved() {
-        return saved;
     }
 }

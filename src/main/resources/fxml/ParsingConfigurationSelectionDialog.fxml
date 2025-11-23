@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.Font?>
-
 <DialogPane xmlns="http://javafx.com/javafx"
             xmlns:fx="http://javafx.com/fxml"
             fx:controller="com.seeloggyplus.controller.ParsingConfigurationSelectionDialogController"
@@ -18,65 +16,61 @@
 
             <!-- Search/Filter Section -->
             <HBox spacing="10" alignment="CENTER_LEFT">
-                <Label text="Search:" />
-                <TextField fx:id="searchField"
-                           promptText="Search by name or description..."
-                           HBox.hgrow="ALWAYS" />
+                <Label text="Search:"/>
+                <TextField fx:id="searchField" promptText="Search by name or description..." HBox.hgrow="ALWAYS"/>
             </HBox>
 
             <!-- Configurations List -->
             <Label text="Available Configurations">
                 <font>
-                    <Font name="System Bold" size="12.0" />
+                    <Font name="System Bold" size="12.0"/>
                 </font>
             </Label>
 
             <TableView fx:id="configTableView" VBox.vgrow="ALWAYS">
                 <columns>
-                    <TableColumn text="Name" prefWidth="150" fx:id="nameColumn" />
-                    <TableColumn text="Description" prefWidth="250" fx:id="descriptionColumn" />
-                    <TableColumn text="Pattern Groups" prefWidth="120" fx:id="groupsColumn" />
-                    <TableColumn text="Status" fx:id="statusColumn" />
+                    <TableColumn text="Name" prefWidth="150" fx:id="nameColumn"/>
+                    <TableColumn text="Description" prefWidth="250" fx:id="descriptionColumn"/>
+                    <TableColumn text="Pattern Groups" prefWidth="120" fx:id="groupsColumn"/>
+                    <TableColumn text="Status" fx:id="statusColumn"/>
                 </columns>
             </TableView>
 
             <!-- Selected Configuration Details -->
             <VBox spacing="10">
-                <Label text="Configuration Details" />
+                <Label text="Configuration Details"/>
 
                 <GridPane hgap="10" vgap="8">
                     <columnConstraints>
-                        <ColumnConstraints minWidth="100" prefWidth="100" />
-                        <ColumnConstraints hgrow="ALWAYS" />
+                        <ColumnConstraints minWidth="100" prefWidth="100"/>
+                        <ColumnConstraints hgrow="ALWAYS"/>
                     </columnConstraints>
 
                     <rowConstraints>
-                        <RowConstraints />
-                        <RowConstraints />
-                        <RowConstraints vgrow="ALWAYS" />
+                        <RowConstraints/>
+                        <RowConstraints/>
+                        <RowConstraints vgrow="ALWAYS"/>
                     </rowConstraints>
 
-                    <Label text="Name:" />
-                    <Label fx:id="detailNameLabel" text="-" GridPane.columnIndex="1" />
+                    <Label text="Name:"/>
+                    <Label fx:id="detailNameLabel" text="-" GridPane.columnIndex="1"/>
 
-                    <Label text="Description:" GridPane.rowIndex="1" />
-                    <Label fx:id="detailDescriptionLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="1" wrapText="true" />
+                    <Label text="Description:" GridPane.rowIndex="1"/>
+                    <Label fx:id="detailDescriptionLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="1"
+                           wrapText="true"/>
 
-                    <Label text="Regex Pattern:" GridPane.rowIndex="2" />
+                    <Label text="Regex Pattern:" GridPane.rowIndex="2"/>
                     <TextArea fx:id="detailPatternTextArea"
                               editable="false"
-                             prefRowCount="3"
-                             GridPane.columnIndex="1"
-                             GridPane.rowIndex="2"
+                              prefRowCount="3"
+                              GridPane.columnIndex="1"
+                              GridPane.rowIndex="2"
                     />
                 </GridPane>
             </VBox>
         </VBox>
     </content>
 
-    <buttonTypes>
-        <ButtonType fx:constant="OK" />
-        <ButtonType fx:constant="CANCEL" />
-    </buttonTypes>
-
+    <ButtonType fx:constant="OK"/>
+    <ButtonType fx:constant="CANCEL"/>
 </DialogPane>
