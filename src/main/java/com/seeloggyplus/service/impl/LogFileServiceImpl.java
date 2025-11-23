@@ -21,7 +21,6 @@ public class LogFileServiceImpl implements LogFileService {
 
     @Override
     public void insertLogFile(LogFile logFile) {
-        // Validation
         if (logFile == null) {
             logger.error("Cannot insert null log file");
             throw new IllegalArgumentException("LogFile cannot be null");

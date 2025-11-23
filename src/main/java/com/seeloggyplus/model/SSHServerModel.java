@@ -16,7 +16,7 @@ import java.util.Objects;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class SSHServer {
+public class SSHServerModel {
 
     public enum ConnectionStatus {
         UNKNOWN,      // Not tested yet
@@ -39,7 +39,7 @@ public class SSHServer {
     // Transient field - not stored in database
     private transient ConnectionStatus connectionStatus = ConnectionStatus.UNKNOWN;
 
-    public SSHServer(String name, String host, int port, String username) {
+    public SSHServerModel(String name, String host, int port, String username) {
         this.name = name;
         this.host = host;
         this.port = port;
@@ -96,7 +96,7 @@ public class SSHServer {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        SSHServer that = (SSHServer) o;
+        SSHServerModel that = (SSHServerModel) o;
         return port == that.port &&
                Objects.equals(host, that.host) &&
                Objects.equals(username, that.username);

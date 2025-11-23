@@ -1,8 +1,9 @@
 package com.seeloggyplus.controller;
 
-import com.seeloggyplus.model.SSHServer;
+import com.seeloggyplus.model.SSHServerModel;
+import com.seeloggyplus.service.SSHService;
 import com.seeloggyplus.service.ServerManagementService;
-import com.seeloggyplus.service.impl.SSHService;
+import com.seeloggyplus.service.impl.SSHServiceImpl;
 import com.seeloggyplus.service.impl.ServerManagementServiceImpl;
 import com.seeloggyplus.util.PasswordPromptDialog;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
@@ -37,14 +38,14 @@ public class ServerManagementDialogController {
     private static final Logger logger = LoggerFactory.getLogger(ServerManagementDialogController.class);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    @FXML private TableView<SSHServer> serverTable;
-    @FXML private TableColumn<SSHServer, String> statusColumn;
-    @FXML private TableColumn<SSHServer, String> nameColumn;
-    @FXML private TableColumn<SSHServer, String> hostColumn;
-    @FXML private TableColumn<SSHServer, String> portColumn;
-    @FXML private TableColumn<SSHServer, String> usernameColumn;
-    @FXML private TableColumn<SSHServer, String> defaultPathColumn;
-    @FXML private TableColumn<SSHServer, String> lastUsedColumn;
+    @FXML private TableView<SSHServerModel> serverTable;
+    @FXML private TableColumn<SSHServerModel, String> statusColumn;
+    @FXML private TableColumn<SSHServerModel, String> nameColumn;
+    @FXML private TableColumn<SSHServerModel, String> hostColumn;
+    @FXML private TableColumn<SSHServerModel, String> portColumn;
+    @FXML private TableColumn<SSHServerModel, String> usernameColumn;
+    @FXML private TableColumn<SSHServerModel, String> defaultPathColumn;
+    @FXML private TableColumn<SSHServerModel, String> lastUsedColumn;
 
     @FXML private TextField searchField;
     @FXML private Button addServerButton;
@@ -64,15 +65,17 @@ public class ServerManagementDialogController {
     @FXML private Label detailLastUsedLabel;
 
     private ServerManagementService serverService;
-    private ObservableList<SSHServer> allServers;
-    private ObservableList<SSHServer> filteredServers;
-    private SSHServer selectedForConnection;
+    private SSHService sshService;
+    private ObservableList<SSHServerModel> allServers;
+    private ObservableList<SSHServerModel> filteredServers;
+    private SSHServerModel selectedForConnection;
 
     @FXML
     public void initialize() {
         logger.info("Initializing ServerManagementDialogController");
         
         serverService = new ServerManagementServiceImpl();
+        sshService = new SSHServiceImpl();
         allServers = FXCollections.observableArrayList();
         filteredServers = FXCollections.observableArrayList();
 
@@ -102,13 +105,13 @@ public class ServerManagementDialogController {
                     setGraphic(null);
                     setTooltip(null);
                 } else {
-                    SSHServer server = getTableRow().getItem();
+                    SSHServerModel server = getTableRow().getItem();
                     updateStatusIcon(server);
                     setGraphic(icon);
                 }
             }
             
-            private void updateStatusIcon(SSHServer server) {
+            private void updateStatusIcon(SSHServerModel server) {
                 if (!server.isValid()) {
                     // Invalid configuration
                     icon.setIcon(FontAwesomeIcon.EXCLAMATION_TRIANGLE);
@@ -196,9 +199,9 @@ public class ServerManagementDialogController {
      * Load servers from database and check connection status
      */
     private void loadServers() {
-        Task<List<SSHServer>> task = new Task<>() {
+        Task<List<SSHServerModel>> task = new Task<>() {
             @Override
-            protected List<SSHServer> call() {
+            protected List<SSHServerModel> call() {
                 return serverService.getAllServers();
             }
         };
@@ -226,7 +229,7 @@ public class ServerManagementDialogController {
      * This is optional and can be triggered by user action
      */
     private void checkAllConnectionStatus() {
-        for (SSHServer server : allServers) {
+        for (SSHServerModel server : allServers) {
             if (server.isValid()) {
                 checkConnectionStatus(server);
             }
@@ -236,21 +239,16 @@ public class ServerManagementDialogController {
     /**
      * Check connection status for a single server
      */
-    private void checkConnectionStatus(SSHServer server) {
+    private void checkConnectionStatus(SSHServerModel server) {
         // Set status to TESTING
-        server.setConnectionStatus(SSHServer.ConnectionStatus.TESTING);
+        server.setConnectionStatus(SSHServerModel.ConnectionStatus.TESTING);
         serverTable.refresh();
         
         Task<Boolean> task = new Task<>() {
             @Override
             protected Boolean call() {
                 try {
-                    return SSHService.testConnection(
-                        server.getHost(), 
-                        server.getPort(), 
-                        server.getUsername(), 
-                        server.getPassword()
-                    ).get();
+                    return sshService.connect(server.getHost(), server.getPort(), server.getUsername(), server.getPassword());
                 } catch (Exception e) {
                     logger.debug("Connection test failed for {}: {}", server.getHost(), e.getMessage());
                     return false;
@@ -261,14 +259,14 @@ public class ServerManagementDialogController {
         task.setOnSucceeded(e -> {
             boolean connected = task.getValue();
             server.setConnectionStatus(connected ? 
-                SSHServer.ConnectionStatus.CONNECTED : 
-                SSHServer.ConnectionStatus.DISCONNECTED);
+                SSHServerModel.ConnectionStatus.CONNECTED :
+                SSHServerModel.ConnectionStatus.DISCONNECTED);
             serverTable.refresh();
             logger.debug("Server {} status: {}", server.getHost(), server.getConnectionStatus());
         });
         
         task.setOnFailed(e -> {
-            server.setConnectionStatus(SSHServer.ConnectionStatus.DISCONNECTED);
+            server.setConnectionStatus(SSHServerModel.ConnectionStatus.DISCONNECTED);
             serverTable.refresh();
             logger.error("Connection check failed for {}", server.getHost(), task.getException());
         });
@@ -288,7 +286,7 @@ public class ServerManagementDialogController {
         }
 
         String search = searchText.toLowerCase();
-        for (SSHServer server : allServers) {
+        for (SSHServerModel server : allServers) {
             if (matchesSearch(server, search)) {
                 filteredServers.add(server);
             }
@@ -298,7 +296,7 @@ public class ServerManagementDialogController {
     /**
      * Check if server matches search criteria
      */
-    private boolean matchesSearch(SSHServer server, String search) {
+    private boolean matchesSearch(SSHServerModel server, String search) {
         return (server.getName() != null && server.getName().toLowerCase().contains(search)) ||
                server.getHost().toLowerCase().contains(search) ||
                server.getUsername().toLowerCase().contains(search) ||
@@ -337,7 +335,7 @@ public class ServerManagementDialogController {
      * Handle edit server action
      */
     private void handleEditServer() {
-        SSHServer selected = serverTable.getSelectionModel().getSelectedItem();
+        SSHServerModel selected = serverTable.getSelectionModel().getSelectedItem();
         if (selected == null) {
             return;
         }
@@ -371,7 +369,7 @@ public class ServerManagementDialogController {
      * Handle delete server action
      */
     private void handleDeleteServer() {
-        SSHServer selected = serverTable.getSelectionModel().getSelectedItem();
+        SSHServerModel selected = serverTable.getSelectionModel().getSelectedItem();
         if (selected == null) {
             return;
         }
@@ -394,7 +392,7 @@ public class ServerManagementDialogController {
      * Handle test connection action with real-time status update
      */
     private void handleTestConnection() {
-        SSHServer selected = serverTable.getSelectionModel().getSelectedItem();
+        SSHServerModel selected = serverTable.getSelectionModel().getSelectedItem();
         if (selected == null) {
             return;
         }
@@ -419,15 +417,14 @@ public class ServerManagementDialogController {
         final String finalPassword = password;
 
         // Set status to TESTING
-        selected.setConnectionStatus(SSHServer.ConnectionStatus.TESTING);
+        selected.setConnectionStatus(SSHServerModel.ConnectionStatus.TESTING);
         serverTable.refresh();
 
         Task<Boolean> task = new Task<>() {
             @Override
             protected Boolean call() {
                 try {
-                    return SSHService.testConnection(selected.getHost(), selected.getPort(), 
-                        selected.getUsername(), finalPassword).get();
+                    return sshService.connect(selected.getHost(), selected.getPort(), selected.getUsername(), finalPassword);
                 } catch (Exception e) {
                     logger.error("Connection test failed", e);
                     return false;
@@ -440,8 +437,8 @@ public class ServerManagementDialogController {
             
             // Update status
             selected.setConnectionStatus(success ? 
-                SSHServer.ConnectionStatus.CONNECTED : 
-                SSHServer.ConnectionStatus.DISCONNECTED);
+                SSHServerModel.ConnectionStatus.CONNECTED :
+                SSHServerModel.ConnectionStatus.DISCONNECTED);
             serverTable.refresh();
             
             // Show result dialog
@@ -455,7 +452,7 @@ public class ServerManagementDialogController {
         });
 
         task.setOnFailed(e -> {
-            selected.setConnectionStatus(SSHServer.ConnectionStatus.DISCONNECTED);
+            selected.setConnectionStatus(SSHServerModel.ConnectionStatus.DISCONNECTED);
             serverTable.refresh();
             showError("Test Failed", "Connection test failed: " + task.getException().getMessage());
         });
@@ -466,7 +463,7 @@ public class ServerManagementDialogController {
     /**
      * Update details panel with server information
      */
-    private void updateDetailsPanel(SSHServer server) {
+    private void updateDetailsPanel(SSHServerModel server) {
         if (server == null) {
             detailNameLabel.setText("-");
             detailHostLabel.setText("-");
@@ -520,7 +517,7 @@ public class ServerManagementDialogController {
         });
     }
 
-    public SSHServer getSelectedServer() {
+    public SSHServerModel getSelectedServer() {
         return selectedForConnection;
     }
 

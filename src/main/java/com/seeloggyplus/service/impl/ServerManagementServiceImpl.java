@@ -1,6 +1,6 @@
 package com.seeloggyplus.service.impl;
 
-import com.seeloggyplus.model.SSHServer;
+import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.repository.ServerManagement;
 import com.seeloggyplus.repository.impl.ServerManagementImpl;
 import com.seeloggyplus.service.ServerManagementService;
@@ -33,7 +33,7 @@ public class ServerManagementServiceImpl implements ServerManagementService {
      * @throws IllegalArgumentException if server is null or invalid
      */
     @Override
-    public void saveServer(SSHServer server) {
+    public void saveServer(SSHServerModel server) {
         if (server == null) {
             logger.error("Attempted to save null server");
             throw new IllegalArgumentException("Server cannot be null");
@@ -117,11 +117,11 @@ public class ServerManagementServiceImpl implements ServerManagementService {
      * @return List of all servers (never null, may be empty)
      */
     @Override
-    public List<SSHServer> getAllServers() {
+    public List<SSHServerModel> getAllServers() {
         logger.debug("Fetching all servers");
         
         try {
-            List<SSHServer> servers = serverManagement.getAllServers();
+            List<SSHServerModel> servers = serverManagement.getAllServers();
             logger.info("Retrieved {} servers", servers.size());
             return servers;
         } catch (Exception e) {

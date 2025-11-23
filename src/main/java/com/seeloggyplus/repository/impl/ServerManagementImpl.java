@@ -1,6 +1,6 @@
 package com.seeloggyplus.repository.impl;
 
-import com.seeloggyplus.model.SSHServer;
+import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.repository.ServerManagement;
 import com.seeloggyplus.config.DatabaseConfig;
 import org.slf4j.Logger;
@@ -48,7 +48,7 @@ public class ServerManagementImpl implements ServerManagement {
      * @throws SQLException if database operation fails
      */
     @Override
-    public void saveServer(SSHServer server) {
+    public void saveServer(SSHServerModel server) {
         Connection connection = null;
         try {
             connection = DatabaseConfig.getInstance().getConnection();
@@ -82,7 +82,7 @@ public class ServerManagementImpl implements ServerManagement {
     /**
      * Insert new server into database
      */
-    private void insertServer(Connection connection, SSHServer server) throws SQLException {
+    private void insertServer(Connection connection, SSHServerModel server) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement(SQL_INSERT)) {
             ps.setString(1, server.getId());
             ps.setString(2, server.getName());
@@ -105,7 +105,7 @@ public class ServerManagementImpl implements ServerManagement {
     /**
      * Update existing server in database
      */
-    private void updateServer(Connection connection, SSHServer server) throws SQLException {
+    private void updateServer(Connection connection, SSHServerModel server) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement(SQL_UPDATE)) {
             ps.setString(1, server.getName());
             ps.setString(2, server.getHost());
@@ -180,9 +180,9 @@ public class ServerManagementImpl implements ServerManagement {
      * @return List of all servers (never null, may be empty)
      */
     @Override
-    public List<SSHServer> getAllServers() {
+    public List<SSHServerModel> getAllServers() {
         Connection connection = null;
-        List<SSHServer> servers = new ArrayList<>();
+        List<SSHServerModel> servers = new ArrayList<>();
         
         try {
             connection = DatabaseConfig.getInstance().getConnection();
@@ -216,8 +216,8 @@ public class ServerManagementImpl implements ServerManagement {
      * @return SSHServer object
      * @throws SQLException if column access fails
      */
-    private SSHServer mapRowToSSHServer(ResultSet rs) throws SQLException {
-        SSHServer server = new SSHServer();
+    private SSHServerModel mapRowToSSHServer(ResultSet rs) throws SQLException {
+        SSHServerModel server = new SSHServerModel();
         
         server.setId(rs.getString("id"));
         server.setName(rs.getString("name"));

@@ -1,8 +1,7 @@
 package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.FileInfo;
-import com.seeloggyplus.service.impl.SSHService;
-import javafx.application.Platform;
+import com.seeloggyplus.service.impl.SSHServiceImpl;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -74,7 +73,7 @@ public class LogPreviewDialogController {
      * @param fileInfo The file to preview.
      * @param sshService An active SSH service, if the file is remote. Can be null for local files.
      */
-    public void loadFile(FileInfo fileInfo, SSHService sshService) {
+    public void loadFile(FileInfo fileInfo, SSHServiceImpl sshService) {
         fileNameLabel.setText(fileInfo.getPath());
         progressIndicator.setVisible(true);
 
@@ -85,7 +84,7 @@ public class LogPreviewDialogController {
                     if (sshService == null || !sshService.isConnected()) {
                         throw new IOException("SSH service is not connected.");
                     }
-                    return sshService.readFileLines(fileInfo.getPath(), null); // Using existing method
+                    return sshService.readFileLines(fileInfo.getPath());
                 } else {
                     List<String> lines = new ArrayList<>();
                     try (BufferedReader reader = new BufferedReader(new FileReader(fileInfo.getPath()))) {
@@ -101,10 +100,12 @@ public class LogPreviewDialogController {
 
         loadTask.setOnSucceeded(e -> {
             List<String> lines = loadTask.getValue();
+            List<LogLine> convertedLines = new ArrayList<>();
             long lineNum = 1;
             for (String line : lines) {
-                logLines.add(new LogLine(lineNum++, line));
+                convertedLines.add(new LogLine(lineNum++, line));
             }
+            logLines.setAll(convertedLines);
             progressIndicator.setVisible(false);
         });
 
@@ -112,7 +113,9 @@ public class LogPreviewDialogController {
             progressIndicator.setVisible(false);
             Throwable ex = loadTask.getException();
             logger.error("Failed to load file for preview: {}", ex.getMessage(), ex);
-            logLines.add(new LogLine(1L, "Error loading file: " + ex.getMessage()));
+            logLines.clear();
+            logLines.add(new LogLine(1L, "ERROR: Could not load file."));
+            logLines.add(new LogLine(2L, ex.getMessage()));
         });
 
         new Thread(loadTask).start();

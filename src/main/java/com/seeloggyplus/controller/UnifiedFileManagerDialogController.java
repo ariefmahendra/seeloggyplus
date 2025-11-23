@@ -2,11 +2,13 @@ package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.FavoriteFolder;
 import com.seeloggyplus.model.FileInfo;
-import com.seeloggyplus.model.SSHServer;
+import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.service.FavoriteFolderService;
+import com.seeloggyplus.service.LocalFileService;
 import com.seeloggyplus.service.ServerManagementService;
 import com.seeloggyplus.service.impl.FavoriteFolderServiceImpl;
-import com.seeloggyplus.service.impl.SSHService;
+import com.seeloggyplus.service.impl.LocalFileServiceImpl;
+import com.seeloggyplus.service.impl.SSHServiceImpl;
 import com.seeloggyplus.service.impl.ServerManagementServiceImpl;
 import com.seeloggyplus.util.PasswordPromptDialog;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
@@ -110,55 +112,45 @@ public class UnifiedFileManagerDialogController {
 
     // Services
     private LocalFileService localFileService;
-    private SSHService sshService;
+    private SSHServiceImpl sshService;
     private ServerManagementService serverManagementService;
     private FavoriteFolderService favoriteFolderService;
 
-    // State
-    private ObservableList<LocationItem> locations;
     private ObservableList<FileInfo> allFiles;
     private FilteredList<FileInfo> filteredFiles;
     private final Stack<String> backHistory = new Stack<>();
     private final Stack<String> forwardHistory = new Stack<>();
     private String currentPath;
     private LocationItem currentLocation;
-
-    // Result
     private FileInfo selectedFileResult;
-    private SSHService activeSshService;
+    private SSHServiceImpl activeSshService;
 
     @FXML
     public void initialize() {
         logger.info("Initializing UnifiedFileManagerDialogController");
 
-        // --- Service Initialization ---
-        localFileService = new LocalFileService();
+        localFileService = new LocalFileServiceImpl();
         serverManagementService = new ServerManagementServiceImpl();
         favoriteFolderService = new FavoriteFolderServiceImpl();
 
         allFiles = FXCollections.observableArrayList();
         filteredFiles = new FilteredList<>(allFiles, p -> true);
 
-        // --- UI Setup ---
-        setupLayout(); // Must be called before other setups that use the lists
+        setupLayout();
         setupLocationList();
         setupFavoritesList();
         setupFileTable();
         setupEventHandlers();
 
-        // Select Local Drive by default
         locationListView.getSelectionModel().select(0);
     }
 
     private void setupLocationList() {
-        locations = FXCollections.observableArrayList();
-
-        // Add Local Drive
+        ObservableList<LocationItem> locations = FXCollections.observableArrayList();
         locations.add(new LocationItem("Local Drive", FontAwesomeIcon.DESKTOP, null));
 
-        // Add Saved Servers
-        List<SSHServer> servers = serverManagementService.getAllServers();
-        for (SSHServer server : servers) {
+        List<SSHServerModel> servers = serverManagementService.getAllServers();
+        for (SSHServerModel server : servers) {
             locations.add(new LocationItem(server.getName(), FontAwesomeIcon.SERVER, server));
         }
 
@@ -188,15 +180,10 @@ public class UnifiedFileManagerDialogController {
 
     private void setupLayout() {
         favoritesListView = new ListView<>();
-        // The locationListView is inside a VBox. We need to add our new list to that VBox.
-        if (locationListView.getParent() instanceof VBox) {
-            VBox leftPanel = (VBox) locationListView.getParent();
-
+        if (locationListView.getParent() instanceof VBox leftPanel) {
             int index = leftPanel.getChildren().indexOf(locationListView);
-
             Label favoritesLabel = new Label("Favorites");
             favoritesLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
-
             if (index != -1) {
                 leftPanel.getChildren().add(index + 1, new Separator());
                 leftPanel.getChildren().add(index + 2, favoritesLabel);
@@ -204,7 +191,6 @@ public class UnifiedFileManagerDialogController {
             } else {
                 leftPanel.getChildren().addAll(new Separator(), favoritesLabel, favoritesListView);
             }
-            
             VBox.setVgrow(locationListView, javafx.scene.layout.Priority.SOMETIMES);
             VBox.setVgrow(favoritesListView, javafx.scene.layout.Priority.ALWAYS);
         }
@@ -213,18 +199,19 @@ public class UnifiedFileManagerDialogController {
     private void setupFavoritesList() {
         favoritesListView.setCellFactory(param -> new ListCell<>() {
             private final FontAwesomeIconView icon = new FontAwesomeIconView(FontAwesomeIcon.STAR);
+
             {
                 icon.setSize("16");
                 icon.setFill(Color.GOLD);
             }
+
             @Override
             protected void updateItem(FavoriteFolder item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setText(null);
                     setGraphic(null);
-                }
-                else {
+                } else {
                     setText(item.getName());
                     setGraphic(icon);
                 }
@@ -239,8 +226,6 @@ public class UnifiedFileManagerDialogController {
                 }
             }
         });
-        
-        // Context menu for removing a favorite
         ContextMenu favContextMenu = new ContextMenu();
         MenuItem removeFavMenuItem = new MenuItem("Remove Favorite");
         removeFavMenuItem.setOnAction(e -> {
@@ -255,39 +240,32 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void setupFileTable() {
-        // Enable cell-level selection for copy-paste
         fileTable.getSelectionModel().setCellSelectionEnabled(true);
         fileTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
-        // --- Context Menu for Files ---
         fileContextMenu = new ContextMenu();
         addToFavoritesMenuItem = new MenuItem("Add to Favorites");
         removeFromFavoritesMenuItem = new MenuItem("Remove from Favorites");
-
         addToFavoritesMenuItem.setOnAction(e -> handleAddToFavorites());
         removeFromFavoritesMenuItem.setOnAction(e -> handleRemoveFromFavorites());
-
         fileContextMenu.getItems().addAll(addToFavoritesMenuItem, removeFromFavoritesMenuItem);
 
         fileTable.setContextMenu(fileContextMenu);
-
         fileTable.setOnContextMenuRequested(event -> {
             FileInfo selected = fileTable.getSelectionModel().getSelectedItem();
             if (selected == null || selected.isFile()) {
-                // Hide menu if no item or a file is selected
                 fileContextMenu.hide();
                 return;
             }
-            // Check if the folder is already a favorite
             boolean isAlreadyFavorite = favoriteFolderService.isFavorite(selected.getPath(), getLocationIdForCurrent());
             addToFavoritesMenuItem.setVisible(!isAlreadyFavorite);
             removeFromFavoritesMenuItem.setVisible(isAlreadyFavorite);
         });
-        
-        // Icon Column
+
         iconColumn.setCellValueFactory(cellData -> new SimpleStringProperty(""));
         iconColumn.setCellFactory(col -> new TableCell<>() {
             private final FontAwesomeIconView icon = new FontAwesomeIconView();
+
             {
                 icon.setSize("16");
             }
@@ -302,15 +280,12 @@ public class UnifiedFileManagerDialogController {
                     if (file.isDirectory()) {
                         icon.setIcon(FontAwesomeIcon.FOLDER);
                         icon.setFill(Color.DARKGOLDENROD);
-                        
-                        // Add a specific style class if it's a favorite
                         boolean isFavorite = favoriteFolderService.isFavorite(file.getPath(), getLocationIdForCurrent());
-                        if(isFavorite) {
+                        if (isFavorite) {
                             getTableRow().setStyle("-fx-font-weight: bold;");
                         } else {
                             getTableRow().setStyle("");
                         }
-                        
                     } else if (file.isLogFile()) {
                         icon.setIcon(FontAwesomeIcon.FILE_TEXT_ALT);
                         icon.setFill(Color.STEELBLUE);
@@ -384,11 +359,10 @@ public class UnifiedFileManagerDialogController {
         cancelButton.setOnAction(e -> closeDialog());
         openButton.setOnAction(e -> handleOpen());
 
-        // Add copy support for the table
         fileTable.setOnKeyPressed(event -> {
             if (new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.C, javafx.scene.input.KeyCombination.CONTROL_DOWN).match(event)) {
                 copySelectionToClipboard(fileTable);
-                event.consume(); // Consume the event to prevent other handlers from acting on it
+                event.consume();
             }
         });
     }
@@ -396,8 +370,6 @@ public class UnifiedFileManagerDialogController {
     private void handleLocationSelected(LocationItem location) {
         if (currentLocation == location)
             return;
-
-        // If switching from remote to local, disconnect old SSH
         if (currentLocation != null && currentLocation.server != null && sshService != null) {
             sshService.disconnect();
             sshService = null;
@@ -407,20 +379,17 @@ public class UnifiedFileManagerDialogController {
         backHistory.clear();
         forwardHistory.clear();
         updateNavigationButtons();
-        loadFavoritesForCurrentLocation(); // Load favorites for the new location
+        loadFavoritesForCurrentLocation();
 
         if (location.server == null) {
-            // Local
             activeSshService = null;
             navigateTo(localFileService.getHomeDirectory());
         } else {
-            // Remote
             connectToRemote(location.server);
         }
     }
 
-    private void connectToRemote(SSHServer server) {
-        // Get the password, prompting the user if it's not saved.
+    private void connectToRemote(SSHServerModel server) {
         String password = server.getPassword();
         if (password == null || password.isBlank()) {
             logger.info("Password for server {} is not saved, prompting user.", server.getName());
@@ -431,7 +400,6 @@ public class UnifiedFileManagerDialogController {
                 password = result.get();
             } else {
                 logger.info("User cancelled password prompt. Aborting connection.");
-                // Set a status and return without connecting
                 updateStatus("Connection cancelled.");
                 return;
             }
@@ -445,7 +413,7 @@ public class UnifiedFileManagerDialogController {
         Task<Boolean> connectTask = new Task<>() {
             @Override
             protected Boolean call() {
-                sshService = new SSHService();
+                sshService = new SSHServiceImpl();
                 return sshService.connect(server.getHost(), server.getPort(), server.getUsername(),
                         finalPassword);
             }
@@ -455,8 +423,6 @@ public class UnifiedFileManagerDialogController {
             if (connectTask.getValue()) {
                 activeSshService = sshService;
                 updateStatus("Connected to " + server.getHost());
-
-                // Get home dir
                 Task<String> homeTask = new Task<>() {
                     @Override
                     protected String call() throws Exception {
@@ -487,15 +453,13 @@ public class UnifiedFileManagerDialogController {
             return null;
         }
         if (currentLocation != null && currentLocation.server == null) {
-            // Local path: use NIO for robust normalization.
             try {
                 return java.nio.file.Paths.get(path).toAbsolutePath().normalize().toString();
             } catch (Exception e) {
                 logger.warn("Path normalization failed for local path: {}", path, e);
-                return path; // Fallback to original
+                return path;
             }
         } else {
-            // Remote path: simple normalization
             if (path.length() > 1 && path.endsWith("/")) {
                 return path.substring(0, path.length() - 1);
             }
@@ -528,11 +492,9 @@ public class UnifiedFileManagerDialogController {
 
         String parent = null;
         if (currentLocation == null || currentLocation.server == null) {
-            // Local
             java.io.File f = new java.io.File(path);
             parent = f.getParent();
         } else {
-            // Remote
             if (!path.equals("/")) {
                 int lastSlash = path.lastIndexOf('/');
                 if (lastSlash > 0) {
@@ -556,10 +518,17 @@ public class UnifiedFileManagerDialogController {
                 if (currentLocation.server == null) {
                     files = new java.util.ArrayList<>(localFileService.listFiles(path));
                 } else {
-                    if (sshService == null || !sshService.isConnected()) {
-                        throw new IOException("Not connected");
+                    if (sshService == null) {
+                        throw new IOException("SSH Service is not initialized.");
                     }
-                    // Map RemoteFileInfo to FileInfo
+
+                    if (!sshService.isConnected()) {
+                        boolean isConnected = sshService.connect(currentLocation.server.getHost(), currentLocation.server.getPort(), currentLocation.server.getUsername(), currentLocation.server.getPassword());
+                        if (!isConnected) {
+                            throw new IOException("SSH Service is not connected.");
+                        }
+                    }
+
                     files = sshService.listFiles(path).stream().map(r -> {
                         FileInfo f = new FileInfo();
                         f.setName(r.getName());
@@ -568,13 +537,12 @@ public class UnifiedFileManagerDialogController {
                         f.setDirectory(r.isDirectory());
                         f.setModifiedTime(r.getModifiedTime());
                         f.setPermissions(r.getPermissions());
-                        f.setOwner(r.getOwner());
+                        f.setOwner("-");
                         f.setSourceType(FileInfo.SourceType.REMOTE);
                         return f;
                     }).collect(Collectors.toList());
                 }
 
-                // Prepend ".." entry if not at root
                 String parentPath = getParentPath(path);
                 if (parentPath != null) {
                     FileInfo upDir = new FileInfo();
@@ -651,7 +619,7 @@ public class UnifiedFileManagerDialogController {
                 .filter(fav -> fav.getPath().equals(selected.getPath()))
                 .findFirst()
                 .ifPresent(fav -> favoriteFolderService.removeFavorite(fav.getId()));
-        
+
         loadFavoritesForCurrentLocation();
         fileTable.refresh(); // To update styling
     }
@@ -733,7 +701,17 @@ public class UnifiedFileManagerDialogController {
             Task<String> homeTask = new Task<>() {
                 @Override
                 protected String call() throws Exception {
-                    return sshService.executeCommand("pwd").trim();
+                    if (sshService == null || !sshService.isConnected()) {
+                        throw new IOException("SSH Service not connected");
+                    }
+
+                    String result = sshService.executeCommand("pwd");
+
+                    if (result != null && !result.isBlank()) {
+                        return result.trim();
+                    } else {
+                        return "/";
+                    }
                 }
             };
             homeTask.setOnSucceeded(ev -> navigateTo(homeTask.getValue()));
@@ -760,7 +738,6 @@ public class UnifiedFileManagerDialogController {
             return;
         }
 
-        // Group by row index
         final java.util.Map<Integer, java.util.List<javafx.scene.control.TablePosition>> rowMap = new java.util.TreeMap<>();
         for (final javafx.scene.control.TablePosition pos : selectedCells) {
             rowMap.computeIfAbsent(pos.getRow(), k -> new java.util.ArrayList<>()).add(pos);
@@ -768,7 +745,6 @@ public class UnifiedFileManagerDialogController {
 
         final StringBuilder clipboardString = new StringBuilder();
         for (final java.util.List<javafx.scene.control.TablePosition> row : rowMap.values()) {
-            // Sort cells by column index
             row.sort(java.util.Comparator.comparingInt(javafx.scene.control.TablePosition::getColumn));
 
             final String rowString = row.stream()
@@ -788,9 +764,7 @@ public class UnifiedFileManagerDialogController {
     private void handleManageServers() {
         try {
             Stage ownerStage = (Stage) manageServersButton.getScene().getWindow();
-            
-            // It's possible the owner is another dialog, but we want the main stage.
-            // Let's assume the main stage is the ultimate owner.
+
             Stage mainStage = ownerStage;
             while (mainStage.getOwner() != null) {
                 mainStage = (Stage) mainStage.getOwner();
@@ -810,7 +784,7 @@ public class UnifiedFileManagerDialogController {
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.initOwner(ownerStage); // The dialog's direct owner is the file manager
             stage.setScene(new Scene(root));
-            
+
             stage.showAndWait();
 
             Platform.runLater(() -> {
@@ -824,8 +798,6 @@ public class UnifiedFileManagerDialogController {
                 }
             });
 
-
-            // Refresh server list in case changes were made
             setupLocationList();
         } catch (IOException e) {
             logger.error("Failed to open server management", e);
@@ -863,7 +835,7 @@ public class UnifiedFileManagerDialogController {
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.initOwner(ownerStage);
             stage.setScene(new Scene(root));
-            
+
             stage.showAndWait();
 
             Platform.runLater(() -> {
@@ -900,16 +872,16 @@ public class UnifiedFileManagerDialogController {
         return selectedFileResult;
     }
 
-    public SSHService getSshService() {
+    public SSHServiceImpl getSshService() {
         return activeSshService;
     }
 
     private static class LocationItem {
         String name;
         FontAwesomeIcon icon;
-        SSHServer server;
+        SSHServerModel server;
 
-        public LocationItem(String name, FontAwesomeIcon icon, SSHServer server) {
+        public LocationItem(String name, FontAwesomeIcon icon, SSHServerModel server) {
             this.name = name;
             this.icon = icon;
             this.server = server;
@@ -919,6 +891,7 @@ public class UnifiedFileManagerDialogController {
     /**
      * Parses a human-readable file size string (e.g., "1.2 KB", "5 MB") into bytes.
      * Returns -1 if the string is not a valid size (e.g., "-").
+     *
      * @param formattedSize The formatted size string.
      * @return The size in bytes, or -1 if unparseable.
      */

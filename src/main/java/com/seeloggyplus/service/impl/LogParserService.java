@@ -158,7 +158,7 @@ public class LogParserService {
                     countUnparsedLine = 0;
                 }
 
-                if (countUnparsedLine > maxEntryUnparsed && !logEntry.isParsed()){
+                if (countUnparsedLine > maxEntryUnparsed){
                     break;
                 }
 
@@ -298,7 +298,6 @@ public class LogParserService {
     /**
      * High-performance search with optimized pattern compilation and string matching.
      * Pre-compiles regex once and caches lowercase strings for case-insensitive search.
-     * 
      * Performance optimizations:
      * - Regex pattern compiled once (not per entry)
      * - Pre-allocates result list with estimated capacity

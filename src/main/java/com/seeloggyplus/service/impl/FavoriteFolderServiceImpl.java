@@ -6,19 +6,10 @@ import com.seeloggyplus.repository.impl.FavoriteFolderRepositoryImpl;
 import com.seeloggyplus.service.FavoriteFolderService;
 
 import java.util.List;
-import java.util.Optional;
 
-public class FavoriteFolderServiceImpl implements FavoriteFolderService {
-
-    private final FavoriteFolderRepository favoriteFolderRepository;
-
+public record FavoriteFolderServiceImpl(FavoriteFolderRepository favoriteFolderRepository) implements FavoriteFolderService {
     public FavoriteFolderServiceImpl() {
-        this.favoriteFolderRepository = new FavoriteFolderRepositoryImpl();
-    }
-
-    // Constructor for testing with mocks
-    public FavoriteFolderServiceImpl(FavoriteFolderRepository favoriteFolderRepository) {
-        this.favoriteFolderRepository = favoriteFolderRepository;
+        this(new FavoriteFolderRepositoryImpl());
     }
 
     @Override

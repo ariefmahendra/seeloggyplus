@@ -7,10 +7,6 @@ import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-/**
- * An implementation of LogEntrySource that wraps a List<LogEntry>.
- * This is suitable when all log entries are already in memory.
- */
 public record ListLogEntrySourceImpl(List<LogEntry> allEntries) implements LogEntrySource {
     @Override
     public int getTotalEntries() {

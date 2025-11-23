@@ -13,11 +13,9 @@ import java.util.List;
 
 public class RecentConfigServiceImpl implements RecentFileService {
     private final RecentFileRepository recentFileRepository;
-    private final LogFileRepository logFileRepository;
 
     public RecentConfigServiceImpl() {
         this.recentFileRepository = new RecentFileRepositoryImpl();
-        this.logFileRepository = new LogFileRepositoryImpl();
     }
 
     @Override
