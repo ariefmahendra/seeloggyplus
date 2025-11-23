@@ -152,6 +152,32 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
         return Optional.ofNullable(recentFile);
     }
 
+    @Override
+    public void deleteById(String id) {
+        String sql = "DELETE FROM recent_files WHERE id = ?";
+
+        Connection connection = getConnection();
+        try(PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setString(1, id);
+            preparedStatement.execute();
+        } catch (SQLException e){
+            logger.error("Error deleting recent file by id: {}", id, e);
+        }
+    }
+
+    @Override
+    public void deleteByFileId(String fileId) {
+        String sql = "DELETE FROM recent_files WHERE file_id = ?";
+
+        Connection connection = getConnection();
+        try(PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setString(1, fileId);
+            preparedStatement.execute();
+        } catch (SQLException e){
+            logger.error("Error deleting recent file by fileId: {}", fileId, e);
+        }
+    }
+
     private RecentFile mapRowToRecentFile(ResultSet rs) throws SQLException {
         RecentFile recentFile = new RecentFile();
         recentFile.setId(rs.getString("id"));

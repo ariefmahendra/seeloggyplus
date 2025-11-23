@@ -12,4 +12,6 @@ public interface RecentFileRepository {
     void deleteAll();
     RecentFilesDto findById(String id);
     Optional<RecentFile> findByFileId(String fileId);
+    void deleteById(String id);
+    void deleteByFileId(String fileId);
 }
