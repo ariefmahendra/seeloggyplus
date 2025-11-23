@@ -175,6 +175,7 @@ public class MainController {
     private String monitoringRemotePath;
     private final List<LogEntry> tailBuffer = Collections.synchronizedList(new ArrayList<>());
     private volatile boolean tailFlushScheduled = false;
+    private boolean tailColumnsAutoResized = false;
 
     @FXML
     public void initialize() {
@@ -403,8 +404,8 @@ public class MainController {
 
             int displayedCount = visibleLogEntries.size();
             updateStatus(String.format("📍 At bottom. Showing last %,d of %,d entries from %s",
-                displayedCount, totalAvailable,
-                currentFile != null ? currentFile.getName() : ""));
+                    displayedCount, totalAvailable,
+                    currentFile != null ? currentFile.getName() : ""));
 
             logger.info("Scrolled to bottom, showing {} entries (TAIL MODE)", displayedCount);
         }));
@@ -501,7 +502,7 @@ public class MainController {
     }
 
     private void updateTableColumns(ParsingConfig config) {
-        logger.info( "Updating table columns with config: {}", config != null ? config.getName() : "null");
+        logger.info("Updating table columns with config: {}", config != null ? config.getName() : "null");
         logTableView.getColumns().clear();
 
         TableColumn<LogEntry, String> lineCol = getLogEntryStringTableLineColumn();
@@ -509,12 +510,12 @@ public class MainController {
 
         if (config != null && config.isValid()) {
             List<String> groupNames = config.getGroupNames();
-            logger.info( "Config has {} named groups: {}", groupNames.size(), groupNames);
+            logger.info("Config has {} named groups: {}", groupNames.size(), groupNames);
 
             int unparsedColumnIndex = determineUnparsedColumnIndex(groupNames);
             logger.info("Unparsed entries will be displayed in column index: {} ({})",
-                unparsedColumnIndex,
-                unparsedColumnIndex < groupNames.size() ? groupNames.get(unparsedColumnIndex) : "N/A");
+                    unparsedColumnIndex,
+                    unparsedColumnIndex < groupNames.size() ? groupNames.get(unparsedColumnIndex) : "N/A");
 
             for (int i = 0; i < groupNames.size(); i++) {
                 final int currentIndex = i;
@@ -649,7 +650,7 @@ public class MainController {
                 if (partialMatchIndex == -1) {
                     String lower = name.toLowerCase();
                     if ((firstChar == 'm' || firstChar == 'M') &&
-                        (lower.contains("message") || lower.contains("msg"))) {
+                            (lower.contains("message") || lower.contains("msg"))) {
                         partialMatchIndex = i;
                     } else if ((firstChar == 't' || firstChar == 'T') && lower.contains("text")) {
                         partialMatchIndex = i;
@@ -750,12 +751,16 @@ public class MainController {
     }
 
     private void openRemoteLogFile(FileInfo remoteFile, SSHServiceImpl sshService, ParsingConfig parsingConfig) {
+        openRemoteLogFile(remoteFile.getPath(), remoteFile.getName(), sshService, parsingConfig);
+    }
+
+    private void openRemoteLogFile(String remotePath, String remoteFileName, SSHServiceImpl sshService, ParsingConfig parsingConfig) {
         if (sshService == null || !sshService.isConnected()) {
             showError("Connection Error", "SSH connection is not active. Please re-select the file.");
             return;
         }
 
-        updateStatus("Downloading remote file: " + remoteFile.getName());
+        updateStatus("Downloading remote file: " + remoteFileName);
         progressBar.setVisible(true);
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
@@ -763,13 +768,15 @@ public class MainController {
             @Override
             protected File call() throws Exception {
                 String tempDir = System.getProperty("java.io.tmpdir");
-                String sanitizedName = new File(remoteFile.getName()).getName();
-                File localTmpFile = new File(tempDir, "seeloggyplus-" + System.currentTimeMillis() + "-" + sanitizedName);
+                String sanitizedName = new File(remoteFileName).getName();
+                File localTmpFile = new File(tempDir,
+                        "seeloggyplus-" + System.currentTimeMillis() + "-" + sanitizedName);
 
-                logger.info("Downloading remote file {} to temporary path {}", remoteFile.getPath(), localTmpFile.getAbsolutePath());
+                logger.info("Downloading remote file {} to temporary path {}",
+                        remotePath, localTmpFile.getAbsolutePath());
 
                 boolean success = sshService.downloadFileConcurrent(
-                        remoteFile.getPath(),
+                        remotePath,
                         localTmpFile.getAbsolutePath(),
                         4,
                         new LogParserService.ProgressCallback() {
@@ -786,7 +793,7 @@ public class MainController {
 
                             @Override
                             public void onComplete(long totalEntries) {
-
+                                // no-op
                             }
                         }
                 );
@@ -880,9 +887,9 @@ public class MainController {
 
         long fileSizeInBytes = file.length();
         logger.info("Starting to parse file: {} ({}) with config: {}",
-            file.getName(),
-            com.seeloggyplus.util.FileUtils.formatFileSize(fileSizeInBytes),
-            parsingConfig.getName());
+                file.getName(),
+                com.seeloggyplus.util.FileUtils.formatFileSize(fileSizeInBytes),
+                parsingConfig.getName());
 
         logger.info("Using parallel parsing strategy with virtual scrolling for optimal performance");
         loadFileWithParallelParsing(file, parsingConfig, logFile, updateRecentFilesList);
@@ -908,6 +915,7 @@ public class MainController {
                 int total = currentLogEntrySource.getTotalEntries();
                 loadWindow(Math.max(0, total - WINDOW_SIZE), true);
                 logger.info("Initial window loaded after parse");
+                autoResizeColumns(logTableView);
             });
 
             if (updateRecentFilesList) {
@@ -956,25 +964,25 @@ public class MainController {
             @Override
             protected List<LogEntry> call() throws IOException {
                 return logParserService.parseFileParallel(file, configToUse, new LogParserService.ProgressCallback() {
-                        @Override
-                        public void onProgress(double progress, long bytesProcessed, long totalBytes) {
-                            updateProgress(bytesProcessed, totalBytes);
-                            Platform.runLater(() -> {
-                                progressBar.setProgress(progress);
-                                updateStatus(String.format(
-                                    "Parsing... %.1f%% (%s / %s)",
-                                    progress * 100,
-                                    formatBytes(bytesProcessed),
-                                    formatBytes(totalBytes)
-                                ));
-                            });
-                        }
+                            @Override
+                            public void onProgress(double progress, long bytesProcessed, long totalBytes) {
+                                updateProgress(bytesProcessed, totalBytes);
+                                Platform.runLater(() -> {
+                                    progressBar.setProgress(progress);
+                                    updateStatus(String.format(
+                                            "Parsing... %.1f%% (%s / %s)",
+                                            progress * 100,
+                                            formatBytes(bytesProcessed),
+                                            formatBytes(totalBytes)
+                                    ));
+                                });
+                            }
 
-                        @Override
-                        public void onComplete(long totalEntries) {
-                            Platform.runLater(() -> logger.info("Parsed {} entries", totalEntries));
+                            @Override
+                            public void onComplete(long totalEntries) {
+                                Platform.runLater(() -> logger.info("Parsed {} entries", totalEntries));
+                            }
                         }
-                    }
                 );
             }
         };
@@ -1130,19 +1138,17 @@ public class MainController {
             return;
         }
 
-        // Reload current parsing config from database (it may have been updated)
         Optional<ParsingConfig> updatedConfigOpt = parsingConfigService.findById(currentParsingConfig.getId());
 
         if (updatedConfigOpt.isEmpty()) {
             logger.warn("Current parsing config no longer exists in database");
             showInfo("Configuration Deleted",
-                "The current parsing configuration has been deleted. Please reload the file with a new configuration.");
+                    "The current parsing configuration has been deleted. Please reload the file with a new configuration.");
             return;
         }
 
         ParsingConfig updatedConfig = updatedConfigOpt.get();
 
-        // Check if config actually changed
         if (configsAreEqual(currentParsingConfig, updatedConfig)) {
             logger.info("Configuration unchanged, no need to re-parse");
             return;
@@ -1152,9 +1158,9 @@ public class MainController {
         alert.setTitle("Parsing Configuration Changed");
         alert.setHeaderText("The parsing configuration has been updated.");
         alert.setContentText(String.format(
-            "Current file: %s\nCurrent config: %s\n\nDo you want to re-parse the file with the updated configuration?",
-            currentFile.getName(),
-            updatedConfig.getName()
+                "Current file: %s\nCurrent config: %s\n\nDo you want to re-parse the file with the updated configuration?",
+                currentFile.getName(),
+                updatedConfig.getName()
         ));
 
         ButtonType reParseButton = new ButtonType("Re-parse Now");
@@ -1178,9 +1184,9 @@ public class MainController {
         }
 
         return Objects.equals(config1.getName(), config2.getName()) &&
-               Objects.equals(config1.getRegexPattern(), config2.getRegexPattern()) &&
-               Objects.equals(config1.getDescription(), config2.getDescription()) &&
-               Objects.equals(config1.getTimestampFormat(), config2.getTimestampFormat());
+                Objects.equals(config1.getRegexPattern(), config2.getRegexPattern()) &&
+                Objects.equals(config1.getDescription(), config2.getDescription()) &&
+                Objects.equals(config1.getTimestampFormat(), config2.getTimestampFormat());
     }
 
     private void handleRecentFileSelected(RecentFilesDto recentFile) {
@@ -1200,7 +1206,7 @@ public class MainController {
                         "This remote file does not have SSH server information (sshServerID is empty).");
                 return;
             }
-            
+
             SSHServerModel server = serverManagementService.getServerById(sshServerId);
             if (server == null) {
                 showError("SSH Server Not Found",
@@ -1208,7 +1214,7 @@ public class MainController {
                                 "Please check Server Management.");
                 return;
             }
-            
+
             ParsingConfig parsingConfig = recentFile.parsingConfig();
             if (parsingConfig != null) {
                 logger.info("ParsingConfig in method handleRecentFileSelected from DTO - ID: {}, Name: {}, Valid: {}", parsingConfig.getId(), parsingConfig.getName(), parsingConfig.isValid());
@@ -1265,7 +1271,7 @@ public class MainController {
                 return;
             }
 
-            logger.info("SSH connected for remote recent file, starting tail on {}", remotePath);
+            logger.info("SSH connected for remote recent file, opening remote file {}", remotePath);
 
             resetFilters();
             startRemoteTail(remotePath, sshService, parsingConfig, server);
@@ -1277,13 +1283,13 @@ public class MainController {
             }
 
             logger.info("Recent file selected: {}, LogFile parsing_config_id: {}",
-                file.getName(), recentFile.logFile().getParsingConfigurationID());
+                    file.getName(), recentFile.logFile().getParsingConfigurationID());
 
             ParsingConfig parsingConfig = recentFile.parsingConfig();
 
             if (parsingConfig != null) {
                 logger.info("ParsingConfig from DTO - ID: {}, Name: {}, Valid: {}",
-                    parsingConfig.getId(), parsingConfig.getName(), parsingConfig.isValid());
+                        parsingConfig.getId(), parsingConfig.getName(), parsingConfig.isValid());
             } else {
                 logger.info("ParsingConfig from DTO is NULL");
             }
@@ -1320,7 +1326,7 @@ public class MainController {
 
             if (parsingConfig != null) {
                 logger.info("Loaded ParsingConfig from database - ID: {}, Name: {}, Valid: {}",
-                    parsingConfig.getId(), parsingConfig.getName(), parsingConfig.isValid());
+                        parsingConfig.getId(), parsingConfig.getName(), parsingConfig.isValid());
             } else {
                 logger.warn("ParsingConfig with ID {} not found in database", parsingConfigId);
             }
@@ -1341,7 +1347,7 @@ public class MainController {
     }
 
     private void clearDateFilter() {
-        logger.info("🗑️ Clearing date/time filter");
+        logger.info("Clearing date/time filter");
         dateTimeFromField.clear();
         dateTimeToField.clear();
     }
@@ -1354,30 +1360,30 @@ public class MainController {
         String trimmed = input.trim();
 
         List<DateTimeFormatter> formatters = Arrays.asList(
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"),
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
-            DateTimeFormatter.ofPattern("yyyy-MM-dd"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSS"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss.SSS"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss.SSS"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
-            DateTimeFormatter.ISO_LOCAL_DATE_TIME
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"),
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
+                DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+                DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSS"),
+                DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"),
+                DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"),
+                DateTimeFormatter.ofPattern("yyyy/MM/dd"),
+                DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss.SSS"),
+                DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"),
+                DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm"),
+                DateTimeFormatter.ofPattern("dd-MM-yyyy"),
+                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss.SSS"),
+                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"),
+                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"),
+                DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                DateTimeFormatter.ISO_LOCAL_DATE_TIME
         );
 
         for (DateTimeFormatter formatter : formatters) {
             try {
                 return LocalDateTime.parse(trimmed, formatter);
             } catch (DateTimeParseException e) {
-               logger.warn("Could not parse date/time string: {}", trimmed);
+                logger.warn("Could not parse date/time string: {}", trimmed);
             }
         }
 
@@ -1385,7 +1391,7 @@ public class MainController {
             java.time.LocalDate date = java.time.LocalDate.parse(trimmed, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             return date.atStartOfDay();
         } catch (DateTimeParseException e) {
-           logger.warn(e.getMessage());
+            logger.warn(e.getMessage());
         }
 
         logger.warn("Could not parse date/time: {}", trimmed);
@@ -1440,7 +1446,7 @@ public class MainController {
         final String dateTimeTo = dateTimeToField.getText();
 
         logger.info("Search - Level: {}, Text: '{}', Regex: {}, CaseSensitive: {}, HideUnparsed: {}",
-            selectedLevel, searchText, isRegex, caseSensitive, hideUnparsed);
+                selectedLevel, searchText, isRegex, caseSensitive, hideUnparsed);
 
         updateStatus("Searching...");
 
@@ -1469,7 +1475,7 @@ public class MainController {
                 }
 
                 final String searchTextLower = (!isRegex && searchText != null && !caseSensitive)
-                    ? searchText.toLowerCase() : searchText;
+                        ? searchText.toLowerCase() : searchText;
                 final boolean hasTextSearch = searchText != null && !searchText.trim().isEmpty();
 
                 final boolean hasLevelFilter = selectedLevel != null && !selectedLevel.equals("ALL");
@@ -1664,11 +1670,11 @@ public class MainController {
         if (config != null && config.getTimestampFormat() != null) {
             promptText = config.getTimestampFormat();
             logger.info("Setting date filter prompt to config format: '{}' (from config: {})",
-                promptText, config.getName());
+                    promptText, config.getName());
         } else {
             promptText = "yyyy-MM-dd HH:mm:ss";
-             logger.info("Setting date filter prompt to default format: '{}' (config: {})",
-                promptText, config != null ? "null format" : "null config");
+            logger.info("Setting date filter prompt to default format: '{}' (config: {})",
+                    promptText, config != null ? "null format" : "null config");
         }
 
         Platform.runLater(() -> {
@@ -1678,11 +1684,11 @@ public class MainController {
         });
 
         String tooltipText = "Enter date/time in format: " + promptText +
-                           "\n\nSupported formats:" +
-                           "\n• " + promptText +
-                           "\n• yyyy-MM-dd (date only)" +
-                           "\n• dd-MM-yyyy HH:mm:ss" +
-                           "\nOr any common date format";
+                "\n\nSupported formats:" +
+                "\n• " + promptText +
+                "\n• yyyy-MM-dd (date only)" +
+                "\n• dd-MM-yyyy HH:mm:ss" +
+                "\nOr any common date format";
 
         Platform.runLater(() -> {
             Tooltip fromTooltip = new Tooltip(tooltipText);
@@ -1923,6 +1929,7 @@ public class MainController {
             stopRemoteTail();
             clearSearch();
             refreshRecentFilesList();
+            cleanupTempFiles();
         }
     }
 
@@ -1947,7 +1954,7 @@ public class MainController {
                         - Text and regex search
                         - Performance optimized for large files
                         
-                        © 2024 SeeLoggyPlus"""
+                        © 2025 SeeLoggyPlus"""
         );
         showAndWaitAndRestore(alert);
     }
@@ -2054,7 +2061,7 @@ public class MainController {
                         "SSH server with ID " + sshServerId + " not found. Please check Server Management.");
                 return;
             }
-            
+
             if (currentParsingConfig == null) {
                 String cfgId = currentLogDb.getParsingConfigurationID();
                 if (cfgId != null && !cfgId.isBlank()) {
@@ -2142,7 +2149,7 @@ public class MainController {
                                  ParsingConfig parsingConfig,
                                  SSHServerModel server) {
         stopRemoteTail();
-        
+
         saveRemoteTailToRecent(remotePath, parsingConfig, server);
 
         this.activeTailSshService = sshService;
@@ -2151,6 +2158,7 @@ public class MainController {
         this.currentFile = null;
         this.originalLogEntrySource = null;
         this.currentLogEntrySource = null;
+        this.tailColumnsAutoResized = false;
 
         updateTableColumns(parsingConfig);
         visibleLogEntries.clear();
@@ -2161,7 +2169,7 @@ public class MainController {
 
         sshService.tailFile(
                 remotePath,
-                WINDOW_SIZE, 
+                WINDOW_SIZE,
                 line -> handleTailLineBackground(line, parsingConfig),
                 error -> Platform.runLater(() -> {
                     logger.error("Remote tail error: {}", error);
@@ -2174,7 +2182,7 @@ public class MainController {
     private void saveRemoteTailToRecent(String remotePath, ParsingConfig parsingConfig, SSHServerModel server) {
         try {
             String fileName = new File(remotePath).getName();
-            
+
             LogFile logFile = logFileService.getLogFileByPathAndName(fileName, remotePath);
 
             if (logFile == null) {
@@ -2182,7 +2190,7 @@ public class MainController {
                 logFile.setName(fileName);
                 logFile.setFilePath(remotePath);
                 logFile.setRemote(true);
-                logFile.setSshServerID(server.getId()); 
+                logFile.setSshServerID(server.getId());
                 logFile.setParsingConfigurationID(parsingConfig.getId());
                 logFile.setModified(String.valueOf(System.currentTimeMillis()));
                 logFile.setSize("-");
@@ -2196,18 +2204,34 @@ public class MainController {
                 logFileService.updateLogFile(logFile);
                 logger.info("Updated existing LogFile for remote tail: id={}, path={}", logFile.getId(), remotePath);
             }
-            
-            RecentFile recent = new RecentFile();
-            recent.setFileId(logFile.getId());          
-            recent.setLastOpened(LocalDateTime.now());
-            recentFileService.save(logFile, recent);
-            
+
+            Optional<RecentFile> existingRecentOpt = recentFileService.findByFileId(logFile.getId());
+            boolean createdNewRecent;
+
+            if (existingRecentOpt.isEmpty()) {
+                RecentFile recent = new RecentFile();
+                recent.setFileId(logFile.getId());
+                recent.setLastOpened(LocalDateTime.now());
+
+                recentFileService.save(logFile, recent);
+                createdNewRecent = true;
+
+                logger.info("Created new RecentFile for remote tail: fileId={}", logFile.getId());
+            } else {
+                createdNewRecent = false;
+                logger.info("Remote tail for existing recent fileId={}, NOT updating lastOpened (no re-sort)", logFile.getId());
+            }
+
             this.currentLogDb = logFile;
             this.monitoringRemotePath = remotePath;
 
-            // Refresh list recent di FX thread
-            Platform.runLater(this::refreshRecentFilesList);
-
+            Platform.runLater(() -> {
+                if (createdNewRecent) {
+                    refreshRecentFilesList();
+                } else {
+                    recentFilesListView.refresh();
+                }
+            });
         } catch (Exception e) {
             logger.error("Failed to save remote tail to recent for path {}", remotePath, e);
         }
@@ -2215,9 +2239,9 @@ public class MainController {
 
     private void handleTailLineBackground(String line, ParsingConfig parsingConfig) {
         long lineNumber = ++remoteTailLineCounter;
-        
+
         LogEntry entry = logParserService.parseLine(line, lineNumber, parsingConfig);
-        
+
         synchronized (tailBuffer) {
             tailBuffer.add(entry);
         }
@@ -2238,7 +2262,7 @@ public class MainController {
                 toAdd = new ArrayList<>(tailBuffer);
                 tailBuffer.clear();
             }
-            
+
             visibleLogEntries.addAll(toAdd);
 
             int overflow = visibleLogEntries.size() - WINDOW_SIZE;
@@ -2253,6 +2277,12 @@ public class MainController {
                 LogEntry last = visibleLogEntries.get(lastIndex);
                 detailLabel.setText("Remote Tail - Line " + last.getLineNumber());
             }
+
+            if (!tailColumnsAutoResized && !visibleLogEntries.isEmpty()) {
+                tailColumnsAutoResized = true;
+                autoResizeColumns(logTableView);
+                logger.info("Auto-resize columns after first tail batch");
+            }
         });
     }
 
@@ -2263,8 +2293,50 @@ public class MainController {
         }
 
         monitoringRemotePath = null;
-        refreshRecentFilesList();
+        Platform.runLater(() -> recentFilesListView.refresh());
     }
+
+    private void cleanupTempFiles() {
+        try {
+            String tmpDirPath = System.getProperty("java.io.tmpdir");
+            File tmpDir = new File(tmpDirPath);
+
+            if (!tmpDir.exists() || !tmpDir.isDirectory()) {
+                logger.warn("Temp directory does not exist or is not a directory: {}", tmpDirPath);
+                return;
+            }
+
+            File[] files = tmpDir.listFiles((dir, name) -> name.startsWith("seeloggyplus-"));
+            if (files == null || files.length == 0) {
+                logger.info("No seeloggyplus temp files to delete in {}", tmpDirPath);
+                return;
+            }
+
+            int successCount = 0;
+            int failCount = 0;
+
+            for (File f : files) {
+                try {
+                    if (f.delete()) {
+                        successCount++;
+                        logger.info("Deleted temp file: {}", f.getAbsolutePath());
+                    } else {
+                        failCount++;
+                        logger.warn("Failed to delete temp file: {}", f.getAbsolutePath());
+                    }
+                } catch (Exception ex) {
+                    failCount++;
+                    logger.error("Error deleting temp file: {}", f.getAbsolutePath(), ex);
+                }
+            }
+
+            logger.info("Temp cleanup completed. Deleted: {}, Failed: {}, Dir: {}",
+                    successCount, failCount, tmpDirPath);
+        } catch (Exception e) {
+            logger.error("Error while cleaning up temp files", e);
+        }
+    }
+
 
     private String formatBytes(long bytes) {
         if (bytes < 1024) {
@@ -2309,13 +2381,6 @@ public class MainController {
 
         int totalSize = tableView.getItems().size();
         List<LogEntry> sample;
-        if (totalSize > 10000) {
-            logger.warn("Table has a large number of entries ({}), auto-fit may take longer", totalSize);
-            showInfo("Auto-Fit Warning", "The log contains a large number of entries (" + totalSize + "). " +
-                "Auto-fitting columns is disabled to prevent performance issues.");
-            tableView.setFixedCellSize(24);
-            return;
-        }
 
         if (totalSize <= 1000) {
             sample = tableView.getItems();
@@ -2355,7 +2420,7 @@ public class MainController {
             for (LogEntry entry : sample) {
                 try {
                     if (col.getCellObservableValue(entry) != null &&
-                        col.getCellObservableValue(entry).getValue() != null) {
+                            col.getCellObservableValue(entry).getValue() != null) {
 
                         String cellValue = col.getCellObservableValue(entry).getValue().toString();
 
@@ -2383,7 +2448,7 @@ public class MainController {
 
             col.setPrefWidth(newWidth);
 
-            logger.debug("Column '{}': width = {}", col.getText(), (int)newWidth);
+            logger.debug("Column '{}': width = {}", col.getText(), (int) newWidth);
         }
 
         long duration = System.currentTimeMillis() - startTime;
@@ -2411,7 +2476,7 @@ public class MainController {
             } else {
                 // Check if the stage was unintentionally moved or resized
                 if (mainStage.getX() != oldX || mainStage.getY() != oldY ||
-                    mainStage.getWidth() != oldWidth || mainStage.getHeight() != oldHeight) {
+                        mainStage.getWidth() != oldWidth || mainStage.getHeight() != oldHeight) {
 
                     mainStage.setX(oldX);
                     mainStage.setY(oldY);
@@ -2437,16 +2502,45 @@ public class MainController {
                 LogFile logFile = item.logFile();
 
                 String displayName = logFile.getName();
-                if (logFile.isRemote() && monitoringRemotePath != null && monitoringRemotePath.equals(logFile.getFilePath())){
+                if (logFile.isRemote()
+                        && monitoringRemotePath != null
+                        && monitoringRemotePath.equals(logFile.getFilePath())) {
                     displayName = displayName + " (Monitoring)";
                 }
 
                 Label nameLabel = new Label(displayName);
                 nameLabel.setStyle("-fx-font-weight: bold;");
 
+                Label serverLabel = null;
+                if (logFile.isRemote()) {
+                    String serverNameText = "Server: -";
+                    String serverId = logFile.getSshServerID();
+                    if (serverId != null && !serverId.isBlank()) {
+                        try {
+                            SSHServerModel server = serverManagementService.getServerById(serverId);
+                            if (server != null) {
+                                serverNameText = "Server: " + server.getName();
+                            } else {
+                                serverNameText = "Server: (not found: " + serverId + ")";
+                            }
+                        } catch (Exception e) {
+                            logger.warn("Failed to load server name for id={}", serverId, e);
+                            serverNameText = "Server: (error)";
+                        }
+                    }
+                    serverLabel = new Label(serverNameText);
+                    serverLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #555;");
+                }
+
                 Label pathLabel = new Label(logFile.getFilePath());
                 Label sizeLabel = new Label(logFile.getSize());
-                vbox.getChildren().addAll(nameLabel, pathLabel, sizeLabel);
+
+                if (serverLabel != null) {
+                    vbox.getChildren().addAll(nameLabel, serverLabel, pathLabel, sizeLabel);
+                } else {
+                    vbox.getChildren().addAll(nameLabel, pathLabel, sizeLabel);
+                }
+
                 setGraphic(vbox);
             }
         }
