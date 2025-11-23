@@ -10,14 +10,13 @@ import com.seeloggyplus.repository.impl.RecentFileRepositoryImpl;
 import com.seeloggyplus.service.RecentFileService;
 
 import java.util.List;
+import java.util.Optional;
 
 public class RecentConfigServiceImpl implements RecentFileService {
     private final RecentFileRepository recentFileRepository;
-    private final LogFileRepository logFileRepository;
 
     public RecentConfigServiceImpl() {
         this.recentFileRepository = new RecentFileRepositoryImpl();
-        this.logFileRepository = new LogFileRepositoryImpl();
     }
 
     @Override
@@ -33,5 +32,15 @@ public class RecentConfigServiceImpl implements RecentFileService {
     @Override
     public void deleteAll() {
         recentFileRepository.deleteAll();
+    }
+
+    @Override
+    public RecentFilesDto findById(String id) {
+        return recentFileRepository.findById(id);
+    }
+
+    @Override
+    public Optional<RecentFile> findByFileId(String fileId) {
+        return recentFileRepository.findByFileId(fileId);
     }
 }

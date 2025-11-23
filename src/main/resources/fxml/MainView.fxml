@@ -24,13 +24,13 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<BorderPane fx:id="mainBorderPane" minHeight="400" minWidth="600" prefHeight="800" prefWidth="1200.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
+<BorderPane minHeight="400" minWidth="600" prefHeight="800" prefWidth="1200.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
     <top>
         <VBox>
             <MenuBar fx:id="menuBar">
                 <!-- File Menu -->
-                <Menu fx:id="fileMenu" text="File">
-                    <MenuItem fx:id="openMenuItem" accelerator="Ctrl+O" onAction="#handleOpen" text="Open..." />
+                <Menu text="File">
+                    <MenuItem accelerator="Ctrl+O" onAction="#handleOpen" text="Open..." />
                     <SeparatorMenuItem />
                     <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit" />
                 </Menu>
@@ -44,7 +44,7 @@
                 </Menu>
 
                 <!-- Settings Menu -->
-                <Menu fx:id="settingsMenu" text="Settings">
+                <Menu text="Settings">
                     <MenuItem fx:id="parsingConfigMenuItem" accelerator="Ctrl+P" text="Parsing Configuration..." />
                     <MenuItem fx:id="serverManagementMenuItem" accelerator="Ctrl+M" text="Server Management..." />
                     <SeparatorMenuItem />
@@ -52,14 +52,14 @@
                 </Menu>
 
                 <!-- Help Menu -->
-                <Menu fx:id="helpMenu" text="Help">
+                <Menu text="Help">
                     <MenuItem fx:id="aboutMenuItem" text="About" />
                     <MenuItem text="Documentation" />
                 </Menu>
             </MenuBar>
 
             <!-- Toolbar -->
-            <ToolBar fx:id="toolBar">
+            <ToolBar>
                 <Label text="Search:" />
                 <TextField fx:id="searchField" prefWidth="300" promptText="Enter search text or regex...">
                     <font>
@@ -141,6 +141,22 @@
                         <Tooltip text="Scroll to Top" />
                     </tooltip>
                 </Button>
+                <Button fx:id="prevWindowButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="STEP_BACKWARD" size="12" />
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Previous Window (Page Up)" />
+                    </tooltip>
+                </Button>
+                <Button fx:id="nextWindowButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="STEP_FORWARD" size="12" />
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Next Window (Page Down)" />
+                    </tooltip>
+                </Button>
                 <Button fx:id="scrollToBottomButton">
                     <graphic>
                         <FontAwesomeIconView glyphName="ARROW_DOWN" size="12" />
@@ -149,12 +165,12 @@
                         <Tooltip text="Scroll to Bottom" />
                     </tooltip>
                 </Button>
-                <Button fx:id="loginLdap" onAction="#onLoginButtonClick">
+                <Button fx:id="tailButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="SIGN_IN" size="12" />
+                        <FontAwesomeIconView glyphName="EYE" size="12" />
                     </graphic>
                     <tooltip>
-                        <Tooltip text="Login Ldap" />
+                        <Tooltip text="Tail (follow last entries)" />
                     </tooltip>
                 </Button>
             </ToolBar>
@@ -163,7 +179,7 @@
 
     <!-- Center: Main Content -->
     <center>
-        <BorderPane fx:id="mainContentPane" xmlns="http://javafx.com/javafx">
+        <BorderPane xmlns="http://javafx.com/javafx">
             <!-- Collapsed Left Panel (appears when leftPanel is unpinned) -->
             <left>
                 <VBox fx:id="collapsedLeftPanel" alignment="TOP_CENTER" managed="false" prefWidth="20" spacing="10" visible="false">
@@ -244,7 +260,7 @@
                         <center>
                             <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
                                 <!-- Center Panel: Log Table -->
-                                <VBox fx:id="centerPanel" spacing="5">
+                                <VBox spacing="5">
                                     <padding>
                                         <Insets bottom="5" left="5" right="5" top="5" />
                                     </padding>
@@ -269,7 +285,7 @@
                                             </font>
                                         </Label>
 
-                                        <HBox fx:id="detailButtonsBox" alignment="CENTER_LEFT" spacing="5">
+                                        <HBox alignment="CENTER_LEFT" spacing="5">
                                             <Button fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
                                                 <graphic>
                                                     <FontAwesomeIconView glyphName="INDENT" size="12" />
@@ -313,9 +329,6 @@
                                             </Button>
                                         </HBox>
                                     </HBox>
-
-                                    <!-- CodeArea will be added programmatically in controller -->
-                                    <!-- Placeholder for detail text area -->
                                 </VBox>
                             </SplitPane>
                         </center>

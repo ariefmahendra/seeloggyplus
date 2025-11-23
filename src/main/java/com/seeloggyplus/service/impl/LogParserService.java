@@ -114,7 +114,7 @@ public class LogParserService {
         for (LogEntry entry : rawEntries) {
             if (entry.isParsed()) {
                 if (!unparsedBuffer.isEmpty()) {
-                    combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedMap.put("message", unparsedBuffer.toString())));
+                    combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedBuffer.toString()));
                     unparsedBuffer.setLength(0);
                 }
                 combined.add(entry);
@@ -158,7 +158,7 @@ public class LogParserService {
                     countUnparsedLine = 0;
                 }
 
-                if (countUnparsedLine > maxEntryUnparsed && !logEntry.isParsed()){
+                if (countUnparsedLine > maxEntryUnparsed){
                     break;
                 }
 
@@ -298,7 +298,6 @@ public class LogParserService {
     /**
      * High-performance search with optimized pattern compilation and string matching.
      * Pre-compiles regex once and caches lowercase strings for case-insensitive search.
-     * 
      * Performance optimizations:
      * - Regex pattern compiled once (not per entry)
      * - Pre-allocates result list with estimated capacity

@@ -1,8 +1,8 @@
 package com.seeloggyplus.service.impl;
 
-import com.seeloggyplus.model.SSHServer;
-import com.seeloggyplus.repository.ServerManagement;
-import com.seeloggyplus.repository.impl.ServerManagementImpl;
+import com.seeloggyplus.model.SSHServerModel;
+import com.seeloggyplus.repository.ServerManagementRepository;
+import com.seeloggyplus.repository.impl.ServerManagementRepositoryImpl;
 import com.seeloggyplus.service.ServerManagementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,10 +18,10 @@ import java.util.UUID;
 public class ServerManagementServiceImpl implements ServerManagementService {
 
     private static final Logger logger = LoggerFactory.getLogger(ServerManagementServiceImpl.class);
-    private final ServerManagement serverManagement;
+    private final ServerManagementRepository serverManagementRepository;
 
     public ServerManagementServiceImpl() {
-        this.serverManagement = new ServerManagementImpl();
+        this.serverManagementRepository = new ServerManagementRepositoryImpl();
     }
 
     /**
@@ -33,7 +33,7 @@ public class ServerManagementServiceImpl implements ServerManagementService {
      * @throws IllegalArgumentException if server is null or invalid
      */
     @Override
-    public void saveServer(SSHServer server) {
+    public void saveServer(SSHServerModel server) {
         if (server == null) {
             logger.error("Attempted to save null server");
             throw new IllegalArgumentException("Server cannot be null");
@@ -56,7 +56,7 @@ public class ServerManagementServiceImpl implements ServerManagementService {
         }
 
         try {
-            serverManagement.saveServer(server);
+            serverManagementRepository.saveServer(server);
             logger.debug("Server saved successfully: {}", server.getId());
         } catch (Exception e) {
             logger.error("Failed to save server: {}", server.getId(), e);
@@ -80,7 +80,7 @@ public class ServerManagementServiceImpl implements ServerManagementService {
         logger.info("Deleting server: {}", id);
         
         try {
-            serverManagement.deleteServer(id);
+            serverManagementRepository.deleteServer(id);
             logger.debug("Server deleted successfully: {}", id);
         } catch (Exception e) {
             logger.error("Failed to delete server: {}", id, e);
@@ -104,7 +104,7 @@ public class ServerManagementServiceImpl implements ServerManagementService {
         logger.debug("Updating last used timestamp for server: {}", id);
         
         try {
-            serverManagement.updateServerLastUsed(id);
+            serverManagementRepository.updateServerLastUsed(id);
         } catch (Exception e) {
             logger.error("Failed to update last used for server: {}", id, e);
             // Don't throw - this is not critical
@@ -117,16 +117,39 @@ public class ServerManagementServiceImpl implements ServerManagementService {
      * @return List of all servers (never null, may be empty)
      */
     @Override
-    public List<SSHServer> getAllServers() {
+    public List<SSHServerModel> getAllServers() {
         logger.debug("Fetching all servers");
         
         try {
-            List<SSHServer> servers = serverManagement.getAllServers();
+            List<SSHServerModel> servers = serverManagementRepository.getAllServers();
             logger.info("Retrieved {} servers", servers.size());
             return servers;
         } catch (Exception e) {
             logger.error("Failed to retrieve servers", e);
             throw new RuntimeException("Failed to retrieve servers: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public SSHServerModel getServerById(String id) {
+        if (id == null || id.trim().isEmpty()) {
+            logger.error("Attempted to get server with null/empty ID");
+            throw new IllegalArgumentException("Server ID cannot be null or empty");
+        }
+
+        logger.debug("Fetching server by ID: {}", id);
+
+        try {
+            SSHServerModel server = serverManagementRepository.getServerById(id);
+            if (server != null) {
+                logger.info("Server found: {} (ID: {})", server.getName(), id);
+            } else {
+                logger.warn("Server not found with ID: {}", id);
+            }
+            return server;
+        } catch (Exception e) {
+            logger.error("Failed to retrieve server: {}", id, e);
+            throw new RuntimeException("Failed to retrieve server: " + e.getMessage(), e);
         }
     }
 }

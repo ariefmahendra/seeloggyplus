@@ -12,6 +12,7 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +59,11 @@ public class ParsingConfigurationSelectionDialogController implements Initializa
     private ParsingConfigService parsingConfigService;
     private ObservableList<ParsingConfig> configList;
     private FilteredList<ParsingConfig> filteredList;
+    /**
+     * -- GETTER --
+     *  Get selected parsing configuration
+     */
+    @Getter
     private ParsingConfig selectedConfig;
 
     @Override
@@ -204,13 +210,6 @@ public class ParsingConfigurationSelectionDialogController implements Initializa
         }
 
         return true;
-    }
-
-    /**
-     * Get selected parsing configuration
-     */
-    public ParsingConfig getSelectedConfig() {
-        return selectedConfig;
     }
 
     /**
