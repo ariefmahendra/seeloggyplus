@@ -43,4 +43,14 @@ public class RecentConfigServiceImpl implements RecentFileService {
     public Optional<RecentFile> findByFileId(String fileId) {
         return recentFileRepository.findByFileId(fileId);
     }
+
+    @Override
+    public void deleteById(String id) {
+        recentFileRepository.deleteById(id);
+    }
+
+    @Override
+    public void deleteByFileId(String fileId) {
+        recentFileRepository.deleteByFileId(fileId);
+    }
 }
