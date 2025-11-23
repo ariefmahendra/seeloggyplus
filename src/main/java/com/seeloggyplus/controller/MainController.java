@@ -1187,7 +1187,6 @@ public class MainController {
         LogFile logFile = recentFile.logFile();
 
         if (logFile.isRemote()) {
-            // ==== REMOTE FILE (TAIL / MONITORING) ====
             String remotePath = logFile.getFilePath();
             String sshServerId = logFile.getSshServerID();
 
@@ -1268,7 +1267,6 @@ public class MainController {
 
             logger.info("SSH connected for remote recent file, starting tail on {}", remotePath);
 
-            // Reset filter dan mulai TAIL remote
             resetFilters();
             startRemoteTail(remotePath, sshService, parsingConfig, server);
         } else {
@@ -1920,6 +1918,7 @@ public class MainController {
         Optional<ButtonType> result = showAndWaitAndRestore(alert);
         if (result.isPresent() && result.get() == ButtonType.OK) {
             recentFileService.deleteAll();
+            logFileService.deleteAllLogFiles();
             logTableView.getItems().clear();
             stopRemoteTail();
             clearSearch();

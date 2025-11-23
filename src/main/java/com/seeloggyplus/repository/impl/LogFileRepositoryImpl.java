@@ -144,4 +144,17 @@ public class LogFileRepositoryImpl implements LogFileRepository {
             throw new FatalDatabaseException("Error finding log file by path and name", ex);
         }
     }
+
+    @Override
+    public void deleteAll() throws FatalDatabaseException {
+        String sqlStr = "DELETE FROM log_files;";
+        Connection conn = getConnection();
+        try (PreparedStatement preparedStatement = conn.prepareStatement(sqlStr)){
+            preparedStatement.executeUpdate();
+            logger.info("Successfully deleted all log files");
+        } catch (SQLException ex){
+            logger.error("Error deleting all log files", ex);
+            throw new FatalDatabaseException("Error deleting all log files", ex);
+        }
+    }
 }

@@ -133,4 +133,15 @@ public class LogFileServiceImpl implements LogFileService {
             throw new RuntimeException("Failed to get log file by path and name", ex);
         }
     }
+
+    @Override
+    public void deleteAllLogFiles() {
+        try {
+            logFileRepository.deleteAll();
+            logger.info("Successfully deleted all log files");
+        } catch (FatalDatabaseException ex) {
+            logger.error("Database error when deleting all log files", ex);
+            throw new RuntimeException("Failed to delete all log files", ex);
+        }
+    }
 }
