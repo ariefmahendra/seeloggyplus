@@ -129,36 +129,40 @@ public class SSHServiceImpl implements SSHService {
     }
 
     @Override
-    public void tailFile(String remotePath, int lines, Consumer<String> logConsumer, Consumer<String> errorConsumer) {
+    public void tailFile(String remotePath,
+                         int lines,
+                         Consumer<String> logConsumer,
+                         Consumer<String> errorConsumer) {
         try {
             Session session = getSessionOrThrow();
+
             stopTailing();
 
             tailExecutor.submit(() -> {
                 isTailing.set(true);
+                ChannelExec channel = null;
                 try {
-                    activeTailChannel = (ChannelExec) session.openChannel("exec");
-                    String command = String.format("tail -n %d -f %s", lines, escapeShellArgument(remotePath));
-                    activeTailChannel.setCommand(command);
+                    channel = (ChannelExec) session.openChannel("exec");
+                    activeTailChannel = channel;
 
-                    InputStream in = activeTailChannel.getInputStream();
-                    InputStream err = activeTailChannel.getErrStream();
+                    String command = String.format("tail -n %d -F %s", lines, escapeShellArgument(remotePath));
+                    channel.setCommand(command);
 
-                    activeTailChannel.connect();
+                    InputStream in = channel.getInputStream();
+                    channel.connect();
                     logger.info("Tail started: {}", remotePath);
 
-                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                    try (BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(in, StandardCharsets.UTF_8))) {
+
                         String line;
                         while (isTailing.get() && (line = reader.readLine()) != null) {
                             logConsumer.accept(line);
                         }
                     }
 
-                    try (BufferedReader errReader = new BufferedReader(new InputStreamReader(err, StandardCharsets.UTF_8))) {
-                        while (errReader.ready()) {
-                            errorConsumer.accept("SSH Error: " + errReader.readLine());
-                        }
-                    }
+                    int exit = channel.getExitStatus();
+                    logger.info("Tail channel closed, exit status={}", exit);
 
                 } catch (Exception e) {
                     if (isTailing.get()) {
@@ -170,6 +174,7 @@ public class SSHServiceImpl implements SSHService {
                     cleanupTailChannel();
                 }
             });
+
         } catch (IOException e) {
             errorConsumer.accept("Init Error: " + e.getMessage());
         }

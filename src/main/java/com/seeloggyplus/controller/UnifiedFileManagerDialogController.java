@@ -29,6 +29,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +66,8 @@ public class UnifiedFileManagerDialogController {
     private TextField pathField;
     @FXML
     private TextField searchField;
+    @FXML
+    private Button tailButton;
 
     @FXML
     private ListView<LocationItem> locationListView;
@@ -103,12 +106,12 @@ public class UnifiedFileManagerDialogController {
     private Button openButton;
 
     // --- Favorites Components ---
-    @FXML
     private ListView<FavoriteFolder> favoritesListView;
     private ContextMenu fileContextMenu;
     private MenuItem addToFavoritesMenuItem;
     private MenuItem removeFromFavoritesMenuItem;
 
+    public enum OpenAction {OPEN, TAIL}
 
     // Services
     private LocalFileService localFileService;
@@ -124,6 +127,8 @@ public class UnifiedFileManagerDialogController {
     private LocationItem currentLocation;
     private FileInfo selectedFileResult;
     private SSHServiceImpl activeSshService;
+    @Getter
+    private OpenAction openAction = OpenAction.OPEN;
 
     @FXML
     public void initialize() {
@@ -332,6 +337,11 @@ public class UnifiedFileManagerDialogController {
             boolean isFileSelected = (newVal != null && newVal.isFile());
             openButton.setDisable(!isFileSelected);
             previewButton.setDisable(!isFileSelected);
+
+            if (tailButton != null) {
+                boolean canTail = isFileSelected && newVal.getSourceType() == FileInfo.SourceType.REMOTE;
+                tailButton.setDisable(!canTail);
+            }
         });
     }
 
@@ -594,8 +604,31 @@ public class UnifiedFileManagerDialogController {
     private void handleOpen() {
         selectedFileResult = fileTable.getSelectionModel().getSelectedItem();
         if (selectedFileResult != null && selectedFileResult.isFile()) {
+            openAction = OpenAction.OPEN;
             closeDialog();
         }
+    }
+
+    @FXML
+    private void handleTail() {
+        selectedFileResult = fileTable.getSelectionModel().getSelectedItem();
+        if (selectedFileResult == null || !selectedFileResult.isFile()) {
+            return;
+        }
+
+        // Tail khusus REMOTE dulu (biar jelas)
+        if (selectedFileResult.getSourceType() != FileInfo.SourceType.REMOTE) {
+            showError("Tail Error", "Tail hanya tersedia untuk file remote (SSH).");
+            return;
+        }
+
+        if (activeSshService == null || !activeSshService.isConnected()) {
+            showError("Tail Error", "Koneksi SSH tidak aktif.");
+            return;
+        }
+
+        openAction = OpenAction.TAIL;
+        closeDialog();
     }
 
     private void handleAddToFavorites() {
@@ -783,20 +816,7 @@ public class UnifiedFileManagerDialogController {
             stage.setTitle("Server Management");
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.initOwner(ownerStage); // The dialog's direct owner is the file manager
-            stage.setScene(new Scene(root));
-
-            stage.showAndWait();
-
-            Platform.runLater(() -> {
-                if (wasMaximized) {
-                    finalMainStage.setMaximized(true);
-                } else {
-                    finalMainStage.setX(oldX);
-                    finalMainStage.setY(oldY);
-                    finalMainStage.setWidth(oldWidth);
-                    finalMainStage.setHeight(oldHeight);
-                }
-            });
+            MainController.restoreWindow(finalMainStage, wasMaximized, oldX, oldY, oldWidth, oldHeight, root, stage);
 
             setupLocationList();
         } catch (IOException e) {
@@ -834,20 +854,7 @@ public class UnifiedFileManagerDialogController {
             stage.setTitle("Log Preview");
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.initOwner(ownerStage);
-            stage.setScene(new Scene(root));
-
-            stage.showAndWait();
-
-            Platform.runLater(() -> {
-                if (wasMaximized) {
-                    finalMainStage.setMaximized(true);
-                } else {
-                    finalMainStage.setX(oldX);
-                    finalMainStage.setY(oldY);
-                    finalMainStage.setWidth(oldWidth);
-                    finalMainStage.setHeight(oldHeight);
-                }
-            });
+            MainController.restoreWindow(finalMainStage, wasMaximized, oldX, oldY, oldWidth, oldHeight, root, stage);
 
         } catch (IOException e) {
             logger.error("Failed to open log preview dialog", e);
@@ -874,6 +881,10 @@ public class UnifiedFileManagerDialogController {
 
     public SSHServiceImpl getSshService() {
         return activeSshService;
+    }
+
+    public SSHServerModel getActiveServer() {
+        return currentLocation != null ? currentLocation.server : null;
     }
 
     private static class LocationItem {

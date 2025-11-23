@@ -1,7 +1,7 @@
 package com.seeloggyplus.repository.impl;
 
 import com.seeloggyplus.model.SSHServerModel;
-import com.seeloggyplus.repository.ServerManagement;
+import com.seeloggyplus.repository.ServerManagementRepository;
 import com.seeloggyplus.config.DatabaseConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +23,9 @@ import java.util.List;
  * - SQL injection prevention with PreparedStatement
  * - Null safety checks
  */
-public class ServerManagementImpl implements ServerManagement {
+public class ServerManagementRepositoryImpl implements ServerManagementRepository {
 
-    private static final Logger logger = LoggerFactory.getLogger(ServerManagementImpl.class);
+    private static final Logger logger = LoggerFactory.getLogger(ServerManagementRepositoryImpl.class);
     
     // SQL Queries
     private static final String SQL_CHECK_EXISTS = "SELECT COUNT(*) FROM ssh_servers WHERE id = ?";
@@ -205,6 +205,31 @@ public class ServerManagementImpl implements ServerManagement {
         } catch (SQLException e) {
             logger.error("Failed to retrieve servers from database", e);
             return Collections.emptyList();
+        }
+    }
+
+    @Override
+    public SSHServerModel getServerById(String id) {
+        Connection connection = null;
+
+        try {
+            connection = DatabaseConfig.getInstance().getConnection();
+
+            try (PreparedStatement ps = connection.prepareStatement(SQL_GET_BY_ID)) {
+                ps.setString(1, id);
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return mapRowToSSHServer(rs);
+                    } else {
+                        logger.warn("No server found with ID: {}", id);
+                        return null;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to retrieve server by ID: {}", id, e);
+            throw new RuntimeException("Database error while retrieving server", e);
         }
     }
 

@@ -142,6 +142,11 @@
                         <FontAwesomeIconView glyphName="EYE"/>
                     </graphic>
                 </Button>
+                <Button text="Tail" fx:id="tailButton" disable="true" onAction="#handleTail">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="TERMINAL"/>
+                    </graphic>
+                </Button>
                 <Button text="Open" fx:id="openButton" defaultButton="true" disable="true">
                     <graphic>
                         <FontAwesomeIconView glyphName="CHECK"/>

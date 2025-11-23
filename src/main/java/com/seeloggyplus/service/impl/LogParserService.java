@@ -114,7 +114,7 @@ public class LogParserService {
         for (LogEntry entry : rawEntries) {
             if (entry.isParsed()) {
                 if (!unparsedBuffer.isEmpty()) {
-                    combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedMap.put("message", unparsedBuffer.toString())));
+                    combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedBuffer.toString()));
                     unparsedBuffer.setLength(0);
                 }
                 combined.add(entry);

@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 
 import com.seeloggyplus.service.impl.*;
 import com.seeloggyplus.util.JsonPrettify;
+import com.seeloggyplus.util.PasswordPromptDialog;
 import com.seeloggyplus.util.XmlPrettify;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
@@ -24,15 +25,11 @@ import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
-import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.control.skin.TableHeaderRow;
-import javafx.scene.control.skin.TableViewSkin;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
@@ -88,6 +85,8 @@ public class MainController {
     private Button pinLeftPanelButton;
 
     // FXML Components - Center Panel (Log Table)
+    @FXML
+    private Button tailButton;
     @FXML
     private Button prevWindowButton;
     @FXML
@@ -155,7 +154,9 @@ public class MainController {
     private LogParserService logParserService;
     private PreferenceService preferenceService;
     private LogFileService logFileService;
+    private ServerManagementService serverManagementService;
 
+    private LogFile currentLogDb;
     private LogEntrySource currentLogEntrySource;
     private LogEntrySource originalLogEntrySource;
     private ObservableList<LogEntry> visibleLogEntries;
@@ -168,6 +169,12 @@ public class MainController {
     private CheckMenuItem autoRefreshMenuItem;
     private static final int WINDOW_SIZE = 5000;
     private int currentWindowStartIndex = 0;
+    private boolean tailModeEnabled = false;
+    private SSHServiceImpl activeTailSshService;
+    private long remoteTailLineCounter = 0;
+    private String monitoringRemotePath;
+    private final List<LogEntry> tailBuffer = Collections.synchronizedList(new ArrayList<>());
+    private volatile boolean tailFlushScheduled = false;
 
     @FXML
     public void initialize() {
@@ -178,6 +185,7 @@ public class MainController {
         preferenceService = new PreferenceServiceImpl();
         logParserService = new LogParserService();
         logFileService = new LogFileServiceImpl();
+        serverManagementService = new ServerManagementServiceImpl();
 
         logFileWatcher = new LogFileWatcher();
         try {
@@ -211,10 +219,10 @@ public class MainController {
         showLeftPanelMenuItem.setOnAction(e -> toggleLeftPanel());
         showBottomPanelMenuItem.setOnAction(e -> toggleBottomPanel());
 
-        autoRefreshMenuItem = new CheckMenuItem("Auto-Refresh (tail -f)");
-        autoRefreshMenuItem.setSelected(true); // Default: enabled
+        autoRefreshMenuItem = new CheckMenuItem("Auto-Refresh");
+        autoRefreshMenuItem.setSelected(true);
         autoRefreshMenuItem.setOnAction(e -> toggleAutoRefresh());
-        viewMenu.getItems().add(2, autoRefreshMenuItem); // Add after show panels
+        viewMenu.getItems().add(2, autoRefreshMenuItem);
 
         parsingConfigMenuItem.setOnAction(e -> handleParsingConfiguration());
         serverManagementMenuItem.setOnAction(e -> handleServerManagement());
@@ -312,6 +320,21 @@ public class MainController {
         clearDateFilterButton.setOnAction(e -> clearDateFilter());
         prevWindowButton.setOnAction(e -> showPreviousWindow());
         nextWindowButton.setOnAction(e -> showNextWindow());
+        tailButton.setOnAction(e -> {
+            if (tailModeEnabled) {
+                disableTail();
+            } else {
+                enableTail();
+            }
+        });
+
+        logTableView.setOnScroll(event -> {
+            if (tailModeEnabled && event.getDeltaY() > 0) {
+                disableTail();
+                logger.info("Tail mode disabled because user scrolled up");
+            }
+        });
+
         updateDateTimeFilterPromptText(null);
         updateTableColumns(null);
         logger.info("Virtual scrolling enabled with performance optimizations - smooth scrolling for large datasets");
@@ -688,6 +711,8 @@ public class MainController {
 
             FileInfo selectedFile = controller.getSelectedFile();
             SSHServiceImpl sshService = controller.getSshService();
+            UnifiedFileManagerDialogController.OpenAction action = controller.getOpenAction();
+            SSHServerModel sshServer = controller.getActiveServer();
 
             if (selectedFile == null) {
                 logger.info("No file selected from UnifiedFileManagerDialog, operation cancelled.");
@@ -708,8 +733,15 @@ public class MainController {
 
             if (selectedFile.getSourceType() == FileInfo.SourceType.LOCAL) {
                 openLocalLogFile(new File(selectedFile.getPath()), true, selectedConfig);
+                if (sshService != null) {
+                    sshService.disconnect();
+                }
             } else {
-                openRemoteLogFile(selectedFile, sshService, selectedConfig);
+                if (action == UnifiedFileManagerDialogController.OpenAction.OPEN) {
+                    openRemoteLogFile(selectedFile, sshService, selectedConfig);
+                } else if (action == UnifiedFileManagerDialogController.OpenAction.TAIL) {
+                    startRemoteTail(selectedFile.getPath(), sshService, selectedConfig, sshServer);
+                }
             }
         } catch (IOException e) {
             logger.error("Failed to open Unified File Manager", e);
@@ -842,6 +874,9 @@ public class MainController {
             showError("Database Error", "Failed to save log file information to database.");
             return;
         }
+
+        this.currentLogDb = logFile;
+        this.currentFile = file;
 
         long fileSizeInBytes = file.length();
         logger.info("Starting to parse file: {} ({}) with config: {}",
@@ -1061,26 +1096,30 @@ public class MainController {
             dialog.setTitle("SSH Server Management");
             dialog.initOwner(mainStage);
             dialog.initModality(Modality.APPLICATION_MODAL);
-            dialog.setScene(new Scene(root));
-
-            dialog.showAndWait();
-
-            Platform.runLater(() -> {
-                if (wasMaximized) {
-                    mainStage.setMaximized(true);
-                } else {
-                    mainStage.setX(oldX);
-                    mainStage.setY(oldY);
-                    mainStage.setWidth(oldWidth);
-                    mainStage.setHeight(oldHeight);
-                }
-            });
+            restoreWindow(mainStage, wasMaximized, oldX, oldY, oldWidth, oldHeight, root, dialog);
 
             logger.info("Server management dialog closed");
         } catch (IOException e) {
             logger.error("Failed to open server management dialog", e);
             showError("Failed to open server management", e.getMessage());
         }
+    }
+
+    static void restoreWindow(Stage mainStage, boolean wasMaximized, double oldX, double oldY, double oldWidth, double oldHeight, Parent root, Stage dialog) {
+        dialog.setScene(new Scene(root));
+
+        dialog.showAndWait();
+
+        Platform.runLater(() -> {
+            if (wasMaximized) {
+                mainStage.setMaximized(true);
+            } else {
+                mainStage.setX(oldX);
+                mainStage.setY(oldY);
+                mainStage.setWidth(oldWidth);
+                mainStage.setHeight(oldHeight);
+            }
+        });
     }
 
     private void handleParsingConfigChanged() {
@@ -1145,8 +1184,93 @@ public class MainController {
     }
 
     private void handleRecentFileSelected(RecentFilesDto recentFile) {
-        if (recentFile.logFile().isRemote()) {
-            showInfo("Remote File", "Opening remote files is not yet implemented in this version.");
+        LogFile logFile = recentFile.logFile();
+
+        if (logFile.isRemote()) {
+            // ==== REMOTE FILE (TAIL / MONITORING) ====
+            String remotePath = logFile.getFilePath();
+            String sshServerId = logFile.getSshServerID();
+
+            logger.info("Recent REMOTE file selected: path={}, sshServerId={}, parsing_config_id={}",
+                    remotePath,
+                    sshServerId,
+                    logFile.getParsingConfigurationID());
+
+            if (sshServerId == null || sshServerId.isBlank()) {
+                showError("Remote File",
+                        "This remote file does not have SSH server information (sshServerID is empty).");
+                return;
+            }
+            
+            SSHServerModel server = serverManagementService.getServerById(sshServerId);
+            if (server == null) {
+                showError("SSH Server Not Found",
+                        "SSH server configuration with ID " + sshServerId + " was not found.\n" +
+                                "Please check Server Management.");
+                return;
+            }
+            
+            ParsingConfig parsingConfig = recentFile.parsingConfig();
+            if (parsingConfig != null) {
+                logger.info("ParsingConfig in method handleRecentFileSelected from DTO - ID: {}, Name: {}, Valid: {}", parsingConfig.getId(), parsingConfig.getName(), parsingConfig.isValid());
+            } else {
+                logger.info("ParsingConfig in method handleRecentFileSelected from DTO is NULL");
+            }
+
+            if (parsingConfig == null) {
+                String parsingConfigId = logFile.getParsingConfigurationID();
+                parsingConfig = getParsingConfig(parsingConfigId);
+            }
+
+            if (parsingConfig == null) {
+                logger.warn("No parsing config associated with remote file: {}, showing selection dialog", remotePath);
+                parsingConfig = showParsingConfigSelectionDialog();
+
+                if (parsingConfig == null) {
+                    logger.info("No parsing configuration selected for recent remote file, operation cancelled");
+                    return;
+                }
+            }
+
+            // --- Connect ke SSH server ---
+            String password = server.getPassword();
+            if (password == null || password.isBlank()) {
+                logger.info("Password for server {} is not saved, prompting user.", server.getName());
+                PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
+                Optional<String> result = prompt.showAndWait();
+
+                if (result.isEmpty() || result.get().isBlank()) {
+                    logger.info("User cancelled password prompt for remote recent file.");
+                    updateStatus("SSH connection cancelled.");
+                    return;
+                }
+                password = result.get();
+            }
+
+            SSHServiceImpl sshService = new SSHServiceImpl();
+            updateStatus("Connecting to " + server.getHost() + "...");
+            boolean connected;
+            try {
+                connected = sshService.connect(server.getHost(),
+                        server.getPort(),
+                        server.getUsername(),
+                        password);
+            } catch (Exception e) {
+                logger.error("Failed to connect to SSH server {} for recent file", server.getName(), e);
+                showError("Connection Error", "Could not connect to server: " + e.getMessage());
+                return;
+            }
+
+            if (!connected) {
+                showError("Connection Error", "Could not connect to " + server.getHost());
+                return;
+            }
+
+            logger.info("SSH connected for remote recent file, starting tail on {}", remotePath);
+
+            // Reset filter dan mulai TAIL remote
+            resetFilters();
+            startRemoteTail(remotePath, sshService, parsingConfig, server);
         } else {
             File file = new File(recentFile.logFile().getFilePath());
             if (!file.exists()) {
@@ -1168,18 +1292,7 @@ public class MainController {
 
             if (parsingConfig == null) {
                 String parsingConfigId = recentFile.logFile().getParsingConfigurationID();
-                logger.info("Attempting to load config from database with ID: {}", parsingConfigId);
-
-                if (parsingConfigId != null && !parsingConfigId.isEmpty()) {
-                    parsingConfig = parsingConfigService.findById(parsingConfigId).orElse(null);
-
-                    if (parsingConfig != null) {
-                        logger.info("Loaded ParsingConfig from database - ID: {}, Name: {}, Valid: {}",
-                            parsingConfig.getId(), parsingConfig.getName(), parsingConfig.isValid());
-                    } else {
-                        logger.warn("ParsingConfig with ID {} not found in database", parsingConfigId);
-                    }
-                }
+                parsingConfig = getParsingConfig(parsingConfigId);
             }
 
             if (parsingConfig == null) {
@@ -1198,6 +1311,23 @@ public class MainController {
 
             openLocalLogFile(file, false, parsingConfig);
         }
+    }
+
+    private ParsingConfig getParsingConfig(String parsingConfigId) {
+        logger.info("Attempting to load config from database with ID: {}", parsingConfigId);
+        ParsingConfig parsingConfig = null;
+
+        if (parsingConfigId != null && !parsingConfigId.isEmpty()) {
+            parsingConfig = parsingConfigService.findById(parsingConfigId).orElse(null);
+
+            if (parsingConfig != null) {
+                logger.info("Loaded ParsingConfig from database - ID: {}, Name: {}, Valid: {}",
+                    parsingConfig.getId(), parsingConfig.getName(), parsingConfig.isValid());
+            } else {
+                logger.warn("ParsingConfig with ID {} not found in database", parsingConfigId);
+            }
+        }
+        return parsingConfig;
     }
 
     private void resetFilters() {
@@ -1750,6 +1880,11 @@ public class MainController {
             return;
         }
 
+        if (!tailModeEnabled) {
+            logger.info("File changed, but tail mode is OFF. Skipping auto-refresh.");
+            return;
+        }
+
         logger.info("Auto-refreshing file: {}", file.getName());
         updateStatus("Auto-refreshing... (file changed)");
         if (currentParsingConfig != null) {
@@ -1785,6 +1920,9 @@ public class MainController {
         Optional<ButtonType> result = showAndWaitAndRestore(alert);
         if (result.isPresent() && result.get() == ButtonType.OK) {
             recentFileService.deleteAll();
+            logTableView.getItems().clear();
+            stopRemoteTail();
+            clearSearch();
             refreshRecentFilesList();
         }
     }
@@ -1844,12 +1982,9 @@ public class MainController {
         int to = Math.min(from + WINDOW_SIZE, total);
         int limit = to - from;
 
-        logger.info("Loading window: from={} to={} (total={})", from, to, total);
-
         currentWindowStartIndex = from;
 
         List<LogEntry> windowEntries = currentLogEntrySource.getEntries(from, limit);
-
         visibleLogEntries.setAll(windowEntries);
 
         if (!visibleLogEntries.isEmpty()) {
@@ -1902,7 +2037,234 @@ public class MainController {
         }
 
         logger.info("Show next window: startIndex={} (before={})", newStart, currentWindowStartIndex);
-        loadWindow(newStart, false); // scroll ke atas window
+        loadWindow(newStart, false);
+    }
+
+    private void enableTail() {
+        if (currentLogDb != null && currentLogDb.isRemote()) {
+            String sshServerId = currentLogDb.getSshServerID();
+            if (sshServerId == null || sshServerId.isBlank()) {
+                showError("Tail Error",
+                        "Current log is marked as remote, but SSH server ID is missing.");
+                return;
+            }
+
+            SSHServerModel server = serverManagementService.getServerById(sshServerId);
+            if (server == null) {
+                showError("Tail Error",
+                        "SSH server with ID " + sshServerId + " not found. Please check Server Management.");
+                return;
+            }
+            
+            if (currentParsingConfig == null) {
+                String cfgId = currentLogDb.getParsingConfigurationID();
+                if (cfgId != null && !cfgId.isBlank()) {
+                    currentParsingConfig = parsingConfigService.findById(cfgId).orElse(null);
+                }
+            }
+
+            if (currentParsingConfig == null) {
+                showError("Tail Error",
+                        "No parsing configuration available for this log. Please select one first.");
+                return;
+            }
+
+            // connect SSH
+            String password = server.getPassword();
+            if (password == null || password.isBlank()) {
+                PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
+                Optional<String> result = prompt.showAndWait();
+                if (result.isEmpty() || result.get().isBlank()) {
+                    updateStatus("SSH connection cancelled.");
+                    return;
+                }
+                password = result.get();
+            }
+
+            SSHServiceImpl sshService = activeTailSshService;
+            if (sshService == null || !sshService.isConnected()) {
+                sshService = new SSHServiceImpl();
+                boolean connected;
+                try {
+                    connected = sshService.connect(server.getHost(),
+                            server.getPort(),
+                            server.getUsername(),
+                            password);
+                } catch (Exception e) {
+                    logger.error("Failed to connect SSH in enableTail()", e);
+                    showError("Tail Error", "Could not connect to SSH server: " + e.getMessage());
+                    return;
+                }
+                if (!connected) {
+                    showError("Tail Error", "Could not connect to SSH server " + server.getHost());
+                    return;
+                }
+            }
+
+            tailModeEnabled = true;
+            tailButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+            logger.info("Tail mode ENABLED for remote log: {}", currentLogDb.getFilePath());
+            updateStatus("Remote tail enabled (monitoring) for " + currentLogDb.getName());
+
+            startRemoteTail(currentLogDb.getFilePath(), sshService, currentParsingConfig, server);
+            return;
+        }
+
+
+        if (currentLogEntrySource == null) {
+            showInfo("Tail Mode", "No file loaded. Open a log file first.");
+            return;
+        }
+
+        tailModeEnabled = true;
+        tailButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+
+        int total = currentLogEntrySource.getTotalEntries();
+        int startIndex = Math.max(0, total - WINDOW_SIZE);
+
+        logger.info("Tail mode ENABLED (LOCAL). Showing last window from index {}", startIndex);
+        loadWindow(startIndex, true);
+
+        updateStatus("Tail mode enabled (following last entries like 'tail -f')");
+    }
+
+    private void disableTail() {
+        tailModeEnabled = false;
+        tailButton.setStyle("");
+
+        stopRemoteTail();
+
+        updateStatus("Tail mode disabled");
+        logger.info("Tail mode DISABLED");
+    }
+
+    private void startRemoteTail(String remotePath,
+                                 SSHServiceImpl sshService,
+                                 ParsingConfig parsingConfig,
+                                 SSHServerModel server) {
+        stopRemoteTail();
+        
+        saveRemoteTailToRecent(remotePath, parsingConfig, server);
+
+        this.activeTailSshService = sshService;
+        this.remoteTailLineCounter = 0;
+        this.currentParsingConfig = parsingConfig;
+        this.currentFile = null;
+        this.originalLogEntrySource = null;
+        this.currentLogEntrySource = null;
+
+        updateTableColumns(parsingConfig);
+        visibleLogEntries.clear();
+
+        tailModeEnabled = true;
+        tailButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+        updateStatus("Starting remote tail (parsed): " + remotePath);
+
+        sshService.tailFile(
+                remotePath,
+                WINDOW_SIZE, 
+                line -> handleTailLineBackground(line, parsingConfig),
+                error -> Platform.runLater(() -> {
+                    logger.error("Remote tail error: {}", error);
+                    showError("Remote Tail Error", error);
+                    disableTail();
+                })
+        );
+    }
+
+    private void saveRemoteTailToRecent(String remotePath, ParsingConfig parsingConfig, SSHServerModel server) {
+        try {
+            String fileName = new File(remotePath).getName();
+            
+            LogFile logFile = logFileService.getLogFileByPathAndName(fileName, remotePath);
+
+            if (logFile == null) {
+                logFile = new LogFile();
+                logFile.setName(fileName);
+                logFile.setFilePath(remotePath);
+                logFile.setRemote(true);
+                logFile.setSshServerID(server.getId()); 
+                logFile.setParsingConfigurationID(parsingConfig.getId());
+                logFile.setModified(String.valueOf(System.currentTimeMillis()));
+                logFile.setSize("-");
+
+                logFileService.insertLogFile(logFile);
+                logger.info("Created remote LogFile for tail: id={}, path={}", logFile.getId(), remotePath);
+            } else {
+                logFile.setRemote(true);
+                logFile.setSshServerID(server.getId());
+                logFile.setParsingConfigurationID(parsingConfig.getId());
+                logFileService.updateLogFile(logFile);
+                logger.info("Updated existing LogFile for remote tail: id={}, path={}", logFile.getId(), remotePath);
+            }
+            
+            RecentFile recent = new RecentFile();
+            recent.setFileId(logFile.getId());          
+            recent.setLastOpened(LocalDateTime.now());
+            recentFileService.save(logFile, recent);
+            
+            this.currentLogDb = logFile;
+            this.monitoringRemotePath = remotePath;
+
+            // Refresh list recent di FX thread
+            Platform.runLater(this::refreshRecentFilesList);
+
+        } catch (Exception e) {
+            logger.error("Failed to save remote tail to recent for path {}", remotePath, e);
+        }
+    }
+
+    private void handleTailLineBackground(String line, ParsingConfig parsingConfig) {
+        long lineNumber = ++remoteTailLineCounter;
+        
+        LogEntry entry = logParserService.parseLine(line, lineNumber, parsingConfig);
+        
+        synchronized (tailBuffer) {
+            tailBuffer.add(entry);
+        }
+
+        scheduleTailFlush();
+    }
+
+    private void scheduleTailFlush() {
+        if (tailFlushScheduled) return;
+        tailFlushScheduled = true;
+
+        Platform.runLater(() -> {
+            tailFlushScheduled = false;
+
+            List<LogEntry> toAdd;
+            synchronized (tailBuffer) {
+                if (tailBuffer.isEmpty()) return;
+                toAdd = new ArrayList<>(tailBuffer);
+                tailBuffer.clear();
+            }
+            
+            visibleLogEntries.addAll(toAdd);
+
+            int overflow = visibleLogEntries.size() - WINDOW_SIZE;
+            if (overflow > 0) {
+                visibleLogEntries.remove(0, overflow);
+            }
+
+            if (!visibleLogEntries.isEmpty()) {
+                int lastIndex = visibleLogEntries.size() - 1;
+                logTableView.scrollTo(lastIndex);
+
+                LogEntry last = visibleLogEntries.get(lastIndex);
+                detailLabel.setText("Remote Tail - Line " + last.getLineNumber());
+            }
+        });
+    }
+
+    private void stopRemoteTail() {
+        if (activeTailSshService != null) {
+            activeTailSshService.stopTailing();
+            activeTailSshService = null;
+        }
+
+        monitoringRemotePath = null;
+        refreshRecentFilesList();
     }
 
     private String formatBytes(long bytes) {
@@ -2063,7 +2425,7 @@ public class MainController {
         return result;
     }
 
-    private static class RecentFileListCell extends ListCell<RecentFilesDto> {
+    private class RecentFileListCell extends ListCell<RecentFilesDto> {
         @Override
         protected void updateItem(RecentFilesDto item, boolean empty) {
             super.updateItem(item, empty);
@@ -2074,8 +2436,15 @@ public class MainController {
             } else {
                 VBox vbox = new VBox(2);
                 LogFile logFile = item.logFile();
-                Label nameLabel = new Label(logFile.getName());
+
+                String displayName = logFile.getName();
+                if (logFile.isRemote() && monitoringRemotePath != null && monitoringRemotePath.equals(logFile.getFilePath())){
+                    displayName = displayName + " (Monitoring)";
+                }
+
+                Label nameLabel = new Label(displayName);
                 nameLabel.setStyle("-fx-font-weight: bold;");
+
                 Label pathLabel = new Label(logFile.getFilePath());
                 Label sizeLabel = new Label(logFile.getSize());
                 vbox.getChildren().addAll(nameLabel, pathLabel, sizeLabel);
@@ -2085,9 +2454,6 @@ public class MainController {
     }
 
     private static class UnparsedContentCell extends TableCell<LogEntry, String> {
-        private static final int MAX_LINES_DISPLAY = 10;
-        private static final int MAX_CHARS_PER_LINE = 200;
-        private static final int MAX_TOTAL_CHARS = 2000;
         private static final String STYLE_UNPARSED = "-fx-padding: 5px;";
 
         private Label contentLabel;

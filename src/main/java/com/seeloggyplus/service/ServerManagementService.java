@@ -9,4 +9,5 @@ public interface ServerManagementService {
     void deleteServer(String id);
     void updateServerLastUsed(String id);
     List<SSHServerModel> getAllServers();
+    SSHServerModel getServerById(String id);
 }

@@ -165,6 +165,14 @@
                         <Tooltip text="Scroll to Bottom" />
                     </tooltip>
                 </Button>
+                <Button fx:id="tailButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="EYE" size="12" />
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Tail (follow last entries)" />
+                    </tooltip>
+                </Button>
             </ToolBar>
         </VBox>
     </top>
