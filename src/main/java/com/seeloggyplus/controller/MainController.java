@@ -234,6 +234,7 @@ public class MainController {
     private void setupLeftPanel() {
         recentFilesListView.setCellFactory(listView -> new RecentFileListCell());
         recentFilesListView.setItems(FXCollections.observableArrayList(recentFileService.findAll()));
+        recentFilesListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         recentFilesListView
                 .getSelectionModel()
                 .selectedItemProperty()
@@ -1916,21 +1917,58 @@ public class MainController {
     }
 
     private void handleClearRecentFiles() {
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Clear Recent Files");
-        alert.setHeaderText("Clear all recent files?");
-        alert.setContentText("This action cannot be undone.");
+      ObservableList<RecentFilesDto> selected = recentFilesListView.getSelectionModel().getSelectedItems();
 
-        Optional<ButtonType> result = showAndWaitAndRestore(alert);
-        if (result.isPresent() && result.get() == ButtonType.OK) {
-            recentFileService.deleteAll();
-            logFileService.deleteAllLogFiles();
-            logTableView.getItems().clear();
-            stopRemoteTail();
-            clearSearch();
-            refreshRecentFilesList();
-            cleanupTempFiles();
-        }
+      if (selected != null && !selected.isEmpty()){
+          int count = selected.size();
+
+          Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+          alert.setTitle("Remove Selected Recent Files");
+          alert.setHeaderText("Remove "+count+" selected recent file(s)?");
+          alert.setContentText("This action cannot be undone.");
+          Optional<ButtonType> result = showAndWaitAndRestore(alert);
+          if (result.isPresent() && result.get() == ButtonType.OK){
+              List<RecentFilesDto> listToDeleteRecentFiles = List.copyOf(selected);
+
+              for (RecentFilesDto recentFilesDto : listToDeleteRecentFiles){
+                  LogFile logFile = recentFilesDto.logFile();
+
+                  if (logFile.isRemote() && monitoringRemotePath != null && monitoringRemotePath.equals(logFile.getFilePath())){
+                      stopRemoteTail();
+                  }
+
+                  recentFileService.deleteByFileId(logFile.getId());
+                  logFileService.deleteLogFileById(logFile.getId());
+              }
+
+              refreshRecentFilesList();
+              cleanupTempFiles();
+              updateStatus("Removed " + count + " selected recent file(s)");
+          }
+          return;
+      }
+
+      if (recentFilesListView.getItems().isEmpty()){
+          updateStatus("No recent files to remove");
+          return;
+      }
+
+      Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+      alert.setTitle("Clear Recent Files");
+      alert.setHeaderText("Clear ALL recent files?");
+      alert.setContentText("This action cannot be undone.");
+
+      Optional<ButtonType> result = showAndWaitAndRestore(alert);
+      if (result.isPresent() && result.get() == ButtonType.OK){
+          recentFileService.deleteAll();
+          logFileService.deleteAllLogFiles();
+          logTableView.getItems().clear();
+          stopRemoteTail();
+          clearSearch();
+          refreshRecentFilesList();
+          cleanupTempFiles();
+          updateStatus("All recent files cleared");
+      }
     }
 
     private void refreshRecentFilesList() {
