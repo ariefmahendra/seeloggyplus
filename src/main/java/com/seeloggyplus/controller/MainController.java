@@ -179,6 +179,7 @@ public class MainController {
     private boolean tailColumnsAutoResized = false;
     private boolean autoPrettifyJson = false;
     private boolean autoPrettifyXml = false;
+    private Predicate<LogEntry> currentTailFilterPredicate = null;
 
     @FXML
     public void initialize() {
@@ -337,13 +338,6 @@ public class MainController {
                 disableTail();
             } else {
                 enableTail();
-            }
-        });
-
-        logTableView.setOnScroll(event -> {
-            if (tailModeEnabled && event.getDeltaY() > 0) {
-                disableTail();
-                logger.info("Tail mode disabled because user scrolled up");
             }
         });
 
@@ -1518,10 +1512,6 @@ public class MainController {
     }
 
     private void performSearch() {
-        if (currentLogEntrySource == null) {
-            return;
-        }
-
         final String searchText = searchField.getText();
         final boolean isRegex = regexCheckBox.isSelected();
         final boolean caseSensitive = caseSensitiveCheckBox.isSelected();
@@ -1533,94 +1523,65 @@ public class MainController {
         logger.info("Search - Level: {}, Text: '{}', Regex: {}, CaseSensitive: {}, HideUnparsed: {}",
                 selectedLevel, searchText, isRegex, caseSensitive, hideUnparsed);
 
+        if (originalLogEntrySource == null && tailModeEnabled) {
+            Predicate<LogEntry> searchPredicate;
+            try {
+                searchPredicate = buildSearchPredicate(
+                        searchText, isRegex, caseSensitive,
+                        hideUnparsed, selectedLevel,
+                        dateTimeFrom, dateTimeTo
+                );
+            } catch (Exception e) {
+                logger.error("Failed to build search predicate for tail mode", e);
+                showError("Search Error", e.getMessage());
+                return;
+            }
+
+            currentTailFilterPredicate = searchPredicate;
+
+            if (searchPredicate == null) {
+                return;
+            }
+
+            List<LogEntry> current = new ArrayList<>(visibleLogEntries);
+            List<LogEntry> filtered = new ArrayList<>();
+            for (LogEntry entry : current) {
+                if (searchPredicate.test(entry)) {
+                    filtered.add(entry);
+                }
+            }
+
+            visibleLogEntries.setAll(filtered);
+            updateStatus("Tail filter applied. New incoming lines will also be filtered.");
+            logger.info("Tail search applied. Showing {} entries in current window", filtered.size());
+            return;
+        }
+
+        if (currentLogEntrySource == null || originalLogEntrySource == null) {
+            return;
+        }
+
         updateStatus("Searching...");
 
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
-                final LocalDateTime filterFrom = parseDateTimeFilter(dateTimeFrom);
-                final LocalDateTime filterTo = parseDateTimeFilter(dateTimeTo);
-                final boolean hasDateFilter = filterFrom != null || filterTo != null;
+                final Predicate<LogEntry> searchPredicate = buildSearchPredicate(
+                        searchText, isRegex, caseSensitive,
+                        hideUnparsed, selectedLevel,
+                        dateTimeFrom, dateTimeTo
+                );
 
-                final Pattern regexPattern;
-                if (isRegex && searchText != null && !searchText.trim().isEmpty()) {
-                    try {
-                        int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
-                        regexPattern = Pattern.compile(searchText, flags);
-                    } catch (Exception e) {
-                        logger.error("Invalid regex pattern: {}", e.getMessage());
-                        Platform.runLater(() -> {
-                            showError("Invalid Regex", "Pattern compilation failed: " + e.getMessage());
-                            updateStatus("Invalid regex pattern");
-                        });
-                        return null;
-                    }
-                } else {
-                    regexPattern = null;
+                if (searchPredicate == null) {
+                    return null;
                 }
-
-                final String searchTextLower = (!isRegex && searchText != null && !caseSensitive)
-                        ? searchText.toLowerCase() : searchText;
-                final boolean hasTextSearch = searchText != null && !searchText.trim().isEmpty();
-
-                final boolean hasLevelFilter = selectedLevel != null && !selectedLevel.equals("ALL");
-                final boolean filterUnparsedOnly = "UNPARSED".equals(selectedLevel);
-
-                Predicate<LogEntry> searchPredicate = entry -> {
-                    if (hideUnparsed && !entry.isParsed()) {
-                        return false;
-                    }
-
-                    if (hasLevelFilter) {
-                        if (filterUnparsedOnly) {
-                            return !entry.isParsed();
-                        }
-                        if (!entry.isParsed()) {
-                            return false;
-                        }
-                        String entryLevel = entry.getLevel();
-                        if (entryLevel == null || !entryLevel.equalsIgnoreCase(selectedLevel)) {
-                            return false;
-                        }
-                    }
-
-                    if (hasDateFilter) {
-                        LocalDateTime entryTime = parseEntryTimestamp(entry);
-                        if (entryTime == null) {
-                            return false;
-                        }
-                        if (filterFrom != null && entryTime.isBefore(filterFrom)) {
-                            return false;
-                        }
-                        if (filterTo != null && entryTime.isAfter(filterTo)) {
-                            return false;
-                        }
-                    }
-
-                    if (hasTextSearch) {
-                        if (isRegex) {
-                            if (regexPattern == null) {
-                                return true;
-                            }
-
-                            return regexPattern.matcher(entry.getRawLog()).find();
-                        } else {
-                            if (caseSensitive) {
-                                return entry.getRawLog().contains(searchTextLower);
-                            } else {
-                                return entry.getRawLog().toLowerCase().contains(searchTextLower);
-                            }
-                        }
-                    }
-
-                    return true;
-                };
 
                 LogEntrySource filteredSource = originalLogEntrySource.filter(searchPredicate);
                 int totalFiltered = filteredSource.getTotalEntries();
 
                 Platform.runLater(() -> {
                     currentLogEntrySource = filteredSource;
+                    currentTailFilterPredicate = searchPredicate;
 
                     if (totalFiltered == 0) {
                         visibleLogEntries.clear();
@@ -1630,8 +1591,7 @@ public class MainController {
 
                     loadWindow(0, false);
 
-                    updateStatus(String.format("📍 Found %,d of %,d entries",
-                            totalFiltered, originalLogEntrySource.getTotalEntries()));
+                    updateStatus(String.format("Found %,d of %,d entries", totalFiltered, originalLogEntrySource.getTotalEntries()));
                 });
                 return null;
             }
@@ -1651,6 +1611,9 @@ public class MainController {
         searchField.clear();
         logLevelFilterComboBox.getSelectionModel().select("ALL");
         hideUnparsedCheckBox.setSelected(false);
+        dateTimeFromField.clear();
+        dateTimeToField.clear();
+        currentTailFilterPredicate = null;
 
         if (originalLogEntrySource != null) {
             currentLogEntrySource = originalLogEntrySource;
@@ -2198,8 +2161,7 @@ public class MainController {
 
             SSHServerModel server = serverManagementService.getServerById(sshServerId);
             if (server == null) {
-                showError("Tail Error",
-                        "SSH server with ID " + sshServerId + " not found. Please check Server Management.");
+                showError("Tail Error", "SSH server with ID " + sshServerId + " not found. Please check Server Management.");
                 return;
             }
 
@@ -2233,10 +2195,7 @@ public class MainController {
                 sshService = new SSHServiceImpl();
                 boolean connected;
                 try {
-                    connected = sshService.connect(server.getHost(),
-                            server.getPort(),
-                            server.getUsername(),
-                            password);
+                    connected = sshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
                 } catch (Exception e) {
                     logger.error("Failed to connect SSH in enableTail()", e);
                     showError("Tail Error", "Could not connect to SSH server: " + e.getMessage());
@@ -2285,12 +2244,8 @@ public class MainController {
         logger.info("Tail mode DISABLED");
     }
 
-    private void startRemoteTail(String remotePath,
-                                 SSHServiceImpl sshService,
-                                 ParsingConfig parsingConfig,
-                                 SSHServerModel server) {
+    private void startRemoteTail(String remotePath, SSHServiceImpl sshService, ParsingConfig parsingConfig, SSHServerModel server) {
         stopRemoteTail();
-
         saveRemoteTailToRecent(remotePath, parsingConfig, server);
 
         this.activeTailSshService = sshService;
@@ -2307,6 +2262,24 @@ public class MainController {
         tailModeEnabled = true;
         tailButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
         updateStatus("Starting remote tail (parsed): " + remotePath);
+
+        try {
+            currentTailFilterPredicate = buildSearchPredicate(
+                    searchField.getText(),
+                    regexCheckBox.isSelected(),
+                    caseSensitiveCheckBox.isSelected(),
+                    hideUnparsedCheckBox.isSelected(),
+                    logLevelFilterComboBox.getSelectionModel().getSelectedItem(),
+                    dateTimeFromField.getText(),
+                    dateTimeToField.getText()
+            );
+            logger.info("Tail filter initialized from current UI filters.");
+        } catch (Exception e) {
+            logger.error("Failed to build tail filter predicate", e);
+            showError("Tail Filter Error", e.getMessage());
+            currentTailFilterPredicate = null;
+        }
+
 
         sshService.tailFile(
                 remotePath,
@@ -2390,6 +2363,99 @@ public class MainController {
         scheduleTailFlush();
     }
 
+    private Predicate<LogEntry> buildSearchPredicate(
+            String searchText,
+            boolean isRegex,
+            boolean caseSensitive,
+            boolean hideUnparsed,
+            String selectedLevel,
+            String dateTimeFrom,
+            String dateTimeTo
+    ) {
+        final LocalDateTime filterFrom = parseDateTimeFilter(dateTimeFrom);
+        final LocalDateTime filterTo = parseDateTimeFilter(dateTimeTo);
+        final boolean hasDateFilter = filterFrom != null || filterTo != null;
+
+        final boolean hasTextSearch = searchText != null && !searchText.trim().isEmpty();
+
+        // compile regex sekali di luar predicate
+        final Pattern compiledPattern;
+        if (isRegex && hasTextSearch) {
+            int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
+            try {
+                compiledPattern = Pattern.compile(searchText, flags);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid regex pattern: " + e.getMessage(), e);
+            }
+        } else {
+            compiledPattern = null;
+        }
+
+        final String searchTextLower =
+                (!isRegex && hasTextSearch && !caseSensitive)
+                        ? searchText.toLowerCase()
+                        : searchText;
+
+        final boolean hasLevelFilter = selectedLevel != null && !selectedLevel.equals("ALL");
+        final boolean filterUnparsedOnly = "UNPARSED".equals(selectedLevel);
+
+        return entry -> {
+            // 1. Hide unparsed
+            if (hideUnparsed && !entry.isParsed()) {
+                return false;
+            }
+
+            // 2. Level filter
+            if (hasLevelFilter) {
+                if (filterUnparsedOnly) {
+                    return !entry.isParsed();
+                }
+                if (!entry.isParsed()) {
+                    return false;
+                }
+                String entryLevel = entry.getLevel();
+                if (entryLevel == null || !entryLevel.equalsIgnoreCase(selectedLevel)) {
+                    return false;
+                }
+            }
+
+            // 3. Date filter
+            if (hasDateFilter) {
+                LocalDateTime entryTime = parseEntryTimestamp(entry);
+                if (entryTime == null) {
+                    return false;
+                }
+                if (filterFrom != null && entryTime.isBefore(filterFrom)) {
+                    return false;
+                }
+                if (filterTo != null && entryTime.isAfter(filterTo)) {
+                    return false;
+                }
+            }
+
+            // 4. Text / regex filter
+            if (hasTextSearch) {
+                String raw = entry.getRawLog();
+                if (raw == null) {
+                    return false;
+                }
+
+                if (isRegex) {
+                    return compiledPattern != null && compiledPattern.matcher(raw).find();
+                } else {
+                    if (caseSensitive) {
+                        return raw.contains(searchTextLower);
+                    } else {
+                        return raw.toLowerCase().contains(searchTextLower);
+                    }
+                }
+            }
+
+            // 5. Kalau nggak ada filter text → lolos semua
+            return true;
+        };
+    }
+
     private void scheduleTailFlush() {
         if (tailFlushScheduled) return;
         tailFlushScheduled = true;
@@ -2404,7 +2470,25 @@ public class MainController {
                 tailBuffer.clear();
             }
 
-            visibleLogEntries.addAll(toAdd);
+            List<LogEntry> filtered = toAdd;
+            if (currentTailFilterPredicate != null) {
+                filtered = new ArrayList<>();
+                for (LogEntry e : toAdd) {
+                    try {
+                        if (currentTailFilterPredicate.test(e)) {
+                            filtered.add(e);
+                        }
+                    } catch (Exception ex) {
+                        logger.warn("Error applying tail filter", ex);
+                    }
+                }
+            }
+
+            if (filtered.isEmpty()) {
+                return;
+            }
+
+            visibleLogEntries.addAll(filtered);
 
             int overflow = visibleLogEntries.size() - WINDOW_SIZE;
             if (overflow > 0) {
