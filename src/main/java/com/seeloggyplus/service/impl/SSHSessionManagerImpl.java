@@ -8,8 +8,10 @@ import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.*;
 
 public class SSHSessionManagerImpl implements SSHSessionManager {
@@ -75,6 +77,10 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
             managed.getSession().disconnect();
             logger.info("Session manually closed: {}", key);
         }
+    }
+
+    public Set<String> getActiveSessionKeys() {
+        return Collections.unmodifiableSet(sessionPool.keySet());
     }
 
     private void cleanupExpiredSessions() {

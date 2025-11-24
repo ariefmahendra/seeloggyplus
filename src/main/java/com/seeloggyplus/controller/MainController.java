@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -28,6 +29,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
@@ -44,6 +46,11 @@ import org.slf4j.LoggerFactory;
 public class MainController {
 
     private static final Logger logger = LoggerFactory.getLogger(MainController.class);
+    
+    // --- Debounce for recent file selection ---
+    private final Timer selectionTimer = new Timer("RecentFile-Selection-Timer", true);
+    private TimerTask selectionTask;
+    private static final long SELECTION_DELAY = 150; // ms
 
     // FXML Components - MenuBar
     @FXML
@@ -213,6 +220,19 @@ public class MainController {
 
         updateStatus("Ready");
         progressBar.setVisible(false);
+        updateTailButtonState();
+    }
+
+    private void updateTailButtonState() {
+        if (currentLogDb != null && currentLogDb.isRemote()) {
+            tailButton.setDisable(false);
+        } else {
+            tailButton.setDisable(true);
+            // If we're on a local file and tail mode is somehow on, turn it off.
+            if (tailModeEnabled) {
+                disableTail();
+            }
+        }
     }
 
 
@@ -239,16 +259,35 @@ public class MainController {
         recentFilesListView.setCellFactory(listView -> new RecentFileListCell());
         recentFilesListView.setItems(FXCollections.observableArrayList(recentFileService.findAll()));
         recentFilesListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        recentFilesListView
-                .getSelectionModel()
-                .selectedItemProperty()
-                .addListener((obs, oldVal, newVal) -> {
-                    if (
-                            newVal != null && (currentFile == null || !currentFile.getAbsolutePath().equals(newVal.logFile().getFilePath()))
-                    ) {
-                        handleRecentFileSelected(newVal);
-                    }
-                });
+
+        // Debounced listener to prevent lag on rapid selection
+        recentFilesListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal == null) {
+                return;
+            }
+
+            // Cancel any previously scheduled task
+            if (selectionTask != null) {
+                selectionTask.cancel();
+            }
+
+            // Schedule a new task to run after a short delay
+            selectionTask = new TimerTask() {
+                @Override
+                public void run() {
+                    Platform.runLater(() -> {
+                        // Check if the item is still selected when the task runs
+                        if (newVal.equals(recentFilesListView.getSelectionModel().getSelectedItem())) {
+                            if (currentFile == null || !currentFile.getAbsolutePath().equals(newVal.logFile().getFilePath())) {
+                                handleRecentFileSelected(newVal);
+                            }
+                        }
+                    });
+                }
+            };
+            selectionTimer.schedule(selectionTask, SELECTION_DELAY);
+        });
+
         clearRecentButton.setOnAction(e -> handleClearRecentFiles());
         pinLeftPanelButton.setOnAction(e -> handleToggleLeftPanelPin());
         expandLeftPanelButton.setOnAction(e -> handleToggleLeftPanelPin());
@@ -321,15 +360,37 @@ public class MainController {
             }
         });
 
+        searchField.setOnAction(e -> performSearch());
+        searchField.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                clearSearch();
+            }
+        });
+
+        searchField.setOnAction(e -> performSearch());
+        searchField.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                clearSearch();
+            }
+        });
+        searchField.setTooltip(new Tooltip("Enter text to search. Press Ctrl+F to focus this field."));
+
         searchButton.setOnAction(e -> performSearch());
+        searchButton.setTooltip(new Tooltip("Perform search (press Enter in text field)"));
+
         clearSearchButton.setOnAction(e -> clearSearch());
+        clearSearchButton.setTooltip(new Tooltip("Clear search and filters (press Escape in text field)"));
+
         autoFitButton.setOnAction(e -> {
             autoResizeColumns(logTableView);
             logger.info("Manual auto-fit columns triggered");
         });
         scrollToTopButton.setOnAction(e -> handleScrollToTop());
         scrollToBottomButton.setOnAction(e -> handleScrollToBottom());
-        refreshButton.setOnAction(e -> handleRefreshCurrentFile());
+
+        refreshButton.setOnAction(e -> handleReload());
+        refreshButton.setTooltip(new Tooltip("Reload current file or tailing session (Ctrl+R)"));
+
         clearDateFilterButton.setOnAction(e -> clearDateFilter());
         prevWindowButton.setOnAction(e -> showPreviousWindow());
         nextWindowButton.setOnAction(e -> showNextWindow());
@@ -344,6 +405,57 @@ public class MainController {
         updateDateTimeFilterPromptText(null);
         updateTableColumns(null);
         logger.info("Virtual scrolling enabled with performance optimizations - smooth scrolling for large datasets");
+    }
+
+    private void handleReload() {
+        logger.info("Reload triggered by user.");
+
+        // Case 1: Remote tail is active
+        if (tailModeEnabled && monitoringRemotePath != null && activeTailSshService != null) {
+            logger.info("Reloading remote tail for '{}'.", monitoringRemotePath);
+
+            if (currentLogDb != null && currentLogDb.getSshServerID() != null) {
+                SSHServerModel server = serverManagementService.getServerById(currentLogDb.getSshServerID());
+                if (server != null && currentParsingConfig != null) {
+                    updateStatus("Reloading remote tail...");
+                    // Re-establish connection for the existing service object before starting tail
+                    try {
+                        String password = server.getPassword(); // Assuming password might be needed if session expired
+                        if (password == null || password.isBlank()) {
+                           // This path is tricky without user interaction.
+                           // We rely on the session manager to keep the session alive.
+                           // If it fails, the user has to re-open from recent list.
+                           logger.warn("Cannot get password for reload, relying on existing session.");
+                        }
+                        activeTailSshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
+                        startRemoteTail(monitoringRemotePath, activeTailSshService, currentParsingConfig, server);
+                    } catch(Exception e) {
+                        logger.error("Failed to re-connect for tail reload", e);
+                        showError("Reload Error", "Failed to re-connect to server: " + e.getMessage());
+                    }
+                } else {
+                    showError("Reload Error", "Could not reload tail: missing server or parsing configuration information.");
+                }
+            } else {
+                showError("Reload Error", "Could not reload tail: missing log file database information.");
+            }
+        }
+        // Case 2: A local file is open (this also covers local tailing)
+        else if (currentFile != null) {
+            logger.info("Reloading local file '{}'.", currentFile.getName());
+
+            if (currentParsingConfig != null) {
+                updateStatus("Reloading file...");
+                openLocalLogFile(currentFile, false, currentParsingConfig);
+            } else {
+                showError("Reload Error", "Could not reload file: no parsing configuration is active.");
+            }
+        }
+        // Case 3: Nothing to reload
+        else {
+            logger.warn("Reload triggered but no active file or tail session.");
+            updateStatus("Nothing to reload.");
+        }
     }
 
     private void handleScrollToTop() {
@@ -533,6 +645,18 @@ public class MainController {
         }
 
         Scene scene = menuBar.getScene();
+        
+        // Focus search field
+        scene.getAccelerators().put(
+                new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN),
+                () -> searchField.requestFocus()
+        );
+
+        // Refresh current file
+        scene.getAccelerators().put(
+                new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN),
+                this::handleReload
+        );
 
         scene.getAccelerators().put(
                 new KeyCodeCombination(KeyCode.PAGE_UP),
@@ -910,15 +1034,7 @@ public class MainController {
         if (currentLoadingTask != null && currentLoadingTask.isRunning()) {
             logger.info("Cancelling previous loading task...");
             currentLoadingTask.cancel(true);
-
-            // Wait briefly for cancellation
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-
-            logger.info("Previous task cancelled");
+            logger.info("Previous task cancellation requested.");
         }
 
         if (visibleLogEntries != null && !visibleLogEntries.isEmpty()) {
@@ -1012,6 +1128,7 @@ public class MainController {
             updateStatus(String.format("Showing all %,d entries from %s (virtual scrolling ⚡)", totalEntries, file.getName()));
             progressBar.setVisible(false);
 
+            updateTailButtonState();
             currentLoadingTask = null;
         });
 
@@ -1210,51 +1327,56 @@ public class MainController {
     }
 
     private void handleParsingConfigChanged() {
-        logger.info("Parsing configuration changed, checking if current file needs re-parsing");
+        logger.info("Parsing configuration changed, checking if current file or tail session needs re-parsing.");
 
-        if (currentFile == null || currentParsingConfig == null) {
-            logger.info("No file currently loaded, skipping re-parse");
+        if (currentParsingConfig == null) {
+            logger.info("No parsing configuration is currently active. Skipping reload.");
             return;
         }
 
         Optional<ParsingConfig> updatedConfigOpt = parsingConfigService.findById(currentParsingConfig.getId());
 
         if (updatedConfigOpt.isEmpty()) {
-            logger.warn("Current parsing config no longer exists in database");
-            showInfo("Configuration Deleted",
-                    "The current parsing configuration has been deleted. Please reload the file with a new configuration.");
+            logger.warn("Current parsing config (ID: {}) no longer exists in the database.", currentParsingConfig.getId());
+            showInfo("Configuration Deleted", "The parsing configuration in use has been deleted. Please reload the file or restart the tail with a new configuration.");
             return;
         }
 
         ParsingConfig updatedConfig = updatedConfigOpt.get();
 
         if (configsAreEqual(currentParsingConfig, updatedConfig)) {
-            logger.info("Configuration unchanged, no need to re-parse");
+            logger.info("Configuration data is identical. No re-parse needed.");
             return;
         }
 
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Parsing Configuration Changed");
-        alert.setHeaderText("The parsing configuration has been updated.");
-        alert.setContentText(String.format(
-                "Current file: %s\nCurrent config: %s\n\nDo you want to re-parse the file with the updated configuration?",
-                currentFile.getName(),
-                updatedConfig.getName()
-        ));
-
-        ButtonType reParseButton = new ButtonType("Re-parse Now");
-        ButtonType laterButton = new ButtonType("Later", ButtonBar.ButtonData.CANCEL_CLOSE);
-        alert.getButtonTypes().setAll(reParseButton, laterButton);
-
-        Optional<ButtonType> result = alert.showAndWait();
-
-        if (result.isPresent() && result.get() == reParseButton) {
-            logger.info("User chose to re-parse file with updated configuration");
+        // Case 1: Local file is open
+        if (currentFile != null) {
+            logger.info("Local file is active. Re-parsing '{}' with updated configuration '{}'.", currentFile.getName(), updatedConfig.getName());
             openLocalLogFile(currentFile, false, updatedConfig);
-        } else {
-            logger.info("User chose not to re-parse file");
-            updateStatus("Configuration updated. Reload file to apply changes.");
+            updateStatus("Configuration updated. Re-parsing file: " + currentFile.getName());
         }
+        // Case 2: Remote tail is active
+        else if (tailModeEnabled && monitoringRemotePath != null && activeTailSshService != null) {
+            logger.info("Remote tail is active. Restarting tail for '{}' with updated configuration '{}'.", monitoringRemotePath, updatedConfig.getName());
+
+            // We need the server info to restart the tail
+            if (currentLogDb != null && currentLogDb.getSshServerID() != null) {
+                SSHServerModel server = serverManagementService.getServerById(currentLogDb.getSshServerID());
+                if (server != null) {
+                    // The activeTailSshService should still be connected.
+                    startRemoteTail(monitoringRemotePath, activeTailSshService, updatedConfig, server);
+                    updateStatus("Configuration updated. Restarting remote tail.");
+                } else {
+                    showError("Server Not Found", "Could not restart tail because the associated SSH server configuration was not found.");
+                }
+            } else {
+                showError("Missing Information", "Could not restart tail because server information is missing.");
+            }
+        } else {
+            logger.info("No active file or tail session to apply configuration changes to.");
+        }
+        
+        refreshRecentFilesList();
     }
 
     private boolean configsAreEqual(ParsingConfig config1, ParsingConfig config2) {
@@ -1269,131 +1391,127 @@ public class MainController {
     }
 
     private void handleRecentFileSelected(RecentFilesDto recentFile) {
+        // Unbind properties from any previous remote-connect task to prevent "A bound value cannot be set" error.
+        statusLabel.textProperty().unbind();
+        progressBar.visibleProperty().unbind();
+        progressBar.setVisible(false);
+
+        cancelCurrentLoadingTask(); // Cancel any ongoing parsing before starting a new operation.
+
         LogFile logFile = recentFile.logFile();
 
         if (logFile.isRemote()) {
-            String remotePath = logFile.getFilePath();
-            String sshServerId = logFile.getSshServerID();
+            Task<SSHServiceImpl> connectTask = new Task<>() {
+                @Override
+                protected SSHServiceImpl call() throws Exception {
+                    String sshServerId = logFile.getSshServerID();
+                    if (sshServerId == null || sshServerId.isBlank()) {
+                        throw new IOException("This remote file does not have SSH server information.");
+                    }
 
-            logger.info("Recent REMOTE file selected: path={}, sshServerId={}, parsing_config_id={}",
-                    remotePath,
-                    sshServerId,
-                    logFile.getParsingConfigurationID());
+                    final SSHServerModel server = serverManagementService.getServerById(sshServerId);
+                    if (server == null) {
+                        throw new IOException("SSH server configuration with ID " + sshServerId + " was not found.");
+                    }
 
-            if (sshServerId == null || sshServerId.isBlank()) {
-                showError("Remote File",
-                        "This remote file does not have SSH server information (sshServerID is empty).");
-                return;
-            }
+                    // --- Password prompt (must run on FX thread) ---
+                    final CompletableFuture<String> passwordFuture = new CompletableFuture<>();
+                    Platform.runLater(() -> {
+                        String password = server.getPassword();
+                        if (password == null || password.isBlank()) {
+                            logger.info("Password for server {} is not saved, prompting user.", server.getName());
+                            PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
+                            prompt.showAndWait().ifPresentOrElse(passwordFuture::complete, () -> passwordFuture.complete(null));
+                        } else {
+                            passwordFuture.complete(password);
+                        }
+                    });
 
-            SSHServerModel server = serverManagementService.getServerById(sshServerId);
-            if (server == null) {
-                showError("SSH Server Not Found",
-                        "SSH server configuration with ID " + sshServerId + " was not found.\n" +
-                                "Please check Server Management.");
-                return;
-            }
+                    String password = passwordFuture.get(); // Wait for password from UI
+                    if (password == null) {
+                        logger.info("User cancelled password prompt for remote recent file.");
+                        updateMessage("SSH connection cancelled.");
+                        cancel(); // Cancel the task if no password
+                        return null;
+                    }
 
-            ParsingConfig parsingConfig = recentFile.parsingConfig();
-            if (parsingConfig != null) {
-                logger.info("ParsingConfig in method handleRecentFileSelected from DTO - ID: {}, Name: {}, Valid: {}", parsingConfig.getId(), parsingConfig.getName(), parsingConfig.isValid());
-            } else {
-                logger.info("ParsingConfig in method handleRecentFileSelected from DTO is NULL");
-            }
+                    updateMessage("Connecting to " + server.getHost() + "...");
+                    SSHServiceImpl sshService = new SSHServiceImpl();
+                    boolean connected = sshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
 
-            if (parsingConfig == null) {
-                String parsingConfigId = logFile.getParsingConfigurationID();
-                parsingConfig = getParsingConfig(parsingConfigId);
-            }
+                    if (!connected) {
+                        throw new IOException("Could not connect to " + server.getHost());
+                    }
 
-            if (parsingConfig == null) {
-                logger.warn("No parsing config associated with remote file: {}, showing selection dialog", remotePath);
-                parsingConfig = showParsingConfigSelectionDialog();
-
-                if (parsingConfig == null) {
-                    logger.info("No parsing configuration selected for recent remote file, operation cancelled");
-                    return;
+                    // Update last used on successful connection
+                    serverManagementService.updateServerLastUsed(server.getId());
+                    return sshService;
                 }
-            }
+            };
 
-            // --- Connect ke SSH server ---
-            String password = server.getPassword();
-            if (password == null || password.isBlank()) {
-                logger.info("Password for server {} is not saved, prompting user.", server.getName());
-                PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
-                Optional<String> result = prompt.showAndWait();
+            statusLabel.textProperty().bind(connectTask.messageProperty());
+            progressBar.visibleProperty().bind(connectTask.runningProperty());
 
-                if (result.isEmpty() || result.get().isBlank()) {
-                    logger.info("User cancelled password prompt for remote recent file.");
-                    updateStatus("SSH connection cancelled.");
-                    return;
+            connectTask.setOnSucceeded(e -> {
+                SSHServiceImpl sshService = connectTask.getValue();
+                if (sshService != null) {
+                    logger.info("SSH connected for remote recent file, proceeding to tail.");
+                    ParsingConfig config = getParsingConfigForLogFile(logFile, recentFile.parsingConfig());
+                    if (config != null) {
+                        resetFilters();
+                        startRemoteTail(logFile.getFilePath(), sshService, config, serverManagementService.getServerById(logFile.getSshServerID()));
+                    }
                 }
-                password = result.get();
-            }
+                statusLabel.textProperty().unbind();
+            });
 
-            SSHServiceImpl sshService = new SSHServiceImpl();
-            updateStatus("Connecting to " + server.getHost() + "...");
-            boolean connected;
-            try {
-                connected = sshService.connect(server.getHost(),
-                        server.getPort(),
-                        server.getUsername(),
-                        password);
-            } catch (Exception e) {
-                logger.error("Failed to connect to SSH server {} for recent file", server.getName(), e);
-                showError("Connection Error", "Could not connect to server: " + e.getMessage());
-                return;
-            }
+            connectTask.setOnFailed(e -> {
+                Throwable ex = connectTask.getException();
+                logger.error("Failed to connect to SSH server for recent file", ex);
+                showError("Connection Error", ex.getMessage());
+                statusLabel.textProperty().unbind();
+            });
 
-            if (!connected) {
-                showError("Connection Error", "Could not connect to " + server.getHost());
-                return;
-            }
+            currentLoadingTask = connectTask;
+            new Thread(connectTask).start();
 
-            logger.info("SSH connected for remote recent file, opening remote file {}", remotePath);
-
-            resetFilters();
-            startRemoteTail(remotePath, sshService, parsingConfig, server);
         } else {
-            File file = new File(recentFile.logFile().getFilePath());
+            // This part is already non-blocking as it starts its own task.
+            File file = new File(logFile.getFilePath());
             if (!file.exists()) {
-                showError("File Not Found", "The file no longer exists: " + recentFile.logFile().getFilePath());
+                showError("File Not Found", "The file no longer exists: " + logFile.getFilePath());
                 return;
             }
 
-            logger.info("Recent file selected: {}, LogFile parsing_config_id: {}",
-                    file.getName(), recentFile.logFile().getParsingConfigurationID());
-
-            ParsingConfig parsingConfig = recentFile.parsingConfig();
-
+            ParsingConfig parsingConfig = getParsingConfigForLogFile(logFile, recentFile.parsingConfig());
             if (parsingConfig != null) {
-                logger.info("ParsingConfig from DTO - ID: {}, Name: {}, Valid: {}",
-                        parsingConfig.getId(), parsingConfig.getName(), parsingConfig.isValid());
-            } else {
-                logger.info("ParsingConfig from DTO is NULL");
+                logger.info("Opening recent file: {} with parsing config: {} (ID: {})", file.getName(), parsingConfig.getName(), parsingConfig.getId());
+                resetFilters();
+                openLocalLogFile(file, false, parsingConfig);
             }
-
-            if (parsingConfig == null) {
-                String parsingConfigId = recentFile.logFile().getParsingConfigurationID();
-                parsingConfig = getParsingConfig(parsingConfigId);
-            }
-
-            if (parsingConfig == null) {
-                logger.warn("No parsing config associated with file: {}, showing selection dialog", file.getName());
-                parsingConfig = showParsingConfigSelectionDialog();
-
-                if (parsingConfig == null) {
-                    logger.info("No parsing configuration selected for recent file, operation cancelled");
-                    return;
-                }
-            }
-
-            logger.info("Opening recent file: {} with parsing config: {} (ID: {})", file.getName(), parsingConfig.getName(), parsingConfig.getId());
-
-            resetFilters();
-
-            openLocalLogFile(file, false, parsingConfig);
         }
+    }
+
+    private ParsingConfig getParsingConfigForLogFile(LogFile logFile, ParsingConfig initialConfig) {
+        if (initialConfig != null) {
+            logger.info("Using ParsingConfig from DTO - ID: {}, Name: {}, Valid: {}", initialConfig.getId(), initialConfig.getName(), initialConfig.isValid());
+            return initialConfig;
+        }
+
+        String parsingConfigId = logFile.getParsingConfigurationID();
+        ParsingConfig configFromDb = getParsingConfig(parsingConfigId);
+
+        if (configFromDb != null) {
+            return configFromDb;
+        }
+
+        logger.warn("No parsing config associated with file: {}, showing selection dialog", logFile.getName());
+        ParsingConfig selectedConfig = showParsingConfigSelectionDialog();
+        if (selectedConfig == null) {
+            logger.info("No parsing configuration selected, operation cancelled");
+            return null;
+        }
+        return selectedConfig;
     }
 
     private ParsingConfig getParsingConfig(String parsingConfigId) {
@@ -1928,24 +2046,6 @@ public class MainController {
         }
     }
 
-    private void handleRefreshCurrentFile() {
-        if (currentFile == null) {
-            logger.warn("No file is currently loaded");
-            updateStatus("No file to refresh");
-            return;
-        }
-
-        if (currentParsingConfig == null) {
-            logger.warn("No parsing config available");
-            updateStatus("No parsing config available");
-            return;
-        }
-
-        logger.info("Manual refresh triggered for: {}", currentFile.getName());
-        updateStatus("Refreshing file...");
-        openLocalLogFile(currentFile, false, currentParsingConfig);
-    }
-
     private void handleAutoRefresh(File file) {
         if (!autoRefreshMenuItem.isSelected()) {
             return;
@@ -2151,87 +2251,71 @@ public class MainController {
     }
 
     private void enableTail() {
-        if (currentLogDb != null && currentLogDb.isRemote()) {
-            String sshServerId = currentLogDb.getSshServerID();
-            if (sshServerId == null || sshServerId.isBlank()) {
-                showError("Tail Error",
-                        "Current log is marked as remote, but SSH server ID is missing.");
-                return;
-            }
-
-            SSHServerModel server = serverManagementService.getServerById(sshServerId);
-            if (server == null) {
-                showError("Tail Error", "SSH server with ID " + sshServerId + " not found. Please check Server Management.");
-                return;
-            }
-
-            if (currentParsingConfig == null) {
-                String cfgId = currentLogDb.getParsingConfigurationID();
-                if (cfgId != null && !cfgId.isBlank()) {
-                    currentParsingConfig = parsingConfigService.findById(cfgId).orElse(null);
-                }
-            }
-
-            if (currentParsingConfig == null) {
-                showError("Tail Error",
-                        "No parsing configuration available for this log. Please select one first.");
-                return;
-            }
-
-            // connect SSH
-            String password = server.getPassword();
-            if (password == null || password.isBlank()) {
-                PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
-                Optional<String> result = prompt.showAndWait();
-                if (result.isEmpty() || result.get().isBlank()) {
-                    updateStatus("SSH connection cancelled.");
-                    return;
-                }
-                password = result.get();
-            }
-
-            SSHServiceImpl sshService = activeTailSshService;
-            if (sshService == null || !sshService.isConnected()) {
-                sshService = new SSHServiceImpl();
-                boolean connected;
-                try {
-                    connected = sshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
-                } catch (Exception e) {
-                    logger.error("Failed to connect SSH in enableTail()", e);
-                    showError("Tail Error", "Could not connect to SSH server: " + e.getMessage());
-                    return;
-                }
-                if (!connected) {
-                    showError("Tail Error", "Could not connect to SSH server " + server.getHost());
-                    return;
-                }
-            }
-
-            tailModeEnabled = true;
-            tailButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
-            logger.info("Tail mode ENABLED for remote log: {}", currentLogDb.getFilePath());
-            updateStatus("Remote tail enabled (monitoring) for " + currentLogDb.getName());
-
-            startRemoteTail(currentLogDb.getFilePath(), sshService, currentParsingConfig, server);
+        if (currentLogDb == null || !currentLogDb.isRemote()) {
+            showInfo("Tail Mode", "Tail mode is only available for remote files.");
             return;
         }
 
-
-        if (currentLogEntrySource == null) {
-            showInfo("Tail Mode", "No file loaded. Open a log file first.");
+        String sshServerId = currentLogDb.getSshServerID();
+        if (sshServerId == null || sshServerId.isBlank()) {
+            showError("Tail Error", "Current log is marked as remote, but SSH server ID is missing.");
             return;
+        }
+
+        SSHServerModel server = serverManagementService.getServerById(sshServerId);
+        if (server == null) {
+            showError("Tail Error", "SSH server with ID " + sshServerId + " not found. Please check Server Management.");
+            return;
+        }
+
+        if (currentParsingConfig == null) {
+            String cfgId = currentLogDb.getParsingConfigurationID();
+            if (cfgId != null && !cfgId.isBlank()) {
+                currentParsingConfig = parsingConfigService.findById(cfgId).orElse(null);
+            }
+        }
+
+        if (currentParsingConfig == null) {
+            showError("Tail Error", "No parsing configuration available for this log. Please select one first.");
+            return;
+        }
+
+        // connect SSH
+        String password = server.getPassword();
+        if (password == null || password.isBlank()) {
+            PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
+            Optional<String> result = prompt.showAndWait();
+            if (result.isEmpty() || result.get().isBlank()) {
+                updateStatus("SSH connection cancelled.");
+                return;
+            }
+            password = result.get();
+        }
+
+        SSHServiceImpl sshService = activeTailSshService;
+        if (sshService == null || !sshService.isConnected()) {
+            sshService = new SSHServiceImpl();
+            boolean connected;
+            try {
+                connected = sshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
+            } catch (Exception e) {
+                logger.error("Failed to connect SSH in enableTail()", e);
+                showError("Tail Error", "Could not connect to SSH server: " + e.getMessage());
+                return;
+            }
+            if (!connected) {
+                showError("Tail Error", "Could not connect to SSH server " + server.getHost());
+                return;
+            }
+            serverManagementService.updateServerLastUsed(server.getId());
         }
 
         tailModeEnabled = true;
         tailButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+        logger.info("Tail mode ENABLED for remote log: {}", currentLogDb.getFilePath());
+        updateStatus("Remote tail enabled (monitoring) for " + currentLogDb.getName());
 
-        int total = currentLogEntrySource.getTotalEntries();
-        int startIndex = Math.max(0, total - WINDOW_SIZE);
-
-        logger.info("Tail mode ENABLED (LOCAL). Showing last window from index {}", startIndex);
-        loadWindow(startIndex, true);
-
-        updateStatus("Tail mode enabled (following last entries like 'tail -f')");
+        startRemoteTail(currentLogDb.getFilePath(), sshService, currentParsingConfig, server);
     }
 
     private void disableTail() {
@@ -2276,15 +2360,15 @@ public class MainController {
             logger.info("Tail filter initialized from current UI filters.");
         } catch (Exception e) {
             logger.error("Failed to build tail filter predicate", e);
-            showError("Tail Filter Error", e.getMessage());
-            currentTailFilterPredicate = null;
-        }
-
-
-        sshService.tailFile(
-                remotePath,
-                WINDOW_SIZE,
-                line -> handleTailLineBackground(line, parsingConfig),
+                                showError("Tail Filter Error", e.getMessage());
+                        currentTailFilterPredicate = null;
+                    }
+            
+                    updateTailButtonState();
+            
+                    sshService.tailFile(
+                            remotePath,
+                            WINDOW_SIZE,                line -> handleTailLineBackground(line, parsingConfig),
                 error -> Platform.runLater(() -> {
                     logger.error("Remote tail error: {}", error);
                     showError("Remote Tail Error", error);

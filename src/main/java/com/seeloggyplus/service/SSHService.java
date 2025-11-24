@@ -18,6 +18,7 @@ public interface SSHService {
     List<SSHServiceImpl.RemoteFileInfo> listFiles(String remotePath) throws IOException;
     String executeCommand(String command) throws IOException;
     List<String> readFileLines(String remotePath) throws IOException;
+    List<String> readFileLines(String remotePath, int lineLimit) throws IOException;
     boolean downloadFile(String remotePath, String localPath);
     boolean downloadFileConcurrent(String remotePath, String localPath, int threadCount, LogParserService.ProgressCallback progressCallback);
 }

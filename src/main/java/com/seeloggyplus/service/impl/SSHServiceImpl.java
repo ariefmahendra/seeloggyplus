@@ -294,6 +294,56 @@ public class SSHServiceImpl implements SSHService {
     }
 
     @Override
+    public List<String> readFileLines(String remotePath, int lineLimit) throws IOException {
+        if (lineLimit <= 0) {
+            return readFileLines(remotePath);
+        }
+        
+        Session session = getSessionOrThrow();
+        List<String> lines = new ArrayList<>();
+        ChannelExec channel = null;
+
+        try {
+            String command = "head -n " + lineLimit + " " + escapeShellArgument(remotePath);
+            channel = (ChannelExec) session.openChannel("exec");
+            channel.setCommand(command);
+
+            InputStream in = channel.getInputStream();
+            InputStream err = channel.getErrStream();
+            channel.connect();
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    lines.add(line);
+                }
+            }
+
+            if (lines.isEmpty()) {
+                try (BufferedReader errReader = new BufferedReader(new InputStreamReader(err, StandardCharsets.UTF_8))) {
+                    StringBuilder errMsg = new StringBuilder();
+                    String errLine;
+                    while ((errLine = errReader.readLine()) != null) {
+                        errMsg.append(errLine).append("\n");
+                    }
+                    if (!errMsg.isEmpty()) {
+                        throw new IOException("Remote error: " + errMsg.toString().trim());
+                    }
+                }
+            }
+
+            return lines;
+
+        } catch (JSchException e) {
+            throw new IOException("SSH execution failed: " + e.getMessage(), e);
+        } finally {
+            if (channel != null) {
+                channel.disconnect();
+            }
+        }
+    }
+
+    @Override
     public boolean downloadFile(String remotePath, String localPath) {
         Session session;
         try {

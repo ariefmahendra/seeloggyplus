@@ -5,5 +5,6 @@ import com.seeloggyplus.model.ParsingConfig;
 
 public record RecentFilesDto(
         LogFile logFile,
-        ParsingConfig parsingConfig
+        ParsingConfig parsingConfig,
+        String serverName
 ) {}

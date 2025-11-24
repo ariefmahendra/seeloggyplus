@@ -42,6 +42,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 "lf.modified, " +
                 "lf.is_remote, " +
                 "lf.ssh_server_id, " +
+                "ss.name AS server_name, " + // Added server name
                 "lf.parsing_configuration_id AS parsing_config_id, " +
                 "pc.id AS config_id, " +
                 "pc.name AS config_name, " +
@@ -51,6 +52,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 "FROM recent_files rf " +
                 "JOIN log_files lf ON rf.file_id = lf.id " +
                 "LEFT JOIN parsing_configs pc ON lf.parsing_configuration_id = pc.id " +
+                "LEFT JOIN ssh_servers ss ON lf.ssh_server_id = ss.id " + // Added join
                 "ORDER BY rf.last_opened DESC";
 
         Connection conn = getConnection();
@@ -108,6 +110,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 "lf.modified, " +
                 "lf.is_remote, " +
                 "lf.ssh_server_id, " +
+                "ss.name AS server_name, " + // Added server name
                 "lf.parsing_configuration_id AS parsing_config_id, " +
                 "pc.id AS config_id, " +
                 "pc.name AS config_name, " +
@@ -117,6 +120,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 "FROM recent_files rf " +
                 "JOIN log_files lf ON rf.file_id = lf.id " +
                 "LEFT JOIN parsing_configs pc ON lf.parsing_configuration_id = pc.id " +
+                "LEFT JOIN ssh_servers ss ON lf.ssh_server_id = ss.id " + // Added join
                 "WHERE rf.id = ?";
 
         Connection conn = getConnection();
@@ -203,6 +207,9 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
         logFile.setSshServerID(rs.getString("ssh_server_id"));
         logFile.setParsingConfigurationID(rs.getString("parsing_config_id"));
 
+        // Get pre-fetched server name
+        String serverName = rs.getString("server_name");
+
         // Handle ParsingConfig - check if it exists in database (LEFT JOIN may return null)
         ParsingConfig parsingConfig = null;
         String configId = rs.getString("config_id");
@@ -220,6 +227,6 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
             parsingConfig.validatePattern();
         }
 
-        return new RecentFilesDto(logFile, parsingConfig);
+        return new RecentFilesDto(logFile, parsingConfig, serverName);
     }
 }

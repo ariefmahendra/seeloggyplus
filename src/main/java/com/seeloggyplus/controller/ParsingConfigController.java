@@ -418,19 +418,23 @@ public class ParsingConfigController {
     }
 
     private void handleSave() {
-        if (isDirty()) {
+        // Save the currently edited config if it's dirty
+        if (isDirty() && selectedConfig != null) {
             saveCurrentConfig();
-        }
-
-        for (ParsingConfig config : configList) {
-            if (config.getId() == null) {
-                parsingConfigService.save(config);
+            if (selectedConfig.getId() == null) {
+                parsingConfigService.save(selectedConfig);
             } else {
-                parsingConfigService.update(config);
+                parsingConfigService.update(selectedConfig);
             }
         }
 
-        // Notify parent controller of changes
+        // Also save any other newly created configs that haven't been persisted yet
+        for (ParsingConfig config : configList) {
+            if (config.getId() == null) {
+                parsingConfigService.save(config);
+            }
+        }
+
         notifyConfigChanged();
         logger.info("Configuration saved and parent notified");
 
@@ -438,20 +442,20 @@ public class ParsingConfigController {
     }
 
     private void handleApply() {
-        if (isDirty()) {
-            saveCurrentConfig();
-        }
+        if (isDirty() && selectedConfig != null) {
+            saveCurrentConfig(); // This updates the in-memory object
 
-        for (ParsingConfig config : configList) {
-            if (config.getId() == null) {
-                parsingConfigService.save(config);
+            if (selectedConfig.getId() == null) {
+                parsingConfigService.save(selectedConfig);
+                logger.info("Saved new configuration: {}", selectedConfig.getName());
             } else {
-                parsingConfigService.update(config);
+                parsingConfigService.update(selectedConfig);
+                logger.info("Updated existing configuration: {}", selectedConfig.getName());
             }
         }
-
+        
         notifyConfigChanged();
-        logger.info("Configuration applied and parent notified");
+        logger.info("Configuration changes applied and parent notified.");
     }
 
     private void handleCancel() {

@@ -29,6 +29,7 @@ import java.util.List;
 public class LogPreviewDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(LogPreviewDialogController.class);
+    private static final int PREVIEW_LINE_LIMIT = 500;
 
     @FXML
     private Label fileNameLabel;
@@ -69,12 +70,13 @@ public class LogPreviewDialogController {
     }
 
     /**
-     * Loads the file content (local or remote) into the preview table.
+     * Loads a preview of the file content (local or remote) into the table,
+     * limited to the first PREVIEW_LINE_LIMIT lines.
      * @param fileInfo The file to preview.
      * @param sshService An active SSH service, if the file is remote. Can be null for local files.
      */
     public void loadFile(FileInfo fileInfo, SSHServiceImpl sshService) {
-        fileNameLabel.setText(fileInfo.getPath());
+        fileNameLabel.setText(String.format("Preview: %s (first %d lines)", fileInfo.getPath(), PREVIEW_LINE_LIMIT));
         progressIndicator.setVisible(true);
 
         Task<List<String>> loadTask = new Task<>() {
@@ -84,13 +86,15 @@ public class LogPreviewDialogController {
                     if (sshService == null || !sshService.isConnected()) {
                         throw new IOException("SSH service is not connected.");
                     }
-                    return sshService.readFileLines(fileInfo.getPath());
+                    return sshService.readFileLines(fileInfo.getPath(), PREVIEW_LINE_LIMIT);
                 } else {
                     List<String> lines = new ArrayList<>();
                     try (BufferedReader reader = new BufferedReader(new FileReader(fileInfo.getPath()))) {
                         String line;
-                        while ((line = reader.readLine()) != null) {
+                        int count = 0;
+                        while ((line = reader.readLine()) != null && count < PREVIEW_LINE_LIMIT) {
                             lines.add(line);
+                            count++;
                         }
                     }
                     return lines;

@@ -2,8 +2,10 @@ package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.service.SSHService;
+import com.seeloggyplus.service.SSHSessionManager;
 import com.seeloggyplus.service.ServerManagementService;
 import com.seeloggyplus.service.impl.SSHServiceImpl;
+import com.seeloggyplus.service.impl.SSHSessionManagerImpl;
 import com.seeloggyplus.service.impl.ServerManagementServiceImpl;
 import com.seeloggyplus.util.PasswordPromptDialog;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
@@ -28,6 +30,7 @@ import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * High-performance Server Management Dialog Controller
@@ -93,7 +96,7 @@ public class ServerManagementDialogController {
         statusColumn.setCellValueFactory(cellData -> new SimpleStringProperty(""));
         statusColumn.setCellFactory(col -> new TableCell<>() {
             private final FontAwesomeIconView icon = new FontAwesomeIconView();
-            
+
             {
                 icon.setSize("16");
             }
@@ -105,64 +108,42 @@ public class ServerManagementDialogController {
                     setGraphic(null);
                     setTooltip(null);
                 } else {
+                    SSHSessionManager sessionManager = SSHSessionManagerImpl.getInstance();
+                    Set<String> activeSessionKeys = sessionManager.getActiveSessionKeys();
                     SSHServerModel server = getTableRow().getItem();
-                    updateStatusIcon(server);
-                    setGraphic(icon);
-                }
-            }
-            
-            private void updateStatusIcon(SSHServerModel server) {
-                if (!server.isValid()) {
-                    // Invalid configuration
-                    icon.setIcon(FontAwesomeIcon.EXCLAMATION_TRIANGLE);
-                    icon.setFill(Color.web("#e74c3c"));
-                    setTooltip(new Tooltip("Invalid: " + server.getValidationError()));
-                    return;
-                }
-                
-                // Show connection status
-                switch (server.getConnectionStatus()) {
-                    case CONNECTED:
+                    String sessionKey = server.getUsername() + "@" + server.getHost() + ":" + server.getPort();
+
+                    if (activeSessionKeys.contains(sessionKey)) {
                         icon.setIcon(FontAwesomeIcon.CHECK_CIRCLE);
                         icon.setFill(Color.web("#2ecc71")); // Green
-                        setTooltip(new Tooltip("Connected"));
-                        break;
-                    case DISCONNECTED:
+                        setTooltip(new Tooltip("Session is active"));
+                    } else {
                         icon.setIcon(FontAwesomeIcon.TIMES_CIRCLE);
                         icon.setFill(Color.web("#e74c3c")); // Red
-                        setTooltip(new Tooltip("Disconnected"));
-                        break;
-                    case TESTING:
-                        icon.setIcon(FontAwesomeIcon.SPINNER);
-                        icon.setFill(Color.web("#f39c12")); // Orange
-                        setTooltip(new Tooltip("Testing connection..."));
-                        break;
-                    case UNKNOWN:
-                    default:
-                        icon.setIcon(FontAwesomeIcon.CIRCLE);
-                        icon.setFill(Color.web("#95a5a6")); // Gray
-                        setTooltip(new Tooltip("Status unknown - click 'Test Connection'"));
-                        break;
+                        setTooltip(new Tooltip("No active session"));
+                    }
+                    setGraphic(icon);
+                    setAlignment(javafx.geometry.Pos.CENTER);
                 }
             }
         });
 
-        nameColumn.setCellValueFactory(cellData -> 
+        nameColumn.setCellValueFactory(cellData ->
             new SimpleStringProperty(cellData.getValue().getName() != null ? cellData.getValue().getName() : "-"));
-        
-        hostColumn.setCellValueFactory(cellData -> 
+
+        hostColumn.setCellValueFactory(cellData ->
             new SimpleStringProperty(cellData.getValue().getHost()));
-        
-        portColumn.setCellValueFactory(cellData -> 
+
+        portColumn.setCellValueFactory(cellData ->
             new SimpleStringProperty(String.valueOf(cellData.getValue().getPort())));
-        
-        usernameColumn.setCellValueFactory(cellData -> 
+
+        usernameColumn.setCellValueFactory(cellData ->
             new SimpleStringProperty(cellData.getValue().getUsername()));
-        
-        defaultPathColumn.setCellValueFactory(cellData -> 
-            new SimpleStringProperty(cellData.getValue().getDefaultPath() != null ? 
+
+        defaultPathColumn.setCellValueFactory(cellData ->
+            new SimpleStringProperty(cellData.getValue().getDefaultPath() != null ?
                 cellData.getValue().getDefaultPath() : "/"));
-        
+
         lastUsedColumn.setCellValueFactory(cellData -> {
             if (cellData.getValue().getLastUsed() != null) {
                 return new SimpleStringProperty(cellData.getValue().getLastUsed().format(DATE_FORMATTER));
@@ -171,7 +152,7 @@ public class ServerManagementDialogController {
         });
 
         serverTable.setItems(filteredServers);
-        
+
         // Selection listener
         serverTable.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             updateDetailsPanel(newVal);
@@ -439,7 +420,13 @@ public class ServerManagementDialogController {
             selected.setConnectionStatus(success ? 
                 SSHServerModel.ConnectionStatus.CONNECTED :
                 SSHServerModel.ConnectionStatus.DISCONNECTED);
-            serverTable.refresh();
+            
+            if (success) {
+                serverService.updateServerLastUsed(selected.getId());
+                loadServers(); // Refresh to show updated last used time
+            } else {
+                serverTable.refresh();
+            }
             
             // Show result dialog
             Alert resultDialog = new Alert(success ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR);
