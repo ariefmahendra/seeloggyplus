@@ -169,15 +169,9 @@ public class ParsingConfigController {
 
     private void setupDetailPanel() {
         nameField.textProperty().addListener((obs, o, n) -> updateButtonStates());
-        descriptionArea
-                .textProperty()
-                .addListener((obs, o, n) -> updateButtonStates());
-        timestampFormatField
-                .textProperty()
-                .addListener((obs, o, n) -> updateButtonStates());
-        regexPatternArea
-                .textProperty()
-                .addListener((obs, o, n) -> {
+        descriptionArea.textProperty().addListener((obs, o, n) -> updateButtonStates());
+        timestampFormatField.textProperty().addListener((obs, o, n) -> updateButtonStates());
+        regexPatternArea.textProperty().addListener((obs, o, n) -> {
                     validatePattern();
                     updateButtonStates();
                 });
@@ -199,16 +193,9 @@ public class ParsingConfigController {
     }
 
     private void setupTestPanel() {
-        fieldNameColumn.setCellValueFactory(
-                new PropertyValueFactory<>("fieldName")
-        );
-        fieldValueColumn.setCellValueFactory(
-                new PropertyValueFactory<>("fieldValue")
-        );
-
-        sampleLogArea.setPromptText(
-                "Enter a sample log line to test the regex pattern..."
-        );
+        fieldNameColumn.setCellValueFactory(new PropertyValueFactory<>("fieldName"));
+        fieldValueColumn.setCellValueFactory(new PropertyValueFactory<>("fieldValue"));
+        sampleLogArea.setPromptText("Enter a sample log line to test the regex pattern...");
         testParsingButton.setOnAction(e -> handleTestParsing());
     }
 
@@ -231,7 +218,7 @@ public class ParsingConfigController {
     private void loadConfigToEditor(ParsingConfig config) {
         this.selectedConfig = config;
         if (config != null) {
-            this.configSnapshot = config.copy(); // Create snapshot to track changes
+            this.configSnapshot = config.copy();
 
             nameField.setText(config.getName());
             descriptionArea.setText(config.getDescription());
@@ -311,15 +298,12 @@ public class ParsingConfigController {
         ParsingConfig testConfig = new ParsingConfig("Test", pattern);
         LogParserService.TestResult result = logParserService.testParsing(sampleLog, testConfig);
         if (result.isSuccess()) {
-            testResultLabel.setText("✓ Pattern matched successfully!");
+            testResultLabel.setText("Pattern matched successfully!");
             testResultLabel.getStyleClass().setAll("validation-success");
 
             ObservableList<ParsedField> fields = FXCollections.observableArrayList();
-            result
-                    .getParsedFields()
-                    .forEach((key, value) -> fields.add(new ParsedField(key, value)));
+            result.getParsedFields().forEach((key, value) -> fields.add(new ParsedField(key, value)));
             previewTableView.setItems(fields);
-
             logger.info("Test parsing successful, displaying {} fields", fields.size());
         } else {
             testResultLabel.setText("✗ " + result.getMessage());
@@ -687,6 +671,22 @@ public class ParsingConfigController {
     public record ParsedField(SimpleStringProperty fieldName, SimpleStringProperty fieldValue) {
         public ParsedField(String fieldName, String fieldValue) {
             this(new SimpleStringProperty(fieldName), new SimpleStringProperty(fieldValue));
+        }
+
+        public String getFieldName() {
+            return fieldName.get();
+        }
+
+        public String getFieldValue() {
+            return fieldValue.get();
+        }
+
+        public SimpleStringProperty fieldNameProperty() {
+            return fieldName;
+        }
+
+        public SimpleStringProperty fieldValueProperty() {
+            return fieldValue;
         }
     }
 }

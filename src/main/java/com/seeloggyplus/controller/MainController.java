@@ -28,8 +28,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
@@ -174,8 +173,12 @@ public class MainController {
     private long remoteTailLineCounter = 0;
     private String monitoringRemotePath;
     private final List<LogEntry> tailBuffer = Collections.synchronizedList(new ArrayList<>());
+
+    // state
     private volatile boolean tailFlushScheduled = false;
     private boolean tailColumnsAutoResized = false;
+    private boolean autoPrettifyJson = false;
+    private boolean autoPrettifyXml = false;
 
     @FXML
     public void initialize() {
@@ -290,9 +293,16 @@ public class MainController {
     private void setupCenterPanel() {
         logTableView.setItems(visibleLogEntries);
         logTableView.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        logTableView.getSelectionModel().setCellSelectionEnabled(true);
+        logTableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         logTableView.setFixedCellSize(24.0);
         logTableView.setTableMenuButtonVisible(false);
         logTableView.setPlaceholder(new javafx.scene.control.Label(""));
+        logTableView.setOnKeyPressed((KeyEvent event) -> {
+            if (event.isControlDown() && event.getCode() == KeyCode.C) {
+                copySelectionToClipboard(logTableView);
+            }
+        });
         logTableView
                 .getSelectionModel()
                 .selectedItemProperty()
@@ -432,13 +442,52 @@ public class MainController {
             VBox.setVgrow(detailTextArea, Priority.ALWAYS);
         }
 
-        prettifyJsonButton.setOnAction(e -> prettifyJson());
-        prettifyXmlButton.setOnAction(e -> prettifyXml());
+        prettifyJsonButton.setOnAction(e -> {
+            autoPrettifyJson = !autoPrettifyJson;
+            updatePrettifyButtonsState();
+            applyAutoPrettify();
+        });
+
+        prettifyXmlButton.setOnAction(e -> {
+            autoPrettifyXml = !autoPrettifyXml;
+            updatePrettifyButtonsState();
+            applyAutoPrettify();
+        });
+
         copyButton.setOnAction(e -> copyDetailToClipboard());
         clearDetailButton.setOnAction(e -> clearDetail());
         pinBottomPanelButton.setOnAction(e -> handleToggleBottomPanelPin());
         expandBottomPanelButton.setOnAction(e -> handleToggleBottomPanelPin());
         updateBottomPanelDisplay();
+        updatePrettifyButtonsState();
+    }
+
+    private void updatePrettifyButtonsState() {
+        if (autoPrettifyJson) {
+            prettifyJsonButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+        } else {
+            prettifyJsonButton.setStyle("");
+        }
+
+        if (autoPrettifyXml) {
+            prettifyXmlButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+        } else {
+            prettifyXmlButton.setStyle("");
+        }
+    }
+
+    private void applyAutoPrettify() {
+        String currentText = detailTextArea.getText();
+        if (currentText == null || currentText.isEmpty()) {
+            return;
+        }
+
+        if (autoPrettifyJson) {
+            prettifyJson(false);
+        }
+        if (autoPrettifyXml) {
+            prettifyXml(false);
+        }
     }
 
     private void handleToggleBottomPanelPin() {
@@ -500,6 +549,41 @@ public class MainController {
                 new KeyCodeCombination(KeyCode.PAGE_DOWN),
                 this::showNextWindow
         );
+    }
+
+    private void copySelectionToClipboard(TableView<?> table) {
+        StringBuilder sb = new StringBuilder();
+
+        ObservableList<TablePosition> selectedCells = table.getSelectionModel().getSelectedCells();
+
+        if (selectedCells.isEmpty()) {
+            return;
+        }
+
+        int prevRow = -1;
+        for (TablePosition position : selectedCells) {
+            int row = position.getRow();
+            int col = position.getColumn();
+
+            if (prevRow == -1) {
+                prevRow = row;
+            } else if (row != prevRow) {
+                sb.append('\n');
+                prevRow = row;
+            } else {
+                sb.append('\t');
+            }
+
+            Object cellData = position.getTableColumn()
+                    .getCellObservableValue(row)
+                    .getValue();
+
+            sb.append(cellData == null ? "" : cellData.toString());
+        }
+
+        ClipboardContent content = new ClipboardContent();
+        content.putString(sb.toString());
+        Clipboard.getSystemClipboard().setContent(content);
     }
 
     private void updateTableColumns(ParsingConfig config) {
@@ -1710,12 +1794,18 @@ public class MainController {
 
         detailLabel.setText("Log Detail - Line " + entry.getLineNumber());
         detailTextArea.clear();
-
         detailTextArea.replaceText(entry.getRawLog());
+
+        applyAutoPrettify();
     }
 
-    private void prettifyJson() {
+    // Dipakai internal, bisa pilih mau tampilkan popup atau tidak
+    private void prettifyJson(boolean showInfoWhenNotFound) {
         String fullText = detailTextArea.getText();
+        if (fullText == null || fullText.isEmpty()) {
+            return;
+        }
+
         StringBuilder newTextBuilder = new StringBuilder(fullText);
         int offset = 0;
 
@@ -1731,24 +1821,33 @@ public class MainController {
 
             int start = newTextBuilder.indexOf(extractedJson, offset);
             if (start == -1) {
-                break; // Should not happen if extractJson worked correctly
+                break; // Safety
             }
             int end = start + extractedJson.length();
 
             newTextBuilder.replace(start, end, prettifiedJson);
-            offset = start + prettifiedJson.length(); // Continue search after the replaced text
+            offset = start + prettifiedJson.length();
         }
 
         if (!newTextBuilder.toString().equals(fullText)) {
             detailTextArea.replaceText(newTextBuilder.toString());
             updateStatus("All JSON occurrences prettified");
-        } else {
+        } else if (showInfoWhenNotFound) {
             showInfo("No JSON Found", "No valid JSON found in the log detail.");
         }
     }
 
-    private void prettifyXml() {
+    // Kalau kamu butuh panggil manual dari tempat lain tanpa parameter:
+    private void prettifyJson() {
+        prettifyJson(true);
+    }
+
+    private void prettifyXml(boolean showInfoWhenNotFound) {
         String fullText = detailTextArea.getText();
+        if (fullText == null || fullText.isEmpty()) {
+            return;
+        }
+
         StringBuilder newTextBuilder = new StringBuilder(fullText);
         int offset = 0;
 
@@ -1775,9 +1874,13 @@ public class MainController {
         if (!newTextBuilder.toString().equals(fullText)) {
             detailTextArea.replaceText(newTextBuilder.toString());
             updateStatus("All XML occurrences prettified");
-        } else {
+        } else if (showInfoWhenNotFound) {
             showInfo("No XML Found", "No valid XML found in the log detail.");
         }
+    }
+
+    private void prettifyXml() {
+        prettifyXml(true);
     }
 
     private void copyDetailToClipboard() {
