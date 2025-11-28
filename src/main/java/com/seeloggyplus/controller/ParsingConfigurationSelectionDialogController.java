@@ -20,10 +20,6 @@ import java.net.URL;
 import java.util.List;
 import java.util.ResourceBundle;
 
-/**
- * Controller untuk ParsingConfigurationSelectionDialog
- * Menampilkan daftar parsing configuration yang tersedia untuk dipilih
- */
 public class ParsingConfigurationSelectionDialogController implements Initializable {
 
     private static final Logger logger = LoggerFactory.getLogger(ParsingConfigurationSelectionDialogController.class);

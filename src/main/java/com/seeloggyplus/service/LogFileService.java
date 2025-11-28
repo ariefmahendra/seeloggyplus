@@ -52,4 +52,6 @@ public interface LogFileService {
      * @throws RuntimeException if database error occurs
      */
     void deleteAllLogFiles();
+
+    void updateParsingConfigIdForLogFiles(String parsingConfigId, String logFileId);
 }

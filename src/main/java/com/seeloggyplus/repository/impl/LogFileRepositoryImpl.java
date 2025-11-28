@@ -157,4 +157,24 @@ public class LogFileRepositoryImpl implements LogFileRepository {
             throw new FatalDatabaseException("Error deleting all log files", ex);
         }
     }
+
+    @Override
+    public void updateParsingConfigId(String parsingConfigId, String logFileId) throws FatalDatabaseException, NotFoundException {
+        String sqlStr = "UPDATE log_files SET parsing_configuration_id = ? WHERE id = ?;";
+        Connection conn = getConnection();
+        try (PreparedStatement preparedStatement = conn.prepareStatement(sqlStr)){
+            preparedStatement.setString(1, parsingConfigId);
+            preparedStatement.setString(2, logFileId);
+
+            int rowsAffected = preparedStatement.executeUpdate();
+
+            if (rowsAffected == 0) {
+                throw new NotFoundException("LogFile with ID " + logFileId + " not found.");
+            }
+            logger.info("Successfully updated parsing configuration ID for log file ID: {}", logFileId);
+        } catch (SQLException ex){
+            logger.error("Error updating parsing configuration ID for log file ID: {}", logFileId, ex);
+            throw new FatalDatabaseException("Error updating parsing configuration ID for log file ID: " + logFileId, ex);
+        }
+    }
 }

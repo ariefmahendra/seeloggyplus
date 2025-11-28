@@ -39,10 +39,6 @@ import org.fxmisc.richtext.CodeArea;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Main controller for the SeeLoggyPlus application Manages the main UI components
- * and coordinates between services
- */
 public class MainController {
 
     private static final Logger logger = LoggerFactory.getLogger(MainController.class);
@@ -228,7 +224,6 @@ public class MainController {
             tailButton.setDisable(false);
         } else {
             tailButton.setDisable(true);
-            // If we're on a local file and tail mode is somehow on, turn it off.
             if (tailModeEnabled) {
                 disableTail();
             }
@@ -256,27 +251,37 @@ public class MainController {
     }
 
     private void setupLeftPanel() {
+        ContextMenu leftPanelContextMenu = new ContextMenu();
+        MenuItem changeParsingConfigMenuItem = new MenuItem("Change Parsing Configuration");
+        changeParsingConfigMenuItem.setOnAction(actionEvent -> {
+            RecentFilesDto selectedRecent = recentFilesListView.getSelectionModel().getSelectedItem();
+            if (selectedRecent != null) {
+                ParsingConfig parsingConfig = showParsingConfigSelectionDialog();
+                if (parsingConfig != null){
+                    handleRecentFileSelectedWithConfig(selectedRecent, parsingConfig);
+                }
+            }
+        });
+
+        leftPanelContextMenu.getItems().addAll(changeParsingConfigMenuItem);
         recentFilesListView.setCellFactory(listView -> new RecentFileListCell());
         recentFilesListView.setItems(FXCollections.observableArrayList(recentFileService.findAll()));
         recentFilesListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        recentFilesListView.setContextMenu(leftPanelContextMenu);
 
-        // Debounced listener to prevent lag on rapid selection
         recentFilesListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal == null) {
                 return;
             }
 
-            // Cancel any previously scheduled task
             if (selectionTask != null) {
                 selectionTask.cancel();
             }
 
-            // Schedule a new task to run after a short delay
             selectionTask = new TimerTask() {
                 @Override
                 public void run() {
                     Platform.runLater(() -> {
-                        // Check if the item is still selected when the task runs
                         if (newVal.equals(recentFilesListView.getSelectionModel().getSelectedItem())) {
                             if (currentFile == null || !currentFile.getAbsolutePath().equals(newVal.logFile().getFilePath())) {
                                 handleRecentFileSelected(newVal);
@@ -292,6 +297,12 @@ public class MainController {
         pinLeftPanelButton.setOnAction(e -> handleToggleLeftPanelPin());
         expandLeftPanelButton.setOnAction(e -> handleToggleLeftPanelPin());
         updateLeftPanelDisplay();
+    }
+
+    private void handleRecentFileSelectedWithConfig(RecentFilesDto recentFile, ParsingConfig parsingConfig) {
+        // todo: update recent file with new parsing config
+        logFileService.updateParsingConfigIdForLogFiles(parsingConfig.getId(), recentFile.logFile().getId());
+        handleRecentFileSelected(recentFile);
     }
 
     private void handleToggleLeftPanelPin() {
@@ -410,7 +421,6 @@ public class MainController {
     private void handleReload() {
         logger.info("Reload triggered by user.");
 
-        // Case 1: Remote tail is active
         if (tailModeEnabled && monitoringRemotePath != null && activeTailSshService != null) {
             logger.info("Reloading remote tail for '{}'.", monitoringRemotePath);
 
@@ -418,13 +428,9 @@ public class MainController {
                 SSHServerModel server = serverManagementService.getServerById(currentLogDb.getSshServerID());
                 if (server != null && currentParsingConfig != null) {
                     updateStatus("Reloading remote tail...");
-                    // Re-establish connection for the existing service object before starting tail
                     try {
-                        String password = server.getPassword(); // Assuming password might be needed if session expired
+                        String password = server.getPassword();
                         if (password == null || password.isBlank()) {
-                           // This path is tricky without user interaction.
-                           // We rely on the session manager to keep the session alive.
-                           // If it fails, the user has to re-open from recent list.
                            logger.warn("Cannot get password for reload, relying on existing session.");
                         }
                         activeTailSshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
@@ -440,7 +446,6 @@ public class MainController {
                 showError("Reload Error", "Could not reload tail: missing log file database information.");
             }
         }
-        // Case 2: A local file is open (this also covers local tailing)
         else if (currentFile != null) {
             logger.info("Reloading local file '{}'.", currentFile.getName());
 
@@ -451,7 +456,6 @@ public class MainController {
                 showError("Reload Error", "Could not reload file: no parsing configuration is active.");
             }
         }
-        // Case 3: Nothing to reload
         else {
             logger.warn("Reload triggered but no active file or tail session.");
             updateStatus("Nothing to reload.");
@@ -645,14 +649,12 @@ public class MainController {
         }
 
         Scene scene = menuBar.getScene();
-        
-        // Focus search field
+
         scene.getAccelerators().put(
                 new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN),
                 () -> searchField.requestFocus()
         );
 
-        // Refresh current file
         scene.getAccelerators().put(
                 new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN),
                 this::handleReload
@@ -681,7 +683,6 @@ public class MainController {
         int prevRow = -1;
         for (TablePosition position : selectedCells) {
             int row = position.getRow();
-            int col = position.getColumn();
 
             if (prevRow == -1) {
                 prevRow = row;
@@ -1657,10 +1658,6 @@ public class MainController {
 
             currentTailFilterPredicate = searchPredicate;
 
-            if (searchPredicate == null) {
-                return;
-            }
-
             List<LogEntry> current = new ArrayList<>(visibleLogEntries);
             List<LogEntry> filtered = new ArrayList<>();
             for (LogEntry entry : current) {
@@ -1689,10 +1686,6 @@ public class MainController {
                         hideUnparsed, selectedLevel,
                         dateTimeFrom, dateTimeTo
                 );
-
-                if (searchPredicate == null) {
-                    return null;
-                }
 
                 LogEntrySource filteredSource = originalLogEntrySource.filter(searchPredicate);
                 int totalFiltered = filteredSource.getTotalEntries();
@@ -1880,7 +1873,6 @@ public class MainController {
         applyAutoPrettify();
     }
 
-    // Dipakai internal, bisa pilih mau tampilkan popup atau tidak
     private void prettifyJson(boolean showInfoWhenNotFound) {
         String fullText = detailTextArea.getText();
         if (fullText == null || fullText.isEmpty()) {
@@ -1918,11 +1910,6 @@ public class MainController {
         }
     }
 
-    // Kalau kamu butuh panggil manual dari tempat lain tanpa parameter:
-    private void prettifyJson() {
-        prettifyJson(true);
-    }
-
     private void prettifyXml(boolean showInfoWhenNotFound) {
         String fullText = detailTextArea.getText();
         if (fullText == null || fullText.isEmpty()) {
@@ -1958,10 +1945,6 @@ public class MainController {
         } else if (showInfoWhenNotFound) {
             showInfo("No XML Found", "No valid XML found in the log detail.");
         }
-    }
-
-    private void prettifyXml() {
-        prettifyXml(true);
     }
 
     private void copyDetailToClipboard() {
@@ -2462,7 +2445,6 @@ public class MainController {
 
         final boolean hasTextSearch = searchText != null && !searchText.trim().isEmpty();
 
-        // compile regex sekali di luar predicate
         final Pattern compiledPattern;
         if (isRegex && hasTextSearch) {
             int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
@@ -2534,8 +2516,6 @@ public class MainController {
                     }
                 }
             }
-
-            // 5. Kalau nggak ada filter text → lolos semua
             return true;
         };
     }
