@@ -66,6 +66,8 @@ public class MainController {
     private MenuItem serverManagementMenuItem;
     @FXML
     private MenuItem aboutMenuItem;
+    @FXML
+    private MenuItem preferencesMenuItem;
 
     // FXML Components - Main Layout
     @FXML
@@ -88,8 +90,7 @@ public class MainController {
     private Button pinLeftPanelButton;
 
     // FXML Components - Center Panel (Log Table)
-    @FXML
-    private Button tailButton;
+
     @FXML
     private Button prevWindowButton;
     @FXML
@@ -97,9 +98,9 @@ public class MainController {
     @FXML
     private TextField searchField;
     @FXML
-    private CheckBox regexCheckBox;
+    private ToggleButton regexCheckBox;
     @FXML
-    private CheckBox caseSensitiveCheckBox;
+    private ToggleButton caseSensitiveCheckBox;
     @FXML
     private Button searchButton;
     @FXML
@@ -117,7 +118,7 @@ public class MainController {
     @FXML
     private ProgressBar progressBar;
     @FXML
-    public CheckBox hideUnparsedCheckBox;
+    public ToggleButton hideUnparsedCheckBox;
     @FXML
     public Button autoFitButton;
     @FXML
@@ -128,6 +129,8 @@ public class MainController {
     private Button scrollToBottomButton;
     @FXML
     private Button refreshButton;
+    @FXML
+    private ToggleButton tailButton;
 
     // FXML Components - Bottom Panel (Log Detail)
     @FXML
@@ -143,9 +146,9 @@ public class MainController {
     @FXML
     private CodeArea detailTextArea;
     @FXML
-    private Button prettifyJsonButton;
+    private ToggleButton prettifyJsonButton;
     @FXML
-    private Button prettifyXmlButton;
+    private ToggleButton prettifyXmlButton;
     @FXML
     private Button copyButton;
     @FXML
@@ -170,7 +173,8 @@ public class MainController {
     private Task<?> currentLoadingTask = null;
     private LogFileWatcher logFileWatcher;
     private CheckMenuItem autoRefreshMenuItem;
-    private static final int WINDOW_SIZE = 5000;
+    private int windowSize = 5000;
+    private int sshDownloadThreads = 4;
     private int currentWindowStartIndex = 0;
     private boolean tailModeEnabled = false;
     private SSHServiceImpl activeTailSshService;
@@ -214,7 +218,10 @@ public class MainController {
         setupKeyboardShortcuts();
         setupSearchFieldAutoCompletion();
 
+        setupSearchFieldAutoCompletion();
+
         restorePanelVisibility();
+        loadPreferences();
 
         updateStatus("Ready");
         progressBar.setVisible(false);
@@ -247,6 +254,7 @@ public class MainController {
 
         parsingConfigMenuItem.setOnAction(e -> handleParsingConfiguration());
         serverManagementMenuItem.setOnAction(e -> handleServerManagement());
+        preferencesMenuItem.setOnAction(e -> handlePreferences());
 
         aboutMenuItem.setOnAction(e -> handleAbout());
     }
@@ -379,13 +387,6 @@ public class MainController {
                 clearSearch();
             }
         });
-
-        searchField.setOnAction(e -> performSearch());
-        searchField.setOnKeyPressed(event -> {
-            if (event.getCode() == KeyCode.ESCAPE) {
-                clearSearch();
-            }
-        });
         searchField.setTooltip(new Tooltip("Enter text to search. Press Ctrl+F to focus this field."));
 
         searchButton.setOnAction(e -> performSearch());
@@ -407,12 +408,43 @@ public class MainController {
         clearDateFilterButton.setOnAction(e -> clearDateFilter());
         prevWindowButton.setOnAction(e -> showPreviousWindow());
         nextWindowButton.setOnAction(e -> showNextWindow());
-        tailButton.setOnAction(e -> {
-            if (tailModeEnabled) {
-                disableTail();
-            } else {
+
+        tailButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
                 enableTail();
+                tailButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+            } else {
+                disableTail();
+                tailButton.setStyle("");
             }
+        });
+
+        // Style update listeners for search toggles
+        regexCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
+                regexCheckBox.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
+            } else {
+                regexCheckBox.setStyle("");
+            }
+            performSearch();
+        });
+
+        caseSensitiveCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
+                caseSensitiveCheckBox.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
+            } else {
+                caseSensitiveCheckBox.setStyle("");
+            }
+            performSearch();
+        });
+
+        hideUnparsedCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
+                hideUnparsedCheckBox.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
+            } else {
+                hideUnparsedCheckBox.setStyle("");
+            }
+            performSearch();
         });
 
         updateDateTimeFilterPromptText(null);
@@ -472,7 +504,7 @@ public class MainController {
         int totalAvailable = currentLogEntrySource.getTotalEntries();
 
         updateStatus(String.format("Jumping to top... Loading first %d entries",
-                Math.min(WINDOW_SIZE, totalAvailable)));
+                Math.min(windowSize, totalAvailable)));
         progressBar.setVisible(true);
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
 
@@ -554,16 +586,27 @@ public class MainController {
             VBox.setVgrow(detailTextArea, Priority.ALWAYS);
         }
 
-        prettifyJsonButton.setOnAction(e -> {
-            autoPrettifyJson = !autoPrettifyJson;
-            updatePrettifyButtonsState();
-            applyAutoPrettify();
+        prettifyJsonButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            autoPrettifyJson = newVal;
+            preferenceService
+                    .saveOrUpdatePreferences(new Preference("main_auto_prettify_json", String.valueOf(newVal)));
+            if (newVal) {
+                prettifyJsonButton.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
+                applyAutoPrettify();
+            } else {
+                prettifyJsonButton.setStyle("");
+            }
         });
 
-        prettifyXmlButton.setOnAction(e -> {
-            autoPrettifyXml = !autoPrettifyXml;
-            updatePrettifyButtonsState();
-            applyAutoPrettify();
+        prettifyXmlButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            autoPrettifyXml = newVal;
+            preferenceService.saveOrUpdatePreferences(new Preference("main_auto_prettify_xml", String.valueOf(newVal)));
+            if (newVal) {
+                prettifyXmlButton.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
+                applyAutoPrettify();
+            } else {
+                prettifyXmlButton.setStyle("");
+            }
         });
 
         copyButton.setOnAction(e -> copyDetailToClipboard());
@@ -571,21 +614,6 @@ public class MainController {
         pinBottomPanelButton.setOnAction(e -> handleToggleBottomPanelPin());
         expandBottomPanelButton.setOnAction(e -> handleToggleBottomPanelPin());
         updateBottomPanelDisplay();
-        updatePrettifyButtonsState();
-    }
-
-    private void updatePrettifyButtonsState() {
-        if (autoPrettifyJson) {
-            prettifyJsonButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
-        } else {
-            prettifyJsonButton.setStyle("");
-        }
-
-        if (autoPrettifyXml) {
-            prettifyXmlButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
-        } else {
-            prettifyXmlButton.setStyle("");
-        }
     }
 
     private void applyAutoPrettify() {
@@ -980,7 +1008,7 @@ public class MainController {
                 boolean success = sshService.downloadFileConcurrent(
                         remotePath,
                         localTmpFile.getAbsolutePath(),
-                        4,
+                        sshDownloadThreads,
                         new LogParserService.ProgressCallback() {
                             @Override
                             public void onProgress(double progress, long bytesProcessed, long totalBytes) {
@@ -1108,7 +1136,7 @@ public class MainController {
 
             Platform.runLater(() -> {
                 int total = currentLogEntrySource.getTotalEntries();
-                loadWindow(Math.max(0, total - WINDOW_SIZE), true);
+                loadWindow(Math.max(0, total - windowSize), true);
                 logger.info("Initial window loaded after parse");
                 autoResizeColumns(logTableView);
             });
@@ -1307,6 +1335,93 @@ public class MainController {
             logger.error("Failed to open server management dialog", e);
             showError("Failed to open server management", e.getMessage());
         }
+    }
+
+    private void handlePreferences() {
+        try {
+            Stage mainStage = (Stage) menuBar.getScene().getWindow();
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/PreferencesDialog.fxml"));
+            Parent root = loader.load();
+
+            PreferencesDialogController controller = loader.getController();
+            controller.setOnSaveCallback(this::loadPreferences);
+
+            Stage dialog = new Stage();
+            dialog.setTitle("Preferences");
+            dialog.initOwner(mainStage);
+            dialog.initModality(Modality.WINDOW_MODAL);
+            dialog.setScene(new Scene(root));
+
+            dialog.showAndWait();
+        } catch (IOException e) {
+            logger.error("Failed to open preferences dialog", e);
+            showError("Preferences Error", "Could not open preferences: " + e.getMessage());
+        }
+    }
+
+    private void loadPreferences() {
+        logger.info("Loading preferences...");
+
+        // Font settings
+        String fontFamily = preferenceService.getPreferencesByCode("app_font_family").orElse("Consolas");
+        String fontSizeStr = preferenceService.getPreferencesByCode("app_font_size").orElse("12");
+        int fontSize = 12;
+        try {
+            fontSize = Integer.parseInt(fontSizeStr);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid font size preference: {}", fontSizeStr);
+        }
+
+        String fontStyle = String.format("-fx-font-family: '%s'; -fx-font-size: %dpx;", fontFamily, fontSize);
+        logTableView.setStyle(fontStyle);
+        detailTextArea.setStyle(fontStyle);
+
+        // Window size
+        String windowSizeStr = preferenceService.getPreferencesByCode("main_window_size").orElse("5000");
+        try {
+            this.windowSize = Integer.parseInt(windowSizeStr);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid window size preference: {}", windowSizeStr);
+        }
+
+        // SSH Threads
+        String threadsStr = preferenceService.getPreferencesByCode("ssh_download_threads").orElse("4");
+        try {
+            this.sshDownloadThreads = Integer.parseInt(threadsStr);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid ssh threads preference: {}", threadsStr);
+        }
+
+        // Auto refresh
+        String autoRefreshStr = preferenceService.getPreferencesByCode("main_auto_refresh_enabled").orElse("true");
+        boolean autoRefresh = Boolean.parseBoolean(autoRefreshStr);
+        if (autoRefreshMenuItem != null) {
+            autoRefreshMenuItem.setSelected(autoRefresh);
+        }
+
+        // Auto prettify
+        this.autoPrettifyJson = Boolean
+                .parseBoolean(preferenceService.getPreferencesByCode("main_auto_prettify_json").orElse("false"));
+        this.autoPrettifyXml = Boolean
+                .parseBoolean(preferenceService.getPreferencesByCode("main_auto_prettify_xml").orElse("false"));
+
+        // Default log level
+        String defaultLevel = preferenceService.getPreferencesByCode("main_default_log_level").orElse("ALL");
+        if (logLevelFilterComboBox.getSelectionModel().isEmpty()
+                || "ALL".equals(logLevelFilterComboBox.getSelectionModel().getSelectedItem())) {
+            logLevelFilterComboBox.getSelectionModel().select(defaultLevel);
+        }
+
+        logger.info("Preferences loaded: font={} {}, windowSize={}, threads={}, autoRefresh={}",
+                fontFamily, fontSize, windowSize, sshDownloadThreads, autoRefresh);
+
+        if (autoPrettifyJson || autoPrettifyXml) {
+            applyAutoPrettify();
+        }
+
+        // Update toggle button states
+        prettifyJsonButton.setSelected(autoPrettifyJson);
+        prettifyXmlButton.setSelected(autoPrettifyXml);
     }
 
     static void restoreWindow(Stage mainStage, boolean wasMaximized, double oldX, double oldY, double oldWidth,
@@ -1742,7 +1857,7 @@ public class MainController {
             currentLogEntrySource = originalLogEntrySource;
 
             int totalEntries = originalLogEntrySource.getTotalEntries();
-            loadWindow(Math.max(0, totalEntries - WINDOW_SIZE), true);
+            loadWindow(Math.max(0, totalEntries - windowSize), true);
         } else {
             visibleLogEntries.clear();
             updateStatus("Search cleared. No file loaded.");
@@ -2011,7 +2126,7 @@ public class MainController {
         int totalEntries = currentLogEntrySource.getTotalEntries();
         logger.info("Scroll to bottom using windowing (total={})", totalEntries);
 
-        loadWindow(Math.max(0, totalEntries - WINDOW_SIZE), true);
+        loadWindow(Math.max(0, totalEntries - windowSize), true);
     }
 
     private void setupFileWatcher(File file) {
@@ -2183,10 +2298,10 @@ public class MainController {
 
         int from = Math.max(0, startIndex);
         if (from >= total) {
-            from = Math.max(0, total - WINDOW_SIZE);
+            from = Math.max(0, total - windowSize);
         }
 
-        int to = Math.min(from + WINDOW_SIZE, total);
+        int to = Math.min(from + windowSize, total);
         int limit = to - from;
 
         currentWindowStartIndex = from;
@@ -2218,7 +2333,7 @@ public class MainController {
             return;
         }
 
-        int newStart = currentWindowStartIndex - WINDOW_SIZE;
+        int newStart = currentWindowStartIndex - windowSize;
         if (newStart < 0) {
             newStart = 0;
         }
@@ -2237,9 +2352,9 @@ public class MainController {
             return;
         }
 
-        int newStart = currentWindowStartIndex + WINDOW_SIZE;
+        int newStart = currentWindowStartIndex + windowSize;
         if (newStart >= total) {
-            newStart = Math.max(0, total - WINDOW_SIZE);
+            newStart = Math.max(0, total - windowSize);
         }
 
         logger.info("Show next window: startIndex={} (before={})", newStart, currentWindowStartIndex);
@@ -2249,12 +2364,16 @@ public class MainController {
     private void enableTail() {
         if (currentLogDb == null || !currentLogDb.isRemote()) {
             showInfo("Tail Mode", "Tail mode is only available for remote files.");
+            if (tailButton.isSelected())
+                tailButton.setSelected(false);
             return;
         }
 
         String sshServerId = currentLogDb.getSshServerID();
         if (sshServerId == null || sshServerId.isBlank()) {
             showError("Tail Error", "Current log is marked as remote, but SSH server ID is missing.");
+            if (tailButton.isSelected())
+                tailButton.setSelected(false);
             return;
         }
 
@@ -2262,6 +2381,8 @@ public class MainController {
         if (server == null) {
             showError("Tail Error",
                     "SSH server with ID " + sshServerId + " not found. Please check Server Management.");
+            if (tailButton.isSelected())
+                tailButton.setSelected(false);
             return;
         }
 
@@ -2274,6 +2395,8 @@ public class MainController {
 
         if (currentParsingConfig == null) {
             showError("Tail Error", "No parsing configuration available for this log. Please select one first.");
+            if (tailButton.isSelected())
+                tailButton.setSelected(false);
             return;
         }
 
@@ -2284,6 +2407,8 @@ public class MainController {
             Optional<String> result = prompt.showAndWait();
             if (result.isEmpty() || result.get().isBlank()) {
                 updateStatus("SSH connection cancelled.");
+                if (tailButton.isSelected())
+                    tailButton.setSelected(false);
                 return;
             }
             password = result.get();
@@ -2298,16 +2423,23 @@ public class MainController {
             } catch (Exception e) {
                 logger.error("Failed to connect SSH in enableTail()", e);
                 showError("Tail Error", "Could not connect to SSH server: " + e.getMessage());
+                if (tailButton.isSelected())
+                    tailButton.setSelected(false);
                 return;
             }
             if (!connected) {
                 showError("Tail Error", "Could not connect to SSH server " + server.getHost());
+                if (tailButton.isSelected())
+                    tailButton.setSelected(false);
                 return;
             }
             serverManagementService.updateServerLastUsed(server.getId());
         }
 
         tailModeEnabled = true;
+        if (!tailButton.isSelected()) {
+            tailButton.setSelected(true);
+        }
         tailButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
         logger.info("Tail mode ENABLED for remote log: {}", currentLogDb.getFilePath());
         updateStatus("Remote tail enabled (monitoring) for " + currentLogDb.getName());
@@ -2317,6 +2449,9 @@ public class MainController {
 
     private void disableTail() {
         tailModeEnabled = false;
+        if (tailButton.isSelected()) {
+            tailButton.setSelected(false);
+        }
         tailButton.setStyle("");
 
         stopRemoteTail();
@@ -2365,7 +2500,7 @@ public class MainController {
 
         sshService.tailFile(
                 remotePath,
-                WINDOW_SIZE, line -> handleTailLineBackground(line, parsingConfig),
+                windowSize, line -> handleTailLineBackground(line, parsingConfig),
                 error -> Platform.runLater(() -> {
                     logger.error("Remote tail error: {}", error);
                     showError("Remote Tail Error", error);
@@ -2671,7 +2806,7 @@ public class MainController {
 
             visibleLogEntries.addAll(filtered);
 
-            int overflow = visibleLogEntries.size() - WINDOW_SIZE;
+            int overflow = visibleLogEntries.size() - windowSize;
             if (overflow > 0) {
                 visibleLogEntries.remove(0, overflow);
             }

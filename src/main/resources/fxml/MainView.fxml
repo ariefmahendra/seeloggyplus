@@ -17,6 +17,7 @@
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleButton?>
 <?import javafx.scene.control.ToolBar?>
 <?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.BorderPane?>
@@ -48,7 +49,7 @@
                     <MenuItem fx:id="parsingConfigMenuItem" accelerator="Ctrl+P" text="Parsing Configuration..." />
                     <MenuItem fx:id="serverManagementMenuItem" accelerator="Ctrl+M" text="Server Management..." />
                     <SeparatorMenuItem />
-                    <MenuItem text="Preferences..." />
+                    <MenuItem fx:id="preferencesMenuItem" text="Preferences..." />
                 </Menu>
 
                 <!-- Help Menu -->
@@ -66,9 +67,9 @@
                         <Font size="10.0" />
                     </font>
                 </TextField>
-                <CheckBox fx:id="regexCheckBox" text="Regex" />
-                <CheckBox fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
-                <CheckBox fx:id="hideUnparsedCheckBox" text="Hide Unparsed" />
+                <ToggleButton fx:id="regexCheckBox" text="Regex" />
+                <ToggleButton fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
+                <ToggleButton fx:id="hideUnparsedCheckBox" text="Hide Unparsed" />
                 <Separator orientation="VERTICAL" />
                 <Label text="Level:" />
                 <ComboBox fx:id="logLevelFilterComboBox" prefHeight="16.0" prefWidth="115.0" promptText="All Levels" styleClass="small-combo-box" stylesheets="@../style/components.css" />
@@ -165,14 +166,14 @@
                         <Tooltip text="Scroll to Bottom" />
                     </tooltip>
                 </Button>
-                <Button fx:id="tailButton">
+                <ToggleButton fx:id="tailButton">
                     <graphic>
                         <FontAwesomeIconView glyphName="EYE" size="12" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Tail (follow last entries)" />
                     </tooltip>
-                </Button>
+                </ToggleButton>
             </ToolBar>
         </VBox>
     </top>
@@ -286,22 +287,22 @@
                                         </Label>
 
                                         <HBox alignment="CENTER_LEFT" spacing="5">
-                                            <Button fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
+                                            <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
                                                 <graphic>
                                                     <FontAwesomeIconView glyphName="INDENT" size="12" />
                                                 </graphic>
                                                 <tooltip>
-                                                    <Tooltip text="Prettify JSON" />
+                                                    <Tooltip text="Auto-Prettify JSON" />
                                                 </tooltip>
-                                            </Button>
-                                            <Button fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
+                                            </ToggleButton>
+                                            <ToggleButton fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
                                                 <graphic>
                                                     <FontAwesomeIconView glyphName="CODE" size="12" />
                                                 </graphic>
                                                 <tooltip>
-                                                    <Tooltip text="Prettify XML" />
+                                                    <Tooltip text="Auto-Prettify XML" />
                                                 </tooltip>
-                                            </Button>
+                                            </ToggleButton>
                                             <Button fx:id="copyButton">
                                                 <graphic>
                                                     <FontAwesomeIconView glyphName="COPY" size="12" />
