@@ -41,31 +41,54 @@ public class ServerManagementDialogController {
     private static final Logger logger = LoggerFactory.getLogger(ServerManagementDialogController.class);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    @FXML private TableView<SSHServerModel> serverTable;
-    @FXML private TableColumn<SSHServerModel, String> statusColumn;
-    @FXML private TableColumn<SSHServerModel, String> nameColumn;
-    @FXML private TableColumn<SSHServerModel, String> hostColumn;
-    @FXML private TableColumn<SSHServerModel, String> portColumn;
-    @FXML private TableColumn<SSHServerModel, String> usernameColumn;
-    @FXML private TableColumn<SSHServerModel, String> defaultPathColumn;
-    @FXML private TableColumn<SSHServerModel, String> lastUsedColumn;
+    @FXML
+    private TableView<SSHServerModel> serverTable;
+    @FXML
+    private TableColumn<SSHServerModel, String> statusColumn;
+    @FXML
+    private TableColumn<SSHServerModel, String> nameColumn;
+    @FXML
+    private TableColumn<SSHServerModel, String> hostColumn;
+    @FXML
+    private TableColumn<SSHServerModel, String> portColumn;
+    @FXML
+    private TableColumn<SSHServerModel, String> usernameColumn;
+    @FXML
+    private TableColumn<SSHServerModel, String> defaultPathColumn;
+    @FXML
+    private TableColumn<SSHServerModel, String> lastUsedColumn;
 
-    @FXML private TextField searchField;
-    @FXML private Button addServerButton;
-    @FXML private Button editServerButton;
-    @FXML private Button deleteServerButton;
-    @FXML private Button testConnectionButton;
-    @FXML private Button refreshButton;
-    @FXML private Button clearSearchButton;
-    @FXML private Button closeButton;
+    @FXML
+    private TextField searchField;
+    @FXML
+    private Button addServerButton;
+    @FXML
+    private Button editServerButton;
+    @FXML
+    private Button deleteServerButton;
+    @FXML
+    private Button testConnectionButton;
+    @FXML
+    private Button refreshButton;
+    @FXML
+    private Button clearSearchButton;
+    @FXML
+    private Button closeButton;
 
-    @FXML private Label detailNameLabel;
-    @FXML private Label detailHostLabel;
-    @FXML private Label detailUsernameLabel;
-    @FXML private Label detailPortLabel;
-    @FXML private Label detailPathLabel;
-    @FXML private Label detailCreatedLabel;
-    @FXML private Label detailLastUsedLabel;
+    @FXML
+    private Label detailNameLabel;
+    @FXML
+    private Label detailHostLabel;
+    @FXML
+    private Label detailUsernameLabel;
+    @FXML
+    private Label detailPortLabel;
+    @FXML
+    private Label detailPathLabel;
+    @FXML
+    private Label detailCreatedLabel;
+    @FXML
+    private Label detailLastUsedLabel;
 
     private ServerManagementService serverService;
     private SSHService sshService;
@@ -76,7 +99,7 @@ public class ServerManagementDialogController {
     @FXML
     public void initialize() {
         logger.info("Initializing ServerManagementDialogController");
-        
+
         serverService = new ServerManagementServiceImpl();
         sshService = new SSHServiceImpl();
         allServers = FXCollections.observableArrayList();
@@ -128,21 +151,18 @@ public class ServerManagementDialogController {
             }
         });
 
-        nameColumn.setCellValueFactory(cellData ->
-            new SimpleStringProperty(cellData.getValue().getName() != null ? cellData.getValue().getName() : "-"));
+        nameColumn.setCellValueFactory(cellData -> new SimpleStringProperty(
+                cellData.getValue().getName() != null ? cellData.getValue().getName() : "-"));
 
-        hostColumn.setCellValueFactory(cellData ->
-            new SimpleStringProperty(cellData.getValue().getHost()));
+        hostColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getHost()));
 
-        portColumn.setCellValueFactory(cellData ->
-            new SimpleStringProperty(String.valueOf(cellData.getValue().getPort())));
+        portColumn.setCellValueFactory(
+                cellData -> new SimpleStringProperty(String.valueOf(cellData.getValue().getPort())));
 
-        usernameColumn.setCellValueFactory(cellData ->
-            new SimpleStringProperty(cellData.getValue().getUsername()));
+        usernameColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getUsername()));
 
-        defaultPathColumn.setCellValueFactory(cellData ->
-            new SimpleStringProperty(cellData.getValue().getDefaultPath() != null ?
-                cellData.getValue().getDefaultPath() : "/"));
+        defaultPathColumn.setCellValueFactory(cellData -> new SimpleStringProperty(
+                cellData.getValue().getDefaultPath() != null ? cellData.getValue().getDefaultPath() : "/"));
 
         lastUsedColumn.setCellValueFactory(cellData -> {
             if (cellData.getValue().getLastUsed() != null) {
@@ -170,7 +190,7 @@ public class ServerManagementDialogController {
         testConnectionButton.setOnAction(e -> handleTestConnection());
         refreshButton.setOnAction(e -> loadServers());
         closeButton.setOnAction(e -> handleClose());
-        
+
         // Search functionality
         searchField.textProperty().addListener((obs, oldVal, newVal) -> filterServers(newVal));
         clearSearchButton.setOnAction(e -> searchField.clear());
@@ -192,7 +212,7 @@ public class ServerManagementDialogController {
             allServers.addAll(task.getValue());
             filterServers(searchField.getText());
             logger.info("Loaded {} servers", allServers.size());
-            
+
             // Auto-check connection status for all servers (optional)
             // checkAllConnectionStatus();
         });
@@ -204,7 +224,7 @@ public class ServerManagementDialogController {
 
         new Thread(task).start();
     }
-    
+
     /**
      * Check connection status for all servers in background
      * This is optional and can be triggered by user action
@@ -216,7 +236,7 @@ public class ServerManagementDialogController {
             }
         }
     }
-    
+
     /**
      * Check connection status for a single server
      */
@@ -224,34 +244,34 @@ public class ServerManagementDialogController {
         // Set status to TESTING
         server.setConnectionStatus(SSHServerModel.ConnectionStatus.TESTING);
         serverTable.refresh();
-        
+
         Task<Boolean> task = new Task<>() {
             @Override
             protected Boolean call() {
                 try {
-                    return sshService.connect(server.getHost(), server.getPort(), server.getUsername(), server.getPassword());
+                    return sshService.connect(server.getHost(), server.getPort(), server.getUsername(),
+                            server.getPassword());
                 } catch (Exception e) {
                     logger.debug("Connection test failed for {}: {}", server.getHost(), e.getMessage());
                     return false;
                 }
             }
         };
-        
+
         task.setOnSucceeded(e -> {
             boolean connected = task.getValue();
-            server.setConnectionStatus(connected ? 
-                SSHServerModel.ConnectionStatus.CONNECTED :
-                SSHServerModel.ConnectionStatus.DISCONNECTED);
+            server.setConnectionStatus(connected ? SSHServerModel.ConnectionStatus.CONNECTED
+                    : SSHServerModel.ConnectionStatus.DISCONNECTED);
             serverTable.refresh();
             logger.debug("Server {} status: {}", server.getHost(), server.getConnectionStatus());
         });
-        
+
         task.setOnFailed(e -> {
             server.setConnectionStatus(SSHServerModel.ConnectionStatus.DISCONNECTED);
             serverTable.refresh();
             logger.error("Connection check failed for {}", server.getHost(), task.getException());
         });
-        
+
         new Thread(task).start();
     }
 
@@ -260,7 +280,7 @@ public class ServerManagementDialogController {
      */
     private void filterServers(String searchText) {
         filteredServers.clear();
-        
+
         if (searchText == null || searchText.trim().isEmpty()) {
             filteredServers.addAll(allServers);
             return;
@@ -279,9 +299,9 @@ public class ServerManagementDialogController {
      */
     private boolean matchesSearch(SSHServerModel server, String search) {
         return (server.getName() != null && server.getName().toLowerCase().contains(search)) ||
-               server.getHost().toLowerCase().contains(search) ||
-               server.getUsername().toLowerCase().contains(search) ||
-               (server.getDefaultPath() != null && server.getDefaultPath().toLowerCase().contains(search));
+                server.getHost().toLowerCase().contains(search) ||
+                server.getUsername().toLowerCase().contains(search) ||
+                (server.getDefaultPath() != null && server.getDefaultPath().toLowerCase().contains(search));
     }
 
     /**
@@ -291,18 +311,18 @@ public class ServerManagementDialogController {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ServerEditDialog.fxml"));
             Parent root = loader.load();
-            
+
             ServerEditDialogController controller = loader.getController();
             controller.setServerService(serverService);
-            
+
             Stage dialog = new Stage();
             dialog.setTitle("Add SSH Server");
             dialog.initModality(Modality.APPLICATION_MODAL);
             dialog.initOwner(addServerButton.getScene().getWindow());
             dialog.setScene(new Scene(root));
-            
+
             showAndWaitAndRestore(dialog);
-            
+
             if (controller.isSaved()) {
                 loadServers();
             }
@@ -324,11 +344,11 @@ public class ServerManagementDialogController {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ServerEditDialog.fxml"));
             Parent root = loader.load();
-            
+
             ServerEditDialogController controller = loader.getController();
             controller.setServerService(serverService);
             controller.setServer(selected);
-            
+
             Stage dialog = new Stage();
             dialog.setTitle("Edit SSH Server");
             dialog.initModality(Modality.APPLICATION_MODAL);
@@ -336,7 +356,7 @@ public class ServerManagementDialogController {
             dialog.setScene(new Scene(root));
 
             showAndWaitAndRestore(dialog);
-            
+
             if (controller.isSaved()) {
                 loadServers();
             }
@@ -358,8 +378,8 @@ public class ServerManagementDialogController {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Delete Server");
         alert.setHeaderText("Delete SSH Server Configuration?");
-        alert.setContentText(String.format("Are you sure you want to delete '%s'?\nThis action cannot be undone.", 
-            selected.getDisplayString()));
+        alert.setContentText(String.format("Are you sure you want to delete '%s'?\nThis action cannot be undone.",
+                selected.getDisplayString()));
 
         Optional<ButtonType> result = showAndWaitAndRestore(alert);
         if (result.isPresent() && result.get() == ButtonType.OK) {
@@ -405,7 +425,8 @@ public class ServerManagementDialogController {
             @Override
             protected Boolean call() {
                 try {
-                    return sshService.connect(selected.getHost(), selected.getPort(), selected.getUsername(), finalPassword);
+                    return sshService.connect(selected.getHost(), selected.getPort(), selected.getUsername(),
+                            finalPassword);
                 } catch (Exception e) {
                     logger.error("Connection test failed", e);
                     return false;
@@ -415,26 +436,24 @@ public class ServerManagementDialogController {
 
         task.setOnSucceeded(e -> {
             boolean success = task.getValue();
-            
+
             // Update status
-            selected.setConnectionStatus(success ? 
-                SSHServerModel.ConnectionStatus.CONNECTED :
-                SSHServerModel.ConnectionStatus.DISCONNECTED);
-            
+            selected.setConnectionStatus(
+                    success ? SSHServerModel.ConnectionStatus.CONNECTED : SSHServerModel.ConnectionStatus.DISCONNECTED);
+
             if (success) {
                 serverService.updateServerLastUsed(selected.getId());
                 loadServers(); // Refresh to show updated last used time
             } else {
                 serverTable.refresh();
             }
-            
+
             // Show result dialog
             Alert resultDialog = new Alert(success ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR);
             resultDialog.setTitle("Connection Test");
             resultDialog.setHeaderText(success ? "Connection Successful" : "Connection Failed");
-            resultDialog.setContentText(success ? 
-                "Successfully connected to " + selected.getDisplayString() :
-                "Failed to connect. Please check your credentials and network connection.");
+            resultDialog.setContentText(success ? "Successfully connected to " + selected.getDisplayString()
+                    : "Failed to connect. Please check your credentials and network connection.");
             showAndWaitAndRestore(resultDialog);
         });
 
@@ -467,10 +486,9 @@ public class ServerManagementDialogController {
         detailUsernameLabel.setText(server.getUsername());
         detailPortLabel.setText(String.valueOf(server.getPort()));
         detailPathLabel.setText(server.getDefaultPath() != null ? server.getDefaultPath() : "/");
-        detailCreatedLabel.setText(server.getCreatedAt() != null ? 
-            server.getCreatedAt().format(DATE_FORMATTER) : "-");
-        detailLastUsedLabel.setText(server.getLastUsed() != null ? 
-            server.getLastUsed().format(DATE_FORMATTER) : "Never");
+        detailCreatedLabel.setText(server.getCreatedAt() != null ? server.getCreatedAt().format(DATE_FORMATTER) : "-");
+        detailLastUsedLabel
+                .setText(server.getLastUsed() != null ? server.getLastUsed().format(DATE_FORMATTER) : "Never");
     }
 
     /**
@@ -511,15 +529,27 @@ public class ServerManagementDialogController {
     // --- Window State Restoration Workaround ---
 
     private Stage getUltimateOwner(Stage stage) {
+        if (stage == null)
+            return null;
         Stage owner = stage;
         while (owner.getOwner() != null) {
             owner = (Stage) owner.getOwner();
         }
         return owner;
     }
-    
+
     private void showAndWaitAndRestore(Stage dialog) {
+        if (dialog.getOwner() == null && serverTable.getScene() != null) {
+            dialog.initOwner(serverTable.getScene().getWindow());
+        }
+        addAppIcon(dialog);
+
         Stage owner = getUltimateOwner((Stage) dialog.getOwner());
+        if (owner == null) {
+            dialog.showAndWait();
+            return;
+        }
+
         boolean wasMaximized = owner.isMaximized();
         double oldX = owner.getX(), oldY = owner.getY(), oldW = owner.getWidth(), oldH = owner.getHeight();
 
@@ -538,13 +568,24 @@ public class ServerManagementDialogController {
     }
 
     private <T> Optional<T> showAndWaitAndRestore(Dialog<T> dialog) {
+        if (dialog.getOwner() == null && serverTable.getScene() != null) {
+            dialog.initOwner(serverTable.getScene().getWindow());
+        }
+
+        try {
+            Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
+            addAppIcon(stage);
+        } catch (Exception e) {
+            // Ignore if stage not ready
+        }
+
         Stage owner = getUltimateOwner((Stage) dialog.getOwner());
+        if (owner == null) {
+            return dialog.showAndWait();
+        }
+
         boolean wasMaximized = owner.isMaximized();
         double oldX = owner.getX(), oldY = owner.getY(), oldW = owner.getWidth(), oldH = owner.getHeight();
-
-        if (dialog.getOwner() == null) {
-            dialog.initOwner(owner);
-        }
 
         Optional<T> result = dialog.showAndWait();
 
@@ -560,5 +601,15 @@ public class ServerManagementDialogController {
         });
 
         return result;
+    }
+
+    private void addAppIcon(Stage stage) {
+        try {
+            javafx.scene.image.Image icon = new javafx.scene.image.Image(
+                    java.util.Objects.requireNonNull(getClass().getResourceAsStream("/images/app-icon.png")));
+            stage.getIcons().add(icon);
+        } catch (Exception e) {
+            logger.warn("Failed to load app icon for dialog", e);
+        }
     }
 }

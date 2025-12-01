@@ -114,7 +114,9 @@ public class UnifiedFileManagerDialogController {
     private MenuItem addToFavoritesMenuItem;
     private MenuItem removeFromFavoritesMenuItem;
 
-    public enum OpenAction {OPEN, TAIL}
+    public enum OpenAction {
+        OPEN, TAIL
+    }
 
     // Services
     private LocalFileService localFileService;
@@ -135,7 +137,6 @@ public class UnifiedFileManagerDialogController {
     // --- Performance Enhancements ---
     private final java.util.Map<String, CacheEntry> directoryCache = new java.util.concurrent.ConcurrentHashMap<>();
     private static final long CACHE_DURATION_MS = 30 * 1000; // 30 seconds
-
 
     @FXML
     public void initialize() {
@@ -168,8 +169,7 @@ public class UnifiedFileManagerDialogController {
             // Add Ctrl+R shortcut for refreshing
             pathField.getScene().getAccelerators().put(
                     new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN),
-                    this::refreshCurrentPath
-            );
+                    this::refreshCurrentPath);
         });
     }
 
@@ -316,7 +316,8 @@ public class UnifiedFileManagerDialogController {
                     if (file.isDirectory()) {
                         icon.setIcon(FontAwesomeIcon.FOLDER);
                         icon.setFill(Color.DARKGOLDENROD);
-                        boolean isFavorite = favoriteFolderService.isFavorite(file.getPath(), getLocationIdForCurrent());
+                        boolean isFavorite = favoriteFolderService.isFavorite(file.getPath(),
+                                getLocationIdForCurrent());
                         if (isFavorite) {
                             getTableRow().setStyle("-fx-font-weight: bold;");
                         } else {
@@ -401,7 +402,8 @@ public class UnifiedFileManagerDialogController {
         openButton.setOnAction(e -> handleOpen());
 
         fileTable.setOnKeyPressed(event -> {
-            if (new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.C, javafx.scene.input.KeyCombination.CONTROL_DOWN).match(event)) {
+            if (new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.C,
+                    javafx.scene.input.KeyCombination.CONTROL_DOWN).match(event)) {
                 copySelectionToClipboard(fileTable);
                 event.consume();
             }
@@ -461,7 +463,8 @@ public class UnifiedFileManagerDialogController {
             @Override
             protected Boolean call() {
                 // The activeSshService is already instantiated in handleLocationSelected
-                return activeSshService.connect(server.getHost(), server.getPort(), server.getUsername(), finalPassword);
+                return activeSshService.connect(server.getHost(), server.getPort(), server.getUsername(),
+                        finalPassword);
             }
         };
 
@@ -473,7 +476,8 @@ public class UnifiedFileManagerDialogController {
             } else {
                 updateStatus("Connection failed");
                 progressIndicator.setVisible(false);
-                showError("Connection Error", "Could not connect to " + server.getHost() + ". Please check credentials.");
+                showError("Connection Error",
+                        "Could not connect to " + server.getHost() + ". Please check credentials.");
                 locationListView.getSelectionModel().select(0); // Go back to local on failure
             }
         });
@@ -596,7 +600,8 @@ public class UnifiedFileManagerDialogController {
                     upDir.setDirectory(true);
                     upDir.setPath(parentPath);
                     if (currentLocation != null) {
-                        upDir.setSourceType(currentLocation.server == null ? FileInfo.SourceType.LOCAL : FileInfo.SourceType.REMOTE);
+                        upDir.setSourceType(currentLocation.server == null ? FileInfo.SourceType.LOCAL
+                                : FileInfo.SourceType.REMOTE);
                     }
                     files.add(0, upDir);
                 }
@@ -697,7 +702,8 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void loadFavoritesForCurrentLocation() {
-        if (currentLocation == null) return;
+        if (currentLocation == null)
+            return;
 
         String locationId = getLocationIdForCurrent();
         List<FavoriteFolder> favorites = favoriteFolderService.getFavoritesForLocation(locationId);
@@ -793,7 +799,8 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void copySelectionToClipboard(final javafx.scene.control.TableView<?> table) {
-        final javafx.collections.ObservableList<javafx.scene.control.TablePosition> selectedCells = table.getSelectionModel().getSelectedCells();
+        final javafx.collections.ObservableList<javafx.scene.control.TablePosition> selectedCells = table
+                .getSelectionModel().getSelectedCells();
         if (selectedCells.isEmpty()) {
             return;
         }
@@ -840,6 +847,7 @@ public class UnifiedFileManagerDialogController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ServerManagementDialog.fxml"));
             Parent root = loader.load();
             Stage stage = new Stage();
+            addAppIcon(stage);
             stage.setTitle("Server Management");
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.initOwner(ownerStage); // The dialog's direct owner is the file manager
@@ -878,6 +886,7 @@ public class UnifiedFileManagerDialogController {
             controller.loadFile(selectedFile, activeSshService);
 
             Stage stage = new Stage();
+            addAppIcon(stage);
             stage.setTitle("Log Preview");
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.initOwner(ownerStage);
@@ -896,6 +905,7 @@ public class UnifiedFileManagerDialogController {
     private void showError(String title, String content) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.ERROR);
+            addAppIcon(alert);
             alert.setTitle(title);
             alert.setContentText(content);
             alert.showAndWait();
@@ -974,6 +984,31 @@ public class UnifiedFileManagerDialogController {
 
         public boolean isExpired() {
             return (System.currentTimeMillis() - timestamp) > CACHE_DURATION_MS;
+        }
+    }
+
+    private void addAppIcon(Dialog<?> dialog) {
+        try {
+            if (dialog.getOwner() == null && cancelButton.getScene() != null) {
+                dialog.initOwner(cancelButton.getScene().getWindow());
+            }
+
+            if (dialog.getDialogPane().getScene() != null && dialog.getDialogPane().getScene().getWindow() != null) {
+                Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
+                addAppIcon(stage);
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+    }
+
+    private void addAppIcon(Stage stage) {
+        try {
+            javafx.scene.image.Image icon = new javafx.scene.image.Image(
+                    java.util.Objects.requireNonNull(getClass().getResourceAsStream("/images/app-icon.png")));
+            stage.getIcons().add(icon);
+        } catch (Exception e) {
+            logger.warn("Failed to load app icon for dialog", e);
         }
     }
 }

@@ -67,6 +67,8 @@ public class MainController {
     @FXML
     private MenuItem aboutMenuItem;
     @FXML
+    private MenuItem documentationMenuItem;
+    @FXML
     private MenuItem preferencesMenuItem;
 
     // FXML Components - Main Layout
@@ -257,6 +259,7 @@ public class MainController {
         preferencesMenuItem.setOnAction(e -> handlePreferences());
 
         aboutMenuItem.setOnAction(e -> handleAbout());
+        documentationMenuItem.setOnAction(e -> handleDocumentation());
     }
 
     private void setupLeftPanel() {
@@ -932,6 +935,7 @@ public class MainController {
             UnifiedFileManagerDialogController controller = loader.getController();
 
             Stage dialog = new Stage();
+            addAppIcon(dialog);
             dialog.setTitle("Open File");
             dialog.initModality(Modality.WINDOW_MODAL);
             dialog.initOwner(mainStage);
@@ -1299,6 +1303,7 @@ public class MainController {
             dialog.setTitle("Parsing Configuration");
             dialog.initOwner(mainStage);
             dialog.initModality(Modality.WINDOW_MODAL);
+            addAppIcon(dialog);
             Scene scene = new Scene(root);
             dialog.setScene(scene);
             dialog.setWidth(1000);
@@ -1328,6 +1333,7 @@ public class MainController {
             dialog.setTitle("SSH Server Management");
             dialog.initOwner(mainStage);
             dialog.initModality(Modality.APPLICATION_MODAL);
+            addAppIcon(dialog);
             restoreWindow(mainStage, wasMaximized, oldX, oldY, oldWidth, oldHeight, root, dialog);
 
             logger.info("Server management dialog closed");
@@ -1350,6 +1356,7 @@ public class MainController {
             dialog.setTitle("Preferences");
             dialog.initOwner(mainStage);
             dialog.initModality(Modality.WINDOW_MODAL);
+            addAppIcon(dialog);
             dialog.setScene(new Scene(root));
 
             dialog.showAndWait();
@@ -2257,22 +2264,44 @@ public class MainController {
     }
 
     private void handleAbout() {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("About SeeLoggyPlus");
-        alert.setHeaderText("SeeLoggyPlus v1.0.0");
-        alert.setContentText(
-                """
-                        High-performance log viewer with advanced parsing capabilities.
+        try {
+            Stage mainStage = (Stage) menuBar.getScene().getWindow();
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/AboutDialog.fxml"));
+            Parent root = loader.load();
 
-                        Features:
-                        - Custom regex parsing with named groups
-                        - Local and remote (SSH) file access
-                        - JSON/XML prettification
-                        - Text and regex search
-                        - Performance optimized for large files
+            Stage dialog = new Stage();
+            dialog.setTitle("About SeeLoggyPlus");
+            dialog.initOwner(mainStage);
+            dialog.initModality(Modality.WINDOW_MODAL);
+            dialog.setResizable(false);
+            addAppIcon(dialog);
+            dialog.setScene(new Scene(root));
 
-                        © 2025 SeeLoggyPlus""");
-        showAndWaitAndRestore(alert);
+            dialog.showAndWait();
+        } catch (IOException e) {
+            logger.error("Failed to open About dialog", e);
+            showError("Error", "Could not open About dialog: " + e.getMessage());
+        }
+    }
+
+    private void handleDocumentation() {
+        try {
+            Stage mainStage = (Stage) menuBar.getScene().getWindow();
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/DocumentationDialog.fxml"));
+            Parent root = loader.load();
+
+            Stage dialog = new Stage();
+            dialog.setTitle("SeeLoggyPlus Documentation");
+            dialog.initOwner(mainStage);
+            dialog.initModality(Modality.NONE); // Documentation can be non-modal
+            addAppIcon(dialog);
+            dialog.setScene(new Scene(root));
+
+            dialog.show();
+        } catch (IOException e) {
+            logger.error("Failed to open Documentation dialog", e);
+            showError("Error", "Could not open Documentation dialog: " + e.getMessage());
+        }
     }
 
     private void handleExit() {
@@ -3083,6 +3112,16 @@ public class MainController {
 
                 setGraphic(vbox);
             }
+        }
+    }
+
+    private void addAppIcon(Stage stage) {
+        try {
+            javafx.scene.image.Image icon = new javafx.scene.image.Image(
+                    java.util.Objects.requireNonNull(getClass().getResourceAsStream("/images/app-icon.png")));
+            stage.getIcons().add(icon);
+        } catch (Exception e) {
+            logger.warn("Failed to load app icon for dialog", e);
         }
     }
 

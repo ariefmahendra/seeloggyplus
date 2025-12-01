@@ -52,7 +52,7 @@
                                        </tooltip>
                                     </Spinner>
                                     <Label text="Font Family:" GridPane.rowIndex="1" />
-                                    <TextField fx:id="appFontFamilyField" promptText="e.g. Consolas, Monospaced" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                    <ComboBox fx:id="appFontFamilyComboBox" prefWidth="200.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
                                  </children>
                               </GridPane>
                            </children>
