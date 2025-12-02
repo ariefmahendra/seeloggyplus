@@ -137,6 +137,7 @@ public class UnifiedFileManagerDialogController {
     // --- Performance Enhancements ---
     private final java.util.Map<String, CacheEntry> directoryCache = new java.util.concurrent.ConcurrentHashMap<>();
     private static final long CACHE_DURATION_MS = 30 * 1000; // 30 seconds
+    private boolean suppressAutoRefresh = false;
 
     @FXML
     public void initialize() {
@@ -174,6 +175,11 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void handleWindowGainedFocus() {
+        if (suppressAutoRefresh) {
+            suppressAutoRefresh = false;
+            return;
+        }
+
         // Only refresh if we are in a remote location and have a path
         if (currentLocation != null && currentLocation.server != null && currentPath != null) {
             logger.info("Window gained focus, auto-refreshing remote path: {}", currentPath);
@@ -904,6 +910,7 @@ public class UnifiedFileManagerDialogController {
 
     private void showError(String title, String content) {
         Platform.runLater(() -> {
+            suppressAutoRefresh = true;
             Alert alert = new Alert(Alert.AlertType.ERROR);
             addAppIcon(alert);
             alert.setTitle(title);

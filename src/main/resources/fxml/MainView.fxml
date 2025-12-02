@@ -55,7 +55,6 @@
                 <!-- Help Menu -->
                 <Menu text="Help">
                     <MenuItem fx:id="aboutMenuItem" text="About" />
-                    <MenuItem fx:id="documentationMenuItem" text="Documentation" />
                 </Menu>
             </MenuBar>
 

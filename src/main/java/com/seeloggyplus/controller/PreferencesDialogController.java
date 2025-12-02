@@ -45,6 +45,8 @@ public class PreferencesDialogController {
     @FXML
     private Spinner<Integer> sshThreadsSpinner;
     @FXML
+    private Spinner<Integer> sshTimeoutSpinner;
+    @FXML
     private Button saveButton;
     @FXML
     private Button cancelButton;
@@ -81,6 +83,8 @@ public class PreferencesDialogController {
         } else {
             sshThreadsSpinner.setTooltip(new Tooltip("Range: 1 to " + availableProcessors));
         }
+
+        sshTimeoutSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 600, 60));
     }
 
     private void setupFontFamilyComboBox() {
@@ -115,6 +119,7 @@ public class PreferencesDialogController {
         lpLineLimitSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("lp_line_limit", "500")));
 
         sshThreadsSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("ssh_download_threads", "4")));
+        sshTimeoutSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("ssh_connection_timeout", "60")));
     }
 
     private String getPreference(String key, String defaultValue) {
@@ -132,6 +137,7 @@ public class PreferencesDialogController {
         commitEditorText(mainWindowSizeSpinner);
         commitEditorText(lpLineLimitSpinner);
         commitEditorText(sshThreadsSpinner);
+        commitEditorText(sshTimeoutSpinner);
 
         savePreference("app_font_size", String.valueOf(appFontSizeSpinner.getValue()));
         savePreference("app_font_family", appFontFamilyComboBox.getValue());
@@ -148,6 +154,7 @@ public class PreferencesDialogController {
         savePreference("lp_line_limit", String.valueOf(lpLineLimitSpinner.getValue()));
 
         savePreference("ssh_download_threads", String.valueOf(sshThreadsSpinner.getValue()));
+        savePreference("ssh_connection_timeout", String.valueOf(sshTimeoutSpinner.getValue()));
 
         logger.info("Preferences saved.");
 
