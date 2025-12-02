@@ -3,6 +3,7 @@ package com.seeloggyplus.service.impl;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
+import com.seeloggyplus.service.PreferenceService;
 import com.seeloggyplus.service.SSHSessionManager;
 import lombok.Getter;
 import org.slf4j.Logger;
@@ -19,8 +20,10 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
     private static final SSHSessionManagerImpl INSTANCE = new SSHSessionManagerImpl();
 
     private final Map<String, ManagedSession> sessionPool = new ConcurrentHashMap<>();
+    private final PreferenceService preferenceService;
 
     private SSHSessionManagerImpl() {
+        this.preferenceService = new PreferenceServiceImpl();
         ScheduledExecutorService cleanupScheduler = Executors.newSingleThreadScheduledExecutor();
         cleanupScheduler.scheduleAtFixedRate(this::cleanupExpiredSessions, 1, 1, TimeUnit.MINUTES);
     }
@@ -30,7 +33,8 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
     }
 
     @Override
-    public Session getSession(String host, int port, String username, String password, long ttlMillis) throws JSchException {
+    public Session getSession(String host, int port, String username, String password, long ttlMillis)
+            throws JSchException {
         String key = generateKey(host, port, username);
         if (sessionPool.containsKey(key)) {
             ManagedSession managed = sessionPool.get(key);
@@ -61,7 +65,19 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
         session.setServerAliveCountMax(3);
 
         session.setConfig(config);
-        session.connect(30000);
+
+        // Get timeout from preferences (in seconds), convert to milliseconds
+        int timeoutSeconds = 60; // default
+        try {
+            String timeoutStr = preferenceService.getPreferencesByCode("ssh_connection_timeout").orElse("60");
+            timeoutSeconds = Integer.parseInt(timeoutStr);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid SSH timeout preference, using default: 60 seconds");
+        }
+
+        int timeoutMillis = timeoutSeconds * 1000;
+        logger.info("Connecting to SSH with timeout: {} seconds ({} ms)", timeoutSeconds, timeoutMillis);
+        session.connect(timeoutMillis);
         return session;
     }
 

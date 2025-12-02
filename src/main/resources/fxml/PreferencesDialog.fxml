@@ -201,12 +201,19 @@
                                  </columnConstraints>
                                  <rowConstraints>
                                     <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                    <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
                                  </rowConstraints>
                                  <children>
                                     <Label text="Download Threads:" />
                                     <Spinner fx:id="sshThreadsSpinner" editable="true" GridPane.columnIndex="1">
                                        <tooltip>
                                           <Tooltip text="Range: 1 to 16" />
+                                       </tooltip>
+                                    </Spinner>
+                                    <Label text="Connection Timeout (sec):" GridPane.rowIndex="1" />
+                                    <Spinner fx:id="sshTimeoutSpinner" editable="true" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                       <tooltip>
+                                          <Tooltip text="Range: 1 to 600 seconds" />
                                        </tooltip>
                                     </Spinner>
                                  </children>
