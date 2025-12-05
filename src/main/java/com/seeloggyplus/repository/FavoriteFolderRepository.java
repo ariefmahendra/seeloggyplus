@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface FavoriteFolderRepository {
-    void setupTable();
     FavoriteFolder save(FavoriteFolder favoriteFolder);
     void delete(int id);
     List<FavoriteFolder> findByLocationId(String locationId);
