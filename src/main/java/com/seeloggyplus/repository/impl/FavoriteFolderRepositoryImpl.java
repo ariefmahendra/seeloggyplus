@@ -16,25 +16,6 @@ public class FavoriteFolderRepositoryImpl implements FavoriteFolderRepository {
     private static final Logger logger = LoggerFactory.getLogger(FavoriteFolderRepositoryImpl.class);
 
     @Override
-    public void setupTable() {
-        String sql = "CREATE TABLE IF NOT EXISTS favorite_folders (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                "name TEXT NOT NULL," +
-                "path TEXT NOT NULL," +
-                "locationId TEXT NOT NULL," +
-                "UNIQUE(path, locationId)" +
-                ");";
-
-        try (Statement stmt = DatabaseConfig.getInstance().getConnection().createStatement()) {
-            stmt.execute(sql);
-            logger.info("Favorite Folders table created or already exists.");
-        } catch (SQLException e) {
-            logger.error("Error creating favorite_folders table", e);
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
     public FavoriteFolder save(FavoriteFolder favoriteFolder) {
         String sql = "INSERT INTO favorite_folders(name, path, locationId) VALUES(?, ?, ?)";
         Connection conn = DatabaseConfig.getInstance().getConnection();
@@ -54,10 +35,9 @@ public class FavoriteFolderRepositoryImpl implements FavoriteFolderRepository {
             logger.info("Saved favorite folder: {}", favoriteFolder.getName());
             return favoriteFolder;
         } catch (SQLException e) {
-            logger.error("Error saving favorite folder: " + favoriteFolder.getName(), e);
-            // Handle UNIQUE constraint violation
+            logger.error("Error saving favorite folder: {}", favoriteFolder.getName(), e);
             if (e.getErrorCode() == 19) { // SQLite constraint violation
-                return null; // Or throw a custom exception
+                return null;
             }
             throw new RuntimeException(e);
         }
@@ -71,7 +51,7 @@ public class FavoriteFolderRepositoryImpl implements FavoriteFolderRepository {
             pstmt.executeUpdate();
             logger.info("Deleted favorite folder with id: {}", id);
         } catch (SQLException e) {
-            logger.error("Error deleting favorite folder with id: " + id, e);
+            logger.error("Error deleting favorite folder with id: {}", id, e);
             throw new RuntimeException(e);
         }
     }
@@ -92,7 +72,7 @@ public class FavoriteFolderRepositoryImpl implements FavoriteFolderRepository {
                 ));
             }
         } catch (SQLException e) {
-            logger.error("Error finding favorite folders for location: " + locationId, e);
+            logger.error("Error finding favorite folders for location: {}", locationId, e);
             throw new RuntimeException(e);
         }
         return favorites;

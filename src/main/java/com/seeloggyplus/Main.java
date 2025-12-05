@@ -1,6 +1,5 @@
 package com.seeloggyplus;
 
-
 import com.seeloggyplus.service.PreferenceService;
 import com.seeloggyplus.service.impl.PreferenceServiceImpl;
 import javafx.application.Application;
@@ -38,7 +37,7 @@ public class Main extends Application {
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
         this.preferenceService = new PreferenceServiceImpl();
-        
+
         try {
             // Load main view
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
@@ -56,7 +55,7 @@ public class Main extends Application {
 
             // Set application icon (if available)
             try {
-                Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/icon.png")));
+                Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/app-icon.png")));
                 primaryStage.getIcons().add(icon);
             } catch (Exception e) {
                 logger.warn("Application icon not found");
@@ -149,11 +148,14 @@ public class Main extends Application {
      */
     private void saveWindowPreferences() {
         if (primaryStage != null) {
-            preferenceService.saveOrUpdatePreferences(new Preference("window_width", String.valueOf(primaryStage.getWidth())));
-            preferenceService.saveOrUpdatePreferences(new Preference("window_height", String.valueOf(primaryStage.getHeight())));
+            preferenceService
+                    .saveOrUpdatePreferences(new Preference("window_width", String.valueOf(primaryStage.getWidth())));
+            preferenceService
+                    .saveOrUpdatePreferences(new Preference("window_height", String.valueOf(primaryStage.getHeight())));
             preferenceService.saveOrUpdatePreferences(new Preference("window_x", String.valueOf(primaryStage.getX())));
             preferenceService.saveOrUpdatePreferences(new Preference("window_y", String.valueOf(primaryStage.getY())));
-            preferenceService.saveOrUpdatePreferences(new Preference("window_maximized", String.valueOf(primaryStage.isMaximized())));
+            preferenceService.saveOrUpdatePreferences(
+                    new Preference("window_maximized", String.valueOf(primaryStage.isMaximized())));
         }
     }
 
@@ -170,8 +172,7 @@ public class Main extends Application {
      */
     private void showErrorAndExit(String message) {
         javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-            javafx.scene.control.Alert.AlertType.ERROR
-        );
+                javafx.scene.control.Alert.AlertType.ERROR);
         alert.setTitle("Application Error");
         alert.setHeaderText("Failed to Start Application");
         alert.setContentText(message);

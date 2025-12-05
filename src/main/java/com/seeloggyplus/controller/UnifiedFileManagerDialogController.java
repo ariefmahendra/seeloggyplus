@@ -25,6 +25,9 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Modality;
@@ -111,11 +114,12 @@ public class UnifiedFileManagerDialogController {
     private MenuItem addToFavoritesMenuItem;
     private MenuItem removeFromFavoritesMenuItem;
 
-    public enum OpenAction {OPEN, TAIL}
+    public enum OpenAction {
+        OPEN, TAIL
+    }
 
     // Services
     private LocalFileService localFileService;
-    private SSHServiceImpl sshService;
     private ServerManagementService serverManagementService;
     private FavoriteFolderService favoriteFolderService;
 
@@ -129,6 +133,11 @@ public class UnifiedFileManagerDialogController {
     private SSHServiceImpl activeSshService;
     @Getter
     private OpenAction openAction = OpenAction.OPEN;
+
+    // --- Performance Enhancements ---
+    private final java.util.Map<String, CacheEntry> directoryCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long CACHE_DURATION_MS = 30 * 1000; // 30 seconds
+    private boolean suppressAutoRefresh = false;
 
     @FXML
     public void initialize() {
@@ -148,6 +157,34 @@ public class UnifiedFileManagerDialogController {
         setupEventHandlers();
 
         locationListView.getSelectionModel().select(0);
+
+        // --- Auto-Refresh on Focus ---
+        Platform.runLater(() -> {
+            Stage stage = (Stage) pathField.getScene().getWindow();
+            stage.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+                if (isNowFocused) {
+                    handleWindowGainedFocus();
+                }
+            });
+
+            // Add Ctrl+R shortcut for refreshing
+            pathField.getScene().getAccelerators().put(
+                    new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN),
+                    this::refreshCurrentPath);
+        });
+    }
+
+    private void handleWindowGainedFocus() {
+        if (suppressAutoRefresh) {
+            suppressAutoRefresh = false;
+            return;
+        }
+
+        // Only refresh if we are in a remote location and have a path
+        if (currentLocation != null && currentLocation.server != null && currentPath != null) {
+            logger.info("Window gained focus, auto-refreshing remote path: {}", currentPath);
+            refreshCurrentPath();
+        }
     }
 
     private void setupLocationList() {
@@ -285,7 +322,8 @@ public class UnifiedFileManagerDialogController {
                     if (file.isDirectory()) {
                         icon.setIcon(FontAwesomeIcon.FOLDER);
                         icon.setFill(Color.DARKGOLDENROD);
-                        boolean isFavorite = favoriteFolderService.isFavorite(file.getPath(), getLocationIdForCurrent());
+                        boolean isFavorite = favoriteFolderService.isFavorite(file.getPath(),
+                                getLocationIdForCurrent());
                         if (isFavorite) {
                             getTableRow().setStyle("-fx-font-weight: bold;");
                         } else {
@@ -370,7 +408,8 @@ public class UnifiedFileManagerDialogController {
         openButton.setOnAction(e -> handleOpen());
 
         fileTable.setOnKeyPressed(event -> {
-            if (new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.C, javafx.scene.input.KeyCombination.CONTROL_DOWN).match(event)) {
+            if (new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.C,
+                    javafx.scene.input.KeyCombination.CONTROL_DOWN).match(event)) {
                 copySelectionToClipboard(fileTable);
                 event.consume();
             }
@@ -380,21 +419,26 @@ public class UnifiedFileManagerDialogController {
     private void handleLocationSelected(LocationItem location) {
         if (currentLocation == location)
             return;
-        if (currentLocation != null && currentLocation.server != null && sshService != null) {
-            sshService.disconnect();
-            sshService = null;
+
+        // Disconnect from the previous session if there was one
+        if (activeSshService != null) {
+            activeSshService.disconnect();
+            activeSshService = null;
         }
 
         currentLocation = location;
         backHistory.clear();
         forwardHistory.clear();
+        directoryCache.clear(); // Clear cache when changing location
         updateNavigationButtons();
         loadFavoritesForCurrentLocation();
 
         if (location.server == null) {
-            activeSshService = null;
+            // This is a local drive, no connection needed
             navigateTo(localFileService.getHomeDirectory());
         } else {
+            // This is a remote server, create a new service and connect
+            activeSshService = new SSHServiceImpl();
             connectToRemote(location.server);
         }
     }
@@ -406,11 +450,12 @@ public class UnifiedFileManagerDialogController {
             PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
             Optional<String> result = prompt.showAndWait();
 
-            if (result.isPresent()) {
+            if (result.isPresent() && !result.get().isBlank()) {
                 password = result.get();
             } else {
                 logger.info("User cancelled password prompt. Aborting connection.");
                 updateStatus("Connection cancelled.");
+                locationListView.getSelectionModel().select(0); // Go back to local
                 return;
             }
         }
@@ -423,36 +468,33 @@ public class UnifiedFileManagerDialogController {
         Task<Boolean> connectTask = new Task<>() {
             @Override
             protected Boolean call() {
-                sshService = new SSHServiceImpl();
-                return sshService.connect(server.getHost(), server.getPort(), server.getUsername(),
+                // The activeSshService is already instantiated in handleLocationSelected
+                return activeSshService.connect(server.getHost(), server.getPort(), server.getUsername(),
                         finalPassword);
             }
         };
 
         connectTask.setOnSucceeded(e -> {
             if (connectTask.getValue()) {
-                activeSshService = sshService;
+                serverManagementService.updateServerLastUsed(server.getId());
                 updateStatus("Connected to " + server.getHost());
-                Task<String> homeTask = new Task<>() {
-                    @Override
-                    protected String call() throws Exception {
-                        String result = sshService.executeCommand("pwd");
-                        return result != null ? result.trim() : "/";
-                    }
-                };
-                homeTask.setOnSucceeded(ev -> navigateTo(homeTask.getValue()));
-                new Thread(homeTask).start();
+                navigateTo(server.getDefaultPath() != null ? server.getDefaultPath() : "/");
             } else {
                 updateStatus("Connection failed");
                 progressIndicator.setVisible(false);
-                showError("Connection Error", "Could not connect to " + server.getHost() + ". Please check credentials.");
+                showError("Connection Error",
+                        "Could not connect to " + server.getHost() + ". Please check credentials.");
+                locationListView.getSelectionModel().select(0); // Go back to local on failure
             }
         });
 
         connectTask.setOnFailed(e -> {
             updateStatus("Connection failed");
             progressIndicator.setVisible(false);
-            showError("Connection Error", "Could not connect to " + server.getHost());
+            Throwable ex = connectTask.getException();
+            logger.error("SSH Connection task failed", ex);
+            showError("Connection Error", "Could not connect to " + server.getHost() + ": " + ex.getMessage());
+            locationListView.getSelectionModel().select(0); // Go back to local on failure
         });
 
         new Thread(connectTask).start();
@@ -518,6 +560,17 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void loadFiles(String path) {
+        // --- Caching Layer ---
+        CacheEntry cachedEntry = directoryCache.get(path);
+        if (cachedEntry != null && !cachedEntry.isExpired()) {
+            logger.info("Cache HIT for path: {}", path);
+            allFiles.setAll(cachedEntry.getFiles());
+            itemCountLabel.setText(allFiles.size() + " items");
+            updateStatus("Ready (from cache)");
+            return;
+        }
+        logger.info("Cache MISS for path: {}", path);
+
         updateStatus("Loading " + path + "...");
         progressIndicator.setVisible(true);
 
@@ -528,18 +581,10 @@ public class UnifiedFileManagerDialogController {
                 if (currentLocation.server == null) {
                     files = new java.util.ArrayList<>(localFileService.listFiles(path));
                 } else {
-                    if (sshService == null) {
-                        throw new IOException("SSH Service is not initialized.");
+                    if (activeSshService == null || !activeSshService.isConnected()) {
+                        throw new IOException("SSH session is not active.");
                     }
-
-                    if (!sshService.isConnected()) {
-                        boolean isConnected = sshService.connect(currentLocation.server.getHost(), currentLocation.server.getPort(), currentLocation.server.getUsername(), currentLocation.server.getPassword());
-                        if (!isConnected) {
-                            throw new IOException("SSH Service is not connected.");
-                        }
-                    }
-
-                    files = sshService.listFiles(path).stream().map(r -> {
+                    files = activeSshService.listFiles(path).stream().map(r -> {
                         FileInfo f = new FileInfo();
                         f.setName(r.getName());
                         f.setPath(r.getPath());
@@ -553,6 +598,7 @@ public class UnifiedFileManagerDialogController {
                     }).collect(Collectors.toList());
                 }
 
+                // Add ".." entry for parent directory navigation
                 String parentPath = getParentPath(path);
                 if (parentPath != null) {
                     FileInfo upDir = new FileInfo();
@@ -560,7 +606,8 @@ public class UnifiedFileManagerDialogController {
                     upDir.setDirectory(true);
                     upDir.setPath(parentPath);
                     if (currentLocation != null) {
-                        upDir.setSourceType(currentLocation.server == null ? FileInfo.SourceType.LOCAL : FileInfo.SourceType.REMOTE);
+                        upDir.setSourceType(currentLocation.server == null ? FileInfo.SourceType.LOCAL
+                                : FileInfo.SourceType.REMOTE);
                     }
                     files.add(0, upDir);
                 }
@@ -570,20 +617,23 @@ public class UnifiedFileManagerDialogController {
         };
 
         loadTask.setOnSucceeded(e -> {
-            allFiles.setAll(loadTask.getValue());
+            List<FileInfo> loadedFiles = loadTask.getValue();
+            directoryCache.put(path, new CacheEntry(loadedFiles)); // Update cache
+            allFiles.setAll(loadedFiles);
             itemCountLabel.setText(allFiles.size() + " items");
             progressIndicator.setVisible(false);
             updateStatus("Ready");
             updateNavigationButtons();
-            loadFavoritesForCurrentLocation(); // Refresh favorites to apply styling
+            loadFavoritesForCurrentLocation();
             fileTable.refresh();
         });
 
         loadTask.setOnFailed(e -> {
             progressIndicator.setVisible(false);
             updateStatus("Error loading files");
-            logger.error("Error loading files", loadTask.getException());
-            showError("Error", "Failed to load files: " + loadTask.getException().getMessage());
+            Throwable ex = loadTask.getException();
+            logger.error("Error loading files for path: {}", path, ex);
+            showError("Error", "Failed to load files: " + ex.getMessage());
         });
 
         new Thread(loadTask).start();
@@ -658,7 +708,8 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void loadFavoritesForCurrentLocation() {
-        if (currentLocation == null) return;
+        if (currentLocation == null)
+            return;
 
         String locationId = getLocationIdForCurrent();
         List<FavoriteFolder> favorites = favoriteFolderService.getFavoritesForLocation(locationId);
@@ -674,6 +725,10 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void closeDialog() {
+        // Ensure any active connection is terminated when the dialog closes
+        if (activeSshService != null) {
+            activeSshService.disconnect();
+        }
         Stage stage = (Stage) cancelButton.getScene().getWindow();
         stage.close();
     }
@@ -730,30 +785,14 @@ public class UnifiedFileManagerDialogController {
         if (currentLocation.server == null) {
             navigateTo(localFileService.getHomeDirectory());
         } else {
-            // Re-fetch home or store it
-            Task<String> homeTask = new Task<>() {
-                @Override
-                protected String call() throws Exception {
-                    if (sshService == null || !sshService.isConnected()) {
-                        throw new IOException("SSH Service not connected");
-                    }
-
-                    String result = sshService.executeCommand("pwd");
-
-                    if (result != null && !result.isBlank()) {
-                        return result.trim();
-                    } else {
-                        return "/";
-                    }
-                }
-            };
-            homeTask.setOnSucceeded(ev -> navigateTo(homeTask.getValue()));
-            new Thread(homeTask).start();
+            navigateTo(currentLocation.server.getDefaultPath() != null ? currentLocation.server.getDefaultPath() : "/");
         }
     }
 
     private void refreshCurrentPath() {
         if (currentPath != null) {
+            directoryCache.remove(currentPath); // Invalidate cache for this path
+            logger.info("Cache invalidated for path: {}", currentPath);
             loadFiles(currentPath);
         }
     }
@@ -766,7 +805,8 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void copySelectionToClipboard(final javafx.scene.control.TableView<?> table) {
-        final javafx.collections.ObservableList<javafx.scene.control.TablePosition> selectedCells = table.getSelectionModel().getSelectedCells();
+        final javafx.collections.ObservableList<javafx.scene.control.TablePosition> selectedCells = table
+                .getSelectionModel().getSelectedCells();
         if (selectedCells.isEmpty()) {
             return;
         }
@@ -813,6 +853,7 @@ public class UnifiedFileManagerDialogController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ServerManagementDialog.fxml"));
             Parent root = loader.load();
             Stage stage = new Stage();
+            addAppIcon(stage);
             stage.setTitle("Server Management");
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.initOwner(ownerStage); // The dialog's direct owner is the file manager
@@ -851,6 +892,7 @@ public class UnifiedFileManagerDialogController {
             controller.loadFile(selectedFile, activeSshService);
 
             Stage stage = new Stage();
+            addAppIcon(stage);
             stage.setTitle("Log Preview");
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.initOwner(ownerStage);
@@ -868,7 +910,9 @@ public class UnifiedFileManagerDialogController {
 
     private void showError(String title, String content) {
         Platform.runLater(() -> {
+            suppressAutoRefresh = true;
             Alert alert = new Alert(Alert.AlertType.ERROR);
+            addAppIcon(alert);
             alert.setTitle(title);
             alert.setContentText(content);
             alert.showAndWait();
@@ -929,6 +973,49 @@ public class UnifiedFileManagerDialogController {
             };
         } catch (NumberFormatException e) {
             return -1L;
+        }
+    }
+
+    private static class CacheEntry {
+        private final List<FileInfo> files;
+        private final long timestamp;
+
+        public CacheEntry(List<FileInfo> files) {
+            this.files = files;
+            this.timestamp = System.currentTimeMillis();
+        }
+
+        public List<FileInfo> getFiles() {
+            return files;
+        }
+
+        public boolean isExpired() {
+            return (System.currentTimeMillis() - timestamp) > CACHE_DURATION_MS;
+        }
+    }
+
+    private void addAppIcon(Dialog<?> dialog) {
+        try {
+            if (dialog.getOwner() == null && cancelButton.getScene() != null) {
+                dialog.initOwner(cancelButton.getScene().getWindow());
+            }
+
+            if (dialog.getDialogPane().getScene() != null && dialog.getDialogPane().getScene().getWindow() != null) {
+                Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
+                addAppIcon(stage);
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+    }
+
+    private void addAppIcon(Stage stage) {
+        try {
+            javafx.scene.image.Image icon = new javafx.scene.image.Image(
+                    java.util.Objects.requireNonNull(getClass().getResourceAsStream("/images/app-icon.png")));
+            stage.getIcons().add(icon);
+        } catch (Exception e) {
+            logger.warn("Failed to load app icon for dialog", e);
         }
     }
 }

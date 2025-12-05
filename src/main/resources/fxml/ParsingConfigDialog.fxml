@@ -81,7 +81,7 @@
                     <Tooltip text="Duplicate selected configuration" />
                 </tooltip>
             </Button>
-            <Button fx:id="importConfigurationButton">
+            <Button fx:id="importConfigurationButton" prefHeight="30.0" prefWidth="30.0">
                 <graphic>
                     <FontAwesomeIconView glyphName="DOWNLOAD" size="1.2em" />
                 </graphic>
@@ -89,7 +89,7 @@
                     <Tooltip text="Import configuration from file" />
                 </tooltip>
             </Button>
-            <Button fx:id="exportConfigurationButton">
+            <Button fx:id="exportConfigurationButton" prefHeight="30.0" prefWidth="30.0">
                 <graphic>
                     <FontAwesomeIconView glyphName="UPLOAD" size="1.2em" />
                 </graphic>

@@ -23,6 +23,7 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import lombok.Getter;
 import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -140,6 +141,7 @@ public class ParsingConfigController {
 
                     if (oldVal != null && isDirty()) {
                         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                        addAppIcon(alert);
                         alert.setTitle("Unsaved Changes");
                         alert.setHeaderText("You have unsaved changes for '" + oldVal.getName() + "'.");
                         alert.setContentText("Do you want to save them before switching?");
@@ -169,46 +171,31 @@ public class ParsingConfigController {
 
     private void setupDetailPanel() {
         nameField.textProperty().addListener((obs, o, n) -> updateButtonStates());
-        descriptionArea
-                .textProperty()
-                .addListener((obs, o, n) -> updateButtonStates());
-        timestampFormatField
-                .textProperty()
-                .addListener((obs, o, n) -> updateButtonStates());
-        regexPatternArea
-                .textProperty()
-                .addListener((obs, o, n) -> {
-                    validatePattern();
-                    updateButtonStates();
-                });
+        descriptionArea.textProperty().addListener((obs, o, n) -> updateButtonStates());
+        timestampFormatField.textProperty().addListener((obs, o, n) -> updateButtonStates());
+        regexPatternArea.textProperty().addListener((obs, o, n) -> {
+            validatePattern();
+            updateButtonStates();
+        });
 
-        groupNamesListView.setCellFactory(listView ->
-                new ListCell<>() {
-                    @Override
-                    protected void updateItem(String item, boolean empty) {
-                        super.updateItem(item, empty);
-                        if (empty || item == null) {
-                            setText(null);
-                            setGraphic(null);
-                        } else {
-                            setText("• " + item);
-                        }
-                    }
+        groupNamesListView.setCellFactory(listView -> new ListCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                } else {
+                    setText("• " + item);
                 }
-        );
+            }
+        });
     }
 
     private void setupTestPanel() {
-        fieldNameColumn.setCellValueFactory(
-                new PropertyValueFactory<>("fieldName")
-        );
-        fieldValueColumn.setCellValueFactory(
-                new PropertyValueFactory<>("fieldValue")
-        );
-
-        sampleLogArea.setPromptText(
-                "Enter a sample log line to test the regex pattern..."
-        );
+        fieldNameColumn.setCellValueFactory(new PropertyValueFactory<>("fieldName"));
+        fieldValueColumn.setCellValueFactory(new PropertyValueFactory<>("fieldValue"));
+        sampleLogArea.setPromptText("Enter a sample log line to test the regex pattern...");
         testParsingButton.setOnAction(e -> handleTestParsing());
     }
 
@@ -231,7 +218,7 @@ public class ParsingConfigController {
     private void loadConfigToEditor(ParsingConfig config) {
         this.selectedConfig = config;
         if (config != null) {
-            this.configSnapshot = config.copy(); // Create snapshot to track changes
+            this.configSnapshot = config.copy();
 
             nameField.setText(config.getName());
             descriptionArea.setText(config.getDescription());
@@ -280,7 +267,8 @@ public class ParsingConfigController {
 
             if (tempConfig.getGroupNames() != null && !tempConfig.getGroupNames().isEmpty()) {
                 groupNamesListView.setItems(FXCollections.observableArrayList(tempConfig.getGroupNames()));
-                logger.info("Detected {} named groups: {}", tempConfig.getGroupNames().size(), tempConfig.getGroupNames());
+                logger.info("Detected {} named groups: {}", tempConfig.getGroupNames().size(),
+                        tempConfig.getGroupNames());
             } else {
                 groupNamesListView.getItems().clear();
                 logger.warn("No named groups detected in pattern");
@@ -311,15 +299,12 @@ public class ParsingConfigController {
         ParsingConfig testConfig = new ParsingConfig("Test", pattern);
         LogParserService.TestResult result = logParserService.testParsing(sampleLog, testConfig);
         if (result.isSuccess()) {
-            testResultLabel.setText("✓ Pattern matched successfully!");
+            testResultLabel.setText("Pattern matched successfully!");
             testResultLabel.getStyleClass().setAll("validation-success");
 
             ObservableList<ParsedField> fields = FXCollections.observableArrayList();
-            result
-                    .getParsedFields()
-                    .forEach((key, value) -> fields.add(new ParsedField(key, value)));
+            result.getParsedFields().forEach((key, value) -> fields.add(new ParsedField(key, value)));
             previewTableView.setItems(fields);
-
             logger.info("Test parsing successful, displaying {} fields", fields.size());
         } else {
             testResultLabel.setText("✗ " + result.getMessage());
@@ -333,7 +318,8 @@ public class ParsingConfigController {
         ParsingConfig newConfig = new ParsingConfig();
         newConfig.setName("New Configuration");
         newConfig.setDescription("Enter description here");
-        newConfig.setRegexPattern("(?<timestamp>\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?<level>\\w+)\\s+(?<message>.*)");
+        newConfig.setRegexPattern(
+                "(?<timestamp>\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?<level>\\w+)\\s+(?<message>.*)");
         configList.add(newConfig);
         configListView.getSelectionModel().select(newConfig);
     }
@@ -367,10 +353,12 @@ public class ParsingConfigController {
         }
     }
 
-    private Optional<ButtonType> getButtonType(List<ParsingConfig> itemToDelete, ObservableList<ParsingConfig> selectedItems) {
+    private Optional<ButtonType> getButtonType(List<ParsingConfig> itemToDelete,
+            ObservableList<ParsingConfig> selectedItems) {
         int countDataParsingConfig = itemToDelete.size();
 
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        addAppIcon(alert);
         alert.setTitle("Delete Configuration");
         alert.setHeaderText("Delete parsing configuration?");
 
@@ -401,6 +389,7 @@ public class ParsingConfigController {
         String regexPattern = regexPatternArea.getText();
         if (regexPattern == null || regexPattern.trim().isEmpty()) {
             Alert alert = new Alert(Alert.AlertType.WARNING);
+            addAppIcon(alert);
             alert.setTitle("Auto-Detect Format");
             alert.setHeaderText("Cannot auto-detect timestamp format");
             alert.setContentText("Please enter a regex pattern first.");
@@ -418,6 +407,7 @@ public class ParsingConfigController {
             logger.info("Auto-detected timestamp format: {}", detectedFormat);
 
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            addAppIcon(alert);
             alert.setTitle("Auto-Detect Format");
             alert.setHeaderText("Timestamp format detected!");
             alert.setContentText("Detected format: " + detectedFormat + "\n\nYou can modify this if needed.");
@@ -426,27 +416,33 @@ public class ParsingConfigController {
             logger.warn("Could not auto-detect timestamp format from pattern");
 
             Alert alert = new Alert(Alert.AlertType.WARNING);
+            addAppIcon(alert);
             alert.setTitle("Auto-Detect Format");
             alert.setHeaderText("Could not detect timestamp format");
-            alert.setContentText("No timestamp group found in the pattern, or pattern is not recognized.\n\nPlease enter the format manually (e.g., yyyy-MM-dd HH:mm:ss.SSS)");
+            alert.setContentText(
+                    "No timestamp group found in the pattern, or pattern is not recognized.\n\nPlease enter the format manually (e.g., yyyy-MM-dd HH:mm:ss.SSS)");
             alert.showAndWait();
         }
     }
 
     private void handleSave() {
-        if (isDirty()) {
+        // Save the currently edited config if it's dirty
+        if (isDirty() && selectedConfig != null) {
             saveCurrentConfig();
-        }
-
-        for (ParsingConfig config : configList) {
-            if (config.getId() == null) {
-                parsingConfigService.save(config);
+            if (selectedConfig.getId() == null) {
+                parsingConfigService.save(selectedConfig);
             } else {
-                parsingConfigService.update(config);
+                parsingConfigService.update(selectedConfig);
             }
         }
 
-        // Notify parent controller of changes
+        // Also save any other newly created configs that haven't been persisted yet
+        for (ParsingConfig config : configList) {
+            if (config.getId() == null) {
+                parsingConfigService.save(config);
+            }
+        }
+
         notifyConfigChanged();
         logger.info("Configuration saved and parent notified");
 
@@ -454,25 +450,26 @@ public class ParsingConfigController {
     }
 
     private void handleApply() {
-        if (isDirty()) {
-            saveCurrentConfig();
-        }
+        if (isDirty() && selectedConfig != null) {
+            saveCurrentConfig(); // This updates the in-memory object
 
-        for (ParsingConfig config : configList) {
-            if (config.getId() == null) {
-                parsingConfigService.save(config);
+            if (selectedConfig.getId() == null) {
+                parsingConfigService.save(selectedConfig);
+                logger.info("Saved new configuration: {}", selectedConfig.getName());
             } else {
-                parsingConfigService.update(config);
+                parsingConfigService.update(selectedConfig);
+                logger.info("Updated existing configuration: {}", selectedConfig.getName());
             }
         }
 
         notifyConfigChanged();
-        logger.info("Configuration applied and parent notified");
+        logger.info("Configuration changes applied and parent notified.");
     }
 
     private void handleCancel() {
         if (isDirty()) {
             Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            addAppIcon(alert);
             alert.setTitle("Unsaved Changes");
             alert.setHeaderText("You have unsaved changes.");
             alert.setContentText("Are you sure you want to discard your changes?");
@@ -493,8 +490,7 @@ public class ParsingConfigController {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Export Parsing Configurations");
         fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("JSON Files", "*.json")
-        );
+                new FileChooser.ExtensionFilter("JSON Files", "*.json"));
 
         if (selectedItems.size() == 1) {
             fileChooser.setInitialFileName(selectedItems.get(0).getName().replaceAll("\\s+", "_") + "_config.json");
@@ -511,6 +507,7 @@ public class ParsingConfigController {
                 logger.info("Exported {} parsing configurations to {}", selectedItems.size(), file.getAbsolutePath());
             } catch (IOException ex) {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
+                addAppIcon(alert);
                 alert.setTitle("Export Error");
                 alert.setHeaderText("Error exporting parsing configurations");
                 alert.setContentText("An error occurred while exporting: " + ex.getMessage());
@@ -524,19 +521,18 @@ public class ParsingConfigController {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Import Parsing Configurations");
         fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("JSON Files", "*.json")
-        );
+                new FileChooser.ExtensionFilter("JSON Files", "*.json"));
         File file = fileChooser.showOpenDialog(importConfigurationButton.getScene().getWindow());
         try {
             ObjectMapper mapper = new ObjectMapper();
 
             List<ParsingConfig> importedConfigs = List.of(
-                    mapper.readValue(file, ParsingConfig[].class)
-            );
+                    mapper.readValue(file, ParsingConfig[].class));
 
             int importedCount = 0;
             for (ParsingConfig config : importedConfigs) {
-                boolean exists = configList.stream().anyMatch(existing -> existing.getName().equalsIgnoreCase(config.getName()));
+                boolean exists = configList.stream()
+                        .anyMatch(existing -> existing.getName().equalsIgnoreCase(config.getName()));
                 if (!exists) {
                     configList.add(config);
                     parsingConfigService.save(config);
@@ -547,6 +543,7 @@ public class ParsingConfigController {
             }
 
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            addAppIcon(alert);
             if (importedCount > 0) {
                 alert.setTitle("Import Successful");
                 alert.setHeaderText("Parsing Configurations Imported");
@@ -562,6 +559,7 @@ public class ParsingConfigController {
             }
         } catch (IOException ex) {
             Alert alert = new Alert(Alert.AlertType.ERROR);
+            addAppIcon(alert);
             alert.setTitle("Import Error");
             alert.setHeaderText("Error importing parsing configurations");
             alert.setContentText("An error occurred while importing: " + ex.getMessage());
@@ -578,7 +576,8 @@ public class ParsingConfigController {
         selectedConfig.setName(nameField.getText());
         selectedConfig.setDescription(descriptionArea.getText());
         selectedConfig.setRegexPattern(regexPatternArea.getText());
-        selectedConfig.setTimestampFormat(timestampFormatField.getText().trim().isEmpty() ? null : timestampFormatField.getText().trim());
+        selectedConfig.setTimestampFormat(
+                timestampFormatField.getText().trim().isEmpty() ? null : timestampFormatField.getText().trim());
 
         configSnapshot = selectedConfig.copy();
 
@@ -645,6 +644,30 @@ public class ParsingConfigController {
         stage.close();
     }
 
+    private void addAppIcon(Dialog<?> dialog) {
+        try {
+            if (dialog.getOwner() == null && cancelButton.getScene() != null) {
+                dialog.initOwner(cancelButton.getScene().getWindow());
+            }
+
+            if (dialog.getDialogPane().getScene() != null && dialog.getDialogPane().getScene().getWindow() != null) {
+                Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
+                addAppIcon(stage);
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+    }
+
+    private void addAppIcon(Stage stage) {
+        try {
+            javafx.scene.image.Image icon = new javafx.scene.image.Image(
+                    java.util.Objects.requireNonNull(getClass().getResourceAsStream("/images/app-icon.png")));
+            stage.getIcons().add(icon);
+        } catch (Exception e) {
+            logger.warn("Failed to load app icon for dialog", e);
+        }
+    }
 
     private static class ConfigListCell extends ListCell<ParsingConfig> {
         private final VBox vbox = new VBox(2);
@@ -671,8 +694,7 @@ public class ParsingConfigController {
                 statusLabel.getStyleClass().removeAll("validation-success", "validation-error");
                 if (item.isValid()) {
                     statusLabel.setText(
-                            "✓ " + item.getGroupNames().size() + " groups"
-                    );
+                            "✓ " + item.getGroupNames().size() + " groups");
                     statusLabel.getStyleClass().add("validation-success");
                 } else {
                     statusLabel.setText("✗ Invalid pattern");
@@ -687,6 +709,22 @@ public class ParsingConfigController {
     public record ParsedField(SimpleStringProperty fieldName, SimpleStringProperty fieldValue) {
         public ParsedField(String fieldName, String fieldValue) {
             this(new SimpleStringProperty(fieldName), new SimpleStringProperty(fieldValue));
+        }
+
+        public String getFieldName() {
+            return fieldName.get();
+        }
+
+        public String getFieldValue() {
+            return fieldValue.get();
+        }
+
+        public SimpleStringProperty fieldNameProperty() {
+            return fieldName;
+        }
+
+        public SimpleStringProperty fieldValueProperty() {
+            return fieldValue;
         }
     }
 }

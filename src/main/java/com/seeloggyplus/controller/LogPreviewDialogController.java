@@ -15,6 +15,8 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.seeloggyplus.service.PreferenceService;
+import com.seeloggyplus.service.impl.PreferenceServiceImpl;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -29,6 +31,8 @@ import java.util.List;
 public class LogPreviewDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(LogPreviewDialogController.class);
+    private int previewLineLimit = 500;
+    private PreferenceService preferenceService;
 
     @FXML
     private Label fileNameLabel;
@@ -47,6 +51,9 @@ public class LogPreviewDialogController {
 
     @FXML
     public void initialize() {
+        preferenceService = new PreferenceServiceImpl();
+        loadPreferences();
+
         lineColumn.setCellValueFactory(new PropertyValueFactory<>("lineNumber"));
         contentColumn.setCellValueFactory(new PropertyValueFactory<>("content"));
         logTableView.setItems(logLines);
@@ -55,7 +62,8 @@ public class LogPreviewDialogController {
         logTableView.getSelectionModel().setCellSelectionEnabled(true);
         logTableView.getSelectionModel().setSelectionMode(javafx.scene.control.SelectionMode.MULTIPLE);
         logTableView.setOnKeyPressed(event -> {
-            if (new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.C, javafx.scene.input.KeyCombination.CONTROL_DOWN).match(event)) {
+            if (new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.C,
+                    javafx.scene.input.KeyCombination.CONTROL_DOWN).match(event)) {
                 copySelectionToClipboard(logTableView);
                 event.consume();
             }
@@ -68,13 +76,39 @@ public class LogPreviewDialogController {
         closeButton.setOnAction(e -> closeDialog());
     }
 
+    private void loadPreferences() {
+        // Line limit
+        String limitStr = preferenceService.getPreferencesByCode("lp_line_limit").orElse("500");
+        try {
+            this.previewLineLimit = Integer.parseInt(limitStr);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid preview line limit preference: {}", limitStr);
+        }
+
+        // Font settings
+        String fontFamily = preferenceService.getPreferencesByCode("app_font_family").orElse("Consolas");
+        String fontSizeStr = preferenceService.getPreferencesByCode("app_font_size").orElse("12");
+        int fontSize = 12;
+        try {
+            fontSize = Integer.parseInt(fontSizeStr);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid font size preference: {}", fontSizeStr);
+        }
+
+        String fontStyle = String.format("-fx-font-family: '%s'; -fx-font-size: %dpx;", fontFamily, fontSize);
+        logTableView.setStyle(fontStyle);
+    }
+
     /**
-     * Loads the file content (local or remote) into the preview table.
-     * @param fileInfo The file to preview.
-     * @param sshService An active SSH service, if the file is remote. Can be null for local files.
+     * Loads a preview of the file content (local or remote) into the table,
+     * limited to the first PREVIEW_LINE_LIMIT lines.
+     * 
+     * @param fileInfo   The file to preview.
+     * @param sshService An active SSH service, if the file is remote. Can be null
+     *                   for local files.
      */
     public void loadFile(FileInfo fileInfo, SSHServiceImpl sshService) {
-        fileNameLabel.setText(fileInfo.getPath());
+        fileNameLabel.setText(String.format("Preview: %s (first %d lines)", fileInfo.getPath(), previewLineLimit));
         progressIndicator.setVisible(true);
 
         Task<List<String>> loadTask = new Task<>() {
@@ -84,13 +118,15 @@ public class LogPreviewDialogController {
                     if (sshService == null || !sshService.isConnected()) {
                         throw new IOException("SSH service is not connected.");
                     }
-                    return sshService.readFileLines(fileInfo.getPath());
+                    return sshService.readFileLines(fileInfo.getPath(), previewLineLimit);
                 } else {
                     List<String> lines = new ArrayList<>();
                     try (BufferedReader reader = new BufferedReader(new FileReader(fileInfo.getPath()))) {
                         String line;
-                        while ((line = reader.readLine()) != null) {
+                        int count = 0;
+                        while ((line = reader.readLine()) != null && count < previewLineLimit) {
                             lines.add(line);
+                            count++;
                         }
                     }
                     return lines;
@@ -122,7 +158,8 @@ public class LogPreviewDialogController {
     }
 
     private void copySelectionToClipboard(final javafx.scene.control.TableView<?> table) {
-        final javafx.collections.ObservableList<javafx.scene.control.TablePosition> selectedCells = table.getSelectionModel().getSelectedCells();
+        final javafx.collections.ObservableList<javafx.scene.control.TablePosition> selectedCells = table
+                .getSelectionModel().getSelectedCells();
         if (selectedCells.isEmpty()) {
             return;
         }
@@ -178,4 +215,3 @@ public class LogPreviewDialogController {
         }
     }
 }
-

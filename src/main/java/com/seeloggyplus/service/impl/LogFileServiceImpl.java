@@ -144,4 +144,23 @@ public class LogFileServiceImpl implements LogFileService {
             throw new RuntimeException("Failed to delete all log files", ex);
         }
     }
+
+    @Override
+    public void updateParsingConfigIdForLogFiles(String parsingConfigId, String logFileId) {
+        if (logFileId == null || logFileId.trim().isEmpty()) {
+            logger.error("Cannot update parsing config id for log file with null or empty id");
+            throw new IllegalArgumentException("LogFile id cannot be null or empty");
+        }
+
+        try {
+            logFileRepository.updateParsingConfigId(parsingConfigId, logFileId);
+            logger.info("Successfully updated parsing config id for log file id: {}", logFileId);
+        } catch (NotFoundException ex){
+            logger.warn("Log file not found by id: {}", logFileId);
+            throw new RuntimeException("Log file not found", ex);
+        } catch (FatalDatabaseException ex) {
+            logger.error("Database error when updating parsing config id for log file id: {}", logFileId, ex);
+            throw new RuntimeException("Failed to update parsing config id for log file", ex);
+        }
+    }
 }

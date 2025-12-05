@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.*?>
+<VBox alignment="TOP_CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="400.0" spacing="10.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.AboutDialogController">
+   <padding>
+      <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+   </padding>
+   <children>
+       <ImageView fitHeight="100.0" fitWidth="100.0" pickOnBounds="true" preserveRatio="true" smooth="true">
+           <image>
+               <Image url="@../images/app-icon.png" />
+           </image>
+       </ImageView>
+      <Label text="SeeLoggyPlus">
+         <font>
+            <Font name="System Bold" size="24.0" />
+         </font>
+      </Label>
+      <Label text="Version 1.0.0">
+         <font>
+            <Font size="14.0" />
+         </font>
+      </Label>
+      <Separator prefWidth="200.0" />
+      <TextFlow textAlignment="CENTER">
+         <children>
+            <Text strokeType="OUTSIDE" strokeWidth="0.0" text="A powerful, enterprise-grade log viewer and analyzer for local and remote log files. Designed for performance and ease of use." />
+         </children>
+      </TextFlow>
+      <VBox alignment="CENTER" spacing="5.0">
+         <children>
+            <Label text="© 2025 SeeLoggyPlus Team. All rights reserved." textFill="#757575">
+               <font>
+                  <Font size="11.0" />
+               </font>
+            </Label>
+         </children>
+      </VBox>
+      <Separator prefWidth="200.0" />
+      <Button fx:id="closeButton" defaultButton="true" mnemonicParsing="false" prefWidth="100.0" text="Close" />
+   </children>
+</VBox>
