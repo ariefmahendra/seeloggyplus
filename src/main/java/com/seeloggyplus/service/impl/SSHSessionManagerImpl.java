@@ -33,8 +33,7 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
     }
 
     @Override
-    public Session getSession(String host, int port, String username, String password, long ttlMillis)
-            throws JSchException {
+    public Session getSession(String host, int port, String username, String password, long ttlMillis) throws JSchException {
         String key = generateKey(host, port, username);
         if (sessionPool.containsKey(key)) {
             ManagedSession managed = sessionPool.get(key);
