@@ -259,7 +259,6 @@ public class MainController {
         preferencesMenuItem.setOnAction(e -> handlePreferences());
 
         aboutMenuItem.setOnAction(e -> handleAbout());
-        documentationMenuItem.setOnAction(e -> handleDocumentation());
     }
 
     private void setupLeftPanel() {
@@ -2281,26 +2280,6 @@ public class MainController {
         } catch (IOException e) {
             logger.error("Failed to open About dialog", e);
             showError("Error", "Could not open About dialog: " + e.getMessage());
-        }
-    }
-
-    private void handleDocumentation() {
-        try {
-            Stage mainStage = (Stage) menuBar.getScene().getWindow();
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/DocumentationDialog.fxml"));
-            Parent root = loader.load();
-
-            Stage dialog = new Stage();
-            dialog.setTitle("SeeLoggyPlus Documentation");
-            dialog.initOwner(mainStage);
-            dialog.initModality(Modality.NONE); // Documentation can be non-modal
-            addAppIcon(dialog);
-            dialog.setScene(new Scene(root));
-
-            dialog.show();
-        } catch (IOException e) {
-            logger.error("Failed to open Documentation dialog", e);
-            showError("Error", "Could not open Documentation dialog: " + e.getMessage());
         }
     }
 
