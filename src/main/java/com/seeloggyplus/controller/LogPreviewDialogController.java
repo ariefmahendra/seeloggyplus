@@ -6,12 +6,10 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +20,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -157,23 +156,22 @@ public class LogPreviewDialogController {
         new Thread(loadTask).start();
     }
 
-    private void copySelectionToClipboard(final javafx.scene.control.TableView<?> table) {
-        final javafx.collections.ObservableList<javafx.scene.control.TablePosition> selectedCells = table
-                .getSelectionModel().getSelectedCells();
+    @SuppressWarnings("unchecked")
+    private void copySelectionToClipboard(final TableView<?> table) {
+        final ObservableList<TablePosition<?, ?>> selectedCells = (ObservableList<TablePosition<?, ?>>) (Object) table.getSelectionModel().getSelectedCells();
         if (selectedCells.isEmpty()) {
             return;
         }
 
         // Group by row index
-        final java.util.Map<Integer, java.util.List<javafx.scene.control.TablePosition>> rowMap = new java.util.TreeMap<>();
-        for (final javafx.scene.control.TablePosition pos : selectedCells) {
-            rowMap.computeIfAbsent(pos.getRow(), k -> new java.util.ArrayList<>()).add(pos);
+        final java.util.Map<Integer, List<TablePosition<?, ?>>> rowMap = new java.util.TreeMap<>();
+        for (final TablePosition<?, ?> pos : selectedCells) {
+            rowMap.computeIfAbsent(pos.getRow(), k -> new ArrayList<>()).add(pos);
         }
 
         final StringBuilder clipboardString = new StringBuilder();
-        for (final java.util.List<javafx.scene.control.TablePosition> row : rowMap.values()) {
-            // Sort cells by column index
-            row.sort(java.util.Comparator.comparingInt(javafx.scene.control.TablePosition::getColumn));
+        for (final java.util.List<TablePosition<?, ?>> row : rowMap.values()) {
+            row.sort(Comparator.comparingInt(TablePosition::getColumn));
 
             final String rowString = row.stream()
                     .map(pos -> {
@@ -184,9 +182,9 @@ public class LogPreviewDialogController {
             clipboardString.append(rowString).append('\n');
         }
 
-        final javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+        final ClipboardContent content = new ClipboardContent();
         content.putString(clipboardString.toString());
-        javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+        Clipboard.getSystemClipboard().setContent(content);
     }
 
     private void closeDialog() {
