@@ -55,8 +55,6 @@ public class MainController {
     @FXML
     private MenuItem exitMenuItem;
     @FXML
-    private Menu viewMenu;
-    @FXML
     private CheckMenuItem showLeftPanelMenuItem;
     @FXML
     private CheckMenuItem showBottomPanelMenuItem;
@@ -66,8 +64,6 @@ public class MainController {
     private MenuItem serverManagementMenuItem;
     @FXML
     private MenuItem aboutMenuItem;
-    @FXML
-    private MenuItem documentationMenuItem;
     @FXML
     private MenuItem preferencesMenuItem;
 
@@ -174,7 +170,6 @@ public class MainController {
     private boolean isBottomPanelPinned = true;
     private Task<?> currentLoadingTask = null;
     private LogFileWatcher logFileWatcher;
-    private CheckMenuItem autoRefreshMenuItem;
     private int windowSize = 5000;
     private int sshDownloadThreads = 4;
     private int currentWindowStartIndex = 0;
@@ -248,11 +243,6 @@ public class MainController {
         showBottomPanelMenuItem.setSelected(true);
         showLeftPanelMenuItem.setOnAction(e -> toggleLeftPanel());
         showBottomPanelMenuItem.setOnAction(e -> toggleBottomPanel());
-
-        autoRefreshMenuItem = new CheckMenuItem("Auto-Refresh");
-        autoRefreshMenuItem.setSelected(true);
-        autoRefreshMenuItem.setOnAction(e -> toggleAutoRefresh());
-        viewMenu.getItems().add(2, autoRefreshMenuItem);
 
         parsingConfigMenuItem.setOnAction(e -> handleParsingConfiguration());
         serverManagementMenuItem.setOnAction(e -> handleServerManagement());
@@ -1153,8 +1143,6 @@ public class MainController {
                 logger.info("Added file to recent files: {}", file.getName());
             }
 
-            setupFileWatcher(file);
-
             int totalEntries = entries.size();
             updateStatus(String.format("Showing all %,d entries from %s (virtual scrolling ⚡)", totalEntries,
                     file.getName()));
@@ -1398,13 +1386,6 @@ public class MainController {
             logger.warn("Invalid ssh threads preference: {}", threadsStr);
         }
 
-        // Auto refresh
-        String autoRefreshStr = preferenceService.getPreferencesByCode("main_auto_refresh_enabled").orElse("true");
-        boolean autoRefresh = Boolean.parseBoolean(autoRefreshStr);
-        if (autoRefreshMenuItem != null) {
-            autoRefreshMenuItem.setSelected(autoRefresh);
-        }
-
         // Auto prettify
         this.autoPrettifyJson = Boolean
                 .parseBoolean(preferenceService.getPreferencesByCode("main_auto_prettify_json").orElse("false"));
@@ -1418,8 +1399,8 @@ public class MainController {
             logLevelFilterComboBox.getSelectionModel().select(defaultLevel);
         }
 
-        logger.info("Preferences loaded: font={} {}, windowSize={}, threads={}, autoRefresh={}",
-                fontFamily, fontSize, windowSize, sshDownloadThreads, autoRefresh);
+        logger.info("Preferences loaded: font={} {}, windowSize={}, threads={}",
+                fontFamily, fontSize, windowSize, sshDownloadThreads);
 
         if (autoPrettifyJson || autoPrettifyXml) {
             applyAutoPrettify();
@@ -2133,72 +2114,6 @@ public class MainController {
         logger.info("Scroll to bottom using windowing (total={})", totalEntries);
 
         loadWindow(Math.max(0, totalEntries - windowSize), true);
-    }
-
-    private void setupFileWatcher(File file) {
-        if (logFileWatcher == null || !logFileWatcher.isRunning()) {
-            logger.warn("LogFileWatcher is not running, auto-refresh disabled");
-            return;
-        }
-
-        if (!autoRefreshMenuItem.isSelected()) {
-            logger.info("Auto-refresh is disabled by user");
-            return;
-        }
-
-        try {
-            if (currentFile != null && !currentFile.equals(file)) {
-                logFileWatcher.unwatchFile(currentFile);
-            }
-
-            logFileWatcher.watchFile(file, (modifiedFile, eventKind) -> {
-                logger.info("File change detected: {} - Event: {}", modifiedFile.getName(), eventKind.name());
-
-                Platform.runLater(() -> handleAutoRefresh(modifiedFile));
-            });
-
-            logger.info("Auto-refresh enabled for: {} (like 'tail -f')", file.getName());
-
-        } catch (Exception e) {
-            logger.error("Failed to setup file watcher", e);
-            showError("Auto-Refresh Error", "Failed to enable auto-refresh for file: " + e.getMessage());
-        }
-    }
-
-    private void handleAutoRefresh(File file) {
-        if (!autoRefreshMenuItem.isSelected()) {
-            return;
-        }
-
-        if (!tailModeEnabled) {
-            logger.info("File changed, but tail mode is OFF. Skipping auto-refresh.");
-            return;
-        }
-
-        logger.info("Auto-refreshing file: {}", file.getName());
-        updateStatus("Auto-refreshing... (file changed)");
-        if (currentParsingConfig != null) {
-            openLocalLogFile(file, false, currentParsingConfig);
-        }
-    }
-
-    private void toggleAutoRefresh() {
-        boolean enabled = autoRefreshMenuItem.isSelected();
-
-        if (enabled) {
-            logger.info("Auto-refresh ENABLED");
-            updateStatus("Auto-refresh enabled (tail -f mode)");
-
-            if (currentFile != null) {
-                setupFileWatcher(currentFile);
-            }
-        } else {
-            logger.info("Auto-refresh DISABLED");
-            updateStatus("Auto-refresh disabled");
-            if (currentFile != null && logFileWatcher != null) {
-                logFileWatcher.unwatchFile(currentFile);
-            }
-        }
     }
 
     private void handleClearRecentFiles() {

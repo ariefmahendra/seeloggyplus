@@ -47,6 +47,7 @@ dependencies {
 
 application {
     mainClass = 'com.seeloggyplus.Main'
+    applicationName = 'SeeloggyPlus'
 }
 
 runtime {
