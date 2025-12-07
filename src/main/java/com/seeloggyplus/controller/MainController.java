@@ -1345,6 +1345,9 @@ public class MainController {
             dialog.initModality(Modality.WINDOW_MODAL);
             addAppIcon(dialog);
             dialog.setScene(new Scene(root));
+            dialog.setResizable(false);
+            dialog.setWidth(400);
+            dialog.setHeight(400);
 
             dialog.showAndWait();
         } catch (IOException e) {
