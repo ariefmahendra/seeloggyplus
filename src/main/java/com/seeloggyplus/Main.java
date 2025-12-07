@@ -28,7 +28,7 @@ public class Main extends Application {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final String APP_TITLE = "SeeLoggyPlus - Log Viewer";
-    private static final String VERSION = "1.0.0";
+    private static final String VERSION = "0.1.0-alpha";
 
     private PreferenceService preferenceService;
     private Stage primaryStage;
