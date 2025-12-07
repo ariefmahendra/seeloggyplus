@@ -28,7 +28,23 @@ public class Main extends Application {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final String APP_TITLE = "SeeLoggyPlus - Log Viewer";
-    private static final String VERSION = "0.1.0-alpha";
+    private static final String VERSION;
+
+    static {
+        String version = "DEV"; // Default version for local development
+        try (java.io.InputStream input = Main.class.getResourceAsStream("/version.properties")) {
+            java.util.Properties prop = new java.util.Properties();
+            if (input == null) {
+                logger.warn("Sorry, unable to find version.properties, defaulting to DEV version.");
+            } else {
+                prop.load(input);
+                version = prop.getProperty("version", version);
+            }
+        } catch (java.io.IOException ex) {
+            logger.error("Error reading version.properties", ex);
+        }
+        VERSION = version;
+    }
 
     private PreferenceService preferenceService;
     private Stage primaryStage;
