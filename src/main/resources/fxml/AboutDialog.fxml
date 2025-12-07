@@ -21,7 +21,7 @@
             <Font name="System Bold" size="24.0" />
          </font>
       </Label>
-      <Label text="Version 1.0.0">
+      <Label text="Version 0.1.0-alpha">
          <font>
             <Font size="14.0" />
          </font>
