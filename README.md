@@ -1,196 +1,104 @@
-# SeeLoggyPlus — Fast, Modern & Intelligent Log Viewer
+# SeeLoggyPlus — A Fast, Modern & Intelligent Log Viewer
 
-SeeLoggyPlus adalah aplikasi **log viewer desktop berbasis JavaFX** untuk membaca, mencari, tailing, dan menganalisis log dengan ukuran besar — baik dari **lokal** maupun **remote (SSH server)** — dengan cepat, aman, dan nyaman.
-
----
-
-## ✨ Fitur Utama
-
-* ✅ Buka log **lokal & remote (SSH)**
-* ✅ **Live Tail Mode** — streaming log real-time
-* ✅ **Regex Parsing dengan Named Groups → Auto Table Columns**
-* ✅ **Recent Files Panel** untuk akses cepat
-* ✅ **Smart Search** — text, case-sensitive, & regex
-* ✅ **Prettify JSON & XML** di panel detail
-* ✅ UI fleksibel — panel dapat disembunyikan
-* ✅ Optimized untuk log berukuran ratusan MB
-* ✅ Tidak perlu plugin atau konfigurasi tambahan
+SeeLoggyPlus is a high-performance, JavaFX-based desktop log viewer designed for developers and system administrators. It provides a fast, secure, and convenient way to read, search, tail, and analyze large log files from both **local** and **remote (SSH)** sources.
 
 ---
 
-## 📥 Instalasi
+## ✨ Key Features
 
-### Persyaratan
-
-* **Java 17+**
-* **Gradle 8+** *(opsional, sudah tersedia Gradle Wrapper)*
-* Koneksi SSH *(hanya jika membuka remote log)*
-
-### Clone Repository
-
-```bash
-git clone https://gitlab.com/ariefmahendra/seeloggyplus.git
-cd seeloggyplus
-```
-
-### Menjalankan Aplikasi
-
-```bash
-./gradlew run
-```
-
-### Build Executable JAR
-
-```bash
-./gradlew fatJar
-```
-
-JAR akan tersedia pada:
-
-```
-build/libs/
-```
+*   **Universal Log Access**: Open log files from your local machine or connect to a remote server via SSH to browse and tail files directly.
+*   **Live Tail Mode**: Stream logs in real-time with an intelligent tailing feature that pauses on manual scroll and resumes when you're ready.
+*   **Dynamic Regex Parsing**: Use named capture groups in your regular expressions (`(?<name>...)`) to automatically transform raw log lines into structured, filterable table columns.
+*   **Smart Search & Filtering**: Instantly filter logs with text, case-sensitive, and regex searches without reloading the entire file. Filter by log level and timestamp ranges.
+*   **Embedded Prettifiers**: Automatically format and syntax-highlight JSON and XML content found within your log entries for improved readability.
+*   **High Performance**: Optimized with multi-threaded parsing and a virtualized UI to handle log files ranging from a few megabytes to several gigabytes with ease.
+*   **Modern & Flexible UI**: A clean, intuitive interface with panels that can be resized or collapsed to focus on what matters.
 
 ---
 
-## 🚀 Cara Menggunakan SeeLoggyPlus
+## 🚀 Getting Started
 
-### 1️⃣ Membuka Log Lokal
+### Prerequisites
 
-1. Klik menu **File → Open File**
-2. Pilih file `.log`, `.txt`, atau format teks lainnya
-3. Pilih parsing configuration
-4. Log langsung tampil dalam tabel
+*   **Java 17** or newer.
 
-### 2️⃣ Membuka Log Remote via SSH
+### Running from Source
 
-1. Klik **File → Open Remote File**
-2. Masukkan host, port, username, password
-3. Browse file di server
-4. Klik **Open** atau **Tail**
+1.  **Clone the repository:**
+    ```bash
+    git clone https://gitlab.com/ariefmahendra/seeloggyplus.git
+    cd seeloggyplus
+    ```
 
-### 3️⃣ Live Tail Mode (Real-Time)
+2.  **Run the application:**
+    The Gradle wrapper included in the repository will handle all dependencies.
+    ```bash
+    # On Linux/macOS
+    ./gradlew run
 
-* Klik tombol **Tail**
-* Baris baru otomatis tampil saat log berubah
-* Scroll manual → tail pause otomatis
-* Klik **Resume Tail** untuk melanjutkan
+    # On Windows
+    .\gradlew.bat run
+    ```
 
-### 4️⃣ Mencari Log
+### Building the Portable Distribution
 
-* Ketik di search bar
-* Pilih:
+To build the standalone, portable distribution that includes the application and its runtime:
 
-    * Case-sensitive
-    * Regex mode
-* Filtering instan tanpa reload file
+1.  **Run the `createPortableDist` task:**
+    ```bash
+    # On Linux/macOS
+    ./gradlew createPortableDist
 
-### 5️⃣ Parsing Log dengan Regex
+    # On Windows
+    .\gradlew.bat createPortableDist
+    ```
 
-* Buka **Settings → Parsing Configuration**
-* Gunakan named groups, contoh:
+2.  **Find the artifact:**
+    The portable `.zip` file will be available in the `build/distributions/` directory. You can extract and run it on any supported OS with Java 17+.
 
+---
+
+## 🛠️ Usage
+
+### Opening Log Files
+
+*   **Local Files**: Navigate to `File > Open...` (`Ctrl+O`) and select a log file. You will be prompted to choose a parsing configuration.
+*   **Remote Files (SSH)**: Navigate to `Settings > Server Management...` to add an SSH server configuration. Then, go to `File > Open...` and select the "Remote" tab to browse and open files on the configured server.
+
+### Live Tailing
+
+Click the **Tail** button (the eye icon) in the toolbar to enter live tail mode. New log entries will be streamed in real-time. The tailing will automatically pause if you scroll up and can be resumed by clicking the "Resume Tail" button that appears.
+
+### Log Parsing with Regex
+
+The power of SeeLoggyPlus lies in its ability to parse any log format using regex with named capture groups.
+
+1.  Go to **Settings > Parsing Configuration...**.
+2.  Create a new configuration and define a regex pattern. Use `(?<column_name>...)` to define a capture group. Each named group will become a column in the log view table.
+
+**Example:** For a log line like `2025-12-07 20:05:15 INFO com.seeloggyplus.Main - Application started.`, you could use:
 ```regex
-(?<timestamp>.+?) (?<level>INFO|WARN|ERROR) (?<message>.*)
+(?<timestamp>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}) (?<level>\\w+) (?<logger>[\\w.]+) - (?<message>.*)
 ```
-
-Hasilnya otomatis menjadi kolom tabel log.
-
-### 6️⃣ Melihat Detail Log
-
-* Klik baris log → panel detail muncul
-* Bisa:
-
-    * ✅ Copy
-    * ✅ Prettify JSON/XML
-    * ✅ Clear panel
+This will create `timestamp`, `level`, `logger`, and `message` columns.
 
 ---
 
-## 🧭 Navigasi & UI
+## 🤝 Contributing
 
-* **Recent Files Panel** — klik untuk membuka kembali
-* **Split View UI** — drag untuk resize
-* **Panel Toggle** — hide/show via menu View
-* **Keyboard Shortcuts**
+Contributions are welcome and greatly appreciated!
 
-    * `Ctrl+O` — Open File
-    * `Ctrl+R` — Open Remote File
-    * `Ctrl+F` — Search
-    * `Ctrl+P` — Parsing Config
+1.  Fork the repository on Github.
+2.  Create a new branch for your feature or bug fix.
+3.  Commit your changes.
+4.  Submit a Merge Request.
 
----
-
-## 📡 Remote Log Support
-
-* SSH authentication:
-
-    * Username + Password
-    * Private Key
-* Bisa browsing folder server
-* Tail mode **tanpa mendownload seluruh file**
-* Tidak menyimpan credential secara permanen
+For bugs and feature requests, please open an issue on the **GitLab Issues** page for this repository.
 
 ---
 
-## ⚡ Performa
-
-* Multi-threaded parsing
-* Efficient memory usage
-* Virtualized table view untuk scrolling cepat
-* Stabil untuk file **100MB – 5GB+**
-
----
-
-## 🛠 Teknologi
-
-* JavaFX 21
-* SQLite
-* JSch SSH Client
-* Gradle
-* SLF4J + Logback
-
----
-
-## 🧩 Sistem Operasi yang Didukung
-
-✅ Windows 10/11
-✅ Linux (Ubuntu, Fedora, Arch, dll.)
-✅ macOS (Intel & Apple Silicon)
-
----
-
-## ❓ Troubleshooting Cepat
-
-| Masalah                 | Solusi                                   |
-| ----------------------- | ---------------------------------------- |
-| Aplikasi tidak berjalan | Pastikan Java 17+ terinstal              |
-| SSH gagal connect       | Periksa host, port, firewall, credential |
-| Regex tidak match       | Test melalui menu Parsing Configuration  |
-
----
-
-## 🤝 Kontribusi
-
-Kontribusi sangat diterima 🎉
-
-1. Fork repository
-2. Buat branch baru
-3. Commit perubahan
-4. Kirim Pull Request
-
-Bugs & improvement request → buka **GitHub Issues**
-
----
-
-## 📜 Lisensi
+## 📜 License
 
 © 2025 — SeeLoggyPlus
-Bebas digunakan untuk kebutuhan personal & profesional.
 
----
-
-## ❤️ Terima Kasih
-
-Terima kasih telah menggunakan SeeLoggyPlus!
-Semoga log analysis Anda menjadi lebih cepat, jelas, dan nyaman 🔍🚀
+This software is free to use for personal and professional purposes. Please refer to the license file for more details.
