@@ -93,7 +93,7 @@ Contributions are welcome and greatly appreciated!
 3.  Commit your changes.
 4.  Submit a Merge Request.
 
-For bugs and feature requests, please open an issue on the **GitLab Issues** page for this repository.
+For bugs and feature requests, please open an issue on the **Github Issues** page for this repository.
 
 ---
 
