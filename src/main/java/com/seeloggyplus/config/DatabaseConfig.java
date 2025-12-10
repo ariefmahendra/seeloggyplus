@@ -3,6 +3,7 @@ package com.seeloggyplus.config;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -20,7 +21,10 @@ public class DatabaseConfig {
 
     private DatabaseConfig() {
         try {
-            Path dbPath = Path.of(System.getProperty("user.home"), "/.seeloggyplus", "/data", "seeloggyplus.db");
+            // Path dbPath = Path.of(System.getProperty("user.home"), "/.seeloggyplus", "/data", "seeloggyplus.db");
+            Path dbPath = Paths.get( ".","/.data", "seeloggyplus.db");
+
+            System.out.println(dbPath.toAbsolutePath());
 
             if (!Files.exists(dbPath)){
                 File dbFile = new File(dbPath.toUri());

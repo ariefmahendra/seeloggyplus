@@ -282,7 +282,7 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void setupFileTable() {
-        fileTable.getSelectionModel().setCellSelectionEnabled(true);
+        fileTable.getSelectionModel().setCellSelectionEnabled(false);
         fileTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
         fileContextMenu = new ContextMenu();
