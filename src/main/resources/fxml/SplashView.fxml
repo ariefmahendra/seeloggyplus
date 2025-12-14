@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.effect.DropShadow?>
+
+<AnchorPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.seeloggyplus.controller.SplashController"
+            prefHeight="350.0" prefWidth="500.0"
+            stylesheets="@../css/splash.css"
+            styleClass="root">
+    
+    <effect>
+        <DropShadow color="#00000080" radius="15" spread="0.2" offsetX="0" offsetY="5"/>
+    </effect>
+
+    <VBox alignment="CENTER" spacing="20.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+        <padding>
+            <Insets bottom="30.0" left="30.0" right="30.0" top="30.0" />
+        </padding>
+
+        <!-- Logo and Title Area -->
+        <VBox alignment="CENTER" spacing="10.0" VBox.vgrow="ALWAYS">
+            <StackPane>
+                <ImageView fitHeight="100.0" fitWidth="100.0" pickOnBounds="true" preserveRatio="true">
+                     <image>
+                        <Image url="@../images/app-icon.png" />
+                     </image>
+                </ImageView>
+            </StackPane>
+            
+            <Label text="SeeLoggyPlus" styleClass="title-label"/>
+            <Label fx:id="versionLabel" text="Version 1.0.0" styleClass="version-label"/>
+        </VBox>
+
+        <!-- Progress Area -->
+        <VBox spacing="5.0" alignment="CENTER_LEFT" maxWidth="400">
+            <Label fx:id="statusLabel" text="Initializing..." styleClass="status-label"/>
+            <ProgressBar fx:id="progressBar" maxWidth="Infinity" progress="0.0" prefHeight="6.0"/>
+        </VBox>
+        
+        <Label text="© 2025 SeeloggyPlus Team. All rights reserved." textFill="#606d80" style="-fx-font-size: 10px;"/>
+    </VBox>
+</AnchorPane>

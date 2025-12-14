@@ -23,24 +23,25 @@ import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import com.seeloggyplus.util.WindowSnapHandler;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Optional;
-import java.util.Stack;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -51,6 +52,20 @@ public class UnifiedFileManagerDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(UnifiedFileManagerDialogController.class);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    // Custom Window Decoration
+    @FXML
+    private HBox titleBar;
+    @FXML
+    private ImageView windowIconView;
+    @FXML
+    private Button minimizeButton;
+    @FXML
+    private Button maximizeButton;
+    @FXML
+    private Button closeButton;
+    @FXML
+    private FontAwesomeIconView maximizeIcon;
 
     // FXML Components
     @FXML
@@ -139,9 +154,13 @@ public class UnifiedFileManagerDialogController {
     private static final long CACHE_DURATION_MS = 30 * 1000; // 30 seconds
     private boolean suppressAutoRefresh = false;
 
+    private WindowSnapHandler windowSnapHandler;
+
     @FXML
     public void initialize() {
         logger.info("Initializing UnifiedFileManagerDialogController");
+
+        setupWindowHandling();
 
         localFileService = new LocalFileServiceImpl();
         serverManagementService = new ServerManagementServiceImpl();
@@ -158,7 +177,6 @@ public class UnifiedFileManagerDialogController {
 
         locationListView.getSelectionModel().select(0);
 
-        // --- Auto-Refresh on Focus ---
         Platform.runLater(() -> {
             Stage stage = (Stage) pathField.getScene().getWindow();
             stage.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
@@ -167,10 +185,7 @@ public class UnifiedFileManagerDialogController {
                 }
             });
 
-            // Add Ctrl+R shortcut for refreshing
-            pathField.getScene().getAccelerators().put(
-                    new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN),
-                    this::refreshCurrentPath);
+            pathField.getScene().getAccelerators().put(new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN), this::refreshCurrentPath);
         });
     }
 
@@ -598,7 +613,7 @@ public class UnifiedFileManagerDialogController {
                     }).collect(Collectors.toList());
                 }
 
-                // Add ".." entry for parent directory navigation
+                // Add ". ." entry for parent directory navigation
                 String parentPath = getParentPath(path);
                 if (parentPath != null) {
                     FileInfo upDir = new FileInfo();
@@ -666,14 +681,14 @@ public class UnifiedFileManagerDialogController {
             return;
         }
 
-        // Tail khusus REMOTE dulu (biar jelas)
+
         if (selectedFileResult.getSourceType() != FileInfo.SourceType.REMOTE) {
-            showError("Tail Error", "Tail hanya tersedia untuk file remote (SSH).");
+            showError("Tail Error", "Tail only ready for remote file (SSH).");
             return;
         }
 
         if (activeSshService == null || !activeSshService.isConnected()) {
-            showError("Tail Error", "Koneksi SSH tidak aktif.");
+            showError("Tail Error", "SSH connection is not active.");
             return;
         }
 
@@ -797,28 +812,72 @@ public class UnifiedFileManagerDialogController {
         }
     }
 
+
+    private void setupWindowHandling() {
+        try {
+            Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/app-icon.png")), 16, 16, true, true);
+            windowIconView.setImage(icon);
+        } catch (Exception e) {
+            logger.warn("Could not load dialog icon", e);
+        }
+
+        if (titleBar.getScene() != null && titleBar.getScene().getWindow() instanceof Stage) {
+            initWindowHandler((Stage) titleBar.getScene().getWindow());
+        } else {
+            titleBar.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) {
+                    if (newScene.getWindow() instanceof Stage) {
+                        initWindowHandler((Stage) newScene.getWindow());
+                    } else {
+                        newScene.windowProperty().addListener((obs2, oldWindow, newWindow) -> {
+                            if (newWindow instanceof Stage) {
+                                initWindowHandler((Stage) newWindow);
+                            }
+                        });
+                    }
+                }
+            });
+        }
+    }
+
+    private void initWindowHandler(Stage stage) {
+        windowSnapHandler = new WindowSnapHandler(stage, titleBar, maximizeIcon);
+
+        stage.setMinWidth(300);
+        stage.setMinHeight(400);
+
+        minimizeButton.setOnAction(e -> {
+            if (windowSnapHandler != null)
+                windowSnapHandler.minimize();
+        });
+        maximizeButton.setOnAction(e -> {
+            if (windowSnapHandler != null)
+                windowSnapHandler.toggleMaximize();
+        });
+        closeButton.setOnAction(e -> closeDialog());
+    }
+
     private void updateNavigationButtons() {
         backButton.setDisable(backHistory.isEmpty());
         forwardButton.setDisable(forwardHistory.isEmpty());
-        upButton.setDisable(currentPath == null || currentPath.equals("/")
-                || (currentLocation.server == null && new java.io.File(currentPath).getParent() == null));
+        upButton.setDisable(currentPath == null || currentPath.equals("/") || (currentLocation.server == null && new java.io.File(currentPath).getParent() == null));
     }
 
     private void copySelectionToClipboard(final javafx.scene.control.TableView<?> table) {
-        final javafx.collections.ObservableList<javafx.scene.control.TablePosition> selectedCells = table
+        final javafx.collections.ObservableList<TablePosition> selectedCells = table
                 .getSelectionModel().getSelectedCells();
         if (selectedCells.isEmpty()) {
             return;
         }
 
-        final java.util.Map<Integer, java.util.List<javafx.scene.control.TablePosition>> rowMap = new java.util.TreeMap<>();
-        for (final javafx.scene.control.TablePosition pos : selectedCells) {
-            rowMap.computeIfAbsent(pos.getRow(), k -> new java.util.ArrayList<>()).add(pos);
+        final Map<Integer, List<TablePosition>> rowMap = new TreeMap<>();
+        for (final TablePosition pos : selectedCells) {
+            rowMap.computeIfAbsent(pos.getRow(), k -> new ArrayList<>()).add(pos);
         }
 
         final StringBuilder clipboardString = new StringBuilder();
-        for (final java.util.List<javafx.scene.control.TablePosition> row : rowMap.values()) {
-            row.sort(java.util.Comparator.comparingInt(javafx.scene.control.TablePosition::getColumn));
+        for (final List<TablePosition> row : rowMap.values()) {
+            row.sort(Comparator.comparingInt(TablePosition::getColumn));
 
             final String rowString = row.stream()
                     .map(pos -> {

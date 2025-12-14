@@ -3,69 +3,122 @@
 <?import de.jensd.fx.glyphs.fontawesome.*?>
 <?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
-<BorderPane minHeight="400" minWidth="600" prefHeight="800" prefWidth="1200.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
+<BorderPane minHeight="400" minWidth="400" prefHeight="800" prefWidth="1200.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController" stylesheets="@../css/theme.css" styleClass="main-window">
     <top>
         <VBox>
-            <MenuBar fx:id="menuBar">
-                <!-- File Menu -->
-                <Menu text="File">
-                    <MenuItem accelerator="Ctrl+O" onAction="#handleOpen" text="Open..." />
-                    <SeparatorMenuItem />
-                    <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit" />
-                </Menu>
 
-                <!-- View Menu -->
-                <Menu fx:id="viewMenu" text="View">
-                    <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel" />
-                    <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel" />
-                    <SeparatorMenuItem />
-                    <MenuItem accelerator="F5" text="Refresh" />
-                </Menu>
+             <!-- Custom Title Bar -->
+            <HBox fx:id="titleBar" minWidth="0" alignment="CENTER_LEFT" spacing="10" style="-fx-background-color: #18181b; -fx-padding: 2 10 2 10;">
+                 <HBox alignment="CENTER_LEFT" spacing="10">
+                    <!-- App Icon -->
+                    <ImageView fx:id="windowIconView" fitWidth="16" fitHeight="16" preserveRatio="true" smooth="true"/>
+                 </HBox>
+                 
 
-                <!-- Settings Menu -->
-                <Menu text="Settings">
-                    <MenuItem fx:id="parsingConfigMenuItem" accelerator="Ctrl+P" text="Parsing Configuration..." />
-                    <MenuItem fx:id="serverManagementMenuItem" accelerator="Ctrl+M" text="Server Management..." />
-                    <SeparatorMenuItem />
-                    <MenuItem fx:id="preferencesMenuItem" text="Preferences..." />
-                </Menu>
+                 <!-- MenuBar Integrated -->
+                 <MenuBar fx:id="menuBar" styleClass="title-bar-menu">
+                     <menus>
+                         <!-- File Menu -->
+                         <Menu text="File">
+                             <items>
+                                 <MenuItem accelerator="Ctrl+O" onAction="#handleOpen" text="Open..." />
+                                 <SeparatorMenuItem />
+                                 <MenuItem fx:id="parsingConfigMenuItem" text="Parsing Configuration..." />
+                                 <MenuItem fx:id="serverManagementMenuItem" text="Server Management..." />
+                                 <SeparatorMenuItem />
+                                 <MenuItem fx:id="preferencesMenuItem" text="Preferences..." />
+                                 <SeparatorMenuItem />
+                                 <MenuItem fx:id="exitMenuItem" text="Exit" />
+                             </items>
+                         </Menu>
 
-                <!-- Help Menu -->
-                <Menu text="Help">
-                    <MenuItem fx:id="aboutMenuItem" text="About" />
-                </Menu>
-            </MenuBar>
+                         <!-- View Menu -->
+                         <Menu fx:id="viewMenu" text="View">
+                             <items>
+                                 <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel" />
+                                 <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel" />
+                                 <SeparatorMenuItem />
+                                 <MenuItem accelerator="F5" text="Refresh" />
+                             </items>
+                         </Menu>
+
+                         <!-- Help Menu -->
+                         <Menu text="Help">
+                             <items>
+                                 <MenuItem fx:id="aboutMenuItem" text="About" />
+                             </items>
+                         </Menu>
+                     </menus>
+                 </MenuBar>
+
+                 <!-- Spacer to push buttons to right -->
+                 <Region HBox.hgrow="ALWAYS" />
+
+                 <HBox alignment="CENTER_RIGHT" spacing="0">
+                     <Button fx:id="minimizeWindowButton" styleClass="window-control-button" focusTraversable="false">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="MINUS" size="12" fill="#a1a1aa"/>
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Minimize"/>
+                        </tooltip>
+                     </Button>
+                     <Button fx:id="maximizeWindowButton" styleClass="window-control-button" focusTraversable="false">
+                        <graphic>
+                            <FontAwesomeIconView fx:id="maximizeIcon" glyphName="SQUARE_ALT" size="12" fill="#a1a1aa"/>
+                        </graphic>
+                         <tooltip>
+                            <Tooltip text="Maximize"/>
+                        </tooltip>
+                     </Button>
+                     <Button fx:id="closeWindowButton" styleClass="window-close-button" focusTraversable="false">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="CLOSE" size="14" fill="#a1a1aa"/>
+                        </graphic>
+                         <tooltip>
+                            <Tooltip text="Close"/>
+                        </tooltip>
+                     </Button>
+                 </HBox>
+            </HBox>
+            
+
 
             <!-- Toolbar -->
-            <ToolBar>
-                <Label text="Search:" />
-                <TextField fx:id="searchField" prefWidth="300" promptText="Enter search text or regex...">
+            <ToolBar minWidth="0">
+                <TextField fx:id="searchField" prefWidth="200" promptText="Search or Regex...">
                     <font>
-                        <Font size="10.0" />
+                        <Font size="12.0" />
                     </font>
                 </TextField>
-                <ToggleButton fx:id="regexCheckBox" text="Regex" />
-                <ToggleButton fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
+                <ToggleButton fx:id="regexCheckBox" text=".*">
+                    <tooltip>
+                        <Tooltip text="Regex Mode" />
+                    </tooltip>
+                </ToggleButton>
+                <ToggleButton fx:id="caseSensitiveCheckBox" text="Aa">
+                    <tooltip>
+                        <Tooltip text="Case Sensitive" />
+                    </tooltip>
+                </ToggleButton>
                 <ToggleButton fx:id="hideUnparsedCheckBox" text="Hide Unparsed" />
                 <Separator orientation="VERTICAL" />
-                <Label text="Level:" />
-                <ComboBox fx:id="logLevelFilterComboBox" prefHeight="16.0" prefWidth="115.0" promptText="All Levels" styleClass="small-combo-box" stylesheets="@../style/components.css" />
+                <ComboBox fx:id="logLevelFilterComboBox" prefWidth="100.0" promptText="Level" />
                 <Separator orientation="VERTICAL" />
-                <Label text="From:" />
-                <TextField fx:id="dateTimeFromField" prefWidth="150" promptText="yyyy-MM-dd HH:mm:ss">
+                <TextField fx:id="dateTimeFromField" prefWidth="135" promptText="From: yyyy-MM-dd HH:mm:ss">
                     <font>
-                        <Font size="10.0" />
+                        <Font size="12.0" />
                     </font>
                     <tooltip>
                         <Tooltip text="Start date/time (yyyy-MM-dd HH:mm:ss)" />
                     </tooltip>
                 </TextField>
-                <Label text="To:" />
-                <TextField fx:id="dateTimeToField" prefWidth="150" promptText="yyyy-MM-dd HH:mm:ss">
+                <TextField fx:id="dateTimeToField" prefWidth="135" promptText="To: yyyy-MM-dd HH:mm:ss">
                     <font>
-                        <Font size="10.0" />
+                        <Font size="12.0" />
                     </font>
                     <tooltip>
                         <Tooltip text="End date/time (yyyy-MM-dd HH:mm:ss)" />
@@ -73,16 +126,16 @@
                 </TextField>
                 <Button fx:id="clearDateFilterButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="TIMES" size="12" />
+                        <FontAwesomeIconView glyphName="TIMES" size="14" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Clear Date Filter" />
                     </tooltip>
                 </Button>
                 <Separator orientation="VERTICAL" />
-                <Button fx:id="searchButton">
+                <Button fx:id="searchButton" styleClass="accent-button">
                     <graphic>
-                        <FontAwesomeIconView glyphName="SEARCH" size="12" />
+                        <FontAwesomeIconView glyphName="SEARCH" size="14" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Apply Filters" />
@@ -90,7 +143,7 @@
                 </Button>
                 <Button fx:id="clearSearchButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
+                        <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="14" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Clear All Filters" />
@@ -99,7 +152,7 @@
                 <Separator orientation="VERTICAL" />
                 <Button fx:id="autoFitButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="COLUMNS" size="12" />
+                        <FontAwesomeIconView glyphName="COLUMNS" size="14" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Auto Fit Table Columns" />
@@ -107,7 +160,7 @@
                 </Button>
                 <Button fx:id="refreshButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="REFRESH" size="12" />
+                        <FontAwesomeIconView glyphName="REFRESH" size="14" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Reload Log" />
@@ -115,7 +168,7 @@
                 </Button>
                 <Button fx:id="scrollToTopButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="ARROW_UP" size="12" />
+                        <FontAwesomeIconView glyphName="ARROW_UP" size="14" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Scroll to Top" />
@@ -123,7 +176,7 @@
                 </Button>
                 <Button fx:id="prevWindowButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="STEP_BACKWARD" size="12" />
+                        <FontAwesomeIconView glyphName="STEP_BACKWARD" size="14" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Previous Window (Page Up)" />
@@ -131,7 +184,7 @@
                 </Button>
                 <Button fx:id="nextWindowButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="STEP_FORWARD" size="12" />
+                        <FontAwesomeIconView glyphName="STEP_FORWARD" size="14" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Next Window (Page Down)" />
@@ -139,7 +192,7 @@
                 </Button>
                 <Button fx:id="scrollToBottomButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="ARROW_DOWN" size="12" />
+                        <FontAwesomeIconView glyphName="ARROW_DOWN" size="14" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Scroll to Bottom" />
@@ -147,7 +200,7 @@
                 </Button>
                 <ToggleButton fx:id="tailButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="EYE" size="12" />
+                        <FontAwesomeIconView glyphName="EYE" size="14" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Tail (follow last entries)" />
@@ -162,14 +215,14 @@
         <BorderPane xmlns="http://javafx.com/javafx">
             <!-- Collapsed Left Panel (appears when leftPanel is unpinned) -->
             <left>
-                <VBox fx:id="collapsedLeftPanel" alignment="TOP_CENTER" managed="false" prefWidth="20" spacing="10" visible="false">
+                <VBox fx:id="collapsedLeftPanel" alignment="TOP_CENTER" managed="false" prefWidth="30" spacing="10" visible="false" style="-fx-background-color: #252526; -fx-border-color: #3f3f46; -fx-border-width: 0 1 0 0;">
                     <padding>
-                        <Insets bottom="5" left="5" right="5" top="5" />
+                        <Insets bottom="10" left="5" right="5" top="10" />
                     </padding>
 
                     <Button fx:id="expandLeftPanelButton" rotate="90">
                         <graphic>
-                            <FontAwesomeIconView glyphName="ANGLE_DOUBLE_RIGHT" size="12" />
+                            <FontAwesomeIconView glyphName="ANGLE_DOUBLE_RIGHT" size="14" />
                         </graphic>
                         <tooltip>
                             <Tooltip text="Expand Recent Files" />
@@ -181,21 +234,21 @@
             <center>
                 <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
                     <!-- Left Panel: Recent Files -->
-                    <VBox fx:id="leftPanel" minWidth="200" prefWidth="250" spacing="5">
+                    <VBox fx:id="leftPanel" minWidth="200" prefWidth="250" spacing="10" style="-fx-background-color: #252526;">
                         <padding>
-                            <Insets bottom="5" left="5" right="5" top="5" />
+                            <Insets bottom="10" left="10" right="10" top="10" />
                         </padding>
 
-                        <HBox spacing="5">
-                            <Label prefHeight="18.0" prefWidth="294.0" text="Recent Log Files" HBox.hgrow="ALWAYS">
+                        <HBox spacing="5" alignment="CENTER_LEFT">
+                            <Label text="Recent Log Files" HBox.hgrow="ALWAYS">
                                 <font>
-                                    <Font name="System Bold" size="12.0" />
+                                    <Font name="System Bold" size="14.0" />
                                 </font>
                             </Label>
-                            <Separator prefWidth="200.0" HBox.hgrow="ALWAYS" />
+                            <Region HBox.hgrow="ALWAYS" />
                             <Button fx:id="pinLeftPanelButton">
                                 <graphic>
-                                    <FontAwesomeIconView glyphName="ANGLE_DOUBLE_LEFT" size="12" />
+                                    <FontAwesomeIconView glyphName="ANGLE_DOUBLE_LEFT" size="14" />
                                 </graphic>
                                 <tooltip>
                                     <Tooltip text="Collapse Recent Files Panel" />
@@ -203,11 +256,11 @@
                             </Button>
                         </HBox>
 
-                        <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS" />
+                        <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS" style="-fx-background-color: #1e1e1e; -fx-background-radius: 4; -fx-border-radius: 4; -fx-border-color: #3f3f46;" />
 
                         <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files">
                             <graphic>
-                                <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
+                                <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="14" />
                             </graphic>
                         </Button>
                     </VBox>
@@ -216,14 +269,14 @@
                     <BorderPane>
                         <!-- Collapsed Bottom Panel (appears when bottomPanel is unpinned) -->
                         <bottom>
-                            <HBox fx:id="collapsedBottomPanel" alignment="CENTER_LEFT" managed="false" prefHeight="20" spacing="10" visible="false">
+                            <HBox fx:id="collapsedBottomPanel" alignment="CENTER_LEFT" managed="false" prefHeight="30" spacing="10" visible="false" style="-fx-background-color: #252526; -fx-border-color: #3f3f46; -fx-border-width: 1 0 0 0;">
                                 <padding>
-                                    <Insets bottom="5" left="5" right="5" top="5" />
+                                    <Insets bottom="5" left="10" right="10" top="5" />
                                 </padding>
 
                                 <Button fx:id="expandBottomPanelButton">
                                     <graphic>
-                                        <FontAwesomeIconView glyphName="ANGLE_DOUBLE_LEFT" size="12" rotate="90" />
+                                        <FontAwesomeIconView glyphName="ANGLE_DOUBLE_LEFT" size="14" rotate="90" />
                                     </graphic>
                                     <tooltip>
                                         <Tooltip text="Expand Detail Panel" />
@@ -231,7 +284,7 @@
                                 </Button>
                                 <Label text="Log Detail (Collapsed)">
                                     <font>
-                                        <Font name="System Bold" size="10.0" />
+                                        <Font name="System Bold" size="12.0" />
                                     </font>
                                 </Label>
                             </HBox>
@@ -240,43 +293,52 @@
                         <center>
                             <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
                                 <!-- Center Panel: Log Table -->
-                                <VBox spacing="5">
+                                <VBox spacing="5" style="-fx-background-color: #1e1e1e;">
                                     <padding>
-                                        <Insets bottom="5" left="5" right="5" top="5" />
+                                        <Insets bottom="10" left="10" right="10" top="10" />
                                     </padding>
 
                                     <TableView fx:id="logTableView" stylesheets="@../style/highlight.css" VBox.vgrow="ALWAYS">
                                         <placeholder>
-                                            <Label text="No log file loaded. Open a file to view logs." />
+                                            <Label text="No log file loaded. Open a file to view logs." textFill="#718096">
+                                                <font>
+                                                    <Font size="14.0"/>
+                                                </font>
+                                            </Label>
                                         </placeholder>
                                     </TableView>
                                 </VBox>
 
                                 <!-- Bottom Panel: Log Detail -->
-                                <VBox fx:id="bottomPanel" minHeight="150" prefHeight="200" spacing="5">
+                                <VBox fx:id="bottomPanel" minHeight="150" prefHeight="200" spacing="0" style="-fx-background-color: #252526;">
                                     <padding>
-                                        <Insets bottom="5" left="5" right="5" top="5" />
+                                        <Insets bottom="0" left="0" right="0" top="10" />
                                     </padding>
 
                                     <HBox alignment="CENTER_LEFT" spacing="10">
+                                        <padding>
+                                            <Insets bottom="10" left="10" right="10" top="2" />
+                                        </padding>
                                         <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS">
                                             <font>
-                                                <Font name="System Bold" size="12.0" />
+                                                <Font name="System Bold" size="14.0" />
                                             </font>
                                         </Label>
 
+                                        <Region HBox.hgrow="ALWAYS"/>
+
                                         <HBox alignment="CENTER_LEFT" spacing="5">
-                                            <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
+                                            <ToggleButton fx:id="prettifyJsonButton">
                                                 <graphic>
-                                                    <FontAwesomeIconView glyphName="INDENT" size="12" />
+                                                    <FontAwesomeIconView glyphName="INDENT" size="14" />
                                                 </graphic>
                                                 <tooltip>
                                                     <Tooltip text="Auto-Prettify JSON" />
                                                 </tooltip>
                                             </ToggleButton>
-                                            <ToggleButton fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
+                                            <ToggleButton fx:id="prettifyXmlButton">
                                                 <graphic>
-                                                    <FontAwesomeIconView glyphName="CODE" size="12" />
+                                                    <FontAwesomeIconView glyphName="CODE" size="14" />
                                                 </graphic>
                                                 <tooltip>
                                                     <Tooltip text="Auto-Prettify XML" />
@@ -284,7 +346,7 @@
                                             </ToggleButton>
                                             <Button fx:id="copyButton">
                                                 <graphic>
-                                                    <FontAwesomeIconView glyphName="COPY" size="12" />
+                                                    <FontAwesomeIconView glyphName="COPY" size="14" />
                                                 </graphic>
                                                 <tooltip>
                                                     <Tooltip text="Copy" />
@@ -292,7 +354,7 @@
                                             </Button>
                                             <Button fx:id="clearDetailButton">
                                                 <graphic>
-                                                    <FontAwesomeIconView glyphName="CLOSE" size="12" />
+                                                    <FontAwesomeIconView glyphName="CLOSE" size="14" />
                                                 </graphic>
                                                 <tooltip>
                                                     <Tooltip text="Clear" />
@@ -301,7 +363,7 @@
                                             <Separator orientation="VERTICAL" />
                                             <Button fx:id="pinBottomPanelButton">
                                                 <graphic>
-                                                    <FontAwesomeIconView glyphName="ANGLE_DOUBLE_DOWN" size="12" />
+                                                    <FontAwesomeIconView glyphName="ANGLE_DOUBLE_DOWN" size="14" />
                                                 </graphic>
                                                 <tooltip>
                                                     <Tooltip text="Pin/Unpin Detail Panel" />
@@ -309,6 +371,7 @@
                                             </Button>
                                         </HBox>
                                     </HBox>
+                                    <!-- Detail Text Area usually added programmatically, ensure it picks up theme -->
                                 </VBox>
                             </SplitPane>
                         </center>
@@ -320,7 +383,7 @@
 
     <!-- Bottom: Status Bar -->
     <bottom>
-        <HBox alignment="CENTER_LEFT" spacing="10">
+        <HBox alignment="CENTER_LEFT" spacing="10" styleClass="main-bottom-bar">
             <padding>
                 <Insets bottom="5" left="10" right="10" top="5" />
             </padding>
@@ -329,5 +392,4 @@
             <ProgressBar fx:id="progressBar" prefWidth="200" visible="false" />
         </HBox>
     </bottom>
-
 </BorderPane>

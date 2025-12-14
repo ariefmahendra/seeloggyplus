@@ -21,9 +21,13 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
+import com.seeloggyplus.util.WindowSnapHandler;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import lombok.Getter;
 import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +35,22 @@ import org.slf4j.LoggerFactory;
 public class ParsingConfigController {
 
     private static final Logger logger = LoggerFactory.getLogger(ParsingConfigController.class);
+
+    // Custom Window Decoration
+    @FXML
+    private HBox titleBar;
+    @FXML
+    private ImageView windowIconView;
+    @FXML
+    private Button minimizeWindowButton;
+    @FXML
+    private Button maximizeWindowButton;
+    @FXML
+    private Button closeWindowButton;
+    @FXML
+    private FontAwesomeIconView maximizeIcon;
+
+    private WindowSnapHandler windowSnapHandler;
 
     @FXML
     private ListView<ParsingConfig> configListView;
@@ -100,6 +120,8 @@ public class ParsingConfigController {
         setupDetailPanel();
         setupTestPanel();
         setupButtons();
+
+        setupWindowHandling();
 
         Platform.runLater(() -> {
             Stage stage = (Stage) cancelButton.getScene().getWindow();
@@ -251,7 +273,6 @@ public class ParsingConfigController {
 
         if (pattern == null || pattern.trim().isEmpty()) {
             validationLabel.setText("Pattern is empty");
-            validationLabel.getStyleClass().setAll("validation-warning");
             groupNamesListView.getItems().clear();
             return;
         }
@@ -263,7 +284,6 @@ public class ParsingConfigController {
 
         if (tempConfig.isValid()) {
             validationLabel.setText("✓ Pattern is valid");
-            validationLabel.getStyleClass().setAll("validation-success");
 
             if (tempConfig.getGroupNames() != null && !tempConfig.getGroupNames().isEmpty()) {
                 groupNamesListView.setItems(FXCollections.observableArrayList(tempConfig.getGroupNames()));
@@ -275,7 +295,6 @@ public class ParsingConfigController {
             }
         } else {
             validationLabel.setText("✗ " + tempConfig.getValidationError());
-            validationLabel.getStyleClass().setAll("validation-error");
             groupNamesListView.getItems().clear();
         }
     }
@@ -286,13 +305,11 @@ public class ParsingConfigController {
 
         if (sampleLog == null || sampleLog.trim().isEmpty()) {
             testResultLabel.setText("Please enter a sample log line");
-            testResultLabel.getStyleClass().setAll("validation-warning");
             return;
         }
 
         if (pattern == null || pattern.trim().isEmpty()) {
             testResultLabel.setText("Please enter a regex pattern");
-            testResultLabel.getStyleClass().setAll("validation-warning");
             return;
         }
 
@@ -300,7 +317,6 @@ public class ParsingConfigController {
         LogParserService.TestResult result = logParserService.testParsing(sampleLog, testConfig);
         if (result.isSuccess()) {
             testResultLabel.setText("Pattern matched successfully!");
-            testResultLabel.getStyleClass().setAll("validation-success");
 
             ObservableList<ParsedField> fields = FXCollections.observableArrayList();
             result.getParsedFields().forEach((key, value) -> fields.add(new ParsedField(key, value)));
@@ -308,7 +324,6 @@ public class ParsingConfigController {
             logger.info("Test parsing successful, displaying {} fields", fields.size());
         } else {
             testResultLabel.setText("✗ " + result.getMessage());
-            testResultLabel.getStyleClass().setAll("validation-error");
             previewTableView.getItems().clear();
             logger.warn("Test parsing failed: {}", result.getMessage());
         }
@@ -655,7 +670,7 @@ public class ParsingConfigController {
                 addAppIcon(stage);
             }
         } catch (Exception e) {
-            // Ignore
+            logger.warn(e.getMessage());
         }
     }
 
@@ -691,18 +706,70 @@ public class ParsingConfigController {
                 nameLabel.setText(item.getName());
                 descLabel.setText(item.getDescription());
 
-                statusLabel.getStyleClass().removeAll("validation-success", "validation-error");
                 if (item.isValid()) {
-                    statusLabel.setText(
-                            "✓ " + item.getGroupNames().size() + " groups");
-                    statusLabel.getStyleClass().add("validation-success");
+                    statusLabel.setText("✓ " + item.getGroupNames().size() + " groups");
                 } else {
                     statusLabel.setText("✗ Invalid pattern");
-                    statusLabel.getStyleClass().add("validation-error");
                 }
 
                 setGraphic(vbox);
             }
+        }
+    }
+
+    private void setupWindowHandling() {
+        try {
+            Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/app-icon.png")), 16, 16, true, true);
+            windowIconView.setImage(icon);
+        } catch (Exception e) {
+            logger.warn("Could not load dialog icon", e);
+        }
+
+        if (titleBar.getScene() != null && titleBar.getScene().getWindow() instanceof Stage) {
+            initWindowHandler((Stage) titleBar.getScene().getWindow());
+        } else {
+            titleBar.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) {
+                    if (newScene.getWindow() instanceof Stage) {
+                        initWindowHandler((Stage) newScene.getWindow());
+                    } else {
+                        newScene.windowProperty().addListener((obs2, oldWindow, newWindow) -> {
+                            if (newWindow instanceof Stage) {
+                                initWindowHandler((Stage) newWindow);
+                            }
+                        });
+                    }
+                }
+            });
+        }
+    }
+
+    private void initWindowHandler(Stage stage) {
+        windowSnapHandler = new WindowSnapHandler(stage, titleBar, maximizeIcon);
+
+        stage.setMinWidth(600);
+        stage.setMinHeight(400);
+
+        if (minimizeWindowButton != null) {
+            minimizeWindowButton.setOnAction(e -> {
+                if (windowSnapHandler != null) windowSnapHandler.minimize();
+            });
+        }
+        if (maximizeWindowButton != null) {
+            maximizeWindowButton.setOnAction(e -> {
+                if (windowSnapHandler != null) windowSnapHandler.toggleMaximize();
+            });
+        }
+        if (closeWindowButton != null) {
+            closeWindowButton.setOnAction(e -> handleCancelOrClose(stage));
+        }
+    }
+
+    private void handleCancelOrClose(Stage stage) {
+        if (isDirty()) {
+            handleCancel();
+        } else {
+            stage.close();
         }
     }
 

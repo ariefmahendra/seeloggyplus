@@ -3,16 +3,35 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.image.*?>
 <?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
 
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.controller.UnifiedFileManagerDialogController"
-            prefWidth="1100" prefHeight="750">
+            prefWidth="1100" prefHeight="750" styleClass="main-window">
     
-    <!-- Top: Navigation & Search -->
+    <!-- Top: Custom Title Bar & Navigation -->
     <top>
-        <VBox>
-            <ToolBar>
+        <VBox spacing="0">
+            <!-- Custom Title Bar -->
+            <HBox fx:id="titleBar" alignment="CENTER_LEFT" spacing="10" styleClass="title-bar" style="-fx-padding: 5 10 5 10;">
+                <ImageView fx:id="windowIconView" fitHeight="16" fitWidth="16" pickOnBounds="true" preserveRatio="true" smooth="true" />
+                <Label text="File Manager" textFill="#e4e4e7" style="-fx-font-weight: bold;"/>
+                <Region HBox.hgrow="ALWAYS" />
+                <HBox alignment="CENTER_RIGHT" spacing="0">
+                    <Button fx:id="minimizeButton" styleClass="window-control-button" focusTraversable="false">
+                        <graphic><FontAwesomeIconView glyphName="MINUS" size="12" fill="#a1a1aa"/></graphic>
+                    </Button>
+                    <Button fx:id="maximizeButton" styleClass="window-control-button" focusTraversable="false">
+                        <graphic><FontAwesomeIconView fx:id="maximizeIcon" glyphName="SQUARE_ALT" size="12" fill="#a1a1aa"/></graphic>
+                    </Button>
+                    <Button fx:id="closeButton" styleClass="window-close-button" focusTraversable="false">
+                        <graphic><FontAwesomeIconView glyphName="CLOSE" size="14" fill="#a1a1aa"/></graphic>
+                    </Button>
+                </HBox>
+            </HBox>
+
+            <ToolBar style="-fx-border-color: #3f3f46; -fx-border-width: 1 0 1 0; -fx-background-color: #1e1e1e;">
                 <Button fx:id="backButton" disable="true">
                     <graphic>
                         <FontAwesomeIconView glyphName="ARROW_LEFT" size="14"/>
@@ -94,13 +113,13 @@
             <VBox>
                 <TableView fx:id="fileTable" VBox.vgrow="ALWAYS">
                     <columns>
-                        <TableColumn fx:id="iconColumn" text="" prefWidth="40" minWidth="40" maxWidth="40" sortable="false"/>
-                        <TableColumn fx:id="nameColumn" text="Name" prefWidth="350" minWidth="150"/>
-                        <TableColumn fx:id="sizeColumn" text="Size" prefWidth="100" minWidth="80"/>
-                        <TableColumn fx:id="typeColumn" text="Type" prefWidth="100" minWidth="80"/>
-                        <TableColumn fx:id="modifiedColumn" text="Modified" prefWidth="150" minWidth="120"/>
-                        <TableColumn fx:id="permissionsColumn" text="Permissions" prefWidth="100" minWidth="90"/>
-                        <TableColumn fx:id="ownerColumn" text="Owner" prefWidth="100" minWidth="80"/>
+                        <TableColumn fx:id="iconColumn" text="" prefWidth="40" minWidth="20" maxWidth="40" sortable="false"/>
+                        <TableColumn fx:id="nameColumn" text="Name" prefWidth="250" minWidth="50"/>
+                        <TableColumn fx:id="sizeColumn" text="Size" prefWidth="80" minWidth="30"/>
+                        <TableColumn fx:id="typeColumn" text="Type" prefWidth="80" minWidth="30"/>
+                        <TableColumn fx:id="modifiedColumn" text="Modified" prefWidth="120" minWidth="50"/>
+                        <TableColumn fx:id="permissionsColumn" text="Permissions" prefWidth="90" minWidth="30"/>
+                        <TableColumn fx:id="ownerColumn" text="Owner" prefWidth="80" minWidth="30"/>
                     </columns>
                     <placeholder>
                         <VBox alignment="CENTER" spacing="10">

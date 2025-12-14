@@ -15,9 +15,7 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import com.seeloggyplus.service.impl.*;
-import com.seeloggyplus.util.JsonPrettify;
-import com.seeloggyplus.util.PasswordPromptDialog;
-import com.seeloggyplus.util.XmlPrettify;
+import com.seeloggyplus.util.*;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.geometry.Side;
 import javafx.application.Platform;
@@ -31,14 +29,18 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.Tooltip;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.fxmisc.richtext.CodeArea;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import javafx.stage.StageStyle;
 
 public class MainController {
 
@@ -152,6 +154,20 @@ public class MainController {
     @FXML
     private Button clearDetailButton;
 
+    // FXML Components - Custom Title Bar
+    @FXML
+    private HBox titleBar;
+    @FXML
+    private Button minimizeWindowButton;
+    @FXML
+    private Button maximizeWindowButton;
+    @FXML
+    private Button closeWindowButton;
+    @FXML
+    private FontAwesomeIconView maximizeIcon;
+    @FXML
+    private ImageView windowIconView;
+
     // Services and Data
     private ParsingConfigService parsingConfigService;
     private RecentFileService recentFileService;
@@ -160,6 +176,7 @@ public class MainController {
     private LogFileService logFileService;
     private ServerManagementService serverManagementService;
 
+    private WindowSnapHandler windowSnapHandler;
     private LogFile currentLogDb;
     private LogEntrySource currentLogEntrySource;
     private LogEntrySource originalLogEntrySource;
@@ -223,6 +240,84 @@ public class MainController {
         updateStatus("Ready");
         progressBar.setVisible(false);
         updateTailButtonState();
+        setupTitleBar();
+    }
+
+    private void setupTitleBar() {
+        if (titleBar == null)
+            return;
+
+        // Load custom icon
+        try {
+            // Try loading PNG first, then ICO
+            // Use PNG for ImageView (ICO not supported by ImageView)
+            String iconPath = "/images/app-icon.png";
+            if (getClass().getResource(iconPath) == null) {
+                logger.warn("Icon resource not found: {}", iconPath);
+            } else {
+                // Load with requested width/height for better quality scaling
+                Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream(iconPath)), 32, 32, true,
+                        true);
+                if (windowIconView != null) {
+                    windowIconView.setImage(icon);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Failed to load window icon", e);
+        }
+
+        // Initialize reusable window handler safely
+        if (titleBar.getScene() != null && titleBar.getScene().getWindow() instanceof Stage) {
+            initWindowHandler((Stage) titleBar.getScene().getWindow());
+        } else {
+            titleBar.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) {
+                    if (newScene.getWindow() instanceof Stage) {
+                        initWindowHandler((Stage) newScene.getWindow());
+                    } else {
+                        newScene.windowProperty().addListener((obs2, oldWindow, newWindow) -> {
+                            if (newWindow instanceof Stage) {
+                                initWindowHandler((Stage) newWindow);
+                            }
+                        });
+                    }
+                }
+            });
+        }
+    }
+
+    private void initWindowHandler(Stage stage) {
+        // Ensure maximizeIcon is injected
+        if (maximizeIcon == null) {
+            logger.warn("Maximize Icon not injected!");
+        }
+        windowSnapHandler = new WindowSnapHandler(stage, titleBar, maximizeIcon);
+
+        // Delegate buttons to handler
+        minimizeWindowButton.setOnAction(e -> {
+            if (windowSnapHandler != null)
+                windowSnapHandler.minimize();
+        });
+        maximizeWindowButton.setOnAction(e -> {
+            if (windowSnapHandler != null)
+                windowSnapHandler.toggleMaximize();
+        });
+        closeWindowButton.setOnAction(e -> handleExit());
+    }
+
+    // Removed duplicated window handling logic (createGhostWindow, CustomUser32,
+    // detectSnap, applySnap, handleMinimize, handleMaximize, setupStageListeners)
+    // as it is now handled by WindowSnapHandler.
+
+    public void setInitialMaximized(boolean maximized) {
+        if (maximized) {
+            // Delay to ensure stage is ready and bounds are correct
+            javafx.application.Platform.runLater(() -> {
+                if (windowSnapHandler != null) {
+                    windowSnapHandler.toggleMaximize();
+                }
+            });
+        }
     }
 
     private void updateTailButtonState() {
@@ -302,7 +397,6 @@ public class MainController {
     }
 
     private void handleRecentFileSelectedWithConfig(RecentFilesDto recentFile, ParsingConfig parsingConfig) {
-        // todo: update recent file with new parsing config
         logFileService.updateParsingConfigIdForLogFiles(parsingConfig.getId(), recentFile.logFile().getId());
         handleRecentFileSelected(recentFile);
     }
@@ -348,7 +442,7 @@ public class MainController {
         logTableView.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         logTableView.getSelectionModel().setCellSelectionEnabled(true);
         logTableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        logTableView.setFixedCellSize(24.0);
+        logTableView.setFixedCellSize(30.0);
         logTableView.setTableMenuButtonVisible(false);
         logTableView.setPlaceholder(new javafx.scene.control.Label(""));
         logTableView.setOnKeyPressed((KeyEvent event) -> {
@@ -576,6 +670,8 @@ public class MainController {
         if (bottomPanel.getChildren().size() < 3) {
             bottomPanel.getChildren().add(1, detailTextArea);
             VBox.setVgrow(detailTextArea, Priority.ALWAYS);
+            // Add margin to replacing padding of the container
+            VBox.setMargin(detailTextArea, new javafx.geometry.Insets(0, 10, 10, 10));
         }
 
         prettifyJsonButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
@@ -615,16 +711,34 @@ public class MainController {
         }
 
         if (autoPrettifyJson) {
-            prettifyJson(false);
+            prettifyJson();
         }
         if (autoPrettifyXml) {
-            prettifyXml(false);
+            prettifyXml();
         }
     }
 
     private void handleToggleBottomPanelPin() {
         isBottomPanelPinned = !isBottomPanelPinned;
         updateBottomPanelDisplay();
+    }
+
+    private void setSplitPaneLocked(boolean locked) {
+        setSplitPaneLocked(locked, 0);
+    }
+
+    private void setSplitPaneLocked(boolean locked, int attempt) {
+        java.util.Set<javafx.scene.Node> dividers = verticalSplitPane.lookupAll(".split-pane-divider");
+
+        if (dividers.isEmpty()) {
+            if (attempt < 5) {
+                // Retry if dividers not found (UI not ready)
+                Platform.runLater(() -> setSplitPaneLocked(locked, attempt + 1));
+            }
+            return;
+        }
+
+        dividers.forEach(node -> node.setMouseTransparent(locked));
     }
 
     private void updateBottomPanelDisplay() {
@@ -646,6 +760,7 @@ public class MainController {
                 } else {
                     verticalSplitPane.setDividerPositions(0.7);
                 }
+                setSplitPaneLocked(false);
             });
         } else {
             expandIcon.setGlyphName("ANGLE_DOUBLE_LEFT");
@@ -654,7 +769,10 @@ public class MainController {
             bottomPanel.setManaged(false);
             collapsedBottomPanel.setVisible(true);
             collapsedBottomPanel.setManaged(true);
-            Platform.runLater(() -> verticalSplitPane.setDividerPositions(1.0));
+            Platform.runLater(() -> {
+                verticalSplitPane.setDividerPositions(1.0);
+                setSplitPaneLocked(true);
+            });
         }
         showBottomPanelMenuItem.setSelected(isBottomPanelPinned);
     }
@@ -908,7 +1026,7 @@ public class MainController {
             return new SimpleStringProperty(lineText);
         });
         lineCol.setPrefWidth(80);
-        lineCol.setMinWidth(80);
+        lineCol.setMinWidth(40);
         lineCol.setMaxWidth(120);
         lineCol.setSortable(false);
         return lineCol;
@@ -918,17 +1036,22 @@ public class MainController {
     public void handleOpen() {
         try {
             Stage mainStage = (Stage) menuBar.getScene().getWindow();
-
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
             Parent root = loader.load();
             UnifiedFileManagerDialogController controller = loader.getController();
 
             Stage dialog = new Stage();
+            dialog.initStyle(StageStyle.TRANSPARENT);
             addAppIcon(dialog);
             dialog.setTitle("Open File");
-            dialog.initModality(Modality.WINDOW_MODAL);
+            dialog.initModality(Modality.NONE);
             dialog.initOwner(mainStage);
-            dialog.setScene(new Scene(root));
+
+            Scene scene = new Scene(root);
+            scene.setFill(Color.TRANSPARENT);
+            scene.getStylesheets()
+                    .add(Objects.requireNonNull(getClass().getResource("/css/theme.css")).toExternalForm());
+            dialog.setScene(scene);
 
             dialog.showAndWait();
 
@@ -1279,7 +1402,6 @@ public class MainController {
 
     private void handleParsingConfiguration() {
         try {
-            Stage mainStage = (Stage) menuBar.getScene().getWindow();
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ParsingConfigDialog.fxml"));
             Parent root = loader.load();
 
@@ -1288,13 +1410,20 @@ public class MainController {
 
             Stage dialog = new Stage();
             dialog.setTitle("Parsing Configuration");
-            dialog.initOwner(mainStage);
-            dialog.initModality(Modality.WINDOW_MODAL);
+            dialog.initModality(Modality.NONE);
+            dialog.initStyle(StageStyle.TRANSPARENT);
             addAppIcon(dialog);
+
             Scene scene = new Scene(root);
+            scene.setFill(Color.TRANSPARENT);
             dialog.setScene(scene);
+
             dialog.setWidth(1000);
             dialog.setHeight(800);
+            dialog.setMinWidth(1000);
+            dialog.setMinHeight(800);
+
+            ResizeHelper.addResizeListener(dialog);
 
             dialog.showAndWait();
             logger.info("Parsing config dialog closed, returning to previous view");
@@ -1318,8 +1447,7 @@ public class MainController {
 
             Stage dialog = new Stage();
             dialog.setTitle("SSH Server Management");
-            dialog.initOwner(mainStage);
-            dialog.initModality(Modality.APPLICATION_MODAL);
+            dialog.initModality(Modality.NONE);
             addAppIcon(dialog);
             restoreWindow(mainStage, wasMaximized, oldX, oldY, oldWidth, oldHeight, root, dialog);
 
@@ -1418,6 +1546,14 @@ public class MainController {
             double oldHeight, Parent root, Stage dialog) {
         dialog.setScene(new Scene(root));
 
+        // --- Animation Inject ---
+        root.setOpacity(0);
+        root.setScaleX(0.95);
+        root.setScaleY(0.95);
+
+        dialog.setOnShown(e -> animatePopIn(root));
+        // ------------------------
+
         dialog.showAndWait();
 
         Platform.runLater(() -> {
@@ -1430,6 +1566,84 @@ public class MainController {
                 mainStage.setHeight(oldHeight);
             }
         });
+    }
+
+    // Helper for Pop-In Animation
+    private static void animatePopIn(javafx.scene.Node node) {
+        javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(javafx.util.Duration.millis(250),
+                node);
+        fade.setFromValue(0.0);
+        fade.setToValue(1.0);
+        fade.setInterpolator(javafx.animation.Interpolator.EASE_OUT);
+
+        javafx.animation.ScaleTransition scale = new javafx.animation.ScaleTransition(javafx.util.Duration.millis(250),
+                node);
+        scale.setFromX(0.95);
+        scale.setFromY(0.95);
+        scale.setToX(1.0);
+        scale.setToY(1.0);
+        scale.setInterpolator(javafx.animation.Interpolator.EASE_OUT);
+
+        javafx.animation.ParallelTransition parallel = new javafx.animation.ParallelTransition(fade, scale);
+        parallel.play();
+    }
+
+    private <T> Optional<T> showAndWaitAndRestore(Dialog<T> dialog) {
+        Stage mainStage = (Stage) menuBar.getScene().getWindow();
+        boolean wasMaximized = mainStage.isMaximized();
+        double oldX = mainStage.getX();
+        double oldY = mainStage.getY();
+        double oldWidth = mainStage.getWidth();
+        double oldHeight = mainStage.getHeight();
+
+        // Ensure the dialog has an owner, which is crucial for modality behavior
+        if (dialog.getOwner() == null) {
+            dialog.initOwner(mainStage);
+        }
+
+        // --- Animation Inject for Dialog<T> ---
+        DialogPane pane = dialog.getDialogPane();
+        if (pane != null) {
+            pane.setOpacity(0);
+            pane.setScaleX(0.95);
+            pane.setScaleY(0.95);
+
+            // Hook safely into window showing
+            if (pane.getScene() != null && pane.getScene().getWindow() != null) {
+                pane.getScene().getWindow().setOnShown(e -> animatePopIn(pane));
+            } else {
+                pane.sceneProperty().addListener((obs, oldS, newS) -> {
+                    if (newS != null) {
+                        newS.windowProperty().addListener((obs2, oldW, newW) -> {
+                            if (newW != null) {
+                                newW.setOnShown(e -> animatePopIn(pane));
+                            }
+                        });
+                    }
+                });
+            }
+        }
+        // --------------------------------------
+
+        Optional<T> result = dialog.showAndWait();
+
+        Platform.runLater(() -> {
+            if (wasMaximized) {
+                mainStage.setMaximized(true);
+            } else {
+                // Check if the stage was unintentionally moved or resized
+                if (mainStage.getX() != oldX || mainStage.getY() != oldY ||
+                        mainStage.getWidth() != oldWidth || mainStage.getHeight() != oldHeight) {
+
+                    mainStage.setX(oldX);
+                    mainStage.setY(oldY);
+                    mainStage.setWidth(oldWidth);
+                    mainStage.setHeight(oldHeight);
+                }
+            }
+        });
+
+        return result;
     }
 
     private void handleParsingConfigChanged() {
@@ -1992,7 +2206,7 @@ public class MainController {
         applyAutoPrettify();
     }
 
-    private void prettifyJson(boolean showInfoWhenNotFound) {
+    private void prettifyJson() {
         String fullText = detailTextArea.getText();
         if (fullText == null || fullText.isEmpty()) {
             return;
@@ -2024,12 +2238,10 @@ public class MainController {
         if (!newTextBuilder.toString().equals(fullText)) {
             detailTextArea.replaceText(newTextBuilder.toString());
             updateStatus("All JSON occurrences prettified");
-        } else if (showInfoWhenNotFound) {
-            showInfo("No JSON Found", "No valid JSON found in the log detail.");
         }
     }
 
-    private void prettifyXml(boolean showInfoWhenNotFound) {
+    private void prettifyXml() {
         String fullText = detailTextArea.getText();
         if (fullText == null || fullText.isEmpty()) {
             return;
@@ -2061,8 +2273,6 @@ public class MainController {
         if (!newTextBuilder.toString().equals(fullText)) {
             detailTextArea.replaceText(newTextBuilder.toString());
             updateStatus("All XML occurrences prettified");
-        } else if (showInfoWhenNotFound) {
-            showInfo("No XML Found", "No valid XML found in the log detail.");
         }
     }
 
@@ -2101,11 +2311,18 @@ public class MainController {
                 .orElse(true);
         updateLeftPanelDisplay();
 
-        isBottomPanelPinned = preferenceService.getPreferencesByCode("bottom_panel_pinned")
-                .filter(Predicate.not(String::isBlank))
-                .map(Boolean::parseBoolean)
-                .orElse(true);
-        updateBottomPanelDisplay();
+        updateLeftPanelDisplay();
+
+        // Force Bottom Panel to be expanded by default as per user request
+        isBottomPanelPinned = true;
+        /*
+         * isBottomPanelPinned =
+         * preferenceService.getPreferencesByCode("bottom_panel_pinned")
+         * .filter(Predicate.not(String::isBlank))
+         * .map(Boolean::parseBoolean)
+         * .orElse(true);
+         */
+        Platform.runLater(this::updateBottomPanelDisplay);
     }
 
     private void scrollToBottomAfterLoad() {
@@ -2531,10 +2748,6 @@ public class MainController {
             compiledPattern = null;
         }
 
-        final String searchTextLower = (!isRegex && hasTextSearch && !caseSensitive)
-                ? searchText.toLowerCase()
-                : searchText;
-
         final boolean hasLevelFilter = selectedLevel != null && !selectedLevel.equals("ALL");
         final boolean filterUnparsedOnly = "UNPARSED".equals(selectedLevel);
 
@@ -2919,40 +3132,6 @@ public class MainController {
 
         long duration = System.currentTimeMillis() - startTime;
         logger.info("Auto-fit completed in {}ms", duration);
-    }
-
-    private <T> Optional<T> showAndWaitAndRestore(Dialog<T> dialog) {
-        Stage mainStage = (Stage) menuBar.getScene().getWindow();
-        boolean wasMaximized = mainStage.isMaximized();
-        double oldX = mainStage.getX();
-        double oldY = mainStage.getY();
-        double oldWidth = mainStage.getWidth();
-        double oldHeight = mainStage.getHeight();
-
-        // Ensure the dialog has an owner, which is crucial for modality behavior
-        if (dialog.getOwner() == null) {
-            dialog.initOwner(mainStage);
-        }
-
-        Optional<T> result = dialog.showAndWait();
-
-        Platform.runLater(() -> {
-            if (wasMaximized) {
-                mainStage.setMaximized(true);
-            } else {
-                // Check if the stage was unintentionally moved or resized
-                if (mainStage.getX() != oldX || mainStage.getY() != oldY ||
-                        mainStage.getWidth() != oldWidth || mainStage.getHeight() != oldHeight) {
-
-                    mainStage.setX(oldX);
-                    mainStage.setY(oldY);
-                    mainStage.setWidth(oldWidth);
-                    mainStage.setHeight(oldHeight);
-                }
-            }
-        });
-
-        return result;
     }
 
     private class RecentFileListCell extends ListCell<RecentFilesDto> {

@@ -1,198 +1,250 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
+<?import de.jensd.fx.glyphs.fontawesome.*?>
 <?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.scene.text.Font?>
-<GridPane hgap="15" vgap="10" xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.ParsingConfigController">
+<?import javafx.scene.text.*?>
 
-    <columnConstraints>
-        <ColumnConstraints hgrow="SOMETIMES" minWidth="220" prefWidth="280" />
-        <ColumnConstraints hgrow="ALWAYS" />
-    </columnConstraints>
+<BorderPane minHeight="650" minWidth="800" prefHeight="650" prefWidth="1000" styleClass="main-window" stylesheets="@../css/theme.css" xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.ParsingConfigController">
+    <top>
+        <VBox>
+            <!-- Custom Title Bar -->
+            <HBox fx:id="titleBar" alignment="CENTER_LEFT" minWidth="0" spacing="10" style="-fx-padding: 5 10 5 10; -fx-border-color: #3f3f46; -fx-border-width: 0 0 1 0;" styleClass="title-bar">
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <!-- App Icon -->
+                    <ImageView fx:id="windowIconView" fitHeight="16" fitWidth="16" preserveRatio="true" smooth="true" />
+                    <Label text="Parsing Configuration" textFill="#e4e4e7">
+                        <font>
+                            <Font name="System Bold" size="13.0" />
+                        </font>
+                    </Label>
+                </HBox>
 
-    <rowConstraints>
-        <RowConstraints vgrow="NEVER" />
-        <RowConstraints vgrow="ALWAYS" />
-        <RowConstraints vgrow="NEVER" />
-    </rowConstraints>
+                <!-- Spacer -->
+                <Region HBox.hgrow="ALWAYS" />
 
-    <!-- Header -->
-    <VBox GridPane.columnIndex="0" GridPane.columnSpan="2">
-        <Label text="Parsing Configuration">
-            <font>
-                <Font name="System Bold" size="14.0" />
-            </font>
-        </Label>
-        <Label text="Create and manage regex patterns for log parsing" />
-        <padding>
-            <Insets left="15.0" />
-        </padding>
-    </VBox>
+                <HBox alignment="CENTER_RIGHT" spacing="0">
+                    <Button fx:id="minimizeWindowButton" focusTraversable="false" styleClass="window-control-button">
+                        <graphic>
+                            <FontAwesomeIconView fill="#a1a1aa" glyphName="MINUS" size="12" />
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Minimize" />
+                        </tooltip>
+                    </Button>
+                    <Button fx:id="maximizeWindowButton" focusTraversable="false" styleClass="window-control-button">
+                        <graphic>
+                            <FontAwesomeIconView fx:id="maximizeIcon" fill="#a1a1aa" glyphName="SQUARE_ALT" size="12" />
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Maximize" />
+                        </tooltip>
+                    </Button>
+                    <Button fx:id="closeWindowButton" focusTraversable="false" styleClass="window-close-button">
+                        <graphic>
+                            <FontAwesomeIconView fill="#a1a1aa" glyphName="CLOSE" size="14" />
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Close" />
+                        </tooltip>
+                    </Button>
+                </HBox>
+            </HBox>
 
-    <!-- Left Panel: Configuration List -->
-    <VBox spacing="8" GridPane.columnIndex="0" GridPane.rowIndex="1">
-        <Label text="Saved Configurations">
+            <!-- Description Sub-header -->
+            <VBox style="-fx-padding: 10 15 5 15;">
+                <Label text="Create and manage regex patterns for log parsing" textFill="#a1a1aa" />
+                <padding>
+                    <Insets left="0.0" />
+                </padding>
+            </VBox>
+        </VBox>
+    </top>
+
+    <center>
+        <!-- Original Grid Pane Content, without header row -->
+        <GridPane hgap="15" vgap="10">
             <padding>
-                <Insets left="10.0" />
+                <Insets bottom="10" left="15" right="15" top="10" />
             </padding>
-            <font>
-                <Font name="System Bold" size="12.0" />
-            </font>
-        </Label>
-        <ListView fx:id="configListView" VBox.vgrow="ALWAYS">
-         <opaqueInsets>
-            <Insets />
-         </opaqueInsets>
-         <VBox.margin>
-            <Insets left="10.0" />
-         </VBox.margin></ListView>
-        <HBox alignment="CENTER_LEFT" spacing="10">
-            <Button fx:id="addButton" prefHeight="30.0" prefWidth="30.0">
-                <graphic>
-                    <FontAwesomeIconView glyphName="PLUS" size="1.2em" />
-                </graphic>
-                <tooltip>
-                    <Tooltip text="Add new configuration" />
-                </tooltip>
-            </Button>
-            <Button fx:id="editButton" prefHeight="30.0" prefWidth="30.0">
-                <graphic>
-                    <FontAwesomeIconView glyphName="PENCIL" size="1.2em" />
-                </graphic>
-                <tooltip>
-                    <Tooltip text="Edit selected configuration" />
-                </tooltip>
-            </Button>
-            <Button fx:id="deleteButton" prefHeight="30.0" prefWidth="30.0">
-                <graphic>
-                    <FontAwesomeIconView glyphName="TRASH" size="1.2em" />
-                </graphic>
-                <tooltip>
-                    <Tooltip text="Delete selected configuration" />
-                </tooltip>
-            </Button>
-            <Button fx:id="duplicateButton" prefHeight="30.0" prefWidth="30.0">
-                <graphic>
-                    <FontAwesomeIconView glyphName="COPY" size="1.2em" />
-                </graphic>
-                <tooltip>
-                    <Tooltip text="Duplicate selected configuration" />
-                </tooltip>
-            </Button>
-            <Button fx:id="importConfigurationButton" prefHeight="30.0" prefWidth="30.0">
-                <graphic>
-                    <FontAwesomeIconView glyphName="DOWNLOAD" size="1.2em" />
-                </graphic>
-                <tooltip>
-                    <Tooltip text="Import configuration from file" />
-                </tooltip>
-            </Button>
-            <Button fx:id="exportConfigurationButton" prefHeight="30.0" prefWidth="30.0">
-                <graphic>
-                    <FontAwesomeIconView glyphName="UPLOAD" size="1.2em" />
-                </graphic>
-                <tooltip>
-                    <Tooltip text="Export selected configuration to file" />
-                </tooltip>
-            </Button>
-            <padding>
-                <Insets left="10.0" />
-            </padding>
-        </HBox>
-      <opaqueInsets>
-         <Insets left="5.0" />
-      </opaqueInsets>
-    </VBox>
 
-    <!-- Right Panel: Editor and Test -->
-    <ScrollPane fitToHeight="true" fitToWidth="true" GridPane.columnIndex="1" GridPane.rowIndex="1">
-        <VBox spacing="12">
-            <!-- Details Section -->
-            <VBox spacing="8">
-                <Label text="Configuration Details">
+            <columnConstraints>
+                <ColumnConstraints hgrow="SOMETIMES" minWidth="220" prefWidth="280" />
+                <ColumnConstraints hgrow="ALWAYS" />
+            </columnConstraints>
+
+            <rowConstraints>
+                <RowConstraints vgrow="ALWAYS" />
+                <RowConstraints vgrow="NEVER" />
+            </rowConstraints>
+
+            <!-- Left Panel: Configuration List (Row 0) -->
+            <VBox spacing="8" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                <Label text="Saved Configurations">
+                    <padding>
+                        <Insets left="10.0" />
+                    </padding>
                     <font>
                         <Font name="System Bold" size="12.0" />
                     </font>
                 </Label>
-                <GridPane hgap="10" vgap="5">
-                    <Label text="Name:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
-                    <TextField fx:id="nameField" promptText="Enter configuration name" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" GridPane.rowIndex="0" />
-                    <Label text="Description:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
-                    <TextArea fx:id="descriptionArea" promptText="A brief summary of the pattern" wrapText="true" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" GridPane.rowIndex="1" />
-                    <Label text="Timestamp Format:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
-                    <HBox spacing="5" GridPane.columnIndex="1" GridPane.rowIndex="2">
-                        <TextField fx:id="timestampFormatField" promptText="yyyy-MM-dd HH:mm:ss.SSS" HBox.hgrow="ALWAYS">
-                            <tooltip>
-                                <Tooltip text="Date/time format for parsing timestamp (e.g., yyyy-MM-dd HH:mm:ss.SSS)" />
-                            </tooltip>
-                        </TextField>
-                        <Button fx:id="autoDetectFormatButton" text="Auto-Detect">
-                            <tooltip>
-                                <Tooltip text="Auto-detect timestamp format from regex pattern" />
-                            </tooltip>
-                        </Button>
-                    </HBox>
-                    <columnConstraints>
-                        <ColumnConstraints />
-                        <ColumnConstraints />
-                    </columnConstraints>
-                    <rowConstraints>
-                        <RowConstraints />
-                        <RowConstraints />
-                        <RowConstraints />
-                    </rowConstraints>
-                </GridPane>
-            </VBox>
-
-            <!-- Regex Pattern Section -->
-            <VBox spacing="5">
-                <Label text="Regex Pattern" />
-                <Label style="-fx-font-size: 11px; -fx-text-fill: #888;" text="Group names in the regular expression will be used as column headers. Example: (?&lt;columnName&gt;regex)" wrapText="true" />
-                <TextArea fx:id="regexPatternArea" prefRowCount="6" wrapText="true" VBox.vgrow="ALWAYS" />
-                <HBox alignment="CENTER_LEFT">
-                    <Label fx:id="validationLabel" />
-                </HBox>
-            </VBox>
-
-            <!-- Named Groups Section -->
-            <VBox spacing="5">
-                <Label text="Detected Named Groups (Table Columns)" />
-                <ListView fx:id="groupNamesListView" VBox.vgrow="ALWAYS" />
-            </VBox>
-
-            <!-- Test Section -->
-            <VBox spacing="8" VBox.vgrow="ALWAYS">
+                <ListView fx:id="configListView" VBox.vgrow="ALWAYS">
+                    <opaqueInsets>
+                        <Insets />
+                    </opaqueInsets>
+                    <VBox.margin>
+                        <Insets left="10.0" />
+                    </VBox.margin>
+                </ListView>
                 <HBox alignment="CENTER_LEFT" spacing="10">
-                    <Label text="Test Pattern" HBox.hgrow="ALWAYS" />
-                    <Button fx:id="testParsingButton" text="Test" />
+                    <Button fx:id="addButton" prefHeight="30.0" prefWidth="30.0">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="PLUS" size="1.2em" />
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Add new configuration" />
+                        </tooltip>
+                    </Button>
+                    <Button fx:id="editButton" prefHeight="30.0" prefWidth="30.0">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="PENCIL" size="1.2em" />
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Edit selected configuration" />
+                        </tooltip>
+                    </Button>
+                    <Button fx:id="deleteButton" prefHeight="30.0" prefWidth="30.0">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="TRASH" size="1.2em" />
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Delete selected configuration" />
+                        </tooltip>
+                    </Button>
+                    <Button fx:id="duplicateButton" prefHeight="30.0" prefWidth="30.0">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="COPY" size="1.2em" />
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Duplicate selected configuration" />
+                        </tooltip>
+                    </Button>
+                    <Button fx:id="importConfigurationButton" prefHeight="30.0" prefWidth="30.0">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="DOWNLOAD" size="1.2em" />
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Import configuration from file" />
+                        </tooltip>
+                    </Button>
+                    <Button fx:id="exportConfigurationButton" prefHeight="30.0" prefWidth="30.0">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="UPLOAD" size="1.2em" />
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Export selected configuration to file" />
+                        </tooltip>
+                    </Button>
+                    <padding>
+                        <Insets left="10.0" />
+                    </padding>
                 </HBox>
-                <TextArea fx:id="sampleLogArea" promptText="Paste a sample log line here..." VBox.vgrow="ALWAYS" />
-                <Label fx:id="testResultLabel" />
-                <TableView fx:id="previewTableView" VBox.vgrow="ALWAYS">
-                    <columns>
-                        <TableColumn fx:id="fieldNameColumn" prefWidth="150" text="Field Name" />
-                        <TableColumn fx:id="fieldValueColumn" prefWidth="150.0" text="Value" />
-                    </columns>
-                    <placeholder>
-                        <Label text="Test results will appear here." />
-                    </placeholder>
-                </TableView>
+                <opaqueInsets>
+                    <Insets left="5.0" />
+                </opaqueInsets>
             </VBox>
-            <padding>
-                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-            </padding>
-        </VBox>
-    </ScrollPane>
 
-    <!-- Footer: Action Buttons -->
-    <HBox alignment="CENTER_RIGHT" spacing="10" GridPane.columnIndex="1" GridPane.rowIndex="2">
-        <Button fx:id="saveButton" text="Save &amp; Close" />
-        <Button fx:id="applyButton" text="Apply" />
-        <Button fx:id="cancelButton" text="Cancel" />
-        <padding>
-            <Insets bottom="10.0" left="5.0" right="5.0" top="10.0" />
-        </padding>
-    </HBox>
-</GridPane>
+            <!-- Right Panel: Editor and Test (Row 0) -->
+            <ScrollPane fitToHeight="true" fitToWidth="true" style="-fx-background-color: transparent; -fx-background: transparent;" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                <VBox spacing="12" style="-fx-background-color: #252526; -fx-background-radius: 6; -fx-padding: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 10, 0, 0, 2);">
+                    <!-- Details Section -->
+                    <VBox spacing="8">
+                        <Label text="Configuration Details">
+                            <font>
+                                <Font name="System Bold" size="12.0" />
+                            </font>
+                        </Label>
+                        <GridPane hgap="10" vgap="5">
+                            <Label text="Name:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                            <TextField fx:id="nameField" promptText="Enter configuration name" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" GridPane.rowIndex="0" />
+                            <Label text="Description:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                            <TextArea fx:id="descriptionArea" promptText="A brief summary of the pattern" wrapText="true" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" GridPane.rowIndex="1" />
+                            <Label text="Timestamp Format:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                            <HBox spacing="5" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                                <TextField fx:id="timestampFormatField" promptText="yyyy-MM-dd HH:mm:ss.SSS" HBox.hgrow="ALWAYS">
+                                    <tooltip>
+                                        <Tooltip text="Date/time format for parsing timestamp (e.g., yyyy-MM-dd HH:mm:ss.SSS)" />
+                                    </tooltip>
+                                </TextField>
+                                <Button fx:id="autoDetectFormatButton" text="Auto-Detect">
+                                    <tooltip>
+                                        <Tooltip text="Auto-detect timestamp format from regex pattern" />
+                                    </tooltip>
+                                </Button>
+                            </HBox>
+                            <columnConstraints>
+                                <ColumnConstraints />
+                                <ColumnConstraints />
+                            </columnConstraints>
+                            <rowConstraints>
+                                <RowConstraints />
+                                <RowConstraints />
+                                <RowConstraints />
+                            </rowConstraints>
+                        </GridPane>
+                    </VBox>
+
+                    <!-- Regex Pattern Section -->
+                    <VBox spacing="5">
+                        <Label text="Regex Pattern" />
+                        <Label text="Group names in the regular expression will be used as column headers. Example: (?&lt;columnName&gt;regex)" wrapText="true" />
+                        <TextArea fx:id="regexPatternArea" prefRowCount="6" wrapText="true" VBox.vgrow="ALWAYS" />
+                        <HBox alignment="CENTER_LEFT">
+                            <Label fx:id="validationLabel" />
+                        </HBox>
+                    </VBox>
+
+                    <!-- Named Groups Section -->
+                    <VBox spacing="5">
+                        <Label text="Detected Named Groups (Table Columns)" />
+                        <ListView fx:id="groupNamesListView" VBox.vgrow="ALWAYS" />
+                    </VBox>
+
+                    <!-- Test Section -->
+                    <VBox spacing="8" VBox.vgrow="ALWAYS">
+                        <HBox alignment="CENTER_LEFT" spacing="10">
+                            <Label text="Test Pattern" HBox.hgrow="ALWAYS" />
+                            <Button fx:id="testParsingButton" styleClass="accent-button" text="Test" />
+                        </HBox>
+                        <TextArea fx:id="sampleLogArea" prefHeight="300" prefWidth="643.0" promptText="Paste a sample log line here (wider area for visibility)..." VBox.vgrow="ALWAYS" />
+                        <Label fx:id="testResultLabel" />
+                        <TableView fx:id="previewTableView" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="fieldNameColumn" prefWidth="150" text="Field Name" />
+                                <TableColumn fx:id="fieldValueColumn" prefWidth="150.0" text="Value" />
+                            </columns>
+                            <placeholder>
+                                <Label text="Test results will appear here." />
+                            </placeholder>
+                        </TableView>
+                    </VBox>
+                    <padding>
+                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                    </padding>
+                </VBox>
+            </ScrollPane>
+
+            <!-- Footer: Action Buttons (Row 1) -->
+            <HBox alignment="CENTER_RIGHT" spacing="10" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                <Button fx:id="saveButton" text="Save &amp; Close" />
+                <Button fx:id="applyButton" text="Apply" />
+                <Button fx:id="cancelButton" text="Cancel" />
+                <padding>
+                    <Insets bottom="10.0" left="5.0" right="5.0" top="10.0" />
+                </padding>
+            </HBox>
+        </GridPane>
+    </center>
+</BorderPane>

@@ -3,26 +3,23 @@ package com.seeloggyplus;
 import com.seeloggyplus.service.PreferenceService;
 import com.seeloggyplus.service.impl.PreferenceServiceImpl;
 import javafx.application.Application;
+import javafx.concurrent.Task;
 import javafx.fxml.FXMLLoader;
-import javafx.geometry.Rectangle2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
-import javafx.stage.Screen;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import com.seeloggyplus.model.Preference;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.function.Predicate;
 
-/**
- * Main application entry point for SeeLoggyPlus
- * High-performance log viewer with advanced parsing capabilities
- */
+import com.seeloggyplus.util.ResizeHelper;
+
 
 public class Main extends Application {
 
@@ -31,7 +28,7 @@ public class Main extends Application {
     private static final String VERSION;
 
     static {
-        String version = "DEV"; // Default version for local development
+        String version = "DEV";
         try (java.io.InputStream input = Main.class.getResourceAsStream("/version.properties")) {
             java.util.Properties prop = new java.util.Properties();
             if (input == null) {
@@ -50,26 +47,114 @@ public class Main extends Application {
     private Stage primaryStage;
 
     @Override
-    public void start(Stage primaryStage) {
+    public void start(Stage primaryStage) throws Exception {
         this.primaryStage = primaryStage;
+
+        primaryStage.initStyle(StageStyle.TRANSPARENT);
+        primaryStage.setMinWidth(800);
+        primaryStage.setMinHeight(600);
+
+        ResizeHelper.addResizeListener(primaryStage);
+
         this.preferenceService = new PreferenceServiceImpl();
 
         try {
-            // Load main view
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
-            Parent root = loader.load();
+            FXMLLoader splashLoader = new FXMLLoader(getClass().getResource("/fxml/SplashView.fxml"));
+            Parent splashRoot = splashLoader.load();
+            com.seeloggyplus.controller.SplashController splashController = splashLoader.getController();
 
-            // Create scene
+            splashController.setVersion(VERSION);
+
+            Stage splashStage = new Stage();
+            splashStage.initStyle(javafx.stage.StageStyle.TRANSPARENT);
+            Scene splashScene = new Scene(splashRoot);
+            splashScene.setFill(javafx.scene.paint.Color.TRANSPARENT);
+            splashStage.setScene(splashScene);
+
+            try {
+                Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/app-icon.png")));
+                splashStage.getIcons().add(icon);
+            } catch (Exception e) {
+                logger.warn(e.getMessage());
+            }
+
+            splashStage.show();
+
+            class ViewContext {
+                Parent root;
+                Object controller;
+
+                ViewContext(Parent root, Object controller) {
+                    this.root = root;
+                    this.controller = controller;
+                }
+            }
+
+            Task<ViewContext> initTask = new Task<>() {
+                @Override
+                protected ViewContext call() throws Exception {
+                    updateMessage("Loading core components...");
+                    updateProgress(0.1, 1.0);
+                    Thread.sleep(500);
+
+                    updateMessage("Initializing preferences...");
+                    updateProgress(0.3, 1.0);
+                    Thread.sleep(500);
+
+                    updateMessage("Loading user interface...");
+                    updateProgress(0.6, 1.0);
+
+                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
+                    Parent root = loader.load();
+                    Object controller = loader.getController();
+
+                    updateMessage("Finalizing...");
+                    updateProgress(0.9, 1.0);
+                    Thread.sleep(400);
+
+                    updateProgress(1.0, 1.0);
+                    return new ViewContext(root, controller);
+                }
+            };
+
+            splashController.setProgress(0, "Starting...");
+            initTask.messageProperty().addListener((obs, oldVal, newVal) -> splashController.setProgress(initTask.getProgress(), newVal));
+            initTask.progressProperty().addListener((obs, oldVal, newVal) -> splashController.setProgress(newVal.doubleValue(), initTask.getMessage()));
+
+            // On Succeeded
+            initTask.setOnSucceeded(e -> {
+                ViewContext context = initTask.getValue();
+                showMainStage(context.root, context.controller);
+                splashStage.close();
+            });
+
+            // On Failed
+            initTask.setOnFailed(e -> {
+                splashStage.close();
+                logger.error("Initialization failed", initTask.getException());
+                showErrorAndExit("Initialization failed: " + initTask.getException().getMessage());
+            });
+
+            // Start Task
+            new Thread(initTask).start();
+
+        } catch (IOException e) {
+            logger.error("Failed to load splash view", e);
+            primaryStage.initStyle(StageStyle.TRANSPARENT);
+            primaryStage.setMinWidth(800);
+            primaryStage.setMinHeight(600);
+            showErrorAndExit("Failed to start application: " + e.getMessage());
+        }
+    }
+
+    private void showMainStage(Parent root, Object controller) {
+        try {
             Scene scene = new Scene(root);
+            scene.setFill(Color.TRANSPARENT);
 
-            // Configure stage
             primaryStage.setTitle(APP_TITLE + " v" + VERSION);
             primaryStage.setScene(scene);
 
-            // Restore window preferences
-            restoreWindowPreferences(primaryStage);
-
-            // Set application icon (if available)
             try {
                 Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/app-icon.png")));
                 primaryStage.getIcons().add(icon);
@@ -77,7 +162,6 @@ public class Main extends Application {
                 logger.warn("Application icon not found");
             }
 
-            // Save window preferences on close
             primaryStage.setOnCloseRequest(event -> {
                 saveWindowPreferences();
                 cleanup();
@@ -85,89 +169,20 @@ public class Main extends Application {
 
             primaryStage.show();
             logger.info("SeeLoggyPlus application started successfully");
-
-        } catch (IOException e) {
-            logger.error("Failed to load main view", e);
-            showErrorAndExit("Failed to start application: " + e.getMessage());
+        } catch (Exception e) {
+            logger.error("Failed to show main stage", e);
+            showErrorAndExit("Error showing main window: " + e.getMessage());
         }
     }
 
-    /**
-     * Restore window size and position from preferences
-     */
-    private void restoreWindowPreferences(Stage stage) {
-        Optional<Double> windowX = getPreferenceAsDouble("window_x");
-        Optional<Double> windowY = getPreferenceAsDouble("window_y");
-
-        double windowWidth = getPreferenceAsDouble("window_width").orElse(1000.0);
-        double windowHeight = getPreferenceAsDouble("window_height").orElse(800.0);
-
-        boolean maximized = preferenceService.getPreferencesByCode("window_maximized")
-                .filter(Predicate.not(String::isBlank))
-                .map(Boolean::parseBoolean)
-                .orElse(false);
-
-        stage.setWidth(windowWidth);
-        stage.setHeight(windowHeight);
-
-        if (windowX.isPresent() && windowY.isPresent()) {
-            double x = windowX.get();
-            double y = windowY.get();
-
-            if (isBoundsVisibleOnScreen(x, y, windowWidth, windowHeight)) {
-                stage.setX(x);
-                stage.setY(y);
-            } else {
-                stage.centerOnScreen();
-            }
-        } else {
-            stage.centerOnScreen();
-        }
-
-        stage.setMaximized(maximized);
-    }
-
-    /**
-     * Helper for robust get preference as double data type
-     */
-    private Optional<Double> getPreferenceAsDouble(String code) {
-        return preferenceService.getPreferencesByCode(code)
-                .filter(Predicate.not(String::isBlank))
-                .flatMap(s -> {
-                    try {
-                        return Optional.of(Double.parseDouble(s));
-                    } catch (NumberFormatException e) {
-                        return Optional.empty();
-                    }
-                });
-    }
-
-    /**
-     * Helper for checking coordinate only in screen
-     */
-    private boolean isBoundsVisibleOnScreen(double x, double y, double width, double height) {
-        Rectangle2D windowBounds = new Rectangle2D(x, y, width, height);
-
-        for (Screen screen : Screen.getScreens()) {
-            Rectangle2D screenBounds = screen.getVisualBounds();
-
-            if (screenBounds.intersects(windowBounds)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 
     /**
      * Save window size and position to preferences
      */
     private void saveWindowPreferences() {
         if (primaryStage != null) {
-            preferenceService
-                    .saveOrUpdatePreferences(new Preference("window_width", String.valueOf(primaryStage.getWidth())));
-            preferenceService
-                    .saveOrUpdatePreferences(new Preference("window_height", String.valueOf(primaryStage.getHeight())));
+            preferenceService.saveOrUpdatePreferences(new Preference("window_width", String.valueOf(primaryStage.getWidth())));
+            preferenceService.saveOrUpdatePreferences(new Preference("window_height", String.valueOf(primaryStage.getHeight())));
             preferenceService.saveOrUpdatePreferences(new Preference("window_x", String.valueOf(primaryStage.getX())));
             preferenceService.saveOrUpdatePreferences(new Preference("window_y", String.valueOf(primaryStage.getY())));
             preferenceService.saveOrUpdatePreferences(
