@@ -58,7 +58,16 @@ task generateVersionProperties {
     }
 }
 // Ensure the properties file is generated before resources are processed
+// Ensure the properties file is generated before resources are processed
 processResources.dependsOn generateVersionProperties
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+    }
+}
 
 application {
     mainClass = 'com.seeloggyplus.Main'

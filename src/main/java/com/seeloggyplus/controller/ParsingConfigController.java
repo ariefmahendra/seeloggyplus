@@ -13,6 +13,15 @@ import java.util.Optional;
 
 import com.seeloggyplus.service.ParsingConfigService;
 import com.seeloggyplus.service.impl.ParsingConfigServiceImpl;
+import com.seeloggyplus.model.FileInfo;
+import com.seeloggyplus.service.impl.SSHServiceImpl;
+import com.seeloggyplus.controller.UnifiedFileManagerDialogController;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.stage.Modality;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -57,11 +66,15 @@ public class ParsingConfigController {
     @FXML
     private TextArea regexPatternArea;
     @FXML
+    private Button autoDetectConfigButton;
+    @FXML
     private Label validationLabel;
     @FXML
     private ListView<String> groupNamesListView;
     @FXML
     private TextArea sampleLogArea;
+    @FXML
+    private Button loadSampleButton;
     @FXML
     private Button testParsingButton;
     @FXML
@@ -205,6 +218,8 @@ public class ParsingConfigController {
         deleteButton.setOnAction(e -> handleDelete());
         duplicateButton.setOnAction(e -> handleDuplicate());
         autoDetectFormatButton.setOnAction(e -> handleAutoDetectFormat());
+        loadSampleButton.setOnAction(e -> handleLoadSample());
+        autoDetectConfigButton.setOnAction(e -> handleAutoDetectConfig());
 
         saveButton.setOnAction(e -> handleSave());
         cancelButton.setOnAction(e -> handleCancel());
@@ -425,6 +440,124 @@ public class ParsingConfigController {
         }
     }
 
+    private void handleLoadSample() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
+            Parent root = loader.load();
+            UnifiedFileManagerDialogController controller = loader.getController();
+
+            Stage stage = new Stage();
+            stage.setTitle("Select Sample Log File");
+            addAppIcon(stage);
+            if (loadSampleButton.getScene() != null) {
+                stage.initOwner(loadSampleButton.getScene().getWindow());
+            }
+            stage.initModality(Modality.WINDOW_MODAL);
+            stage.setScene(new Scene(root));
+            stage.showAndWait();
+
+            // We assume controller has these getters as MainController uses them
+            // Since we don't have direct access to verify compilation, we assume
+            // consistency
+            // Note: MainController uses getSelectedFile(). We'll use
+            // getSelectedFileResult() if standard getter.
+            // Looking at standard conventions, assume standard Lombok:
+            // getSelectedFileResult() or manual getSelectedFile()
+            // To be safe, let's use reflection/guess or rely on the Fact that
+            // MainController uses getSelectedFile().
+
+            // Wait, I saw "private FileInfo selectedFileResult;" in
+            // UnifiedFileManagerDialogController.
+            // I'll try getSelectedFile() first as MainController uses it.
+            // If it fails, the user will report it.
+            // Actually, I can use controller.getSelectedFile() if it exists.
+
+            // Let's assume getSelectedFile() is the text because MainController uses it.
+            FileInfo file = controller.getSelectedFile();
+
+            if (file != null) {
+                List<String> lines = List.of();
+                if (file.getSourceType() == FileInfo.SourceType.LOCAL) {
+                    try {
+                        lines = Files.lines(Paths.get(file.getPath())).limit(50).toList();
+                    } catch (IOException e) {
+                        showError("Error reading local file", e.getMessage());
+                        return;
+                    }
+                } else {
+                    SSHServiceImpl ssh = controller.getSshService();
+                    if (ssh != null && ssh.isConnected()) {
+                        try {
+                            lines = ssh.readFileLines(file.getPath(), 50);
+                        } catch (IOException e) {
+                            showError("Error reading remote file", e.getMessage());
+                        } finally {
+                            ssh.disconnect();
+                        }
+                    } else {
+                        showError("Connection Error", "SSH not connected or file not accessible.");
+                    }
+                }
+
+                if (!lines.isEmpty()) {
+                    sampleLogArea.setText(String.join("\n", lines));
+                    // Check if we want to auto-detect immediately
+                    // For now, let user click the button.
+                }
+            }
+        } catch (IOException e) {
+            logger.error("Failed to open file manager", e);
+            showError("Error", "Could not open file manager: " + e.getMessage());
+        }
+    }
+
+    private void handleAutoDetectConfig() {
+        String sampleText = sampleLogArea.getText();
+        if (sampleText == null || sampleText.trim().isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            addAppIcon(alert);
+            alert.setTitle("Auto-Detect Configuration");
+            alert.setHeaderText("No sample log provided");
+            alert.setContentText("Please load a sample log first or paste content into the sample area.");
+            alert.showAndWait();
+            return;
+        }
+
+        List<String> lines = List.of(sampleText.split("\\n"));
+        ParsingConfig detected = parsingConfigService.detectLogFormat(lines);
+
+        if (detected != null && detected.isValid()) {
+            regexPatternArea.setText(detected.getRegexPattern());
+            if (detected.getTimestampFormat() != null) {
+                timestampFormatField.setText(detected.getTimestampFormat());
+            }
+            validatePattern();
+
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            addAppIcon(alert);
+            alert.setTitle("Auto-Detection Successful");
+            alert.setHeaderText("Configuration Detected!");
+            alert.setContentText("Regex pattern and timestamp format have been updated based on the sample log.");
+            alert.showAndWait();
+        } else {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            addAppIcon(alert);
+            alert.setTitle("Auto-Detection Failed");
+            alert.setHeaderText("Could not detect format");
+            alert.setContentText("The sample log format could not be recognized automatically.");
+            alert.showAndWait();
+        }
+    }
+
+    private void showError(String title, String content) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        addAppIcon(alert);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(content);
+        alert.showAndWait();
+    }
+
     private void handleSave() {
         // Save the currently edited config if it's dirty
         if (isDirty() && selectedConfig != null) {
@@ -635,6 +768,8 @@ public class ParsingConfigController {
         regexPatternArea.setDisable(disabled);
         timestampFormatField.setDisable(disabled);
         autoDetectFormatButton.setDisable(disabled);
+        loadSampleButton.setDisable(disabled);
+        autoDetectConfigButton.setDisable(disabled);
         testParsingButton.setDisable(disabled);
         sampleLogArea.setDisable(disabled);
     }

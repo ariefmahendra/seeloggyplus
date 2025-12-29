@@ -15,6 +15,9 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
+import com.seeloggyplus.pipeline.Event;
+import com.seeloggyplus.pipeline.Pipeline;
+import com.seeloggyplus.pipeline.filters.RegexFilter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,7 +40,8 @@ public class LogParserService {
     /**
      * Parse file in parallel for better performance with large files
      */
-    public List<LogEntry> parseFileParallel(File file, ParsingConfig config, ProgressCallback callback) throws IOException {
+    public List<LogEntry> parseFileParallel(File file, ParsingConfig config, ProgressCallback callback)
+            throws IOException {
         if (!file.exists() || !file.canRead()) {
             throw new IOException("File does not exist or cannot be read: " + file.getAbsolutePath());
         }
@@ -53,10 +57,19 @@ public class LogParserService {
         long currentLine = 1;
         for (int i = 0; i < MAX_THREADS; i++) {
             long chunkStartLine = currentLine;
-            long chunkEndLine = (i == MAX_THREADS - 1) ? totalLines : Math.min(totalLines, currentLine + linesPerChunk - 1);
+            long chunkEndLine = (i == MAX_THREADS - 1) ? totalLines
+                    : Math.min(totalLines, currentLine + linesPerChunk - 1);
 
             long startByte = lineStartOffsets.get(chunkStartLine);
-            long endByte = (chunkEndLine == totalLines) ? fileSize : lineStartOffsets.get(chunkEndLine + 1) - 1; // End byte is just before the next line starts
+            long endByte = (chunkEndLine == totalLines) ? fileSize : lineStartOffsets.get(chunkEndLine + 1) - 1; // End
+                                                                                                                 // byte
+                                                                                                                 // is
+                                                                                                                 // just
+                                                                                                                 // before
+                                                                                                                 // the
+                                                                                                                 // next
+                                                                                                                 // line
+                                                                                                                 // starts
 
             chunkInfos.add(new ChunkInfo(startByte, endByte, chunkStartLine));
             currentLine = chunkEndLine + 1;
@@ -65,9 +78,12 @@ public class LogParserService {
         List<Future<List<LogEntry>>> futures = new ArrayList<>();
         AtomicLong bytesProcessed = new AtomicLong(0);
 
+        // Create pipeline once
+        final Pipeline pipeline = createPipeline(config);
+
         for (ChunkInfo chunk : chunkInfos) {
             futures.add(executorService.submit(() -> {
-                List<LogEntry> chunkEntries = processChunk(file, chunk, config);
+                List<LogEntry> chunkEntries = processChunk(file, chunk, pipeline);
                 bytesProcessed.addAndGet(chunk.endByte() - chunk.startByte());
                 if (callback != null) {
                     double progress = (double) bytesProcessed.get() / fileSize;
@@ -125,7 +141,7 @@ public class LogParserService {
                     unparsedStartLine = entry.getLineNumber();
                 }
                 unparsedEndLine = entry.getLineNumber();
-                if (unparsedBuffer.length() < maxEntryUnparsed){
+                if (unparsedBuffer.length() < maxEntryUnparsed) {
                     if (!unparsedBuffer.isEmpty()) {
                         unparsedBuffer.append(System.lineSeparator());
                     }
@@ -140,7 +156,7 @@ public class LogParserService {
         return combined;
     }
 
-    private List<LogEntry> processChunk(File file, ChunkInfo chunkInfo, ParsingConfig config) {
+    private List<LogEntry> processChunk(File file, ChunkInfo chunkInfo, Pipeline pipeline) {
         List<LogEntry> entries = new ArrayList<>();
         long currentLineNumber = chunkInfo.startLineNumber();
         int countUnparsedLine = 0;
@@ -150,15 +166,15 @@ public class LogParserService {
 
             String line;
             while ((line = reader.readLine()) != null && channel.position() <= chunkInfo.endByte()) {
-                LogEntry logEntry = parseLine(line, currentLineNumber, config);
+                LogEntry logEntry = parseLine(line, currentLineNumber, pipeline);
 
-                if (!logEntry.isParsed()){
+                if (!logEntry.isParsed()) {
                     countUnparsedLine++;
                 } else {
                     countUnparsedLine = 0;
                 }
 
-                if (countUnparsedLine > maxEntryUnparsed){
+                if (countUnparsedLine > maxEntryUnparsed) {
                     break;
                 }
 
@@ -174,7 +190,8 @@ public class LogParserService {
 
     /**
      * Pre-calculates the starting byte offset for each line in the file.
-     * This is used to accurately determine chunk boundaries and starting line numbers for parallel processing.
+     * This is used to accurately determine chunk boundaries and starting line
+     * numbers for parallel processing.
      */
     private Map<Long, Long> preCalculateLineOffsets(File file) throws IOException {
         Map<Long, Long> lineStartOffsets = new TreeMap<>(); // TreeMap to keep keys sorted
@@ -186,7 +203,8 @@ public class LogParserService {
             lineStartOffsets.put(currentLineNumber, currentByteOffset); // Offset for line 1
 
             while ((line = reader.readLine()) != null) {
-                currentByteOffset += (line.getBytes(StandardCharsets.UTF_8).length + System.lineSeparator().getBytes(StandardCharsets.UTF_8).length);
+                currentByteOffset += (line.getBytes(StandardCharsets.UTF_8).length
+                        + System.lineSeparator().getBytes(StandardCharsets.UTF_8).length);
                 currentLineNumber++;
                 lineStartOffsets.put(currentLineNumber, currentByteOffset);
             }
@@ -198,48 +216,87 @@ public class LogParserService {
     private record ChunkInfo(
             long startByte,
             long endByte,
-            long startLineNumber
-    ) {}
+            long startLineNumber) {
+    }
 
     /**
      * Parse a single line with the given configuration
      */
+    /**
+     * Parse a single line with the given configuration (Backward Compatibility)
+     */
     public LogEntry parseLine(String line, long lineNumber, ParsingConfig config) {
-        if (line == null || line.isEmpty()) {
+        Pipeline pipeline = createPipeline(config);
+        return parseLine(line, lineNumber, pipeline);
+    }
+
+    /**
+     * Parse a single line using a Pipeline
+     */
+    public LogEntry parseLine(String line, long lineNumber, Pipeline pipeline) {
+        if (line == null)
+            return new LogEntry(lineNumber, "");
+        if (pipeline == null)
+            return new LogEntry(lineNumber, line);
+
+        Event event = pipeline.process(line);
+
+        if (event == null) {
+            // Event was dropped by a filter
+            // For now, we return it as unparsed or a specific dropped entry?
+            // Logstash drops it. But here we might want to see it?
+            // If pipeline returns null, it means Explicit Drop.
+            // But existing logic combines unparsed entries.
+            // If we drop it, it disappears.
+            // Let's assume for now valid pipeline processing returns Event.
+            // If null, we'll treat as unparsed/empty?
+            // Actually, pipeline.process returns null if dropped.
+            // Let's treating dropped logs as... not existing?
+            // But for a Log Viewer, we usually want to see everything unless filtered out.
+            // Let's assume validation failure in RegexFilter adds tag but returns true.
+            // Only explicit DropFilter returns false.
+
+            // If event is null (dropped), users probably don't want to see it.
+            // But existing logic expects LogEntry.
+            // If we return null here, caller might crash (e.g. processChunk adds to list).
+            // Let's return a special LogEntry or just handle null in processChunk.
+            // processChunk: entries.add(logEntry). List supports null? yes.
+            // But combineUnparsedEntries iterates it.
+
+            // Safer: return unparsed entry if null, assuming something went wrong or just
+            // fallback.
             return new LogEntry(lineNumber, line);
         }
 
-        if (config == null || !config.isValid()) {
-            return new LogEntry(lineNumber, line);
+        // Check for parse failure tags
+        boolean parsed = true;
+        if (event.hasTag("_grokparsefailure") || event.hasTag("_pipeline_error")) {
+            parsed = false;
         }
 
-        try {
-            Pattern pattern = config.getCompiledPattern();
-            if (pattern == null) {
-                return new LogEntry(lineNumber, line);
+        // If we define "Parsed" as "Has fields extracted"
+        if (event.getFields().isEmpty()) {
+            parsed = false;
+        }
+
+        if (parsed) {
+            // Convert Map<String, Object> to Map<String, String> for LogEntry
+            Map<String, String> stringFields = new HashMap<>();
+            for (Map.Entry<String, Object> entry : event.getFields().entrySet()) {
+                stringFields.put(entry.getKey(), String.valueOf(entry.getValue()));
             }
-
-            Matcher matcher = pattern.matcher(line);
-            if (matcher.find()) {
-                Map<String, String> fields = new HashMap<>();
-
-                for (String groupName : config.getGroupNames()) {
-                    try {
-                        String value = matcher.group(groupName);
-                        fields.put(groupName, value != null ? value : "");
-                    } catch (IllegalArgumentException e) {
-                        fields.put(groupName, "");
-                    }
-                }
-
-                return new LogEntry(lineNumber, line, fields);
-            } else {
-                return new LogEntry(lineNumber, line);
-            }
-        } catch (Exception e) {
-            logger.warn("Error parsing line {}: {}", lineNumber, e.getMessage());
+            return new LogEntry(lineNumber, line, stringFields);
+        } else {
             return new LogEntry(lineNumber, line);
         }
+    }
+
+    private Pipeline createPipeline(ParsingConfig config) {
+        Pipeline pipeline = new Pipeline();
+        if (config != null && config.isValid() && config.getCompiledPattern() != null) {
+            pipeline.addFilter(new RegexFilter(config.getCompiledPattern(), config.getGroupNames()));
+        }
+        return pipeline;
     }
 
     /**
@@ -262,31 +319,37 @@ public class LogParserService {
         }
 
         try {
-            Pattern pattern = config.getCompiledPattern();
-            Matcher matcher = pattern.matcher(sampleLog);
+            // Use Pipeline for consistency
+            Pipeline pipeline = createPipeline(config);
+            Event event = pipeline.process(sampleLog);
 
-            if (matcher.find()) {
-                Map<String, String> fields = new HashMap<>();
-                List<String> groupNames = config.getGroupNames();
+            if (event == null) {
+                // Dropped
+                result.setSuccess(false);
+                result.setMessage("Log was dropped by a filter.");
+                return result;
+            }
 
-                for (String groupName : groupNames) {
-                    try {
-                        String value = matcher.group(groupName);
-                        fields.put(groupName, value != null ? value : "");
-                    } catch (IllegalArgumentException e) {
-                        fields.put(groupName, "");
-                    }
-                }
-
-                result.setSuccess(true);
-                result.setMessage("Pattern matched successfully");
-                result.setParsedFields(fields);
-                result.setGroupNames(groupNames);
-            } else {
+            if (event.hasTag("_grokparsefailure")) {
                 result.setSuccess(false);
                 result.setMessage("Pattern did not match the sample log");
                 result.setGroupNames(config.getGroupNames());
+            } else if (event.hasTag("_pipeline_error")) {
+                result.setSuccess(false);
+                result.setMessage("Pipeline error: " + event.getField("_error_msg"));
+            } else {
+                // Success
+                result.setSuccess(true);
+                result.setMessage("Pattern matched successfully");
+
+                Map<String, String> stringFields = new HashMap<>();
+                for (Map.Entry<String, Object> entry : event.getFields().entrySet()) {
+                    stringFields.put(entry.getKey(), String.valueOf(entry.getValue()));
+                }
+                result.setParsedFields(stringFields);
+                result.setGroupNames(config.getGroupNames());
             }
+
         } catch (Exception e) {
             result.setSuccess(false);
             result.setMessage("Error testing pattern: " + e.getMessage());
@@ -296,17 +359,19 @@ public class LogParserService {
     }
 
     /**
-     * High-performance search with optimized pattern compilation and string matching.
-     * Pre-compiles regex once and caches lowercase strings for case-insensitive search.
+     * High-performance search with optimized pattern compilation and string
+     * matching.
+     * Pre-compiles regex once and caches lowercase strings for case-insensitive
+     * search.
      * Performance optimizations:
      * - Regex pattern compiled once (not per entry)
      * - Pre-allocates result list with estimated capacity
      * - Avoids repeated toLowerCase() calls
      * - Uses efficient string matching algorithms
      * 
-     * @param entries List of log entries to search
-     * @param searchText Text or regex pattern to search for
-     * @param isRegex Whether to use regex matching
+     * @param entries       List of log entries to search
+     * @param searchText    Text or regex pattern to search for
+     * @param isRegex       Whether to use regex matching
      * @param caseSensitive Whether search is case-sensitive
      * @return Filtered list of matching entries
      */

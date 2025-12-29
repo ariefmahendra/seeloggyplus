@@ -725,10 +725,14 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void closeDialog() {
-        // Ensure any active connection is terminated when the dialog closes
-        if (activeSshService != null) {
+        // Ensure any active connection is terminated when the dialog closes, unless we
+        // selected a file to open
+        if (activeSshService != null && selectedFileResult == null) {
             activeSshService.disconnect();
+        } else if (activeSshService != null && selectedFileResult != null) {
+            logger.info("Keeping SSH connection alive for caller to use with file: {}", selectedFileResult.getName());
         }
+
         Stage stage = (Stage) cancelButton.getScene().getWindow();
         stage.close();
     }
