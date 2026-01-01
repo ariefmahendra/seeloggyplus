@@ -61,15 +61,7 @@ public class LogParserService {
                     : Math.min(totalLines, currentLine + linesPerChunk - 1);
 
             long startByte = lineStartOffsets.get(chunkStartLine);
-            long endByte = (chunkEndLine == totalLines) ? fileSize : lineStartOffsets.get(chunkEndLine + 1) - 1; // End
-                                                                                                                 // byte
-                                                                                                                 // is
-                                                                                                                 // just
-                                                                                                                 // before
-                                                                                                                 // the
-                                                                                                                 // next
-                                                                                                                 // line
-                                                                                                                 // starts
+            long endByte = (chunkEndLine == totalLines) ? fileSize : lineStartOffsets.get(chunkEndLine + 1) - 1;
 
             chunkInfos.add(new ChunkInfo(startByte, endByte, chunkStartLine));
             currentLine = chunkEndLine + 1;
@@ -81,9 +73,22 @@ public class LogParserService {
         // Create pipeline once
         final Pipeline pipeline = createPipeline(config);
 
+        // Prepare DateFormatter
+        final java.time.format.DateTimeFormatter dateFormatter;
+        if (config != null && config.getTimestampFormat() != null && !config.getTimestampFormat().isEmpty()) {
+            try {
+                dateFormatter = java.time.format.DateTimeFormatter.ofPattern(config.getTimestampFormat());
+            } catch (IllegalArgumentException e) {
+                logger.warn("Invalid timestamp format in config: " + config.getTimestampFormat());
+                throw new IOException("Invalid timestamp format: " + config.getTimestampFormat(), e);
+            }
+        } else {
+            dateFormatter = null;
+        }
+
         for (ChunkInfo chunk : chunkInfos) {
             futures.add(executorService.submit(() -> {
-                List<LogEntry> chunkEntries = processChunk(file, chunk, pipeline);
+                List<LogEntry> chunkEntries = processChunk(file, chunk, pipeline, dateFormatter);
                 bytesProcessed.addAndGet(chunk.endByte() - chunk.startByte());
                 if (callback != null) {
                     double progress = (double) bytesProcessed.get() / fileSize;
@@ -123,7 +128,6 @@ public class LogParserService {
 
         List<LogEntry> combined = new ArrayList<>();
         StringBuilder unparsedBuffer = new StringBuilder(1000);
-        Map<String, String> unparsedMap = new HashMap<>();
         long unparsedStartLine = -1;
         long unparsedEndLine = -1;
 
@@ -156,7 +160,8 @@ public class LogParserService {
         return combined;
     }
 
-    private List<LogEntry> processChunk(File file, ChunkInfo chunkInfo, Pipeline pipeline) {
+    private List<LogEntry> processChunk(File file, ChunkInfo chunkInfo, Pipeline pipeline,
+            java.time.format.DateTimeFormatter dateFormatter) {
         List<LogEntry> entries = new ArrayList<>();
         long currentLineNumber = chunkInfo.startLineNumber();
         int countUnparsedLine = 0;
@@ -166,7 +171,7 @@ public class LogParserService {
 
             String line;
             while ((line = reader.readLine()) != null && channel.position() <= chunkInfo.endByte()) {
-                LogEntry logEntry = parseLine(line, currentLineNumber, pipeline);
+                LogEntry logEntry = parseLine(line, currentLineNumber, pipeline, dateFormatter);
 
                 if (!logEntry.isParsed()) {
                     countUnparsedLine++;
@@ -222,18 +227,23 @@ public class LogParserService {
     /**
      * Parse a single line with the given configuration
      */
-    /**
-     * Parse a single line with the given configuration (Backward Compatibility)
-     */
     public LogEntry parseLine(String line, long lineNumber, ParsingConfig config) {
         Pipeline pipeline = createPipeline(config);
-        return parseLine(line, lineNumber, pipeline);
+        java.time.format.DateTimeFormatter dateFormatter = null;
+        if (config != null && config.getTimestampFormat() != null) {
+            try {
+                dateFormatter = java.time.format.DateTimeFormatter.ofPattern(config.getTimestampFormat());
+            } catch (Exception e) {
+            }
+        }
+        return parseLine(line, lineNumber, pipeline, dateFormatter);
     }
 
     /**
-     * Parse a single line using a Pipeline
+     * Parse a single line using a Pipeline and optional DateFormatter
      */
-    public LogEntry parseLine(String line, long lineNumber, Pipeline pipeline) {
+    public LogEntry parseLine(String line, long lineNumber, Pipeline pipeline,
+            java.time.format.DateTimeFormatter dateFormatter) {
         if (line == null)
             return new LogEntry(lineNumber, "");
         if (pipeline == null)
@@ -242,29 +252,6 @@ public class LogParserService {
         Event event = pipeline.process(line);
 
         if (event == null) {
-            // Event was dropped by a filter
-            // For now, we return it as unparsed or a specific dropped entry?
-            // Logstash drops it. But here we might want to see it?
-            // If pipeline returns null, it means Explicit Drop.
-            // But existing logic combines unparsed entries.
-            // If we drop it, it disappears.
-            // Let's assume for now valid pipeline processing returns Event.
-            // If null, we'll treat as unparsed/empty?
-            // Actually, pipeline.process returns null if dropped.
-            // Let's treating dropped logs as... not existing?
-            // But for a Log Viewer, we usually want to see everything unless filtered out.
-            // Let's assume validation failure in RegexFilter adds tag but returns true.
-            // Only explicit DropFilter returns false.
-
-            // If event is null (dropped), users probably don't want to see it.
-            // But existing logic expects LogEntry.
-            // If we return null here, caller might crash (e.g. processChunk adds to list).
-            // Let's return a special LogEntry or just handle null in processChunk.
-            // processChunk: entries.add(logEntry). List supports null? yes.
-            // But combineUnparsedEntries iterates it.
-
-            // Safer: return unparsed entry if null, assuming something went wrong or just
-            // fallback.
             return new LogEntry(lineNumber, line);
         }
 
@@ -285,7 +272,21 @@ public class LogParserService {
             for (Map.Entry<String, Object> entry : event.getFields().entrySet()) {
                 stringFields.put(entry.getKey(), String.valueOf(entry.getValue()));
             }
-            return new LogEntry(lineNumber, line, stringFields);
+
+            LogEntry logEntry = new LogEntry(lineNumber, line, stringFields);
+
+            // Explicit Timestamp Parsing
+            if (dateFormatter != null && stringFields.containsKey("timestamp")) {
+                try {
+                    java.time.LocalDateTime dt = java.time.LocalDateTime.parse(stringFields.get("timestamp"),
+                            dateFormatter);
+                    logEntry.setTimestamp(dt);
+                } catch (Exception e) {
+                    // logger.warn("Failed to parse timestamp: " + stringFields.get("timestamp"));
+                    // Leave null
+                }
+            }
+            return logEntry;
         } else {
             return new LogEntry(lineNumber, line);
         }
@@ -340,7 +341,6 @@ public class LogParserService {
             } else {
                 // Success
                 result.setSuccess(true);
-                result.setMessage("Pattern matched successfully");
 
                 Map<String, String> stringFields = new HashMap<>();
                 for (Map.Entry<String, Object> entry : event.getFields().entrySet()) {
@@ -348,6 +348,22 @@ public class LogParserService {
                 }
                 result.setParsedFields(stringFields);
                 result.setGroupNames(config.getGroupNames());
+
+                // Test Timestamp Parsing
+                if (config.getTimestampFormat() != null && !config.getTimestampFormat().isEmpty()
+                        && stringFields.containsKey("timestamp")) {
+                    try {
+                        java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter
+                                .ofPattern(config.getTimestampFormat());
+                        java.time.LocalDateTime.parse(stringFields.get("timestamp"), dtf);
+                        result.setMessage("Pattern matched successfully & Timestamp parsed validly.");
+                    } catch (Exception e) {
+                        result.setMessage("Pattern matched, BUT Timestamp format invalid: " + e.getMessage());
+                        // result.setSuccess(false); // Make it a warning instead of error?
+                    }
+                } else {
+                    result.setMessage("Pattern matched successfully");
+                }
             }
 
         } catch (Exception e) {

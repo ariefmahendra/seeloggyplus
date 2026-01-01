@@ -30,6 +30,7 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import lombok.Getter;
@@ -60,7 +61,7 @@ public class ParsingConfigController {
     @FXML
     private TextArea descriptionArea;
     @FXML
-    private TextField timestampFormatField;
+    private ComboBox<String> timestampFormatField;
     @FXML
     private Button autoDetectFormatButton;
     @FXML
@@ -101,6 +102,18 @@ public class ParsingConfigController {
     @Setter
     private Runnable onConfigChangedCallback;
 
+    // Common Date Patterns for Presets
+    private static final String[] COMMON_DATE_PATTERNS = {
+            "yyyy-MM-dd HH:mm:ss.SSS", // ISO 8601 Extended
+            "yyyy-MM-dd HH:mm:ss", // ISO 8601 Simple
+            "dd/MMM/yyyy:HH:mm:ss Z", // Apache Common / Nginx
+            "MMM dd HH:mm:ss", // Syslog (Feb 01 12:00:00)
+            "yyyy-MM-dd", // Date Only
+            "HH:mm:ss.SSS", // Time Only
+            "yyyy/MM/dd HH:mm:ss", // Slash separated
+            "dd-MM-yyyy HH:mm:ss" // EU format
+    };
+
     @FXML
     public void initialize() {
         logger.info("Initializing ParsingConfigController");
@@ -109,10 +122,15 @@ public class ParsingConfigController {
         logParserService = new LogParserService();
         configList = FXCollections.observableArrayList(parsingConfigService.findAll());
 
+        // Initialize ComboBox Presets
+        timestampFormatField.setItems(FXCollections.observableArrayList(COMMON_DATE_PATTERNS));
+
         setupConfigList();
         setupDetailPanel();
         setupTestPanel();
         setupButtons();
+        setupContextMenu();
+        setupBuilderToolbar();
 
         Platform.runLater(() -> {
             Stage stage = (Stage) cancelButton.getScene().getWindow();
@@ -185,7 +203,12 @@ public class ParsingConfigController {
     private void setupDetailPanel() {
         nameField.textProperty().addListener((obs, o, n) -> updateButtonStates());
         descriptionArea.textProperty().addListener((obs, o, n) -> updateButtonStates());
-        timestampFormatField.textProperty().addListener((obs, o, n) -> updateButtonStates());
+
+        // ComboBox Listener: Listen to the EDITOR's text property for manual typing
+        timestampFormatField.getEditor().textProperty().addListener((obs, o, n) -> updateButtonStates());
+        // Also listen to selection changes
+        timestampFormatField.valueProperty().addListener((obs, o, n) -> updateButtonStates());
+
         regexPatternArea.textProperty().addListener((obs, o, n) -> {
             validatePattern();
             updateButtonStates();
@@ -238,7 +261,9 @@ public class ParsingConfigController {
             nameField.setText(config.getName());
             descriptionArea.setText(config.getDescription());
             regexPatternArea.setText(config.getRegexPattern());
-            timestampFormatField.setText(config.getTimestampFormat() != null ? config.getTimestampFormat() : "");
+            timestampFormatField.setValue(config.getTimestampFormat() != null ? config.getTimestampFormat() : "");
+            timestampFormatField.getEditor()
+                    .setText(config.getTimestampFormat() != null ? config.getTimestampFormat() : "");
 
             setEditorDisabled(false);
             validatePattern();
@@ -254,7 +279,8 @@ public class ParsingConfigController {
         nameField.clear();
         descriptionArea.clear();
         regexPatternArea.clear();
-        timestampFormatField.clear();
+        timestampFormatField.setValue(null);
+        timestampFormatField.getEditor().clear();
         groupNamesListView.getItems().clear();
         validationLabel.setText("");
         previewTableView.getItems().clear();
@@ -288,31 +314,55 @@ public class ParsingConfigController {
                 groupNamesListView.getItems().clear();
                 logger.warn("No named groups detected in pattern");
             }
+
+            // Phase 1.9: Auto-Preview (Live Feedback)
+            // Automatically update the preview table if a sample log exists
+            if (sampleLogArea.getText() != null && !sampleLogArea.getText().trim().isEmpty()) {
+                updatePreview();
+            }
+
         } else {
             validationLabel.setText("✗ " + tempConfig.getValidationError());
             validationLabel.getStyleClass().setAll("validation-error");
             groupNamesListView.getItems().clear();
+            // Clear preview if pattern becomes invalid
+            previewTableView.getItems().clear();
+            testResultLabel.setText("");
         }
     }
 
     private void handleTestParsing() {
+        // Keeps the button working, but logic is now shared
+        if (regexPatternArea.getText() == null || regexPatternArea.getText().trim().isEmpty()) {
+            testResultLabel.setText("Please enter a regex pattern");
+            testResultLabel.getStyleClass().setAll("validation-warning");
+            return;
+        }
+        updatePreview();
+    }
+
+    private void updatePreview() {
         String sampleLog = sampleLogArea.getText();
         String pattern = regexPatternArea.getText();
 
+        // Defensive checks
         if (sampleLog == null || sampleLog.trim().isEmpty()) {
+            // No sample? That's fine, just don't preview.
+            // Using logic from handleTestParsing: warn user if explicit.
+            // But for auto-preview, we might want to be silent?
+            // Since this is shared, let's just proceed.
+            // If explicit button click, user sees "Please enter sample".
+            // If auto, validationPattern checks sampleLog existence before calling.
             testResultLabel.setText("Please enter a sample log line");
             testResultLabel.getStyleClass().setAll("validation-warning");
             return;
         }
 
-        if (pattern == null || pattern.trim().isEmpty()) {
-            testResultLabel.setText("Please enter a regex pattern");
-            testResultLabel.getStyleClass().setAll("validation-warning");
-            return;
-        }
-
         ParsingConfig testConfig = new ParsingConfig("Test", pattern);
+        // We use the service to test. This internally creates a Pipeline since Phase
+        // 1.0
         LogParserService.TestResult result = logParserService.testParsing(sampleLog, testConfig);
+
         if (result.isSuccess()) {
             testResultLabel.setText("Pattern matched successfully!");
             testResultLabel.getStyleClass().setAll("validation-success");
@@ -320,12 +370,13 @@ public class ParsingConfigController {
             ObservableList<ParsedField> fields = FXCollections.observableArrayList();
             result.getParsedFields().forEach((key, value) -> fields.add(new ParsedField(key, value)));
             previewTableView.setItems(fields);
-            logger.info("Test parsing successful, displaying {} fields", fields.size());
+            // logger.debug for auto-preview to avoid spamming logs
+            logger.debug("Test parsing successful, displaying {} fields", fields.size());
         } else {
             testResultLabel.setText("✗ " + result.getMessage());
             testResultLabel.getStyleClass().setAll("validation-error");
             previewTableView.getItems().clear();
-            logger.warn("Test parsing failed: {}", result.getMessage());
+            logger.debug("Test parsing failed: {}", result.getMessage());
         }
     }
 
@@ -418,7 +469,8 @@ public class ParsingConfigController {
         String detectedFormat = tempConfig.autoDetectTimestampFormat();
 
         if (detectedFormat != null) {
-            timestampFormatField.setText(detectedFormat);
+            timestampFormatField.setValue(detectedFormat);
+            timestampFormatField.getEditor().setText(detectedFormat);
             logger.info("Auto-detected timestamp format: {}", detectedFormat);
 
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -529,7 +581,8 @@ public class ParsingConfigController {
         if (detected != null && detected.isValid()) {
             regexPatternArea.setText(detected.getRegexPattern());
             if (detected.getTimestampFormat() != null) {
-                timestampFormatField.setText(detected.getTimestampFormat());
+                timestampFormatField.setValue(detected.getTimestampFormat());
+                timestampFormatField.getEditor().setText(detected.getTimestampFormat());
             }
             validatePattern();
 
@@ -580,6 +633,294 @@ public class ParsingConfigController {
         logger.info("Configuration saved and parent notified");
 
         closeDialog();
+    }
+
+    private void setupContextMenu() {
+        ContextMenu contextMenu = new ContextMenu();
+
+        MenuItem markTimestamp = new MenuItem("Mark as Timestamp");
+        markTimestamp.setOnAction(e -> handleMarkSelection("Timestamp"));
+
+        MenuItem markLevel = new MenuItem("Mark as Level");
+        markLevel.setOnAction(e -> handleMarkSelection("Level"));
+
+        MenuItem markMessage = new MenuItem("Mark as Message");
+        markMessage.setOnAction(e -> handleMarkSelection("Message"));
+
+        MenuItem markCustom = new MenuItem("Mark as Custom...");
+        markCustom.setOnAction(e -> handleMarkCustom());
+
+        contextMenu.getItems().addAll(markTimestamp, markLevel, markMessage, new SeparatorMenuItem(), markCustom);
+        sampleLogArea.setContextMenu(contextMenu);
+    }
+
+    // Phase 1.9+: Visual Builder Toolbar (UX Enhancement)
+    private void setupBuilderToolbar() {
+        // Create Buttons with Icons
+        Button btnTimestamp = createBuilderButton("Timestamp", "CLOCK_O", "Mark selection as Timestamp");
+        Button btnLevel = createBuilderButton("Level", "TAG", "Mark selection as Log Level");
+        Button btnMessage = createBuilderButton("Message", "ALIGN_LEFT", "Mark selection as Message/Content");
+        Button btnCustom = createBuilderButton("Custom", "MAGIC", "Mark selection as Custom Field...");
+
+        // Actions
+        btnTimestamp.setOnAction(e -> handleMarkSelection("Timestamp"));
+        btnLevel.setOnAction(e -> handleMarkSelection("Level"));
+        btnMessage.setOnAction(e -> handleMarkSelection("Message"));
+        btnCustom.setOnAction(e -> handleMarkCustom());
+
+        // UX: Enable/Disable based on selection
+        // Initially disabled
+        btnTimestamp.setDisable(true);
+        btnLevel.setDisable(true);
+        btnMessage.setDisable(true);
+        btnCustom.setDisable(true);
+
+        sampleLogArea.selectedTextProperty().addListener((obs, oldVal, newVal) -> {
+            boolean hasSelection = newVal != null && !newVal.isEmpty();
+            btnTimestamp.setDisable(!hasSelection);
+            btnLevel.setDisable(!hasSelection);
+            btnMessage.setDisable(!hasSelection);
+            btnCustom.setDisable(!hasSelection);
+        });
+
+        // Layout
+        HBox toolbar = new HBox(10);
+        toolbar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        toolbar.setPadding(new javafx.geometry.Insets(0, 0, 5, 0)); // Bottom padding
+        toolbar.getChildren().addAll(
+                new Label("Visual Builder: "),
+                btnTimestamp, btnLevel, btnMessage, btnCustom);
+
+        // Inject into Parent
+        if (sampleLogArea.getParent() instanceof VBox) {
+            VBox parent = (VBox) sampleLogArea.getParent();
+            // Index 0 is Label, Index 1 is TextArea. Verify?
+            // FXML: Label, TextArea. So index 1 is TextArea. We insert AT 1.
+            // But wait, getChildren() might be dynamic.
+            // Safer: Find index of sampleLogArea
+            int index = parent.getChildren().indexOf(sampleLogArea);
+            if (index != -1) {
+                parent.getChildren().add(index, toolbar);
+            }
+        }
+    }
+
+    private Button createBuilderButton(String text, String iconName, String tooltipText) {
+        Button btn = new Button(text);
+        try {
+            de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView icon = new de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView();
+            icon.setGlyphName(iconName);
+            icon.setSize("1.1em");
+            btn.setGraphic(icon);
+        } catch (NoClassDefFoundError | Exception e) {
+            // Fallback if fontawesome not loaded
+            logger.warn("Could not load icon: " + iconName);
+        }
+        btn.setTooltip(new Tooltip(tooltipText));
+        // Compact style
+        btn.setStyle("-fx-padding: 4 8 4 8; -fx-font-size: 11px;");
+        return btn;
+    }
+
+    private void handleMarkSelection(String fieldName) {
+        String fullText = sampleLogArea.getText();
+        IndexRange range = sampleLogArea.getSelection();
+        String currentPattern = regexPatternArea.getText();
+
+        if (fullText == null || range.getLength() == 0) {
+            return;
+        }
+
+        String prefix = fullText.substring(0, range.getStart());
+        String selected = fullText.substring(range.getStart(), range.getEnd());
+        String suffix = fullText.substring(range.getEnd());
+
+        // --- User Request: Dynamic Space ---
+        // Use smartEscape to convert whitespace sequences to \s+
+        String escapedPrefix = smartEscape(prefix);
+        String escapedSuffix = smartEscape(suffix);
+
+        // --- Substitution Logic ---
+        String substitution;
+
+        switch (fieldName) {
+            case "Timestamp":
+                // --- User Request: Regex 1 by 1 ---
+                // Map each character to its regex class (\d, \w, etc.)
+                substitution = "(?<timestamp>" + generateTimestampPattern(selected) + ")";
+                break;
+
+            case "Level":
+                // --- User Request: String | dari semua kategori ---
+                // Try to match against standard known levels
+                substitution = "(?<level>" + generateLevelPattern(selected) + ")";
+                break;
+
+            case "Message":
+                if (!suffix.trim().isEmpty()) {
+                    substitution = "(?<message>.*?)";
+                } else {
+                    substitution = "(?<message>.*)";
+                }
+                break;
+
+            default:
+                substitution = "(?<" + fieldName + ">\\S+)";
+                break;
+        }
+
+        // 2. Incremental Replacement Logic
+        // Strategy: Find the selected text (escaped) in the CURRENT regex pattern and
+        // replace it.
+        // This preserves previously marked fields (which are already regex groups in
+        // the pattern).
+
+        // Use smartEscape for target to ensure consistency with prefix/suffix
+        // normalization
+        String escapedTarget = smartEscape(selected);
+
+        if (currentPattern == null || currentPattern.trim().isEmpty()) {
+            // First time? Fallback to full generation (safer for initial state)
+            String newPattern = escapedPrefix + substitution + escapedSuffix;
+            regexPatternArea.setText(newPattern);
+        } else {
+            // Incremental
+            int occurrenceIndex = countOccurrences(prefix, selected);
+            int replaceIndex = findNthOccurrence(currentPattern, escapedTarget, occurrenceIndex);
+
+            if (replaceIndex != -1) {
+                String newPattern = currentPattern.substring(0, replaceIndex)
+                        + substitution
+                        + currentPattern.substring(replaceIndex + escapedTarget.length());
+                regexPatternArea.setText(newPattern);
+            } else {
+                if (currentPattern.contains(escapedTarget)) {
+                    regexPatternArea.setText(
+                            currentPattern.replaceFirst(java.util.regex.Pattern.quote(escapedTarget), substitution));
+                    logger.info("Used fallback replaceFirst logic.");
+                } else {
+                    Alert alert = new Alert(Alert.AlertType.WARNING);
+                    addAppIcon(alert);
+                    alert.setTitle("Selection Not Found");
+                    alert.setHeaderText("Could not find selected text in current pattern");
+                    alert.setContentText("Selection not found. Try clearing the pattern.");
+                    alert.showAndWait();
+                    return;
+                }
+            }
+        }
+    }
+
+    // Generates regex character-by-character: 2 -> \d, a -> [a-z], etc.
+    private String generateTimestampPattern(String text) {
+        StringBuilder sb = new StringBuilder();
+        for (char c : text.toCharArray()) {
+            if (Character.isDigit(c)) {
+                sb.append("\\d"); // Matches digit (UI shows \d)
+            } else if (Character.isLetter(c)) {
+                if (Character.isUpperCase(c)) {
+                    sb.append("[A-Z]");
+                } else if (Character.isLowerCase(c)) {
+                    sb.append("[a-z]");
+                } else {
+                    sb.append("[a-zA-Z]");
+                }
+            } else if (Character.isWhitespace(c)) {
+                sb.append("\\s+"); // Matches whitespace (UI shows \s+)
+            } else {
+                // Literal symbol (escape it)
+                sb.append(escapeRegex(String.valueOf(c)));
+            }
+        }
+        // Optimize: Combine consecutive \d\d\d to \d{3}?
+        // User asked for "1 by 1", but \d{4} is cleaner. Let's start with strict 1-by-1
+        // per request implicit meaning "character class".
+        // Actually, user said "regex 1 per 1". \d\d\d is literally 1 per 1. \d{3} is
+        // quantified.
+        // I will adhere to strict char class mapping to be safe, or maybe basic
+        // quantification.
+        // Lets stick to safe char classes.
+        return sb.toString();
+    }
+
+    private String generateLevelPattern(String text) {
+        // Standard Log Levels
+        String[] levels = { "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "SEVERE", "FINE", "FINER", "FINEST",
+                "ALL", "OFF" };
+
+        // If current selection is one of them, return the full OR set.
+        String upper = text.toUpperCase();
+        boolean isStandard = java.util.Arrays.asList(levels).contains(upper);
+
+        if (isStandard) {
+            return String.join("|", levels);
+        } else {
+            // Fallback if it's a custom level name like "CRIT"
+            return "\\S+";
+        }
+    }
+
+    private String smartEscape(String input) {
+        if (input == null)
+            return "";
+        // 1. Escape Special Chars
+        String escaped = escapeRegex(input);
+        // 2. Dynamic Space: Replace literal space sequences with \s+
+        // In Java String literal: "\\s+" -> String "\s+"
+        // replaceAll replacement string: "\\\\s+" -> String "\\s+" -> Matcher Result
+        // "\s+"
+        return escaped.replaceAll("\\s+", "\\\\s+");
+    }
+
+    private int countOccurrences(String str, String target) {
+        int count = 0;
+        int lastIndex = 0;
+        while (lastIndex != -1) {
+            lastIndex = str.indexOf(target, lastIndex);
+            if (lastIndex != -1) {
+                count++;
+                lastIndex += target.length();
+            }
+        }
+        return count;
+    }
+
+    private int findNthOccurrence(String str, String target, int n) {
+        int index = -1;
+        for (int i = 0; i <= n; i++) {
+            index = str.indexOf(target, index + 1);
+            if (index == -1)
+                return -1;
+        }
+        return index;
+    }
+
+    private void handleMarkCustom() {
+        TextInputDialog dialog = new TextInputDialog();
+        addAppIcon(dialog);
+        dialog.setTitle("Mark as Custom Field");
+        dialog.setHeaderText("Enter field name:");
+        dialog.setContentText("Field Name:");
+
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(name -> {
+            if (!name.trim().isEmpty()) {
+                handleMarkSelection(name.trim());
+            }
+        });
+    }
+
+    private String escapeRegex(String input) {
+        if (input == null)
+            return "";
+        // Simple escape for common special characters in logs
+        // . [ ] ( ) { } * + ? ^ $ | \
+        // Also handle whitespace? No, literal whitespace is usually desired as anchor
+        // unless it's variable.
+        // For "Smart" builder, we might want to replace multiple spaces with \\s+
+        // automatically?
+        // Let's sticking to literal first, but escape special chars.
+        return input.replaceAll("([\\\\.\\[\\](){}_*+?^$|])", "\\\\$1");
     }
 
     private void handleApply() {
@@ -710,7 +1051,8 @@ public class ParsingConfigController {
         selectedConfig.setDescription(descriptionArea.getText());
         selectedConfig.setRegexPattern(regexPatternArea.getText());
         selectedConfig.setTimestampFormat(
-                timestampFormatField.getText().trim().isEmpty() ? null : timestampFormatField.getText().trim());
+                timestampFormatField.getEditor().getText().trim().isEmpty() ? null
+                        : timestampFormatField.getEditor().getText().trim());
 
         configSnapshot = selectedConfig.copy();
 
@@ -741,7 +1083,7 @@ public class ParsingConfigController {
         String currentPattern = Optional.ofNullable(regexPatternArea.getText()).orElse("").trim();
 
         String snapshotTimestamp = Optional.ofNullable(configSnapshot.getTimestampFormat()).orElse("").trim();
-        String currentTimestamp = Optional.ofNullable(timestampFormatField.getText()).orElse("").trim();
+        String currentTimestamp = Optional.ofNullable(timestampFormatField.getEditor().getText()).orElse("").trim();
 
         // Compare the normalized, trimmed strings.
         return !Objects.equals(snapshotName, currentName) ||

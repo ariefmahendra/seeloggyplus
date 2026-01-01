@@ -129,11 +129,11 @@
                         <TextArea fx:id="descriptionArea" promptText="A brief summary of the pattern" wrapText="true" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" GridPane.rowIndex="1" prefRowCount="2"/>
                         <Label text="Timestamp Format:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
                         <HBox spacing="5" GridPane.columnIndex="1" GridPane.rowIndex="2">
-                            <TextField fx:id="timestampFormatField" promptText="yyyy-MM-dd HH:mm:ss.SSS" HBox.hgrow="ALWAYS">
+                            <ComboBox fx:id="timestampFormatField" editable="true" promptText="Select or type format" HBox.hgrow="ALWAYS" maxWidth="Infinity">
                                 <tooltip>
                                     <Tooltip text="Date/time format for parsing timestamp (e.g., yyyy-MM-dd HH:mm:ss.SSS)" />
                                 </tooltip>
-                            </TextField>
+                            </ComboBox>
                             <Button fx:id="autoDetectFormatButton" text="Auto-Detect">
                                 <tooltip>
                                     <Tooltip text="Auto-detect timestamp format from regex pattern" />

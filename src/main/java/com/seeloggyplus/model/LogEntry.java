@@ -54,7 +54,8 @@ public class LogEntry {
     }
 
     // Private common constructor
-    private LogEntry(long lineNumber, long endLineNumber, String rawLog, Map<String, String> parsedFields, boolean isParsed) {
+    private LogEntry(long lineNumber, long endLineNumber, String rawLog, Map<String, String> parsedFields,
+            boolean isParsed) {
         this.lineNumber = lineNumber;
         this.endLineNumber = endLineNumber;
         this.rawLog = rawLog;
@@ -68,15 +69,9 @@ public class LogEntry {
             this.thread = parsedFields.getOrDefault("thread", "");
             this.logger = parsedFields.getOrDefault("logger", "");
 
-            // Parse timestamp if available
-            String timestampStr = parsedFields.get("timestamp");
-            if (timestampStr != null) {
-                try {
-                    this.timestamp = LocalDateTime.parse(timestampStr);
-                } catch (Exception e) {
-                    this.timestamp = null;
-                }
-            }
+            // Timestamp is now set externally by the Service layer to ensure correct format
+            // usage
+            this.timestamp = null;
         } else {
             this.message = rawLog;
         }

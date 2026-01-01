@@ -4,16 +4,22 @@ import com.seeloggyplus.model.ParsingConfig;
 import com.seeloggyplus.repository.ParsingConfigRepository;
 import com.seeloggyplus.repository.impl.ParsingConfigRepositoryImpl;
 import com.seeloggyplus.service.ParsingConfigService;
+import io.krakens.grok.api.Grok;
+import io.krakens.grok.api.GrokCompiler;
+import io.krakens.grok.api.Match;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class ParsingConfigServiceImpl implements ParsingConfigService {
 
     private final ParsingConfigRepository parsingConfigRepository;
+    private final GrokCompiler grokCompiler;
+    private final Map<String, String> candidatePatterns;
+    private final Map<String, String> predefinedRegexes;
 
     public ParsingConfigServiceImpl() {
         this(new ParsingConfigRepositoryImpl());
@@ -21,6 +27,97 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
 
     public ParsingConfigServiceImpl(ParsingConfigRepository parsingConfigRepository) {
         this.parsingConfigRepository = parsingConfigRepository;
+        this.grokCompiler = GrokCompiler.newInstance();
+        this.grokCompiler.registerDefaultPatterns();
+
+        // --- 1. Register Helper Patterns for Detection ---
+        this.grokCompiler.register("EPOCH", "\\d{10}|\\d{13}|\\d{10}\\.\\d+");
+        this.grokCompiler.register("COMPACT", "\\d{14}");
+        this.grokCompiler.register("ISO8601_LOOSE",
+                "\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}(?:[.,]\\d{1,9})?(?:Z|[+\\-]\\d{2}(?::?\\d{2})?)?");
+        this.grokCompiler.register("LOGBACK_PREFIX", "(?:\\|-|\\| |-)");
+
+        // --- 2. Initialize Detection Candidates (Grok Patterns) ---
+        // Use \\s+ for Robust Whitespace Matching (vs literal single space)
+        this.candidatePatterns = new LinkedHashMap<>();
+
+        candidatePatterns.put("Compact", "%{COMPACT:ts}\\s+%{GREEDYDATA}");
+
+        candidatePatterns.put("Logback",
+                "%{ISO8601_LOOSE:ts}\\s+%{LOGBACK_PREFIX}%{LOGLEVEL}\\s+in\\s+%{DATA}\\s+-\\s+%{GREEDYDATA}");
+
+        candidatePatterns.put("ISO8601 Standard", "%{ISO8601_LOOSE:ts}\\s+%{LOGLEVEL}\\s+%{GREEDYDATA}");
+        candidatePatterns.put("ISO8601 Extended", "%{ISO8601_LOOSE:ts}\\s+%{GREEDYDATA}");
+
+        // Web - Use DATA/NOTSPACE. Use GREEDYDATA at end to allow truncated samples
+        // (e.g. tests without status/bytes)
+        candidatePatterns.put("Apache Common",
+                "%{IPORHOST}\\s+%{NOTSPACE}\\s+%{NOTSPACE}\\s+\\[%{HTTPDATE:ts}\\]\\s+\"%{DATA}\"%{GREEDYDATA}");
+        candidatePatterns.put("Apache Combined",
+                "%{IPORHOST}\\s+%{NOTSPACE}\\s+%{NOTSPACE}\\s+\\[%{HTTPDATE:ts}\\]\\s+\"%{DATA}\"\\s+%{NUMBER}\\s+(?:%{NUMBER}|-)\\s+\"%{DATA}\"\\s+\"%{DATA}\"");
+        candidatePatterns.put("Apache Error",
+                "\\[%{DAY} %{MONTH} %{MONTHDAY} %{TIME} %{YEAR}\\]\\s+\\[%{WORD}\\]\\s+%{GREEDYDATA}");
+
+        // Syslog Variants - Anchor BSD and use \\s+ for padding
+        candidatePatterns.put("Syslog BSD",
+                "^%{DAY}\\s+%{MONTH}\\s+%{MONTHDAY}\\s+%{TIME}\\s+%{YEAR}\\s+%{GREEDYDATA}");
+        candidatePatterns.put("Syslog",
+                "%{SYSLOGTIMESTAMP:ts}\\s+%{SYSLOGHOST}\\s+%{DATA}(?:\\[%{POSINT}\\])?:\\s+%{GREEDYDATA}");
+
+        // Database
+        candidatePatterns.put("PostgreSQL",
+                "%{DATESTAMP:ts}\\s+%{TZ}\\s+\\[%{NUMBER}\\]:\\s+\\[%{DATA}\\]\\s+%{GREEDYDATA}");
+        candidatePatterns.put("Oracle", "\\d{2}-[a-zA-Z]{3}-\\d{4}\\s+%{TIME}\\s+%{GREEDYDATA}");
+
+        // Dates
+        candidatePatterns.put("US Date", "%{DATE_US:ts}\\s+%{TIME}\\s+%{GREEDYDATA}");
+        candidatePatterns.put("EU Date", "%{DATE_EU:ts}\\s+%{TIME}\\s+%{GREEDYDATA}");
+
+        candidatePatterns.put("Time Only", "%{TIME:ts}\\s+%{GREEDYDATA}");
+
+        // Fallback
+        candidatePatterns.put("Epoch", "%{EPOCH:ts}\\s+%{GREEDYDATA}");
+
+        // --- 3. Initialize Safe Regexes (Hybrid Strategy) ---
+        this.predefinedRegexes = new LinkedHashMap<>();
+
+        // ISO / Logback
+        String isoRegex = "(?<timestamp>\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}(?:[.,]\\d{1,9})?(?:Z|[+\\-]\\d{2}(?::?\\d{2})?)?)";
+        predefinedRegexes.put("Logback",
+                isoRegex + "\\s+(?:\\|-|\\| |-)\\s*(?<level>\\w+)\\s+in\\s+(?<context>.*?)\\s+-\\s+(?<message>.*)");
+        predefinedRegexes.put("ISO8601 Standard", isoRegex + "\\s+(?<level>\\w+)\\s+(?<message>.*)");
+        predefinedRegexes.put("ISO8601 Extended", isoRegex + "\\s+(?<message>.*)");
+
+        // Apache
+        predefinedRegexes.put("Apache Common",
+                "(?<clientip>[\\d\\.:]+) \\S+ \\S+ \\[(?<timestamp>.*?)\\] \"(?<request>.*?)\" (?<response>\\d+) (?<bytes>\\d+|-)");
+        predefinedRegexes.put("Apache Combined",
+                "(?<clientip>[\\d\\.:]+) \\S+ \\S+ \\[(?<timestamp>.*?)\\] \"(?<request>.*?)\" (?<response>\\d+) (?<bytes>\\d+|-) \"(?<referrer>.*?)\" \"(?<agent>.*?)\"");
+        predefinedRegexes.put("Apache Error", "\\[(?<timestamp>.*?)\\] \\[(?<level>\\w+)\\] (?<message>.*)");
+
+        // Syslog
+        predefinedRegexes.put("Syslog",
+                "(?<timestamp>[A-Za-z]{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?<logsource>\\S+)\\s+(?<program>.*?)(?:\\[(?<pid>\\d+)\\])?:\\s+(?<message>.*)");
+        predefinedRegexes.put("Syslog BSD",
+                "(?<timestamp>[A-Za-z]{3}\\s+[A-Za-z]{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}\\s+\\d{4})\\s+(?<message>.*)");
+
+        // Database
+        predefinedRegexes.put("PostgreSQL",
+                "(?<timestamp>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?)\\s+(?<timezone>\\w+|[+\\-]\\d{4})\\s+\\[(?<pid>\\d+)\\]:\\s+\\[(?<session>.*?)\\]\\s+(?<message>.*)");
+        predefinedRegexes.put("Oracle",
+                "(?<timestamp>\\d{2}-[A-Za-z]{3}-\\d{4} \\d{2}:\\d{2}:\\d{2})\\s+(?<message>.*)");
+
+        // Generic Dates
+        predefinedRegexes.put("US Date",
+                "(?<timestamp>\\d{1,2}/\\d{1,2}/\\d{2,4}\\s+\\d{1,2}:\\d{2}:\\d{2}(?:\\s+(?:AM|PM))?)\\s+(?:(?<level>\\w+)\\s+)?(?<message>.*)");
+        predefinedRegexes.put("EU Date",
+                "(?<timestamp>\\d{1,2}[.-]\\d{1,2}[.-]\\d{4}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?:(?<level>\\w+)\\s+)?(?<message>.*)");
+
+        // Simple
+        predefinedRegexes.put("Time Only",
+                "(?<timestamp>\\d{1,2}:\\d{2}:\\d{2}(?:[.,]\\d+)?)\\s+(?:(?<level>\\w+)\\s+)?(?<message>.*)");
+        predefinedRegexes.put("Epoch", "(?<timestamp>\\d{10}|\\d{13}|\\d{10}\\.\\d+)\\s+(?<message>.*)");
+        predefinedRegexes.put("Compact", "(?<timestamp>\\d{14})\\s+(?:(?<level>\\w+)\\s+)?(?<message>.*)");
     }
 
     @Override
@@ -60,7 +157,6 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
             return null;
         }
 
-        // Filter and find the first usable line
         String sample = sampleLines.stream()
                 .filter(l -> l != null && !l.trim().isEmpty())
                 .findFirst()
@@ -69,336 +165,107 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
         if (sample == null)
             return null;
 
-        StringBuilder regexBuilder = new StringBuilder();
-        String detectedTimestampFormat = null;
+        for (Map.Entry<String, String> entry : candidatePatterns.entrySet()) {
+            String formatName = entry.getKey();
+            String grokPattern = entry.getValue();
 
-        // --- 1. Define Timestamp Patterns (Specific to General) ---
+            try {
+                Grok grok = grokCompiler.compile(grokPattern);
+                Match match = grok.match(sample);
+                Map<String, Object> capture = match.capture();
 
-        // 1.1 Epoch (High Priority due to numeric nature, handled carefully)
-        // 10 digits (seconds), 13 (millis), 16 (micros), 19 (nanos)
-        // Also supports decimal seconds: 1735726530.123
-        String epochPattern = "(?:\\d{10}|\\d{13}|\\d{16}|\\d{19}|\\d{10}\\.\\d{3,9})";
+                if (capture != null && !capture.isEmpty()) {
+                    String safeRegex = predefinedRegexes.get(formatName);
 
-        // 1.2 ISO 8601 Extended / Cloud / Container
-        // 2025-01-01T10:15:30.123456Z, 2025-01-01 10:15:30.123+07:00
-        // Robust pattern: YYYY-MM-DD[T ]HH:MM:SS[.nanos][Z|Offset]
-        // Note: We use a non-capturing group for the separator to allow 'T' or space
-        String isoExtended = "\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}(?:[.,]\\d{1,9})?(?:Z|[+\\-]\\d{2}(?::?\\d{2})?)?";
+                    if (safeRegex == null) {
+                        safeRegex = grok.getNamedRegex();
+                    }
 
-        // 1.3 Web Server / Network
-        // Apache/Nginx: 01/Jan/2025:10:15:30 +0700
-        String apacheCommon = "\\d{2}/[A-Za-z]{3}/\\d{4}:\\d{2}:\\d{2}:\\d{2}(?:\\s+[+\\-]\\d{4})?";
-        // Apache Error: [Wed Jan 01 10:15:30.123456 2025] - Pattern is inside brackets
-        // usually
-        String apacheError = "[A-Za-z]{3}\\s+[A-Za-z]{3}\\s+\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?\\s+\\d{4}";
+                    ParsingConfig config = new ParsingConfig("Auto-Detected (" + formatName + ")", safeRegex);
+                    config.setDescription("Detected using Grok Pattern: " + grokPattern);
 
-        // 1.4 Syslog Variants
-        // RFC 3164 (No year): Jan 1 10:15:30
-        String syslogRFC3164 = "[A-Za-z]{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}";
-        // RFC 5424 is covered by ISO Extended usually, but ensures no year-less
-        // confusion
-        // BSD Variant: Tue Jan 1 10:15:30 2025
-        String syslogBSD = "[A-Za-z]{3}\\s+[A-Za-z]{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?\\s+\\d{4}";
+                    String tsVal = "";
+                    if (capture.containsKey("ts") && capture.get("ts") != null)
+                        tsVal = capture.get("ts").toString();
+                    else if (capture.containsKey("timestamp") && capture.get("timestamp") != null)
+                        tsVal = capture.get("timestamp").toString();
 
-        // 1.5 Database / Vendor Specific
-        // Oracle: 01-JAN-25 10.15.30.123456 AM or 01-JAN-2025 22:15:30
-        String oracle = "\\d{2}-[A-Za-z]{3}-\\d{2,4}\\s+\\d{2}[.:]\\d{2}[.:]\\d{2}(?:[.:]\\d+)?(?:\\s+(?:AM|PM))?";
-        // Postgres: 2025-01-01 10:15:30.123 UTC/CET (ISO like but with named timezone
-        // suffix)
-        // Cisco: Jan 1 2025 10:15:30
-        String cisco = "[A-Za-z]{3}\\s+\\d{1,2}\\s+\\d{4}\\s+\\d{2}:\\d{2}:\\d{2}";
+                    String detectedTimestampFormat = guessTimestampFormat(formatName, tsVal);
+                    config.setTimestampFormat(detectedTimestampFormat);
 
-        // 1.6 Locale / Region (US, EU, Asian)
-        // US: 01/01/2025 10:15:30 AM
-        String usDate = "\\d{1,2}/\\d{1,2}/\\d{2,4}\\s+\\d{1,2}:\\d{2}:\\d{2}(?:\\s+(?:AM|PM))?";
-        // EU: 01.01.2025 10:15:30 or 01-01-2025...
-        String euDate = "\\d{2}[.-]\\d{2}[.-]\\d{4}\\s+\\d{2}:\\d{2}:\\d{2}";
-        // Dot separated (User request): 2023.12.01
-        String dotDate = "\\d{4}\\.\\d{2}\\.\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?";
-
-        // 1.7 Compact / Mainframe
-        // Compact: 20250101101530 (14 digits)
-        // Be careful not to match random large numbers. Requires boundaries or logic.
-        String compactDate = "\\d{14}";
-
-        // 1.8 Weird / Legacy / Time Only
-        // Time Only: 10:15:30 or 10:15:30,123
-        String timeOnly = "\\d{2}:\\d{2}:\\d{2}(?:[.,]\\d{3})?";
-        // RFC 1123: Fri, 01 Dec 2023 10:00:00 GMT
-        String rfc1123 = "[A-Za-z]{3},\\s+\\d{2}\\s+[A-Za-z]{3}\\s+\\d{4}\\s+\\d{2}:\\d{2}:\\d{2}\\s+[A-Z]{3}";
-        // ANSI C: Fri Dec 1 10:00:00 2023
-        // Updated to support fractional seconds for Apache Error logs compatibility
-        String ansiC = "[A-Za-z]{3}\\s+[A-Za-z]{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?\\s+\\d{4}";
-
-        // --- 2. Construct Search Regex ---
-        // Priority Order:
-        // 1. Epoch (Very specific numeric patterns)
-        // 2. ISO Extended (Most common modern standard)
-        // 3. Specific Vendor/RFC formats (Apache, Syslog, Web, DB)
-        // 4. Compact/Locale/TimeOnly (Fallbacks)
-
-        String timestampSearchPattern = isoExtended + // High confidence matches naturally
-                "|" + apacheCommon +
-                "|" + rfc1123 +
-                "|" + ansiC +
-                "|" + oracle +
-                "|" + cisco +
-                "|" + syslogBSD +
-                "|" + syslogRFC3164 + // Shorter, keep after longer BSD/Ansi
-                "|" + usDate +
-                "|" + euDate +
-                "|" + dotDate +
-                "|" + "\\d{14}" + // Compact 14
-                "|" + epochPattern + // Epoch (can overlap with random numbers, check context)
-                "|" + timeOnly;
-
-        Pattern tsPattern = Pattern.compile(timestampSearchPattern);
-        Matcher tsMatcher = tsPattern.matcher(sample);
-
-        if (tsMatcher.find()) {
-            int start = tsMatcher.start();
-            int end = tsMatcher.end();
-
-            String foundTimestamp = sample.substring(start, end);
-            String before = sample.substring(0, start);
-            String after = sample.substring(end);
-
-            // --- 3. Refine Logic based on matched content ---
-
-            // Check for brackets wrapping the timestamp
-            boolean isBracketed = isBracketed(start, end, sample);
-            if (isBracketed) {
-                before = sample.substring(0, start - 1);
-                after = sample.substring(end + 1);
-            }
-
-            // Determine Regex and Format Key
-            String tsGroupRegex = null;
-
-            // 3.1 Epoch Check
-            if (foundTimestamp.matches("^" + epochPattern + "$") && !foundTimestamp.contains(":")) {
-                // Likely epoch. Check digits.
-                // If it looks like a compact date (14 digits starting with 20...), handle
-                // separately
-                if (foundTimestamp.length() == 14
-                        && (foundTimestamp.startsWith("20") || foundTimestamp.startsWith("19"))) {
-                    tsGroupRegex = "\\d{14}";
-                    detectedTimestampFormat = "yyyyMMddHHmmss";
-                } else {
-                    tsGroupRegex = "\\d+(?:\\.\\d+)?"; // Generic number capture
-                    detectedTimestampFormat = "Epoch (Unix Timestamp)";
+                    try {
+                        config.validatePattern();
+                        return config;
+                    } catch (Exception e) {
+                        continue;
+                    }
                 }
+            } catch (Exception e) {
+                // Continue
             }
-            // 3.2 ISO Extended Check
-            else if (foundTimestamp.matches("\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}.*")) {
-                // Construct strict regex based on separators found
-                String sep = foundTimestamp.contains("T") ? "T" : "\\s+";
-                String timezonePart = "(?:Z|[+\\-]\\d{2}:?\\d{2})?";
-                String fracPart = "(?:[.,]\\d{1,9})?";
-
-                tsGroupRegex = "\\d{4}-\\d{2}-\\d{2}" + sep + "\\d{2}:\\d{2}:\\d{2}" + fracPart + timezonePart;
-
-                // Guess Java Format
-                detectedTimestampFormat = "yyyy-MM-dd" + (sep.equals("T") ? "'T'" : " ") + "HH:mm:ss";
-                if (foundTimestamp.matches(".*[.,]\\d+.*"))
-                    detectedTimestampFormat += ".SSS";
-                // Check for Z or +HH:mm / -HH:mm at the END or T...Z
-                // Avoid matching YYYY-MM-DD hyphens
-                if (foundTimestamp.matches(".*(?:Z|[+\\-]\\d{2}(?::?\\d{2})?)$"))
-                    detectedTimestampFormat += "XXX";
-            }
-            // 3.3 Apache Common
-            else if (foundTimestamp.matches("\\d{2}/[A-Za-z]{3}/\\d{4}:\\d{2}:\\d{2}:\\d{2}.*")) {
-                tsGroupRegex = "\\d{2}/[A-Za-z]{3}/\\d{4}:\\d{2}:\\d{2}:\\d{2}(?:\\s+[+\\-]\\d{4})?";
-                detectedTimestampFormat = "dd/MMM/yyyy:HH:mm:ss Z";
-            }
-            // 3.4 Apache Error / ANSI C / Syslog BSD / RFC1123
-            // These allow spaces in date parts e.g. "Dec 1"
-            else if (foundTimestamp.matches("[A-Za-z]{3}\\s+.*")) {
-                if (foundTimestamp.contains(",")) { // RFC 1123
-                    tsGroupRegex = "[A-Za-z]{3},\\s+\\d{2}\\s+[A-Za-z]{3}\\s+\\d{4}\\s+\\d{2}:\\d{2}:\\d{2}\\s+[A-Z]{3}";
-                    detectedTimestampFormat = "EEE, dd MMM yyyy HH:mm:ss zzz";
-                } else if (foundTimestamp.matches(".*\\d{4}$")) { // Ends in year (ANSI C / BSD / Apache Error)
-                    tsGroupRegex = "[A-Za-z]{3}\\s+(?:[A-Za-z]{3}\\s+)?\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?\\s+\\d{4}";
-                    detectedTimestampFormat = "EEE MMM dd HH:mm:ss yyyy"; // Generic guess
-                } else { // RFC 3164 (No year)
-                    tsGroupRegex = "[A-Za-z]{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}";
-                    detectedTimestampFormat = "MMM dd HH:mm:ss";
-                }
-            }
-            // 3.5 Oracle / Cisco
-            else if (foundTimestamp.matches("\\d{2}-[A-Za-z]{3}.*")
-                    || foundTimestamp.matches("[A-Za-z]{3}\\s+\\d{1,2}\\s+\\d{4}.*")) {
-                tsGroupRegex = ".*"; // Simplify for complex vendor strings to greedy match until known delimiter if
-                                     // hard
-                // Better specific regex:
-                if (foundTimestamp.contains("-")) {
-                    tsGroupRegex = "\\d{2}-[A-Za-z]{3}-\\d{2,4}\\s+\\d{2}[.:]\\d{2}[.:]\\d{2}(?:[.:]\\d+)?(?:\\s+(?:AM|PM))?";
-                    detectedTimestampFormat = "dd-MMM-yyyy HH:mm:ss";
-                } else {
-                    tsGroupRegex = "[A-Za-z]{3}\\s+\\d{1,2}\\s+\\d{4}\\s+\\d{2}:\\d{2}:\\d{2}"; // Cisco
-                    detectedTimestampFormat = "MMM dd yyyy HH:mm:ss";
-                }
-            }
-            // 3.6 US / EU / Dot
-            else if (foundTimestamp.contains("/")) {
-                // US vs EU: If first part > 12, definitely EU. Else ambiguous.
-                tsGroupRegex = "\\d{1,2}/\\d{1,2}/\\d{2,4}\\s+\\d{1,2}:\\d{2}:\\d{2}(?:\\s+(?:AM|PM))?";
-                detectedTimestampFormat = "MM/dd/yyyy HH:mm:ss"; // Assume US default
-            } else if (foundTimestamp.contains(".")) {
-                if (foundTimestamp.matches("\\d{4}\\.\\d{2}\\.\\d{2}.*")) {
-                    tsGroupRegex = "\\d{4}\\.\\d{2}\\.\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?";
-                    detectedTimestampFormat = "yyyy.MM.dd HH:mm:ss";
-                } else {
-                    // EU with dots
-                    tsGroupRegex = "\\d{2}\\.\\d{2}\\.\\d{4}\\s+\\d{2}:\\d{2}:\\d{2}";
-                    detectedTimestampFormat = "dd.MM.yyyy HH:mm:ss";
-                }
-            }
-            // 3.7 Compact 14 Digits
-            else if (foundTimestamp.matches("\\d{14}")) {
-                tsGroupRegex = "\\d{14}";
-                detectedTimestampFormat = "yyyyMMddHHmmss";
-            }
-            // 3.8 Time Only Fallback
-            else {
-                tsGroupRegex = "\\d{2}:\\d{2}:\\d{2}(?:[.,]\\d{3})?";
-                detectedTimestampFormat = "HH:mm:ss.SSS";
-            }
-
-            // Build Final Regex
-            regexBuilder.append(buildBeforeRegex(before));
-
-            if (isBracketed) {
-                regexBuilder.append("\\[(?<timestamp>" + tsGroupRegex + ")\\]");
-            } else {
-                regexBuilder.append("(?<timestamp>" + tsGroupRegex + ")");
-            }
-
-            // Delimiter handling
-            regexBuilder.append(determineSeparatorPattern(after)); // e.g. \s+, |, etc.
-
-            // After handling
-            regexBuilder.append(buildAfterRegex(after, isBracketed));
-
-        } else {
-            // Fallback
-            if (sample.trim().startsWith("{") && sample.trim().endsWith("}")) {
-                return new ParsingConfig("JSON Log", "(?<json>.*)");
-            }
-            return new ParsingConfig("Generic Log", "(?<message>.*)");
         }
 
-        ParsingConfig config = new ParsingConfig("Auto-Detected", regexBuilder.toString());
-        config.setTimestampFormat(detectedTimestampFormat);
-        config.setDescription("Auto-detected via Comprehensive Analysis");
-        config.validatePattern();
+        if (sample.trim().startsWith("{") && sample.trim().endsWith("}")) {
+            return new ParsingConfig("JSON Log", "(?<json>.*)");
+        }
 
-        return config;
+        return new ParsingConfig("Generic Log", "(?<message>.*)");
     }
 
-    // --- Helper Methods ---
+    private String guessTimestampFormat(String formatName, String tsVal) {
+        if (tsVal == null)
+            tsVal = "";
 
-    private boolean isBracketed(int start, int end, String sample) {
-        return start > 0 && sample.charAt(start - 1) == '[' &&
-                end < sample.length() && sample.charAt(end) == ']';
-    }
+        if (formatName.equals("Epoch"))
+            return "Epoch (Unix Timestamp)";
+        if (formatName.equals("Compact"))
+            return "yyyyMMddHHmmss";
 
-    private String determineSeparatorPattern(String after) {
-        // If immediately followed by pipe or specific chars, allow zero whitespace
-        if (after.startsWith("|") || after.startsWith(","))
-            return "\\s*";
-        // Default to flexible whitespace
-        return "\\s*";
-    }
-
-    private String buildBeforeRegex(String before) {
-        StringBuilder sb = new StringBuilder();
-        if (!before.trim().isEmpty()) {
-            String levelPattern = "(?:INFO|WARN|ERROR|DEBUG|TRACE|FATAL|SEVERE|FINE|NOTICE|CRIT|ALERT|EMERG)";
-            // Check for strict Level match
-            if (before.trim().matches(levelPattern)) {
-                sb.append("(?<level>" + levelPattern + ")\\s+");
-            } else {
-                sb.append("(?<prefix>.*?)\\s*");
-            }
+        if (formatName.contains("Logback")) {
+            if (tsVal.matches(".*[.,]\\d{3}.*"))
+                return "yyyy-MM-dd HH:mm:ss.SSS";
+            return "yyyy-MM-dd HH:mm:ss";
         }
-        return sb.toString();
-    }
+        if (formatName.contains("ISO8601") || formatName.contains("PostgreSQL")) {
+            boolean hasT = tsVal.contains("T");
+            boolean hasFrac = tsVal.matches(".*[.,]\\d+.*");
+            boolean hasTZ = tsVal.endsWith("Z") || tsVal.matches(".*[+\\-]\\d{2}:?\\d{2}$");
 
-    // Simplifed After Regex builder
-    private String buildAfterRegex(String after, boolean wasBracketed) {
-        StringBuilder sb = new StringBuilder();
-        String remaining = after.trim();
-
-        // 1. Timezone cleanup (if not consumed by timestamp regex)
-        // Check for +0700 or Z *separated* from timestamp
-        if (remaining.matches("^[+\\-]\\d{4}.*") || remaining.equals("Z") || remaining.startsWith("Z ")) {
-            sb.append("(?<timezone>Z|[+\\-]\\d{4})\\s*");
-            remaining = remaining.replaceFirst("^(Z|[+\\-]\\d{4})\\s*", "");
-
-            // Handle potential closing bracket if timezone was inside
-            if (remaining.startsWith("]") && !wasBracketed) {
-                sb.append("\\]\\s*");
-                remaining = remaining.substring(1).trim();
-            }
-        } else if (remaining.matches("^[A-Z]{3,4}\\s+.*") || remaining.matches("^[A-Z]{3,4}$")) {
-            // Timezone text like UTC, CET
-            sb.append("(?<timezone>[A-Z]{3,4})\\s*");
-            remaining = remaining.replaceFirst("^[A-Z]{3,4}\\s*", "");
+            String base = hasT ? "yyyy-MM-dd'T'HH:mm:ss" : "yyyy-MM-dd HH:mm:ss";
+            if (hasFrac)
+                base += ".SSS";
+            if (hasTZ)
+                base += "XXX";
+            return base;
         }
 
-        // 2. Separators
-        if (remaining.startsWith("|-")) {
-            sb.append("\\|-");
-            remaining = remaining.substring(2).trim();
-        } else if (remaining.startsWith("-")) {
-            sb.append("-\\s+");
-            remaining = remaining.substring(1).trim();
-        } else if (remaining.startsWith("|")) {
-            sb.append("\\|\\s+");
-            remaining = remaining.substring(1).trim();
+        if (formatName.contains("Apache Common") || formatName.contains("Apache Combined"))
+            return "dd/MMM/yyyy:HH:mm:ss Z";
+
+        if (formatName.contains("Apache Error")) {
+            if (tsVal.matches(".*\\d{2}:\\d{2}:\\d{2}\\.\\d+.*"))
+                return "EEE MMM dd HH:mm:ss.SSS yyyy";
+            return "EEE MMM dd HH:mm:ss yyyy";
         }
 
-        // 3. Level Detection
-        String levelPattern = "(?:INFO|WARN|ERROR|DEBUG|TRACE|FATAL|SEVERE|FINE|NOTICE|CRIT|ALERT|EMERG)";
-        // Simple heuristic: If the start of remaining looks like a level
-        Matcher lvlM = Pattern.compile("^" + levelPattern).matcher(remaining);
-        if (lvlM.find()) {
-            sb.append("(?<level>" + levelPattern + ")\\s+");
-            remaining = remaining.substring(lvlM.end()).trim();
-        } else {
-            // Bracketed level? [INFO]
-            lvlM = Pattern.compile("^\\[" + levelPattern + "\\]").matcher(remaining);
-            if (lvlM.find()) {
-                sb.append("\\[(?<level>" + levelPattern + ")\\]\\s+");
-                remaining = remaining.substring(lvlM.end()).trim();
-            }
+        if (formatName.equals("Syslog"))
+            return "MMM dd HH:mm:ss";
+        if (formatName.equals("Syslog BSD"))
+            return "EEE MMM dd HH:mm:ss yyyy";
+
+        if (formatName.equals("Oracle"))
+            return "dd-MMM-yyyy HH:mm:ss";
+
+        if (formatName.equals("US Date"))
+            return "MM/dd/yyyy HH:mm:ss";
+        if (formatName.equals("EU Date"))
+            return "dd.MM.yyyy HH:mm:ss";
+        if (formatName.equals("Time Only")) {
+            if (tsVal.matches(".*[.,]\\d+.*"))
+                return "HH:mm:ss.SSS";
+            return "HH:mm:ss";
         }
 
-        // 4. Logback "in Context" pattern (restored)
-        // Matches "in ch.qos.logback.classic.LoggerContext[default]"
-        if (remaining.startsWith("in ")) {
-            int dashIdx = remaining.indexOf(" - ");
-            if (dashIdx > 0) {
-                sb.append("in\\s+(?<context>.*?)\\s+-\\s+");
-                remaining = remaining.substring(dashIdx + 3).trim();
-            }
-        }
-
-        // 5. Thread / Context (Generic bracket capture if present)
-        if (remaining.startsWith("[")) {
-            // Look for closing bracket
-            int closeIdx = remaining.indexOf("]");
-            if (closeIdx > 0) {
-                sb.append("\\[(?<thread>[^\\]]+)\\]\\s+");
-                remaining = remaining.substring(closeIdx + 1).trim();
-            }
-        }
-
-        // 6. Message
-        sb.append("(?<message>.*)");
-
-        return sb.toString();
+        return null;
     }
 }
