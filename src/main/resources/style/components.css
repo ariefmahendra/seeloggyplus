@@ -14,3 +14,45 @@
 .table-view .table-cell {
     -fx-alignment: TOP_LEFT;
 }
+
+/* ============================================
+   Recent Files List Styling
+   ============================================ */
+.recent-files-list .list-cell {
+    -fx-padding: 8px 10px;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0 0 1px 0;
+    /* Separator line */
+    -fx-border-color: #e0e0e0;
+}
+
+.recent-files-list .list-cell:filled:selected,
+.recent-files-list .list-cell:filled:selected:hover {
+    -fx-background-color: #2f65ca;
+    /* Professional Blue */
+    -fx-text-fill: white;
+    -fx-background-insets: 0;
+    -fx-border-color: #1a4fa0;
+    /* Slightly darker border */
+    -fx-border-width: 0 0 0 4px;
+    /* Left accent border */
+}
+
+/* Specific Label Styling in Selected State */
+.recent-files-list .list-cell:filled:selected .name-label,
+.recent-files-list .list-cell:filled:selected .path-label,
+.recent-files-list .list-cell:filled:selected .size-label,
+.recent-files-list .list-cell:filled:selected .server-label,
+.recent-files-list .list-cell:filled:selected .config-label {
+    -fx-text-fill: white;
+}
+
+.recent-files-list .list-cell:filled:hover {
+    -fx-background-color: #f0f4f8;
+}
+
+.recent-files-list .list-cell:empty {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+}

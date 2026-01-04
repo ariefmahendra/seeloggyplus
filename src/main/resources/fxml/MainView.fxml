@@ -353,6 +353,11 @@
                             <Font size="14.0" />
                         </font>
                     </Label>
+                    <Button fx:id="cancelProcessingButton" text="Cancel" onAction="#handleCancelProcessing" style="-fx-base: #ffdddd; -fx-text-fill: #cc0000; -fx-border-color: #cc0000; -fx-border-radius: 3; -fx-background-radius: 3;">
+                        <tooltip>
+                            <Tooltip text="Stop current operation" />
+                        </tooltip>
+                    </Button>
                 </VBox>
             </VBox>
         </StackPane>

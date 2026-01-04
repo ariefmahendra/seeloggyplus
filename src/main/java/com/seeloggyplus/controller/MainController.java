@@ -344,7 +344,10 @@ public class MainController {
         });
 
         leftPanelContextMenu.getItems().addAll(changeParsingConfigMenuItem);
-        recentFilesListView.setCellFactory(listView -> new RecentFileListCell());
+        recentFilesListView
+                .setCellFactory(listView -> new com.seeloggyplus.ui.cell.RecentFileListCell(serverManagementService,
+                        () -> monitoringRemotePath));
+        recentFilesListView.getStyleClass().add("recent-files-list");
         recentFilesListView.setItems(FXCollections.observableArrayList(recentFileService.findAll()));
         recentFilesListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         recentFilesListView.setContextMenu(leftPanelContextMenu);
@@ -419,6 +422,27 @@ public class MainController {
             Platform.runLater(() -> horizontalSplitPane.setDividerPositions(0.0));
         }
         showLeftPanelMenuItem.setSelected(isLeftPanelPinned);
+    }
+
+    /**
+     * Selects the given file in the recent files list view.
+     * This improves UX by keeping the current file highlighted.
+     */
+    private void selectRecentFile(File file) {
+        if (file == null || recentFilesListView == null) {
+            return;
+        }
+
+        String targetPath = file.getAbsolutePath();
+        Platform.runLater(() -> {
+            for (RecentFilesDto dto : recentFilesListView.getItems()) {
+                if (dto != null && dto.logFile() != null && targetPath.equals(dto.logFile().getFilePath())) {
+                    recentFilesListView.getSelectionModel().select(dto);
+                    recentFilesListView.scrollTo(dto);
+                    break;
+                }
+            }
+        });
     }
 
     private void setupCenterPanel() {
@@ -1073,6 +1097,13 @@ public class MainController {
         Thread.ofVirtual().start(downloadTask);
     }
 
+    @FXML
+    public void handleCancelProcessing() {
+        logger.info("User requested processing cancellation.");
+        cancelCurrentLoadingTask();
+        hideLoading();
+    }
+
     private void cancelCurrentLoadingTask() {
         if (currentLoadingTask != null && currentLoadingTask.isRunning()) {
             logger.info("Cancelling previous loading task...");
@@ -1089,7 +1120,6 @@ public class MainController {
         currentLogEntrySource = null;
         originalLogEntrySource = null;
 
-        // Offload GC to Virtual Thread to prevent UI freeze
         Thread.ofVirtual().start(() -> {
             System.gc();
             logger.info("Memory cleanup (GC) triggered on background thread");
@@ -1179,6 +1209,9 @@ public class MainController {
                 logger.info("Added file to recent files: {}", file.getName());
             }
 
+            // Auto-select the current file in the recent files list for better UX
+            selectRecentFile(file);
+
             hideLoading();
             updateTailButtonState();
             currentLoadingTask = null;
@@ -1190,7 +1223,9 @@ public class MainController {
             });
         });
 
-        task.setOnFailed(e -> {
+        task.setOnFailed(e ->
+
+        {
             hideLoading();
             Throwable ex = task.getException();
             logger.error("Failed to parse file", ex);
@@ -3154,63 +3189,6 @@ public class MainController {
         });
 
         return result;
-    }
-
-    private class RecentFileListCell extends ListCell<RecentFilesDto> {
-        @Override
-        protected void updateItem(RecentFilesDto item, boolean empty) {
-            super.updateItem(item, empty);
-
-            if (empty || item == null) {
-                setText(null);
-                setGraphic(null);
-            } else {
-                VBox vbox = new VBox(2);
-                LogFile logFile = item.logFile();
-
-                String displayName = logFile.getName();
-                if (logFile.isRemote()
-                        && monitoringRemotePath != null
-                        && monitoringRemotePath.equals(logFile.getFilePath())) {
-                    displayName = displayName + " (Monitoring)";
-                }
-
-                Label nameLabel = new Label(displayName);
-                nameLabel.setStyle("-fx-font-weight: bold;");
-
-                Label serverLabel = null;
-                if (logFile.isRemote()) {
-                    String serverNameText = "Server: -";
-                    String serverId = logFile.getSshServerID();
-                    if (serverId != null && !serverId.isBlank()) {
-                        try {
-                            SSHServerModel server = serverManagementService.getServerById(serverId);
-                            if (server != null) {
-                                serverNameText = "Server: " + server.getName();
-                            } else {
-                                serverNameText = "Server: (not found: " + serverId + ")";
-                            }
-                        } catch (Exception e) {
-                            logger.warn("Failed to load server name for id={}", serverId, e);
-                            serverNameText = "Server: (error)";
-                        }
-                    }
-                    serverLabel = new Label(serverNameText);
-                    serverLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #555;");
-                }
-
-                Label pathLabel = new Label(logFile.getFilePath());
-                Label sizeLabel = new Label(logFile.getSize());
-
-                if (serverLabel != null) {
-                    vbox.getChildren().addAll(nameLabel, serverLabel, pathLabel, sizeLabel);
-                } else {
-                    vbox.getChildren().addAll(nameLabel, pathLabel, sizeLabel);
-                }
-
-                setGraphic(vbox);
-            }
-        }
     }
 
     private void addAppIcon(Stage stage) {

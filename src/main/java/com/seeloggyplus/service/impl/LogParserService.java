@@ -88,6 +88,7 @@ public class LogParserService {
             } catch (InterruptedException e) {
                 logger.info("Parsing interrupted (task cancelled by user)");
                 Thread.currentThread().interrupt();
+                futures.forEach(f -> f.cancel(true));
                 break;
             } catch (ExecutionException e) {
                 logger.error("Error processing a file chunk", e);
@@ -149,6 +150,7 @@ public class LogParserService {
             } catch (InterruptedException e) {
                 logger.info("Indexing interrupted");
                 Thread.currentThread().interrupt();
+                futures.forEach(f -> f.cancel(true));
                 break; // Stop waiting
             } catch (ExecutionException e) {
                 logger.error("Error indexing chunk", e);
