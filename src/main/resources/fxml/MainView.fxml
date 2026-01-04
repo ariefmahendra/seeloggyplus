@@ -48,7 +48,6 @@
                 </TextField>
                 <ToggleButton fx:id="regexCheckBox" text="Regex" />
                 <ToggleButton fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
-                <ToggleButton fx:id="hideUnparsedCheckBox" text="Hide Unparsed" />
                 <Separator orientation="VERTICAL" />
                 <Label text="Level:" />
                 <ComboBox fx:id="logLevelFilterComboBox" prefHeight="16.0" prefWidth="115.0" promptText="All Levels" styleClass="small-combo-box" stylesheets="@../style/components.css" />
@@ -121,22 +120,7 @@
                         <Tooltip text="Scroll to Top" />
                     </tooltip>
                 </Button>
-                <Button fx:id="prevWindowButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="STEP_BACKWARD" size="12" />
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Previous Window (Page Up)" />
-                    </tooltip>
-                </Button>
-                <Button fx:id="nextWindowButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="STEP_FORWARD" size="12" />
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Next Window (Page Down)" />
-                    </tooltip>
-                </Button>
+
                 <Button fx:id="scrollToBottomButton">
                     <graphic>
                         <FontAwesomeIconView glyphName="ARROW_DOWN" size="12" />
@@ -159,175 +143,221 @@
 
     <!-- Center: Main Content -->
     <center>
-        <BorderPane xmlns="http://javafx.com/javafx">
-            <!-- Collapsed Left Panel (appears when leftPanel is unpinned) -->
-            <left>
-                <VBox fx:id="collapsedLeftPanel" alignment="TOP_CENTER" managed="false" prefWidth="20" spacing="10" visible="false">
-                    <padding>
-                        <Insets bottom="5" left="5" right="5" top="5" />
-                    </padding>
-
-                    <Button fx:id="expandLeftPanelButton" rotate="90">
-                        <graphic>
-                            <FontAwesomeIconView glyphName="ANGLE_DOUBLE_RIGHT" size="12" />
-                        </graphic>
-                        <tooltip>
-                            <Tooltip text="Expand Recent Files" />
-                        </tooltip>
-                    </Button>
-                </VBox>
-            </left>
-
-            <center>
-                <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
-                    <!-- Left Panel: Recent Files -->
-                    <VBox fx:id="leftPanel" minWidth="200" prefWidth="250" spacing="5">
+        <StackPane>
+            <BorderPane xmlns="http://javafx.com/javafx">
+                <!-- Collapsed Left Panel (appears when leftPanel is unpinned) -->
+                <left>
+                    <VBox fx:id="collapsedLeftPanel" alignment="TOP_CENTER" managed="false" prefWidth="20" spacing="10" visible="false">
                         <padding>
                             <Insets bottom="5" left="5" right="5" top="5" />
                         </padding>
 
-                        <HBox spacing="5">
-                            <Label prefHeight="18.0" prefWidth="294.0" text="Recent Log Files" HBox.hgrow="ALWAYS">
-                                <font>
-                                    <Font name="System Bold" size="12.0" />
-                                </font>
-                            </Label>
-                            <Separator prefWidth="200.0" HBox.hgrow="ALWAYS" />
-                            <Button fx:id="pinLeftPanelButton">
-                                <graphic>
-                                    <FontAwesomeIconView glyphName="ANGLE_DOUBLE_LEFT" size="12" />
-                                </graphic>
-                                <tooltip>
-                                    <Tooltip text="Collapse Recent Files Panel" />
-                                </tooltip>
-                            </Button>
-                        </HBox>
-
-                        <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS" />
-
-                        <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files">
+                        <Button fx:id="expandLeftPanelButton" rotate="90">
                             <graphic>
-                                <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
+                                <FontAwesomeIconView glyphName="ANGLE_DOUBLE_RIGHT" size="12" />
                             </graphic>
+                            <tooltip>
+                                <Tooltip text="Expand Recent Files" />
+                            </tooltip>
                         </Button>
                     </VBox>
+                </left>
 
-                    <!-- Right Panel: Log Viewer and Detail -->
-                    <BorderPane>
-                        <!-- Collapsed Bottom Panel (appears when bottomPanel is unpinned) -->
-                        <bottom>
-                            <HBox fx:id="collapsedBottomPanel" alignment="CENTER_LEFT" managed="false" prefHeight="20" spacing="10" visible="false">
-                                <padding>
-                                    <Insets bottom="5" left="5" right="5" top="5" />
-                                </padding>
+                <center>
+                    <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
+                        <!-- Left Panel: Recent Files -->
+                        <VBox fx:id="leftPanel" minWidth="200" prefWidth="250" spacing="5">
+                            <padding>
+                                <Insets bottom="5" left="5" right="5" top="5" />
+                            </padding>
 
-                                <Button fx:id="expandBottomPanelButton">
-                                    <graphic>
-                                        <FontAwesomeIconView glyphName="ANGLE_DOUBLE_LEFT" size="12" rotate="90" />
-                                    </graphic>
-                                    <tooltip>
-                                        <Tooltip text="Expand Detail Panel" />
-                                    </tooltip>
-                                </Button>
-                                <Label text="Log Detail (Collapsed)">
+                            <HBox spacing="5">
+                                <Label prefHeight="18.0" prefWidth="294.0" text="Recent Log Files" HBox.hgrow="ALWAYS">
                                     <font>
-                                        <Font name="System Bold" size="10.0" />
+                                        <Font name="System Bold" size="12.0" />
                                     </font>
                                 </Label>
+                                <Separator prefWidth="200.0" HBox.hgrow="ALWAYS" />
+                                <Button fx:id="pinLeftPanelButton">
+                                    <graphic>
+                                        <FontAwesomeIconView glyphName="ANGLE_DOUBLE_LEFT" size="12" />
+                                    </graphic>
+                                    <tooltip>
+                                        <Tooltip text="Collapse Recent Files Panel" />
+                                    </tooltip>
+                                </Button>
                             </HBox>
-                        </bottom>
 
-                        <center>
-                            <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
-                                <!-- Center Panel: Log Table -->
-                                <VBox spacing="5">
+                            <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS" />
+
+                            <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files">
+                                <graphic>
+                                    <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
+                                </graphic>
+                            </Button>
+                        </VBox>
+
+                        <!-- Right Panel: Log Viewer and Detail -->
+                        <BorderPane>
+                            <!-- Collapsed Bottom Panel (appears when bottomPanel is unpinned) -->
+                            <bottom>
+                                <HBox fx:id="collapsedBottomPanel" alignment="CENTER_LEFT" managed="false" prefHeight="20" spacing="10" visible="false">
                                     <padding>
                                         <Insets bottom="5" left="5" right="5" top="5" />
                                     </padding>
 
-                                    <TableView fx:id="logTableView" stylesheets="@../style/highlight.css" VBox.vgrow="ALWAYS">
-                                        <placeholder>
-                                            <Label text="No log file loaded. Open a file to view logs." />
-                                        </placeholder>
-                                    </TableView>
-                                </VBox>
+                                    <Button fx:id="expandBottomPanelButton">
+                                        <graphic>
+                                            <FontAwesomeIconView glyphName="ANGLE_DOUBLE_LEFT" size="12" rotate="90" />
+                                        </graphic>
+                                        <tooltip>
+                                            <Tooltip text="Expand Detail Panel" />
+                                        </tooltip>
+                                    </Button>
+                                    <Label text="Log Detail (Collapsed)">
+                                        <font>
+                                            <Font name="System Bold" size="10.0" />
+                                        </font>
+                                    </Label>
+                                </HBox>
+                            </bottom>
 
-                                <!-- Bottom Panel: Log Detail -->
-                                <VBox fx:id="bottomPanel" minHeight="150" prefHeight="200" spacing="5">
-                                    <padding>
-                                        <Insets bottom="5" left="5" right="5" top="5" />
-                                    </padding>
+                            <center>
+                                <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
+                                    <!-- Center Panel: Log Table -->
+                                    <VBox spacing="5">
+                                        <padding>
+                                            <Insets bottom="5" left="5" right="5" top="5" />
+                                        </padding>
 
-                                    <HBox alignment="CENTER_LEFT" spacing="10">
-                                        <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS">
-                                            <font>
-                                                <Font name="System Bold" size="12.0" />
-                                            </font>
-                                        </Label>
-
-                                        <HBox alignment="CENTER_LEFT" spacing="5">
-                                            <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
-                                                <graphic>
-                                                    <FontAwesomeIconView glyphName="INDENT" size="12" />
-                                                </graphic>
+                                        <TableView fx:id="logTableView" stylesheets="@../style/highlight.css" VBox.vgrow="ALWAYS">
+                                            <placeholder>
+                                                <Label text="No log file loaded. Open a file to view logs." />
+                                            </placeholder>
+                                        </TableView>
+                                        
+                                        <!-- Pagination Bar -->
+                                        <HBox fx:id="paginationBar" alignment="CENTER" spacing="5" styleClass="pagination-bar">
+                                            <padding>
+                                                <Insets bottom="5" left="10" right="10" top="5" />
+                                            </padding>
+                                            <Button fx:id="firstPageButton" text="«" minWidth="32">
                                                 <tooltip>
-                                                    <Tooltip text="Auto-Prettify JSON" />
-                                                </tooltip>
-                                            </ToggleButton>
-                                            <ToggleButton fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
-                                                <graphic>
-                                                    <FontAwesomeIconView glyphName="CODE" size="12" />
-                                                </graphic>
-                                                <tooltip>
-                                                    <Tooltip text="Auto-Prettify XML" />
-                                                </tooltip>
-                                            </ToggleButton>
-                                            <Button fx:id="copyButton">
-                                                <graphic>
-                                                    <FontAwesomeIconView glyphName="COPY" size="12" />
-                                                </graphic>
-                                                <tooltip>
-                                                    <Tooltip text="Copy" />
+                                                    <Tooltip text="First Page" />
                                                 </tooltip>
                                             </Button>
-                                            <Button fx:id="clearDetailButton">
-                                                <graphic>
-                                                    <FontAwesomeIconView glyphName="CLOSE" size="12" />
-                                                </graphic>
+                                            <Button fx:id="prevPageButton" text="‹" minWidth="32">
                                                 <tooltip>
-                                                    <Tooltip text="Clear" />
+                                                    <Tooltip text="Previous Page" />
+                                                </tooltip>
+                                            </Button>
+                                            <HBox fx:id="pageButtonsContainer" alignment="CENTER" spacing="3" />
+                                            <Button fx:id="nextPageButton" text="›" minWidth="32">
+                                                <tooltip>
+                                                    <Tooltip text="Next Page" />
+                                                </tooltip>
+                                            </Button>
+                                            <Button fx:id="lastPageButton" text="»" minWidth="32">
+                                                <tooltip>
+                                                    <Tooltip text="Last Page" />
                                                 </tooltip>
                                             </Button>
                                             <Separator orientation="VERTICAL" />
-                                            <Button fx:id="pinBottomPanelButton">
-                                                <graphic>
-                                                    <FontAwesomeIconView glyphName="ANGLE_DOUBLE_DOWN" size="12" />
-                                                </graphic>
+                                            <Label fx:id="pageInfoLabel" text="Page 1 of 1" />
+                                            <Separator orientation="VERTICAL" />
+                                            <Label text="Per page:" />
+                                            <ComboBox fx:id="pageSizeComboBox" prefWidth="90">
                                                 <tooltip>
-                                                    <Tooltip text="Pin/Unpin Detail Panel" />
+                                                    <Tooltip text="Items per page" />
                                                 </tooltip>
-                                            </Button>
+                                            </ComboBox>
                                         </HBox>
-                                    </HBox>
-                                </VBox>
-                            </SplitPane>
-                        </center>
-                    </BorderPane>
-                </SplitPane>
-            </center>
-        </BorderPane>
+                                    </VBox>
+
+                                    <!-- Bottom Panel: Log Detail -->
+                                    <VBox fx:id="bottomPanel" minHeight="150" prefHeight="200" spacing="5">
+                                        <padding>
+                                            <Insets bottom="5" left="5" right="5" top="5" />
+                                        </padding>
+
+                                        <HBox alignment="CENTER_LEFT" spacing="10">
+                                            <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS">
+                                                <font>
+                                                    <Font name="System Bold" size="12.0" />
+                                                </font>
+                                            </Label>
+
+                                            <HBox alignment="CENTER_LEFT" spacing="5">
+                                                <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
+                                                    <graphic>
+                                                        <FontAwesomeIconView glyphName="INDENT" size="12" />
+                                                    </graphic>
+                                                    <tooltip>
+                                                        <Tooltip text="Auto-Prettify JSON" />
+                                                    </tooltip>
+                                                </ToggleButton>
+                                                <ToggleButton fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
+                                                    <graphic>
+                                                        <FontAwesomeIconView glyphName="CODE" size="12" />
+                                                    </graphic>
+                                                    <tooltip>
+                                                        <Tooltip text="Auto-Prettify XML" />
+                                                    </tooltip>
+                                                </ToggleButton>
+                                                <Button fx:id="copyButton">
+                                                    <graphic>
+                                                        <FontAwesomeIconView glyphName="COPY" size="12" />
+                                                    </graphic>
+                                                    <tooltip>
+                                                        <Tooltip text="Copy" />
+                                                    </tooltip>
+                                                </Button>
+                                                <Button fx:id="clearDetailButton">
+                                                    <graphic>
+                                                        <FontAwesomeIconView glyphName="CLOSE" size="12" />
+                                                    </graphic>
+                                                    <tooltip>
+                                                        <Tooltip text="Clear" />
+                                                    </tooltip>
+                                                </Button>
+                                                <Separator orientation="VERTICAL" />
+                                                <Button fx:id="pinBottomPanelButton">
+                                                    <graphic>
+                                                        <FontAwesomeIconView glyphName="ANGLE_DOUBLE_DOWN" size="12" />
+                                                    </graphic>
+                                                    <tooltip>
+                                                        <Tooltip text="Pin/Unpin Detail Panel" />
+                                                    </tooltip>
+                                                </Button>
+                                            </HBox>
+                                        </HBox>
+                                    </VBox>
+                                </SplitPane>
+                            </center>
+                        </BorderPane>
+                    </SplitPane>
+                </center>
+            </BorderPane>
+            
+            <!-- Loading Overlay -->
+            <VBox fx:id="loadingOverlay" alignment="CENTER" visible="false" style="-fx-background-color: rgba(0, 0, 0, 0.4);">
+                <VBox alignment="CENTER" spacing="15" style="-fx-background-color: white; -fx-background-radius: 8; -fx-padding: 25; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 10, 0, 0, 0); -fx-min-width: 300; -fx-max-width: 400;">
+                    <ProgressIndicator fx:id="loadingProgress" minWidth="60" minHeight="60" maxWidth="60" maxHeight="60" />
+                    <Label text="Processing Request..." textFill="#333333">
+                        <font>
+                            <Font name="System Bold" size="18.0" />
+                        </font>
+                    </Label>
+                    <Label fx:id="loadingLabel" text="Please wait..." textFill="#666666" wrapText="true" textAlignment="CENTER">
+                        <font>
+                            <Font size="14.0" />
+                        </font>
+                    </Label>
+                </VBox>
+            </VBox>
+        </StackPane>
     </center>
 
-    <!-- Bottom: Status Bar -->
-    <bottom>
-        <HBox alignment="CENTER_LEFT" spacing="10">
-            <padding>
-                <Insets bottom="5" left="10" right="10" top="5" />
-            </padding>
 
-            <Label fx:id="statusLabel" text="Ready" HBox.hgrow="ALWAYS" />
-            <ProgressBar fx:id="progressBar" prefWidth="200" visible="false" />
-        </HBox>
-    </bottom>
 
 </BorderPane>

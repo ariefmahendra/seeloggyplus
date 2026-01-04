@@ -33,6 +33,10 @@ public class LogEntry {
     @Getter
     private boolean isParsed;
 
+    public boolean isParsed() {
+        return isParsed;
+    }
+
     // Constructor for unparsed single lines
     public LogEntry(long lineNumber, String rawLog) {
         this(lineNumber, lineNumber, rawLog, new HashMap<>(), false);

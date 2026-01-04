@@ -9,8 +9,9 @@ group = 'com.seeloggyplus'
 // The project version is now defined in the gradle.properties file.
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 tasks.withType(JavaCompile) {
@@ -48,6 +49,18 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
     implementation 'io.krakens:java-grok:0.1.9'
+
+    // Apache Lucene (Phase 2: High Performance Search)
+    implementation 'org.apache.lucene:lucene-core:9.8.0'
+    implementation 'org.apache.lucene:lucene-queryparser:9.8.0'
+    implementation 'org.apache.lucene:lucene-analysis-common:9.8.0'
+    implementation 'org.apache.lucene:lucene-highlighter:9.8.0'
+
+    // TestFX Integration Testing
+    testImplementation 'org.testfx:testfx-core:4.0.17'
+    testImplementation 'org.testfx:testfx-junit5:4.0.17'
+    testImplementation 'org.hamcrest:hamcrest:2.2'
+    testImplementation 'org.assertj:assertj-core:3.24.2'
 }
 
 // Generates a version.properties file from the project version
@@ -85,7 +98,7 @@ runtime {
     ]
 
     targetPlatform('win') {
-        jdkHome = jdkDownload('https://cdn.azul.com/zulu/bin/zulu17.46.19-ca-fx-jdk17.0.9-win_x64.zip')
+        jdkHome = jdkDownload('https://cdn.azul.com/zulu/bin/zulu21.32.17-ca-fx-jdk21.0.2-win_x64.zip')
     }
 }
 tasks.register('fatJar', Jar) {
