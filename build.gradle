@@ -96,11 +96,8 @@ runtime {
             'jdk.crypto.ec', 'jdk.crypto.cryptoki',
             'javafx.controls', 'javafx.fxml', 'javafx.web', 'javafx.graphics'
     ]
-
-    targetPlatform('win') {
-        jdkHome = jdkDownload('https://cdn.azul.com/zulu/bin/zulu21.32.17-ca-fx-jdk21.0.2-win_x64.zip')
-    }
 }
+
 tasks.register('fatJar', Jar) {
     archiveClassifier = 'all'
     archiveFileName = "seeloggyplus-all.jar"
@@ -112,54 +109,22 @@ tasks.register('fatJar', Jar) {
 
 tasks.register('createPortableDist', Zip) {
     group = 'distribution'
-    description = 'create zip portable distribution'
+    description = 'create zip portable distribution without bundled JRE'
 
-    dependsOn 'fatJar', 'jpackageImage'
+    dependsOn 'fatJar'
 
     archiveFileName = "${project.name}-Portable.zip"
     destinationDirectory = file("${buildDir}/distributions")
 
     into("${project.name}") {
-        from("${buildDir}/jpackage/${project.name}/runtime") {
-            into 'jre'
-        }
-
         from(tasks.fatJar.archiveFile) {
             rename { "${project.name}.jar" }
         }
 
-        def jvmArgs = '--add-opens javafx.graphics/javafx.scene=ALL-UNNAMED ' +
-                '--add-opens javafx.controls/javafx.scene.control=ALL-UNNAMED ' +
-                '--add-opens javafx.controls/javafx.scene.control.skin=ALL-UNNAMED ' +
-                '--add-opens javafx.base/com.sun.javafx.runtime=ALL-UNNAMED ' +
-                '--add-opens javafx.graphics/com.sun.javafx.scene=ALL-UNNAMED ' +
-                '--add-opens javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED'
-
-        def scriptNoConsole = """
-@echo off
-set DIR=%~dp0
-start "" "%DIR%jre\\bin\\javaw.exe" ${jvmArgs} -jar "%DIR%${project.name}.jar"
-exit
-        """.trim()
-
-        from(resources.text.fromString(scriptNoConsole)) {
-            rename { "seeloggyplus-start.bat" }
-        }
-
-        def scriptWithConsole = """
-@echo off
-title Debug Mode - ${project.name}
-echo Starting application...
-echo ---------------------------------------------------
-set DIR=%~dp0
-"%DIR%jre\\bin\\java.exe" ${jvmArgs} -jar "%DIR%${project.name}.jar"
-echo ---------------------------------------------------
-echo Application is closed.
-pause
-        """.trim()
-
-        from(resources.text.fromString(scriptWithConsole)) {
-            rename { "seeloggyplus-debug.bat" }
-        }
+        // Add launcher scripts for custom memory configuration
+        from('launcher.bat')
+        from('launcher.sh')
+        from('launcher.properties')
+        from('LAUNCHER_README.md')
     }
 }

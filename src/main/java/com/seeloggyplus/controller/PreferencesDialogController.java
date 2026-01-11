@@ -25,6 +25,8 @@ public class PreferencesDialogController {
     @FXML
     private ComboBox<String> appFontFamilyComboBox;
     @FXML
+    private Spinner<Integer> appMaxMemorySpinner;
+    @FXML
     private Spinner<Integer> tailWindowSizeSpinner;
     @FXML
     private ComboBox<String> mainDefaultLogLevelComboBox;
@@ -70,6 +72,7 @@ public class PreferencesDialogController {
         int availableProcessors = Runtime.getRuntime().availableProcessors();
 
         appFontSizeSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(8, 30, 12));
+        appMaxMemorySpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 16, 4));
         tailWindowSizeSpinner
                 .setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1000, 100000, 20000, 1000));
         lpLineLimitSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 10000, 500, 50));
@@ -105,6 +108,7 @@ public class PreferencesDialogController {
     private void loadPreferences() {
         appFontSizeSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("app_font_size", "12")));
         appFontFamilyComboBox.getSelectionModel().select(getPreference("app_font_family", "Consolas"));
+        appMaxMemorySpinner.getValueFactory().setValue(Integer.parseInt(getPreference("app_max_memory_gb", "4")));
 
         tailWindowSizeSpinner.getValueFactory()
                 .setValue(Integer.parseInt(getPreference("main_tail_window_size", "20000")));
@@ -135,6 +139,7 @@ public class PreferencesDialogController {
         logger.info("handleSave() triggered. Committing spinner values...");
         // Commit spinners to ensure latest typed value is captured
         commitEditorText(appFontSizeSpinner);
+        commitEditorText(appMaxMemorySpinner);
         commitEditorText(tailWindowSizeSpinner);
         commitEditorText(lpLineLimitSpinner);
         commitEditorText(sshThreadsSpinner);
@@ -142,6 +147,10 @@ public class PreferencesDialogController {
 
         savePreference("app_font_size", String.valueOf(appFontSizeSpinner.getValue()));
         savePreference("app_font_family", appFontFamilyComboBox.getValue());
+        savePreference("app_max_memory_gb", String.valueOf(appMaxMemorySpinner.getValue()));
+
+        // Update launcher.properties for max memory
+        updateLauncherConfig(appMaxMemorySpinner.getValue());
 
         savePreference("main_tail_window_size", String.valueOf(tailWindowSizeSpinner.getValue()));
         savePreference("main_default_log_level", mainDefaultLogLevelComboBox.getValue());
@@ -195,6 +204,32 @@ public class PreferencesDialogController {
         File selectedDirectory = directoryChooser.showDialog(saveButton.getScene().getWindow());
         if (selectedDirectory != null) {
             ufmDefaultPathField.setText(selectedDirectory.getAbsolutePath());
+        }
+    }
+
+    private void updateLauncherConfig(int maxMemoryGb) {
+        try {
+            java.io.File configFile = new java.io.File("launcher.properties");
+            java.util.Properties props = new java.util.Properties();
+
+            // Read existing properties if file exists
+            if (configFile.exists()) {
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(configFile)) {
+                    props.load(fis);
+                }
+            }
+
+            // Update max memory property
+            props.setProperty("max.memory.gb", String.valueOf(maxMemoryGb));
+
+            // Write properties back to file
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(configFile)) {
+                props.store(fos, "SeeLoggy+ Launcher Configuration - Auto-generated");
+            }
+
+            logger.info("Updated launcher.properties with max memory: {}GB", maxMemoryGb);
+        } catch (Exception e) {
+            logger.error("Failed to update launcher.properties", e);
         }
     }
 

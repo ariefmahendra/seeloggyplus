@@ -100,11 +100,6 @@ public class ParsingConfigController {
     private ParsingConfig configSnapshot;
 
     // Callback
-
-    public void setOnConfigChangedCallback(Runnable callback) {
-        this.onConfigChangedCallback = callback;
-    }
-
     @Setter
     private Runnable onConfigChangedCallback;
 
