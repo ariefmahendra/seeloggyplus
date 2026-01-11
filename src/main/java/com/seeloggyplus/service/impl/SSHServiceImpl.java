@@ -1,9 +1,10 @@
 package com.seeloggyplus.service.impl;
 
 import com.jcraft.jsch.*;
+import com.seeloggyplus.dto.RemoteFileInfo;
+import com.seeloggyplus.service.LogParser;
 import com.seeloggyplus.service.SSHService;
 import lombok.Getter;
-import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,23 +20,36 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
+/**
+ * Implementation of {@link SSHService} using JSch library.
+ * <p>
+ * Handles secure shell connections, file transfers (SFTP), and remote command
+ * executions.
+ */
 public class SSHServiceImpl implements SSHService {
+
     private static final Logger logger = LoggerFactory.getLogger(SSHServiceImpl.class);
     private static final int DEFAULT_PORT = 22;
     private static final long DEFAULT_TTL = 10 * 60 * 1000;
 
-    @Getter private String host;
-    @Getter private int port;
-    @Getter private String username;
+    @Getter
+    private String host;
+    @Getter
+    private int port;
+    @Getter
+    private String username;
     private String password;
 
     private Session currentSession;
-
     private ChannelExec activeTailChannel;
     private final AtomicBoolean isTailing = new AtomicBoolean(false);
     private final ExecutorService tailExecutor = Executors.newSingleThreadExecutor();
 
-    public SSHServiceImpl() {}
+    /**
+     * Default constructor.
+     */
+    public SSHServiceImpl() {
+    }
 
     @Override
     public boolean connect(String host, int port, String username, String password) {
@@ -50,7 +64,8 @@ public class SSHServiceImpl implements SSHService {
         this.password = password;
 
         try {
-            this.currentSession = SSHSessionManagerImpl.getInstance().getSession(this.host, this.port, this.username, this.password, ttlMillis);
+            this.currentSession = SSHSessionManagerImpl.getInstance().getSession(this.host, this.port, this.username,
+                    this.password, ttlMillis);
             return this.currentSession.isConnected();
         } catch (JSchException e) {
             logger.error("Connection failed: {}", e.getMessage());
@@ -72,13 +87,9 @@ public class SSHServiceImpl implements SSHService {
         return currentSession != null && currentSession.isConnected();
     }
 
-    /**
-     * Execute remote command and return the output as String.
-     */
     @Override
     public String executeCommand(String command) throws IOException {
         Session session = getSessionOrThrow();
-
         StringBuilder output = new StringBuilder();
         ChannelExec channel = null;
 
@@ -98,11 +109,12 @@ public class SSHServiceImpl implements SSHService {
                 }
             }
 
-            if (output.isEmpty()) {
-                try (BufferedReader errReader = new BufferedReader(new InputStreamReader(err, StandardCharsets.UTF_8))) {
+            if (output.length() == 0) {
+                try (BufferedReader errReader = new BufferedReader(
+                        new InputStreamReader(err, StandardCharsets.UTF_8))) {
                     String line;
                     while ((line = errReader.readLine()) != null) {
-                        logger.warn("SSH Stderr: " + line);
+                        logger.warn("SSH Stderr: {}", line);
                     }
                 }
             }
@@ -111,15 +123,19 @@ public class SSHServiceImpl implements SSHService {
         } catch (JSchException e) {
             throw new IOException("Failed to execute command: " + command, e);
         } finally {
-            if (channel != null) channel.disconnect();
+            if (channel != null) {
+                channel.disconnect();
+            }
         }
     }
 
     private Session getSessionOrThrow() throws IOException {
         if (isConnected()) {
             try {
+                // Refresh TTL
                 SSHSessionManagerImpl.getInstance().getSession(host, port, username, password, DEFAULT_TTL);
-            } catch (JSchException ignored) {}
+            } catch (JSchException ignored) {
+            }
             return currentSession;
         }
         if (password != null && connect(host, port, username, password)) {
@@ -129,13 +145,9 @@ public class SSHServiceImpl implements SSHService {
     }
 
     @Override
-    public void tailFile(String remotePath,
-                         int lines,
-                         Consumer<String> logConsumer,
-                         Consumer<String> errorConsumer) {
+    public void tailFile(String remotePath, int lines, Consumer<String> logConsumer, Consumer<String> errorConsumer) {
         try {
             Session session = getSessionOrThrow();
-
             stopTailing();
 
             tailExecutor.submit(() -> {
@@ -154,7 +166,6 @@ public class SSHServiceImpl implements SSHService {
 
                     try (BufferedReader reader = new BufferedReader(
                             new InputStreamReader(in, StandardCharsets.UTF_8))) {
-
                         String line;
                         while (isTailing.get() && (line = reader.readLine()) != null) {
                             logConsumer.accept(line);
@@ -209,13 +220,17 @@ public class SSHServiceImpl implements SSHService {
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
                 String line;
-                while ((line = reader.readLine()) != null) content.append(line).append("\n");
+                while ((line = reader.readLine()) != null) {
+                    content.append(line).append("\n");
+                }
             }
             return content.toString();
         } catch (JSchException e) {
             throw new IOException(e);
         } finally {
-            if (channel != null) channel.disconnect();
+            if (channel != null) {
+                channel.disconnect();
+            }
         }
     }
 
@@ -240,14 +255,12 @@ public class SSHServiceImpl implements SSHService {
         } catch (JSchException | SftpException e) {
             throw new IOException(e);
         } finally {
-            if (sftpChannel != null) sftpChannel.disconnect();
+            if (sftpChannel != null) {
+                sftpChannel.disconnect();
+            }
         }
     }
 
-    /**
-     * Read remote file content as a list of strings (lines).
-     * Safe for use with TableView.
-     */
     @Override
     public List<String> readFileLines(String remotePath) throws IOException {
         Session session = getSessionOrThrow();
@@ -270,13 +283,14 @@ public class SSHServiceImpl implements SSHService {
             }
 
             if (lines.isEmpty()) {
-                try (BufferedReader errReader = new BufferedReader(new InputStreamReader(err, StandardCharsets.UTF_8))) {
+                try (BufferedReader errReader = new BufferedReader(
+                        new InputStreamReader(err, StandardCharsets.UTF_8))) {
                     StringBuilder errMsg = new StringBuilder();
                     String errLine;
                     while ((errLine = errReader.readLine()) != null) {
                         errMsg.append(errLine).append("\n");
                     }
-                    if (!errMsg.isEmpty()) {
+                    if (errMsg.length() > 0) {
                         throw new IOException("Remote error: " + errMsg.toString().trim());
                     }
                 }
@@ -298,7 +312,7 @@ public class SSHServiceImpl implements SSHService {
         if (lineLimit <= 0) {
             return readFileLines(remotePath);
         }
-        
+
         Session session = getSessionOrThrow();
         List<String> lines = new ArrayList<>();
         ChannelExec channel = null;
@@ -320,13 +334,14 @@ public class SSHServiceImpl implements SSHService {
             }
 
             if (lines.isEmpty()) {
-                try (BufferedReader errReader = new BufferedReader(new InputStreamReader(err, StandardCharsets.UTF_8))) {
+                try (BufferedReader errReader = new BufferedReader(
+                        new InputStreamReader(err, StandardCharsets.UTF_8))) {
                     StringBuilder errMsg = new StringBuilder();
                     String errLine;
                     while ((errLine = errReader.readLine()) != null) {
                         errMsg.append(errLine).append("\n");
                     }
-                    if (!errMsg.isEmpty()) {
+                    if (errMsg.length() > 0) {
                         throw new IOException("Remote error: " + errMsg.toString().trim());
                     }
                 }
@@ -367,12 +382,15 @@ public class SSHServiceImpl implements SSHService {
             logger.error("Download failed: {}", e.getMessage());
             return false;
         } finally {
-            if (sftpChannel != null) sftpChannel.disconnect();
+            if (sftpChannel != null) {
+                sftpChannel.disconnect();
+            }
         }
     }
 
     @Override
-    public boolean downloadFileConcurrent(String remotePath, String localPath, int threadCount, LogParserService.ProgressCallback progressCallback) {
+    public boolean downloadFileConcurrent(String remotePath, String localPath, int threadCount,
+            LogParser.ProgressCallback progressCallback) {
         Session session;
         try {
             session = getSessionOrThrow();
@@ -385,8 +403,8 @@ public class SSHServiceImpl implements SSHService {
 
         try {
             long fileSize = getFileSize(remotePath);
-            if (fileSize <= 0) return false;
-
+            if (fileSize <= 0)
+                return false;
 
             if (fileSize < 5 * 1024 * 1024) {
                 return downloadFile(remotePath, localPath);
@@ -397,8 +415,6 @@ public class SSHServiceImpl implements SSHService {
             }
 
             long chunkSize = fileSize / threadCount;
-            long remainder = fileSize % threadCount;
-
             CountDownLatch latch = new CountDownLatch(threadCount);
             AtomicLong totalBytesDownloaded = new AtomicLong(0);
             AtomicBoolean hasError = new AtomicBoolean(false);
@@ -407,7 +423,6 @@ public class SSHServiceImpl implements SSHService {
 
             for (int i = 0; i < threadCount; i++) {
                 final long start = i * chunkSize;
-
                 final long end = (i == threadCount - 1) ? fileSize : (start + chunkSize);
                 final long length = end - start;
                 final int threadId = i;
@@ -416,21 +431,21 @@ public class SSHServiceImpl implements SSHService {
                     ChannelSftp channel = null;
 
                     try (RandomAccessFile raf = new RandomAccessFile(localPath, "rw")) {
-                        if (hasError.get()) return;
+                        if (hasError.get())
+                            return;
 
                         channel = (ChannelSftp) session.openChannel("sftp");
                         channel.connect();
 
                         raf.seek(start);
-
                         InputStream is = channel.get(remotePath, null, start);
-
                         byte[] buffer = new byte[32 * 1024];
                         long bytesReadThisThread = 0;
                         int read;
 
                         while (bytesReadThisThread < length && (read = is.read(buffer)) != -1) {
-                            if (hasError.get()) break;
+                            if (hasError.get())
+                                break;
 
                             long remaining = length - bytesReadThisThread;
                             int toWrite = (int) Math.min(read, remaining);
@@ -451,7 +466,8 @@ public class SSHServiceImpl implements SSHService {
                         logger.error("Error in download thread {}: {}", threadId, e.getMessage());
                         hasError.set(true);
                     } finally {
-                        if (channel != null) channel.disconnect();
+                        if (channel != null)
+                            channel.disconnect();
                         latch.countDown();
                     }
                 });
@@ -473,13 +489,14 @@ public class SSHServiceImpl implements SSHService {
         try {
             sftpChannel = (ChannelSftp) session.openChannel("sftp");
             sftpChannel.connect();
-
             SftpATTRS attrs = sftpChannel.lstat(remotePath);
             return attrs.getSize();
         } catch (JSchException | SftpException e) {
             throw new IOException("Failed to get file size: " + e.getMessage(), e);
         } finally {
-            if (sftpChannel != null) sftpChannel.disconnect();
+            if (sftpChannel != null) {
+                sftpChannel.disconnect();
+            }
         }
     }
 
@@ -497,22 +514,5 @@ public class SSHServiceImpl implements SSHService {
         info.setModifiedTime(attrs.getMTime() * 1000L);
         info.setPermissions(attrs.getPermissionsString());
         return info;
-    }
-
-    @Setter @Getter
-    public static class RemoteFileInfo implements Comparable<RemoteFileInfo> {
-        private String name;
-        private String path;
-        private long size;
-        private boolean isDirectory;
-        private long modifiedTime;
-        private String permissions;
-
-        @Override
-        public int compareTo(RemoteFileInfo o) {
-            if (this.isDirectory && !o.isDirectory) return -1;
-            if (!this.isDirectory && o.isDirectory) return 1;
-            return this.name.compareToIgnoreCase(o.name);
-        }
     }
 }

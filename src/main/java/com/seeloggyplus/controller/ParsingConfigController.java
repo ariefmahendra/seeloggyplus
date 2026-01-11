@@ -3,7 +3,8 @@ package com.seeloggyplus.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.seeloggyplus.model.ParsingConfig;
-import com.seeloggyplus.service.impl.LogParserService;
+import com.seeloggyplus.service.LogParser;
+import com.seeloggyplus.service.impl.LogParserServiceImpl;
 
 import java.io.File;
 import java.io.IOException;
@@ -94,7 +95,7 @@ public class ParsingConfigController {
     private Button applyButton;
 
     private ParsingConfigService parsingConfigService;
-    private LogParserService logParserService;
+    private LogParser logParserService;
     private ObservableList<ParsingConfig> configList;
     private ParsingConfig selectedConfig;
     private ParsingConfig configSnapshot;
@@ -120,7 +121,7 @@ public class ParsingConfigController {
         logger.info("Initializing ParsingConfigController");
 
         parsingConfigService = new ParsingConfigServiceImpl();
-        logParserService = new LogParserService();
+        logParserService = new LogParserServiceImpl();
         configList = FXCollections.observableArrayList(parsingConfigService.findAll());
 
         // Initialize ComboBox Presets
@@ -362,7 +363,7 @@ public class ParsingConfigController {
         ParsingConfig testConfig = new ParsingConfig("Test", pattern);
         // We use the service to test. This internally creates a Pipeline since Phase
         // 1.0
-        LogParserService.TestResult result = logParserService.testParsing(sampleLog, testConfig);
+        LogParser.TestResult result = logParserService.testParsing(sampleLog, testConfig);
 
         if (result.isSuccess()) {
             testResultLabel.setText("Pattern matched successfully!");

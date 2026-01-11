@@ -2,6 +2,7 @@ package com.seeloggyplus.service.impl;
 
 import com.seeloggyplus.model.LogEntry;
 import com.seeloggyplus.service.SearchService;
+import lombok.NoArgsConstructor;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.LongPoint;
@@ -9,6 +10,7 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.Directory;
@@ -19,14 +21,26 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Implementation of SearchService using Apache Lucene 9.8.0.
- * Executes full-text search and range queries against the index.
+ * Implementation of {@link SearchService} using Apache Lucene 9.8.0.
+ * <p>
+ * Executes full-text search and range queries against the on-disk index.
+ * Supports efficient pagination, virtual scrolling, and bidirectional search
+ * optimization.
+ * <p>
+ * This class is stateful (holds open index readers) and must be closed when
+ * done.
  */
+@NoArgsConstructor
 public class LuceneSearchService implements SearchService {
 
     private static final Logger logger = LoggerFactory.getLogger(LuceneSearchService.class);
@@ -36,9 +50,12 @@ public class LuceneSearchService implements SearchService {
     private IndexSearcher searcher;
     private QueryParser queryParser;
     private ScoreDoc lastSeenScoreDoc;
-    private String currentRunId;
-    private java.util.concurrent.ExecutorService executor;
+    private ExecutorService executor;
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void openIndex(String runId) throws IOException {
         Path indexPath = Paths.get(INDEX_BASE_DIR, runId);
         if (!indexPath.toFile().exists()) {
@@ -59,16 +76,18 @@ public class LuceneSearchService implements SearchService {
 
         // Use WorkStealingPool for efficient parallel search across segments
         // This utilizes all available CPU cores
-        this.executor = java.util.concurrent.Executors.newWorkStealingPool();
+        this.executor = Executors.newWorkStealingPool();
         this.searcher = new IndexSearcher(reader, executor);
 
         // "message" is the default field for full-text search
         this.queryParser = new QueryParser("message", new StandardAnalyzer());
-        this.currentRunId = runId;
 
         logger.info("Opened Lucene Index for runId: {} with parallel search enabled", runId);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<LogEntry> search(String queryStr, long fromTimestamp, long toTimestamp, int limit) {
         if (searcher == null)
@@ -88,6 +107,9 @@ public class LuceneSearchService implements SearchService {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<LogEntry> searchPage(String queryStr, long fromTimestamp, long toTimestamp, int offset, int limit) {
         if (searcher == null)
@@ -96,10 +118,10 @@ public class LuceneSearchService implements SearchService {
         try {
             Query finalQuery = buildQuery(queryStr, fromTimestamp, toTimestamp);
 
-            TopDocs results = null;
-            Sort sortByLineNumber = null;
+            TopDocs results;
+            Sort sortByLineNumber;
 
-            // Optimisation: Bidirectional Search
+            // Optimization: Bidirectional Search
             // If offset is past the halfway mark, search backwards from the end (Reverse
             // Sort)
             // This turns "Last Page" access from O(N) to O(1)
@@ -111,17 +133,6 @@ public class LuceneSearchService implements SearchService {
                 // Reverse Sort
                 sortByLineNumber = new Sort(new SortField("line_number_sort", SortField.Type.LONG, true));
 
-                // Calculate reverse offset
-                // Example: Total 100, Limit 10.
-                // Request Offset 90 (Page 10).
-                // Forward: Skip 90, take 10.
-                // Reverse: Skip 0, take 10.
-                // ReverseOffset = Total - (Offset + Limit)
-                // If Total=100, Offset=95, Limit=10 -> Range [95-104].
-                // Available [0-99]. Overlap [95-99] (5 items).
-                // ReverseOffset = 100 - (95 + 10) = -5?
-                // Handle partial pages at end logic:
-
                 long effectiveLimit = limit;
                 long endPos = offset + limit;
                 if (endPos > totalHits) {
@@ -130,14 +141,6 @@ public class LuceneSearchService implements SearchService {
                 }
 
                 long reverseOffset = totalHits - endPos;
-
-                if (reverseOffset < 0)
-                    reverseOffset = 0; // Should not happen with math above
-
-                // Use reverse search
-                // Note: searchAfter logic for reverse search needs careful handling or disable
-                // it
-                // For now, simple skip logic for reverse search (since reverse offset is small)
 
                 if (reverseOffset > 0) {
                     TopDocs prevDocs = searcher.search(finalQuery, (int) reverseOffset, sortByLineNumber);
@@ -155,7 +158,6 @@ public class LuceneSearchService implements SearchService {
                 // Normal Forward Search
                 sortByLineNumber = new Sort(new SortField("line_number_sort", SortField.Type.LONG));
 
-                TopDocs resultsForward;
                 // For large offsets, use searchAfter for efficient deep pagination
                 ScoreDoc afterDoc = null;
 
@@ -167,11 +169,10 @@ public class LuceneSearchService implements SearchService {
                 }
 
                 if (afterDoc != null) {
-                    resultsForward = searcher.searchAfter(afterDoc, finalQuery, limit, sortByLineNumber);
+                    results = searcher.searchAfter(afterDoc, finalQuery, limit, sortByLineNumber);
                 } else {
-                    resultsForward = searcher.search(finalQuery, limit, sortByLineNumber);
+                    results = searcher.search(finalQuery, limit, sortByLineNumber);
                 }
-                results = resultsForward;
             }
 
             // Capture the last doc for next page optimization
@@ -195,21 +196,24 @@ public class LuceneSearchService implements SearchService {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Object getLastSearchAfterToken() {
         return lastSeenScoreDoc;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public List<LogEntry> searchPageAfter(String queryStr, long fromTimestamp, long toTimestamp, Object afterToken,
-            int limit) {
-        if (searcher == null)
-            return Collections.emptyList();
+    public List<LogEntry> searchPageAfter(String queryStr, long fromTimestamp, long toTimestamp, Object afterToken, int limit) {
+        if (searcher == null) return Collections.emptyList();
 
         try {
             Query finalQuery = buildQuery(queryStr, fromTimestamp, toTimestamp);
-            Sort sortByLineNumber = new Sort(new SortField("line_number_sort", SortField.Type.LONG)); // Corrected field
-                                                                                                      // name
+            Sort sortByLineNumber = new Sort(new SortField("line_number_sort", SortField.Type.LONG));
 
             ScoreDoc afterDoc = (ScoreDoc) afterToken;
             TopDocs results = searcher.searchAfter(afterDoc, finalQuery, limit, sortByLineNumber);
@@ -227,6 +231,9 @@ public class LuceneSearchService implements SearchService {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public long getTotalHits(String queryStr, long fromTimestamp, long toTimestamp) {
         if (searcher == null)
@@ -240,15 +247,55 @@ public class LuceneSearchService implements SearchService {
         }
     }
 
-    private Query buildQuery(String queryStr, long from, long to)
-            throws org.apache.lucene.queryparser.classic.ParseException {
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public long getOffsetForLineNumber(long lineNumber) {
+        if (searcher == null)
+            return -1;
+        try {
+            // Count how many documents have a line number strictly less than target
+            Query rangeQuery = LongPoint.newRangeQuery("line_number_range", 0, lineNumber - 1);
+            return searcher.count(rangeQuery);
+        } catch (IOException e) {
+            logger.error("Failed to count offset for line number {}", lineNumber, e);
+            return -1;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void close() {
+        if (reader != null) {
+            try {
+                reader.close();
+                logger.info("Closed Lucene IndexReader");
+            } catch (IOException e) {
+                logger.warn("Failed to close reader", e);
+            }
+        }
+        if (executor != null) {
+            executor.shutdown();
+        }
+    }
+
+    // --- Private Helper Methods ---
+
+    /**
+     * Builds a Lucene Query object from the user's string input and filters.
+     * Handles custom logic for "level:" fields and date ranges.
+     */
+    private Query buildQuery(String queryStr, long from, long to) throws ParseException {
         BooleanQuery.Builder booleanBuilder = new BooleanQuery.Builder();
 
         String remainingQuery = queryStr != null ? queryStr : "";
 
         // 1. Extract and handle level filter separately (StringField needs exact match)
-        java.util.regex.Pattern levelPattern = java.util.regex.Pattern.compile("level:(\\w+|\"[^\"]*\")");
-        java.util.regex.Matcher levelMatcher = levelPattern.matcher(remainingQuery);
+        Pattern levelPattern = Pattern.compile("level:(\\w+|\"[^\"]*\")");
+        Matcher levelMatcher = levelPattern.matcher(remainingQuery);
 
         while (levelMatcher.find()) {
             String levelValue = levelMatcher.group(1).replace("\"", "");
@@ -303,6 +350,9 @@ public class LuceneSearchService implements SearchService {
         return built;
     }
 
+    /**
+     * Converts Lucene Search Hits (ScoreDocs) into a list of LogEntry objects.
+     */
     private List<LogEntry> mapHitsToEntries(ScoreDoc[] hits) throws IOException {
         List<LogEntry> entries = new ArrayList<>();
         StoredFields fieldReader = reader.storedFields();
@@ -320,15 +370,11 @@ public class LuceneSearchService implements SearchService {
             String message = doc.get("message");
 
             // Reconstruct parsed fields map
-            java.util.Map<String, String> fields = new java.util.HashMap<>();
-            if (level != null)
-                fields.put("level", level);
-            if (message != null)
-                fields.put("message", message);
-            // Add raw log as 'unparsed' fallback if needed, or consistent with LogEntry
-            // logic
-            if (rawLog != null)
-                fields.put("unparsed", rawLog);
+            Map<String, String> fields = new HashMap<>();
+            if (level != null) fields.put("level", level);
+            if (message != null) fields.put("message", message);
+            // Add raw log as 'unparsed' fallback if needed
+            if (rawLog != null) fields.put("unparsed", rawLog);
 
             // Create LogEntry as 'Parsed'
             LogEntry entry = new LogEntry(lineNumber, rawLog, fields);
@@ -337,8 +383,8 @@ public class LuceneSearchService implements SearchService {
             if (doc.getField("timestamp_store") != null) {
                 long epochMillis = doc.getField("timestamp_store").numericValue().longValue();
                 if (epochMillis > 0) {
-                    java.time.LocalDateTime dt = java.time.Instant.ofEpochMilli(epochMillis)
-                            .atZone(java.time.ZoneId.systemDefault())
+                    LocalDateTime dt = Instant.ofEpochMilli(epochMillis)
+                            .atZone(ZoneId.systemDefault())
                             .toLocalDateTime();
                     entry.setTimestamp(dt);
                 }
@@ -347,34 +393,5 @@ public class LuceneSearchService implements SearchService {
             entries.add(entry);
         }
         return entries;
-    }
-
-    @Override
-    public long getOffsetForLineNumber(long lineNumber) {
-        if (searcher == null)
-            return -1;
-        try {
-            // Count how many documents have a line number strictly less than target
-            Query rangeQuery = LongPoint.newRangeQuery("line_number_range", 0, lineNumber - 1);
-            return searcher.count(rangeQuery);
-        } catch (IOException e) {
-            logger.error("Failed to count offset for line number {}", lineNumber, e);
-            return -1;
-        }
-    }
-
-    @Override
-    public void close() {
-        if (reader != null) {
-            try {
-                reader.close();
-                logger.info("Closed Lucene IndexReader");
-            } catch (IOException e) {
-                logger.warn("Failed to close reader", e);
-            }
-        }
-        if (executor != null) {
-            executor.shutdown();
-        }
     }
 }

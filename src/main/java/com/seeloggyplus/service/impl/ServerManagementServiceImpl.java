@@ -15,7 +15,7 @@ import java.util.UUID;
  * High-quality implementation of ServerManagementService
  * Handles business logic for SSH server CRUD operations
  */
-public class ServerManagementServiceImpl implements ServerManagementService {
+    public class ServerManagementServiceImpl implements ServerManagementService {
 
     private static final Logger logger = LoggerFactory.getLogger(ServerManagementServiceImpl.class);
     private final ServerManagementRepository serverManagementRepository;
@@ -49,8 +49,7 @@ public class ServerManagementServiceImpl implements ServerManagementService {
         if (server.getId() == null || server.getId().trim().isEmpty()) {
             server.setId(UUID.randomUUID().toString());
             server.setCreatedAt(LocalDateTime.now());
-            logger.info("Creating new server: {} ({}@{}:{})", 
-                server.getName(), server.getUsername(), server.getHost(), server.getPort());
+            logger.info("Creating new server: {} ({}@{}:{})", server.getName(), server.getUsername(), server.getHost(), server.getPort());
         } else {
             logger.info("Updating existing server: {} (ID: {})", server.getName(), server.getId());
         }

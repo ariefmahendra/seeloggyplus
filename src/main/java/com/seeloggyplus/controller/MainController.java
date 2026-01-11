@@ -8,7 +8,8 @@ import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardWatchEventKinds;
-import com.seeloggyplus.service.impl.LogFileWatcher;
+import com.seeloggyplus.service.FileWatcher;
+import com.seeloggyplus.service.impl.LogFileWatcherImpl;
 
 import com.seeloggyplus.dto.RecentFilesDto;
 import com.seeloggyplus.model.*;
@@ -27,8 +28,9 @@ import java.util.regex.Pattern;
 import com.seeloggyplus.service.impl.*;
 import com.seeloggyplus.service.IndexerService;
 import com.seeloggyplus.service.SearchService;
-import com.seeloggyplus.service.impl.LuceneIndexerService;
-import com.seeloggyplus.service.impl.LuceneSearchService;
+import com.seeloggyplus.service.impl.LuceneIndexerServiceImpl;
+import com.seeloggyplus.service.LogParser;
+import com.seeloggyplus.service.impl.LogParserServiceImpl;
 import com.seeloggyplus.service.impl.LuceneLogEntrySource;
 import com.seeloggyplus.util.*;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
@@ -196,7 +198,7 @@ public class MainController {
     // Services and Data
     private ParsingConfigService parsingConfigService;
     private RecentFileService recentFileService;
-    private LogParserService logParserService;
+    private LogParser logParserService;
     private PreferenceService preferenceService;
     private LogFileService logFileService;
     private ServerManagementService serverManagementService;
@@ -240,7 +242,7 @@ public class MainController {
     private boolean isLeftPanelPinned = true;
     private boolean isBottomPanelPinned = true;
     private Task<?> currentLoadingTask = null;
-    private LogFileWatcher logFileWatcher;
+    private FileWatcher logFileWatcher;
     private long localTailFilePointer = 0;
     private boolean tailColumnsAutoResized = false;
     private int windowSize = 5000;
@@ -269,13 +271,13 @@ public class MainController {
         parsingConfigService = new ParsingConfigServiceImpl();
         recentFileService = new RecentConfigServiceImpl();
         preferenceService = new PreferenceServiceImpl();
-        logParserService = new LogParserService();
+        logParserService = new LogParserServiceImpl();
         logFileService = new LogFileServiceImpl();
         serverManagementService = new ServerManagementServiceImpl();
-        indexerService = new LuceneIndexerService();
+        indexerService = new LuceneIndexerServiceImpl();
         searchService = new LuceneSearchService();
 
-        logFileWatcher = new LogFileWatcher();
+        logFileWatcher = new LogFileWatcherImpl();
         try {
             logFileWatcher.start();
             logger.info("LogFileWatcher started successfully");
@@ -1104,7 +1106,7 @@ public class MainController {
                         localTmpFile.getAbsolutePath());
                 boolean success = sshService.downloadFileConcurrent(remotePath, localTmpFile.getAbsolutePath(),
                         sshDownloadThreads,
-                        new LogParserService.ProgressCallback() {
+                        new LogParser.ProgressCallback() {
                             @Override
                             public void onProgress(double progress, long bytesProcessed, long totalBytes) {
                                 Platform.runLater(() -> {
@@ -1309,7 +1311,7 @@ public class MainController {
             protected Void call() throws Exception {
                 indexerService.initializeIndex(runId);
                 logParserService.indexFileParallel(file, parsingConfig, indexerService,
-                        new LogParserService.ProgressCallback() {
+                        new LogParser.ProgressCallback() {
                             @Override
                             public void onProgress(double progress, long bytesProcessed, long totalBytes) {
                                 updateProgress(bytesProcessed, totalBytes);
@@ -1398,7 +1400,7 @@ public class MainController {
         return new Task<>() {
             @Override
             protected List<LogEntry> call() throws IOException {
-                return logParserService.parseFileParallel(file, configToUse, new LogParserService.ProgressCallback() {
+                return logParserService.parseFileParallel(file, configToUse, new LogParser.ProgressCallback() {
                     @Override
                     public void onProgress(double progress, long bytesProcessed, long totalBytes) {
                         updateProgress(bytesProcessed, totalBytes);
@@ -3377,7 +3379,7 @@ public class MainController {
             }
 
             // Watch Service
-            logFileWatcher = new LogFileWatcher();
+            logFileWatcher = new LogFileWatcherImpl();
             logFileWatcher.start();
             logFileWatcher.watchFile(file, (f, kind) -> {
                 if (kind == StandardWatchEventKinds.ENTRY_MODIFY) {

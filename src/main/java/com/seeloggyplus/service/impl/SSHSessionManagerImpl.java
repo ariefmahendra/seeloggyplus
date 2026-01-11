@@ -13,27 +13,47 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
+/**
+ * Singleton implementation of {@link SSHSessionManager}.
+ * <p>
+ * Manages a pool of SSH sessions with TTL-based expiration and automatic
+ * cleanup.
+ */
 public class SSHSessionManagerImpl implements SSHSessionManager {
+
     private static final Logger logger = LoggerFactory.getLogger(SSHSessionManagerImpl.class);
     private static final SSHSessionManagerImpl INSTANCE = new SSHSessionManagerImpl();
 
     private final Map<String, ManagedSession> sessionPool = new ConcurrentHashMap<>();
     private final PreferenceService preferenceService;
 
+    /**
+     * Private constructor for Singleton.
+     * Initializes preference service and cleanup scheduler.
+     */
     private SSHSessionManagerImpl() {
         this.preferenceService = new PreferenceServiceImpl();
         ScheduledExecutorService cleanupScheduler = Executors.newSingleThreadScheduledExecutor();
         cleanupScheduler.scheduleAtFixedRate(this::cleanupExpiredSessions, 1, 1, TimeUnit.MINUTES);
     }
 
+    /**
+     * Retrieves the singleton instance.
+     *
+     * @return The singleton instance.
+     */
     public static SSHSessionManagerImpl getInstance() {
         return INSTANCE;
     }
 
     @Override
-    public Session getSession(String host, int port, String username, String password, long ttlMillis) throws JSchException {
+    public Session getSession(String host, int port, String username, String password, long ttlMillis)
+            throws JSchException {
         String key = generateKey(host, port, username);
         if (sessionPool.containsKey(key)) {
             ManagedSession managed = sessionPool.get(key);
@@ -60,7 +80,7 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
         config.put("StrictHostKeyChecking", "no");
         config.put("PreferredAuthentications", "password");
 
-        session.setServerAliveInterval(60 * 1000);
+        session.setServerAliveInterval(60 * 1000); // 60 seconds
         session.setServerAliveCountMax(3);
 
         session.setConfig(config);
@@ -75,7 +95,7 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
         }
 
         int timeoutMillis = timeoutSeconds * 1000;
-        logger.info("Connecting to SSH with timeout: {} seconds ({} ms)", timeoutSeconds, timeoutMillis);
+        logger.info("Connecting to SSH with timeout: {} seconds", timeoutSeconds);
         session.connect(timeoutMillis);
         return session;
     }
@@ -94,6 +114,7 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
         }
     }
 
+    @Override
     public Set<String> getActiveSessionKeys() {
         return Collections.unmodifiableSet(sessionPool.keySet());
     }
@@ -111,6 +132,9 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
         });
     }
 
+    /**
+     * Inner class to wrap Session with metadata.
+     */
     private static class ManagedSession {
         @Getter
         private final Session session;

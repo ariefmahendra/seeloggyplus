@@ -1,6 +1,8 @@
 package com.seeloggyplus.service.impl;
 
+import com.seeloggyplus.service.FileWatcher;
 import javafx.application.Platform;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,37 +13,27 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-public class LogFileWatcher {
+/**
+ * NIO-based implementation of {@link FileWatcher}.
+ * <p>
+ * Uses Java's {@link WatchService} to monitor file system events.
+ * Notifications are dispatched to listeners on the JavaFX Application Thread.
+ */
+@RequiredArgsConstructor
+public class LogFileWatcherImpl implements FileWatcher {
 
-    private static final Logger logger = LoggerFactory.getLogger(LogFileWatcher.class);
+    private static final Logger logger = LoggerFactory.getLogger(LogFileWatcherImpl.class);
 
     private WatchService watchService;
     private Thread watchThread;
     private volatile boolean running = false;
-
-    // Map of watched files to their listeners
     private final Map<Path, FileChangeListener> listeners = new HashMap<>();
-
-    // Map of WatchKey to directory path
     private final Map<WatchKey, Path> watchKeys = new HashMap<>();
 
     /**
-     * Callback interface for file change notifications
+     * {@inheritDoc}
      */
-    @FunctionalInterface
-    public interface FileChangeListener {
-        /**
-         * Called when the watched file is modified
-         *
-         * @param file The file that was modified
-         * @param eventKind The type of event (ENTRY_MODIFY, ENTRY_CREATE, etc.)
-         */
-        void onFileChanged(File file, WatchEvent.Kind<?> eventKind);
-    }
-
-    /**
-     * Start the file watcher service
-     */
+    @Override
     public void start() throws IOException {
         if (running) {
             logger.warn("LogFileWatcher is already running");
@@ -59,8 +51,9 @@ public class LogFileWatcher {
     }
 
     /**
-     * Stop the file watcher service
+     * {@inheritDoc}
      */
+    @Override
     public void stop() {
         if (!running) {
             return;
@@ -87,11 +80,9 @@ public class LogFileWatcher {
     }
 
     /**
-     * Watch a specific file for changes
-     *
-     * @param file The file to watch
-     * @param listener The listener to notify on changes
+     * {@inheritDoc}
      */
+    @Override
     public void watchFile(File file, FileChangeListener listener) throws IOException {
         if (!running) {
             throw new IllegalStateException("LogFileWatcher is not running. Call start() first.");
@@ -101,38 +92,31 @@ public class LogFileWatcher {
             throw new IllegalArgumentException("File does not exist: " + file.getAbsolutePath());
         }
 
-        // Watch the parent directory (WatchService watches directories, not files)
         Path directoryPath = file.toPath().getParent();
         Path filePath = file.toPath();
 
         synchronized (listeners) {
-            // Check if directory is already being watched
-            boolean directoryWatched = watchKeys.values().stream()
-                .anyMatch(p -> p.equals(directoryPath));
+            boolean directoryWatched = watchKeys.containsValue(directoryPath);
 
             if (!directoryWatched) {
-                // Register directory for MODIFY and CREATE events
                 WatchKey key = directoryPath.register(
-                    watchService,
-                    StandardWatchEventKinds.ENTRY_MODIFY,
-                    StandardWatchEventKinds.ENTRY_CREATE
-                );
+                        watchService,
+                        StandardWatchEventKinds.ENTRY_MODIFY,
+                        StandardWatchEventKinds.ENTRY_CREATE);
 
                 watchKeys.put(key, directoryPath);
                 logger.info("Registered directory for watching: {}", directoryPath);
             }
 
-            // Add listener for this specific file
             listeners.put(filePath, listener);
             logger.info("Added file watcher for: {}", file.getName());
         }
     }
 
     /**
-     * Stop watching a specific file
-     *
-     * @param file The file to stop watching
+     * {@inheritDoc}
      */
+    @Override
     public void unwatchFile(File file) {
         Path filePath = file.toPath();
 
@@ -143,18 +127,18 @@ public class LogFileWatcher {
     }
 
     /**
-     * Main watch loop that processes file system events
+     * Main watch loop that processes file system events.
+     * Runs on a separate daemon thread.
      */
     private void watchLoop() {
         logger.info("Watch loop started");
 
         while (running) {
             try {
-                // Wait for events (with timeout to allow checking 'running' flag)
                 WatchKey key = watchService.poll(1, TimeUnit.SECONDS);
 
                 if (key == null) {
-                    continue; // Timeout, check if still running
+                    continue;
                 }
 
                 Path directory = watchKeys.get(key);
@@ -165,33 +149,24 @@ public class LogFileWatcher {
                     continue;
                 }
 
-                // Process all events for this key
                 for (WatchEvent<?> event : key.pollEvents()) {
                     WatchEvent.Kind<?> kind = event.kind();
 
-                    // Skip overflow events
                     if (kind == StandardWatchEventKinds.OVERFLOW) {
                         logger.warn("WatchEvent OVERFLOW - some events may have been lost");
                         continue;
                     }
 
-                    // Get the filename from the event
                     @SuppressWarnings("unchecked")
                     WatchEvent<Path> ev = (WatchEvent<Path>) event;
                     Path filename = ev.context();
                     Path fullPath = directory.resolve(filename);
 
-                    // Check if this file has a listener
                     synchronized (listeners) {
                         FileChangeListener listener = listeners.get(fullPath);
 
                         if (listener != null) {
                             File modifiedFile = fullPath.toFile();
-
-                            logger.debug("File change detected: {} - Event: {}",
-                                modifiedFile.getName(), kind.name());
-
-                            // Notify listener on JavaFX Application Thread
                             Platform.runLater(() -> {
                                 try {
                                     listener.onFileChanged(modifiedFile, kind);
@@ -203,7 +178,6 @@ public class LogFileWatcher {
                     }
                 }
 
-                // Reset the key - important!
                 boolean valid = key.reset();
                 if (!valid) {
                     logger.warn("WatchKey no longer valid, removing from map");
@@ -222,19 +196,20 @@ public class LogFileWatcher {
     }
 
     /**
-     * Check if the watcher is currently running
+     * {@inheritDoc}
      */
+    @Override
     public boolean isRunning() {
         return running;
     }
 
     /**
-     * Get number of files currently being watched
+     * {@inheritDoc}
      */
+    @Override
     public int getWatchedFileCount() {
         synchronized (listeners) {
             return listeners.size();
         }
     }
 }
-

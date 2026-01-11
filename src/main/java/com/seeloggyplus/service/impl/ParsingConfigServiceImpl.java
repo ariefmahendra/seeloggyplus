@@ -7,6 +7,8 @@ import com.seeloggyplus.service.ParsingConfigService;
 import io.krakens.grok.api.Grok;
 import io.krakens.grok.api.GrokCompiler;
 import io.krakens.grok.api.Match;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,22 +16,48 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Implementation of {@link ParsingConfigService}.
+ * <p>
+ * Manages parsing configurations and provides intelligent log format detection
+ * using the Krakens Grok library.
+ */
 public class ParsingConfigServiceImpl implements ParsingConfigService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ParsingConfigServiceImpl.class);
 
     private final ParsingConfigRepository parsingConfigRepository;
     private final GrokCompiler grokCompiler;
     private final Map<String, String> candidatePatterns;
     private final Map<String, String> predefinedRegexes;
 
+    /**
+     * Default constructor.
+     * Initializes the service with a default {@link ParsingConfigRepositoryImpl}.
+     */
     public ParsingConfigServiceImpl() {
         this(new ParsingConfigRepositoryImpl());
     }
 
+    /**
+     * Constructor for dependency injection.
+     *
+     * @param parsingConfigRepository The repository to use.
+     */
     public ParsingConfigServiceImpl(ParsingConfigRepository parsingConfigRepository) {
         this.parsingConfigRepository = parsingConfigRepository;
         this.grokCompiler = GrokCompiler.newInstance();
         this.grokCompiler.registerDefaultPatterns();
+        this.candidatePatterns = new LinkedHashMap<>();
+        this.predefinedRegexes = new LinkedHashMap<>();
 
+        initializePatterns();
+    }
+
+    /**
+     * Initializes Grok patterns and Regex mappings.
+     */
+    private void initializePatterns() {
         // --- 1. Register Helper Patterns for Detection ---
         this.grokCompiler.register("EPOCH", "\\d{10}|\\d{13}|\\d{10}\\.\\d+");
         this.grokCompiler.register("COMPACT", "\\d{14}");
@@ -38,19 +66,15 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
         this.grokCompiler.register("LOGBACK_PREFIX", "(?:\\|-|\\| |-)");
 
         // --- 2. Initialize Detection Candidates (Grok Patterns) ---
-        // Use \\s+ for Robust Whitespace Matching (vs literal single space)
-        this.candidatePatterns = new LinkedHashMap<>();
+        // Use LinkedHashMap to preserve priority order
 
         candidatePatterns.put("Compact", "%{COMPACT:ts}\\s+%{GREEDYDATA}");
-
         candidatePatterns.put("Logback",
                 "%{ISO8601_LOOSE:ts}\\s+%{LOGBACK_PREFIX}%{LOGLEVEL}\\s+in\\s+%{DATA}\\s+-\\s+%{GREEDYDATA}");
-
         candidatePatterns.put("ISO8601 Standard", "%{ISO8601_LOOSE:ts}\\s+%{LOGLEVEL}\\s+%{GREEDYDATA}");
         candidatePatterns.put("ISO8601 Extended", "%{ISO8601_LOOSE:ts}\\s+%{GREEDYDATA}");
 
-        // Web - Use DATA/NOTSPACE. Use GREEDYDATA at end to allow truncated samples
-        // (e.g. tests without status/bytes)
+        // Web Logic
         candidatePatterns.put("Apache Common",
                 "%{IPORHOST}\\s+%{NOTSPACE}\\s+%{NOTSPACE}\\s+\\[%{HTTPDATE:ts}\\]\\s+\"%{DATA}\"%{GREEDYDATA}");
         candidatePatterns.put("Apache Combined",
@@ -58,7 +82,7 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
         candidatePatterns.put("Apache Error",
                 "\\[%{DAY} %{MONTH} %{MONTHDAY} %{TIME} %{YEAR}\\]\\s+\\[%{WORD}\\]\\s+%{GREEDYDATA}");
 
-        // Syslog Variants - Anchor BSD and use \\s+ for padding
+        // Syslog Variants
         candidatePatterns.put("Syslog BSD",
                 "^%{DAY}\\s+%{MONTH}\\s+%{MONTHDAY}\\s+%{TIME}\\s+%{YEAR}\\s+%{GREEDYDATA}");
         candidatePatterns.put("Syslog",
@@ -72,48 +96,40 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
         // Dates
         candidatePatterns.put("US Date", "%{DATE_US:ts}\\s+%{TIME}\\s+%{GREEDYDATA}");
         candidatePatterns.put("EU Date", "%{DATE_EU:ts}\\s+%{TIME}\\s+%{GREEDYDATA}");
-
         candidatePatterns.put("Time Only", "%{TIME:ts}\\s+%{GREEDYDATA}");
 
         // Fallback
         candidatePatterns.put("Epoch", "%{EPOCH:ts}\\s+%{GREEDYDATA}");
 
         // --- 3. Initialize Safe Regexes (Hybrid Strategy) ---
-        this.predefinedRegexes = new LinkedHashMap<>();
-
-        // ISO / Logback
         String isoRegex = "(?<timestamp>\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}(?:[.,]\\d{1,9})?(?:Z|[+\\-]\\d{2}(?::?\\d{2})?)?)";
+
         predefinedRegexes.put("Logback",
                 isoRegex + "\\s+(?:\\|-|\\| |-)\\s*(?<level>\\w+)\\s+in\\s+(?<context>.*?)\\s+-\\s+(?<message>.*)");
         predefinedRegexes.put("ISO8601 Standard", isoRegex + "\\s+(?<level>\\w+)\\s+(?<message>.*)");
         predefinedRegexes.put("ISO8601 Extended", isoRegex + "\\s+(?<message>.*)");
 
-        // Apache
         predefinedRegexes.put("Apache Common",
                 "(?<clientip>[\\d\\.:]+) \\S+ \\S+ \\[(?<timestamp>.*?)\\] \"(?<request>.*?)\" (?<response>\\d+) (?<bytes>\\d+|-)");
         predefinedRegexes.put("Apache Combined",
                 "(?<clientip>[\\d\\.:]+) \\S+ \\S+ \\[(?<timestamp>.*?)\\] \"(?<request>.*?)\" (?<response>\\d+) (?<bytes>\\d+|-) \"(?<referrer>.*?)\" \"(?<agent>.*?)\"");
         predefinedRegexes.put("Apache Error", "\\[(?<timestamp>.*?)\\] \\[(?<level>\\w+)\\] (?<message>.*)");
 
-        // Syslog
         predefinedRegexes.put("Syslog",
                 "(?<timestamp>[A-Za-z]{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?<logsource>\\S+)\\s+(?<program>.*?)(?:\\[(?<pid>\\d+)\\])?:\\s+(?<message>.*)");
         predefinedRegexes.put("Syslog BSD",
                 "(?<timestamp>[A-Za-z]{3}\\s+[A-Za-z]{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}\\s+\\d{4})\\s+(?<message>.*)");
 
-        // Database
         predefinedRegexes.put("PostgreSQL",
                 "(?<timestamp>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?)\\s+(?<timezone>\\w+|[+\\-]\\d{4})\\s+\\[(?<pid>\\d+)\\]:\\s+\\[(?<session>.*?)\\]\\s+(?<message>.*)");
         predefinedRegexes.put("Oracle",
                 "(?<timestamp>\\d{2}-[A-Za-z]{3}-\\d{4} \\d{2}:\\d{2}:\\d{2})\\s+(?<message>.*)");
 
-        // Generic Dates
         predefinedRegexes.put("US Date",
                 "(?<timestamp>\\d{1,2}/\\d{1,2}/\\d{2,4}\\s+\\d{1,2}:\\d{2}:\\d{2}(?:\\s+(?:AM|PM))?)\\s+(?:(?<level>\\w+)\\s+)?(?<message>.*)");
         predefinedRegexes.put("EU Date",
                 "(?<timestamp>\\d{1,2}[.-]\\d{1,2}[.-]\\d{4}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?:(?<level>\\w+)\\s+)?(?<message>.*)");
 
-        // Simple
         predefinedRegexes.put("Time Only",
                 "(?<timestamp>\\d{1,2}:\\d{2}:\\d{2}(?:[.,]\\d+)?)\\s+(?:(?<level>\\w+)\\s+)?(?<message>.*)");
         predefinedRegexes.put("Epoch", "(?<timestamp>\\d{10}|\\d{13}|\\d{10}\\.\\d+)\\s+(?<message>.*)");
@@ -132,18 +148,23 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
 
     @Override
     public void save(ParsingConfig config) {
-        config.setId(UUID.randomUUID().toString());
+        if (config.getId() == null) {
+            config.setId(UUID.randomUUID().toString());
+        }
         parsingConfigRepository.save(config);
+        logger.debug("Saved parsing config: {}", config.getName());
     }
 
     @Override
     public void update(ParsingConfig config) {
         parsingConfigRepository.update(config);
+        logger.debug("Updated parsing config: {}", config.getName());
     }
 
     @Override
     public void delete(ParsingConfig config) {
         parsingConfigRepository.delete(config);
+        logger.debug("Deleted parsing config: {}", config.getName());
     }
 
     @Override
@@ -176,7 +197,6 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
 
                 if (capture != null && !capture.isEmpty()) {
                     String safeRegex = predefinedRegexes.get(formatName);
-
                     if (safeRegex == null) {
                         safeRegex = grok.getNamedRegex();
                     }
@@ -184,24 +204,21 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
                     ParsingConfig config = new ParsingConfig("Auto-Detected (" + formatName + ")", safeRegex);
                     config.setDescription("Detected using Grok Pattern: " + grokPattern);
 
-                    String tsVal = "";
-                    if (capture.containsKey("ts") && capture.get("ts") != null)
-                        tsVal = capture.get("ts").toString();
-                    else if (capture.containsKey("timestamp") && capture.get("timestamp") != null)
-                        tsVal = capture.get("timestamp").toString();
-
+                    String tsVal = extractTimestampValue(capture);
                     String detectedTimestampFormat = guessTimestampFormat(formatName, tsVal);
                     config.setTimestampFormat(detectedTimestampFormat);
 
                     try {
                         config.validatePattern();
+                        logger.info("Auto-detected log format: {}", formatName);
                         return config;
                     } catch (Exception e) {
+                        logger.warn("Detected format {} but validation failed", formatName);
                         continue;
                     }
                 }
             } catch (Exception e) {
-                // Continue
+                // Ignore compilation errors for patterns
             }
         }
 
@@ -210,6 +227,12 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
         }
 
         return new ParsingConfig("Generic Log", "(?<message>.*)");
+    }
+
+    private String extractTimestampValue(Map<String, Object> capture) {
+        if (capture.get("ts") != null) return capture.get("ts").toString();
+        if (capture.get("timestamp") != null) return capture.get("timestamp").toString();
+        return "";
     }
 
     private String guessTimestampFormat(String formatName, String tsVal) {
@@ -252,10 +275,8 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
             return "MMM dd HH:mm:ss";
         if (formatName.equals("Syslog BSD"))
             return "EEE MMM dd HH:mm:ss yyyy";
-
         if (formatName.equals("Oracle"))
             return "dd-MMM-yyyy HH:mm:ss";
-
         if (formatName.equals("US Date"))
             return "MM/dd/yyyy HH:mm:ss";
         if (formatName.equals("EU Date"))
@@ -266,6 +287,6 @@ public class ParsingConfigServiceImpl implements ParsingConfigService {
             return "HH:mm:ss";
         }
 
-        return null;
+        return null; // Let user define
     }
 }

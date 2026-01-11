@@ -11,44 +11,66 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Implementation of {@link PreferenceService}.
+ * <p>
+ * Handles business logic for application preferences, delegating persistence
+ * to {@link PreferenceRepository}.
+ */
 public class PreferenceServiceImpl implements PreferenceService {
+
     private static final Logger logger = LoggerFactory.getLogger(PreferenceServiceImpl.class);
     private final PreferenceRepository preferencesRepository;
 
+    /**
+     * Default constructor.
+     * Initializes with the default repository implementation.
+     */
     public PreferenceServiceImpl() {
-        preferencesRepository = new PreferenceRepositoryImpl();
+        this(new PreferenceRepositoryImpl());
+    }
+
+    /**
+     * Constructor for dependency injection.
+     *
+     * @param preferencesRepository The repository instance to use.
+     */
+    public PreferenceServiceImpl(PreferenceRepository preferencesRepository) {
+        this.preferencesRepository = preferencesRepository;
     }
 
     @Override
     public void savePreferences(Preference preferences) {
-        logger.info("Starting Save Preferences");
-        String id = UUID.randomUUID().toString();
-        preferences.setId(id);
+        logger.debug("Saving new preference: {}", preferences.getCode());
+        if (preferences.getId() == null || preferences.getId().isEmpty()) {
+            preferences.setId(UUID.randomUUID().toString());
+        }
         preferencesRepository.savePreferences(preferences);
-        logger.info("Finish save preferences");
+        logger.info("Saved preference: {}", preferences.getCode());
     }
 
     @Override
     public void updatePreferences(Preference preferences) {
-        logger.info("Starting update preferences");
+        logger.debug("Updating preference: {}", preferences.getCode());
         preferencesRepository.updatePreferences(preferences);
-        logger.info("Finish update preferences");
+        logger.info("Updated preference: {}", preferences.getCode());
     }
 
     @Override
     public Optional<String> getPreferencesByCode(String code) {
-        logger.info("Starting get preferences");
+        logger.debug("Retrieving preference for code: {}", code);
         return preferencesRepository.getPreferencesByCode(code);
     }
 
     @Override
     public List<Preference> getListPreferences() {
-        logger.info("Starting get list preferences");
+        logger.debug("Retrieving all preferences");
         return preferencesRepository.getListPreferences();
     }
 
     @Override
     public void saveOrUpdatePreferences(Preference preferences) {
+        logger.debug("Save or Update preference: {}", preferences.getCode());
         preferencesRepository.saveOrUpdatePreferences(preferences);
     }
 }

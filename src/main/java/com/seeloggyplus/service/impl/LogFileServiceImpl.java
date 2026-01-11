@@ -6,37 +6,39 @@ import com.seeloggyplus.model.LogFile;
 import com.seeloggyplus.repository.LogFileRepository;
 import com.seeloggyplus.repository.impl.LogFileRepositoryImpl;
 import com.seeloggyplus.service.LogFileService;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.UUID;
 
+/**
+ * Implementation of {@link LogFileService}.
+ * <p>
+ * Manages the lifecycle of {@link LogFile} entities, including validation
+ * and error handling before delegating to the persistence layer.
+ */
+@RequiredArgsConstructor
 public class LogFileServiceImpl implements LogFileService {
-    private final LogFileRepository logFileRepository;
+
     private static final Logger logger = LoggerFactory.getLogger(LogFileServiceImpl.class);
-    
+    private final LogFileRepository logFileRepository;
+
+    /**
+     * Default constructor for manual instantiation.
+     * Initializes with the default repository implementation.
+     */
     public LogFileServiceImpl() {
-        this.logFileRepository = new LogFileRepositoryImpl();
+        this(new LogFileRepositoryImpl());
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void insertLogFile(LogFile logFile) {
-        if (logFile == null) {
-            logger.error("Cannot insert null log file");
-            throw new IllegalArgumentException("LogFile cannot be null");
-        }
+        validateLogFile(logFile);
 
-        if (logFile.getName() == null || logFile.getName().trim().isEmpty()) {
-            logger.error("Cannot insert log file with null or empty name");
-            throw new IllegalArgumentException("LogFile name cannot be null or empty");
-        }
-
-        if (logFile.getFilePath() == null || logFile.getFilePath().trim().isEmpty()) {
-            logger.error("Cannot insert log file with null or empty file path");
-            throw new IllegalArgumentException("LogFile path cannot be null or empty");
-        }
-
-        // Set ID if not already set
         if (logFile.getId() == null || logFile.getId().trim().isEmpty()) {
             logFile.setId(UUID.randomUUID().toString());
         }
@@ -50,6 +52,9 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public LogFile getLogFileById(String id) {
         if (id == null || id.trim().isEmpty()) {
@@ -59,8 +64,8 @@ public class LogFileServiceImpl implements LogFileService {
 
         try {
             return logFileRepository.findById(id);
-        } catch (NotFoundException ex){
-            logger.warn("get log file by id not found : {}", id);
+        } catch (NotFoundException ex) {
+            logger.warn("Log file not found by id: {}", id);
             return null;
         } catch (FatalDatabaseException ex) {
             logger.error("Database error when getting log file by id: {}", id, ex);
@@ -68,6 +73,9 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void deleteLogFileById(String id) {
         if (id == null || id.trim().isEmpty()) {
@@ -78,8 +86,8 @@ public class LogFileServiceImpl implements LogFileService {
         try {
             logFileRepository.deleteById(id);
             logger.info("Successfully deleted log file with id: {}", id);
-        } catch (NotFoundException ex){
-            logger.warn("get log file by id for delete log not found: {}", id);
+        } catch (NotFoundException ex) {
+            logger.warn("Log file not found for delete: {}", id);
             throw new RuntimeException("Log file not found", ex);
         } catch (FatalDatabaseException ex) {
             logger.error("Database error when deleting log file by id: {}", id, ex);
@@ -87,13 +95,15 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void updateLogFile(LogFile logFile) {
         if (logFile == null) {
             logger.error("Cannot update null log file");
             throw new IllegalArgumentException("LogFile cannot be null");
         }
-
         if (logFile.getId() == null || logFile.getId().trim().isEmpty()) {
             logger.error("Cannot update log file with null or empty id");
             throw new IllegalArgumentException("LogFile id cannot be null or empty");
@@ -102,8 +112,8 @@ public class LogFileServiceImpl implements LogFileService {
         try {
             logFileRepository.update(logFile);
             logger.info("Successfully updated log file: {}", logFile.getName());
-        } catch (NotFoundException ex){
-            logger.warn("Log file not found by id: {}", logFile.getId());
+        } catch (NotFoundException ex) {
+            logger.warn("Log file not found by id: {} during update", logFile.getId());
             throw new RuntimeException("Log file not found", ex);
         } catch (FatalDatabaseException ex) {
             logger.error("Database error when updating log file: {}", logFile.getName(), ex);
@@ -111,13 +121,15 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public LogFile getLogFileByPathAndName(String name, String filePath) {
         if (name == null || name.trim().isEmpty()) {
             logger.error("Cannot get log file with null or empty name");
             throw new IllegalArgumentException("LogFile name cannot be null or empty");
         }
-
         if (filePath == null || filePath.trim().isEmpty()) {
             logger.error("Cannot get log file with null or empty file path");
             throw new IllegalArgumentException("LogFile path cannot be null or empty");
@@ -125,15 +137,18 @@ public class LogFileServiceImpl implements LogFileService {
 
         try {
             return logFileRepository.findByPathAndName(filePath, name);
-        } catch (NotFoundException ex){
+        } catch (NotFoundException ex) {
             logger.warn("Log file not found by path: {} and name: {}", filePath, name);
             return null;
         } catch (FatalDatabaseException ex) {
-            logger.error("Database error when getting log file by path and name: {}", ex.getMessage(), ex);
+            logger.error("Database error when getting log file by path/name", ex);
             throw new RuntimeException("Failed to get log file by path and name", ex);
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void deleteAllLogFiles() {
         try {
@@ -145,6 +160,9 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void updateParsingConfigIdForLogFiles(String parsingConfigId, String logFileId) {
         if (logFileId == null || logFileId.trim().isEmpty()) {
@@ -155,12 +173,27 @@ public class LogFileServiceImpl implements LogFileService {
         try {
             logFileRepository.updateParsingConfigId(parsingConfigId, logFileId);
             logger.info("Successfully updated parsing config id for log file id: {}", logFileId);
-        } catch (NotFoundException ex){
-            logger.warn("Log file not found by id: {}", logFileId);
+        } catch (NotFoundException ex) {
+            logger.warn("Log file not found by id: {} when update parsing configuration", logFileId);
             throw new RuntimeException("Log file not found", ex);
         } catch (FatalDatabaseException ex) {
             logger.error("Database error when updating parsing config id for log file id: {}", logFileId, ex);
             throw new RuntimeException("Failed to update parsing config id for log file", ex);
+        }
+    }
+
+    private void validateLogFile(LogFile logFile) {
+        if (logFile == null) {
+            logger.error("Cannot insert null log file");
+            throw new IllegalArgumentException("LogFile cannot be null");
+        }
+        if (logFile.getName() == null || logFile.getName().trim().isEmpty()) {
+            logger.error("Cannot insert log file with null or empty name");
+            throw new IllegalArgumentException("LogFile name cannot be null or empty");
+        }
+        if (logFile.getFilePath() == null || logFile.getFilePath().trim().isEmpty()) {
+            logger.error("Cannot insert log file with null or empty file path");
+            throw new IllegalArgumentException("LogFile path cannot be null or empty");
         }
     }
 }
