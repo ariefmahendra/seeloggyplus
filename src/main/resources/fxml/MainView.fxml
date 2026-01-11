@@ -70,14 +70,6 @@
                         <Tooltip text="End date/time (yyyy-MM-dd HH:mm:ss)" />
                     </tooltip>
                 </TextField>
-                <Button fx:id="clearDateFilterButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="TIMES" size="12" />
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Clear Date Filter" />
-                    </tooltip>
-                </Button>
                 <Separator orientation="VERTICAL" />
                 <Button fx:id="searchButton">
                     <graphic>
@@ -137,6 +129,15 @@
                         <Tooltip text="Tail (follow last entries)" />
                     </tooltip>
                 </ToggleButton>
+                <Separator orientation="VERTICAL" />
+                <Button fx:id="clearLogButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="TRASH" size="12" />
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Clear Log View" />
+                    </tooltip>
+                </Button>
             </ToolBar>
         </VBox>
     </top>
@@ -364,5 +365,20 @@
     </center>
 
 
+
+
+
+    <bottom>
+        <HBox alignment="CENTER_RIGHT" spacing="10" style="-fx-padding: 3 10 3 10; -fx-background-color: #f0f0f0; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;">
+             <Button text="GC" onAction="#handleGC" style="-fx-font-size: 10px; -fx-padding: 2 5;">
+                <tooltip><Tooltip text="Minta Garbage Collection (System.gc())" /></tooltip>
+             </Button>
+            <Separator orientation="VERTICAL" />
+            <Label fx:id="memoryStatusLabel" text="Memory: ..." style="-fx-font-family: 'Segoe UI', sans-serif; -fx-font-size: 11px; -fx-text-fill: #555555;"/>
+            <ProgressBar fx:id="memoryBar" prefWidth="100" progress="0.0" style="-fx-accent: #2196f3; -fx-control-inner-background: #e0e0e0;" >
+                <tooltip><Tooltip text="Heap Usage" /></tooltip>
+            </ProgressBar>
+        </HBox>
+    </bottom>
 
 </BorderPane>

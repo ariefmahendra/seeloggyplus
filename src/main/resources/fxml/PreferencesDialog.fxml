@@ -81,6 +81,7 @@
                                     <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
                                     <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
                                     <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                                    <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
                                  </rowConstraints>
                                  <children>
                                     <Label text="Window Size (rows):" />
@@ -89,9 +90,15 @@
                                           <Tooltip text="Range: 100 to 50000" />
                                        </tooltip>
                                     </Spinner>
-                                    <Label text="Default Log Level:" GridPane.rowIndex="1" />
-                                    <ComboBox fx:id="mainDefaultLogLevelComboBox" prefWidth="150.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
-                                    <CheckBox fx:id="mainAutoRefreshCheckBox" mnemonicParsing="false" text="Enable Auto-Refresh by Default" GridPane.columnSpan="2" GridPane.rowIndex="2" />
+                                    <Label text="Tail Window Size (rows):" GridPane.rowIndex="1" />
+                                    <Spinner fx:id="tailWindowSizeSpinner" editable="true" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                       <tooltip>
+                                          <Tooltip text="Range: 1000 to 100000" />
+                                       </tooltip>
+                                    </Spinner>
+                                    <Label text="Default Log Level:" GridPane.rowIndex="2" />
+                                    <ComboBox fx:id="mainDefaultLogLevelComboBox" prefWidth="150.0" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                    <CheckBox fx:id="mainAutoRefreshCheckBox" mnemonicParsing="false" text="Enable Auto-Refresh by Default" GridPane.columnSpan="2" GridPane.rowIndex="3" />
                                  </children>
                               </GridPane>
                               <Separator prefWidth="200.0" />

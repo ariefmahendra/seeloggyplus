@@ -305,33 +305,10 @@ public class LuceneSearchService implements SearchService {
 
     private List<LogEntry> mapHitsToEntries(ScoreDoc[] hits) throws IOException {
         List<LogEntry> entries = new ArrayList<>();
-        StoredFields storedFields = searcher.storedFields(); // Valid for Lucene 9.x? storedFields() is on
-                                                             // IndexReader/Searcher
-        // Actually in Lucene 9.8, searcher.doc(docId) is deprecated/slow?
-        // searcher.doc(int) returns Document. storedFields().document(docId) is
-        // preferred?
-        // Reader.storedFields() returns StoredFields instance.
-
-        // Let's check Lucene 9.8 API pattern.
-        // storedFields() is a method on IndexReader or LeafReader?
-        // storedFields() is on IndexReader in 9.x usually via StoredFields instance.
-        // Actually simple `searcher.doc(hit.doc)` is common enough for
-        // non-performance-critical loops
-        // OR `searcher.getIndexReader().storedFields().document(hit.doc)`
-
-        // Let's stick to `searcher.doc(id)` compatibility or check if it's deprecated.
-        // In 9.0+, `searcher.doc(id)` uses StoredFields internally.
-        // Ideally: StoredFields storedFields = reader.storedFields();
-
         StoredFields fieldReader = reader.storedFields();
 
         for (ScoreDoc hit : hits) {
             Document doc = fieldReader.document(hit.doc);
-
-            // Reconstruct LogEntry
-            // We need a way to parse "raw_log" back or just use the stored string fields.
-            // LogEntry constructor: LogEntry(long lineNumber, String rawLog)
-            // or we prefer setting fields if we have them.
 
             long lineNumber = 0;
             if (doc.getField("line_number") != null) {
@@ -339,19 +316,33 @@ public class LuceneSearchService implements SearchService {
             }
 
             String rawLog = doc.get("raw_log");
+            String level = doc.get("level");
+            String message = doc.get("message");
 
-            LogEntry entry = new LogEntry(lineNumber, rawLog);
+            // Reconstruct parsed fields map
+            java.util.Map<String, String> fields = new java.util.HashMap<>();
+            if (level != null)
+                fields.put("level", level);
+            if (message != null)
+                fields.put("message", message);
+            // Add raw log as 'unparsed' fallback if needed, or consistent with LogEntry
+            // logic
+            if (rawLog != null)
+                fields.put("unparsed", rawLog);
 
-            // Optional: Set 'isParsed' fields if we want to display structured data
-            // directly
-            // But LogEntry parsing happens in constructor usually or parsedFields map.
-            // Phase 1 changes might affect this.
-            // Ideally we re-use the raw log. Parsing it again?
-            // Or did we store parsed fields?
-            // Lucene Index has "level", "message".
-            // Adding a helper to set them would be nice, but LogEntry might compute them on
-            // fly if parsed?
-            // For now, returning Raw Log is the baseline requirement.
+            // Create LogEntry as 'Parsed'
+            LogEntry entry = new LogEntry(lineNumber, rawLog, fields);
+
+            // Rehydrate Timestamp
+            if (doc.getField("timestamp_store") != null) {
+                long epochMillis = doc.getField("timestamp_store").numericValue().longValue();
+                if (epochMillis > 0) {
+                    java.time.LocalDateTime dt = java.time.Instant.ofEpochMilli(epochMillis)
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .toLocalDateTime();
+                    entry.setTimestamp(dt);
+                }
+            }
 
             entries.add(entry);
         }

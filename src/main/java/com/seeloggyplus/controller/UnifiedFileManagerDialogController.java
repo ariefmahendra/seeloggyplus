@@ -134,6 +134,10 @@ public class UnifiedFileManagerDialogController {
     @Getter
     private OpenAction openAction = OpenAction.OPEN;
 
+    public OpenAction getOpenAction() {
+        return openAction;
+    }
+
     // --- Performance Enhancements ---
     private final java.util.Map<String, CacheEntry> directoryCache = new java.util.concurrent.ConcurrentHashMap<>();
     private static final long CACHE_DURATION_MS = 30 * 1000; // 30 seconds

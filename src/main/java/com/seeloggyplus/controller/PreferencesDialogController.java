@@ -27,6 +27,8 @@ public class PreferencesDialogController {
     @FXML
     private Spinner<Integer> mainWindowSizeSpinner;
     @FXML
+    private Spinner<Integer> tailWindowSizeSpinner;
+    @FXML
     private ComboBox<String> mainDefaultLogLevelComboBox;
     @FXML
     private CheckBox mainAutoRefreshCheckBox;
@@ -72,6 +74,8 @@ public class PreferencesDialogController {
         appFontSizeSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(8, 30, 12));
         mainWindowSizeSpinner
                 .setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(100, 50000, 5000, 100));
+        tailWindowSizeSpinner
+                .setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1000, 100000, 20000, 1000));
         lpLineLimitSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 10000, 500, 50));
 
         // Max threads = available logical processors provided by the OS
@@ -107,6 +111,8 @@ public class PreferencesDialogController {
         appFontFamilyComboBox.getSelectionModel().select(getPreference("app_font_family", "Consolas"));
 
         mainWindowSizeSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("main_window_size", "5000")));
+        tailWindowSizeSpinner.getValueFactory()
+                .setValue(Integer.parseInt(getPreference("main_tail_window_size", "20000")));
         mainDefaultLogLevelComboBox.getSelectionModel().select(getPreference("main_default_log_level", "ALL"));
         mainAutoRefreshCheckBox.setSelected(Boolean.parseBoolean(getPreference("main_auto_refresh_enabled", "true")));
         mainAutoPrettifyJsonCheckBox
@@ -135,6 +141,7 @@ public class PreferencesDialogController {
         // Commit spinners to ensure latest typed value is captured
         commitEditorText(appFontSizeSpinner);
         commitEditorText(mainWindowSizeSpinner);
+        commitEditorText(tailWindowSizeSpinner);
         commitEditorText(lpLineLimitSpinner);
         commitEditorText(sshThreadsSpinner);
         commitEditorText(sshTimeoutSpinner);
@@ -143,6 +150,7 @@ public class PreferencesDialogController {
         savePreference("app_font_family", appFontFamilyComboBox.getValue());
 
         savePreference("main_window_size", String.valueOf(mainWindowSizeSpinner.getValue()));
+        savePreference("main_tail_window_size", String.valueOf(tailWindowSizeSpinner.getValue()));
         savePreference("main_default_log_level", mainDefaultLogLevelComboBox.getValue());
         savePreference("main_auto_refresh_enabled", String.valueOf(mainAutoRefreshCheckBox.isSelected()));
         savePreference("main_auto_prettify_json", String.valueOf(mainAutoPrettifyJsonCheckBox.isSelected()));

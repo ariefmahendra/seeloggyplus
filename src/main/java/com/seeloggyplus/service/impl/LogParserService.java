@@ -95,7 +95,7 @@ public class LogParserService {
             }
         }
 
-        List<LogEntry> combinedEntries = combineUnparsedEntries(allEntries);
+        List<LogEntry> combinedEntries = allEntries;
 
         if (callback != null) {
             callback.onComplete(combinedEntries.size());
@@ -169,45 +169,6 @@ public class LogParserService {
         logger.info("Indexed {} entries from file: {}", totalIndexed.get(), file.getName());
     }
 
-    private List<LogEntry> combineUnparsedEntries(List<LogEntry> rawEntries) {
-        if (rawEntries.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<LogEntry> combined = new ArrayList<>();
-        StringBuilder unparsedBuffer = new StringBuilder(1000);
-        long unparsedStartLine = -1;
-        long unparsedEndLine = -1;
-
-        for (LogEntry entry : rawEntries) {
-            if (!entry.getParsedFields().isEmpty()) {
-                if (!unparsedBuffer.isEmpty()) {
-                    combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedBuffer.toString()));
-                    unparsedBuffer.setLength(0);
-                }
-                combined.add(entry);
-                unparsedStartLine = -1;
-                unparsedEndLine = -1;
-            } else {
-                if (unparsedStartLine == -1) {
-                    unparsedStartLine = entry.getLineNumber();
-                }
-                unparsedEndLine = entry.getLineNumber();
-                if (unparsedBuffer.length() < maxEntryUnparsed) {
-                    if (!unparsedBuffer.isEmpty()) {
-                        unparsedBuffer.append(System.lineSeparator());
-                    }
-                    unparsedBuffer.append(entry.getRawLog());
-                }
-            }
-        }
-
-        if (!unparsedBuffer.isEmpty()) {
-            combined.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedBuffer.toString()));
-        }
-        return combined;
-    }
-
     private List<LogEntry> processChunk(File file, ChunkInfo chunkInfo, Pipeline pipeline,
             java.time.format.DateTimeFormatter dateFormatter) {
         List<LogEntry> entries = new ArrayList<>();
@@ -218,7 +179,8 @@ public class LogParserService {
             BufferedReader reader = new BufferedReader(Channels.newReader(channel, StandardCharsets.UTF_8));
 
             String line;
-            while ((line = reader.readLine()) != null && channel.position() <= chunkInfo.endByte()) {
+            long linesRead = 0;
+            while (linesRead < chunkInfo.lineCount() && (line = reader.readLine()) != null) {
                 LogEntry logEntry = parseLine(line, currentLineNumber, pipeline, dateFormatter);
 
                 if (logEntry.getParsedFields().isEmpty()) {
@@ -228,11 +190,14 @@ public class LogParserService {
                 }
 
                 if (countUnparsedLine > maxEntryUnparsed) {
+                    entries.add(new LogEntry(currentLineNumber, "*** WARNING: Parsing stopped for this chunk. Exceeded "
+                            + maxEntryUnparsed + " consecutive unparsed lines. Check your regex configuration. ***"));
                     break;
                 }
 
                 entries.add(logEntry);
                 currentLineNumber++;
+                linesRead++;
             }
 
         } catch (IOException e) {
@@ -298,8 +263,9 @@ public class LogParserService {
                     // Check if we passed the target size for this chunk
                     if (currentByte >= nextSplitTarget && chunks.size() < numChunks - 1) {
                         // Close current chunk
-                        chunks.add(new ChunkInfo(chunkStartByte, currentByte - 1, chunkStartLine)); // -1 to include \n
-                                                                                                    // in this chunk
+                        chunks.add(new ChunkInfo(chunkStartByte, currentByte - 1, chunkStartLine,
+                                currentLine - chunkStartLine)); // -1 to include \n
+                        // in this chunk
 
                         // Start new chunk
                         chunkStartByte = currentByte;
@@ -311,12 +277,13 @@ public class LogParserService {
 
             // Add final chunk
             if (currentByte > chunkStartByte) {
-                chunks.add(new ChunkInfo(chunkStartByte, currentByte, chunkStartLine));
+                chunks.add(
+                        new ChunkInfo(chunkStartByte, currentByte, chunkStartLine, currentLine - chunkStartLine + 1));
             }
         }
 
         if (chunks.isEmpty() && fileSize > 0) {
-            chunks.add(new ChunkInfo(0, fileSize, 1));
+            chunks.add(new ChunkInfo(0, fileSize, 1, 0)); // 0 lines if empty? Or verify. If file empty, 0 lines.
         }
 
         return chunks;
@@ -326,7 +293,8 @@ public class LogParserService {
     private record ChunkInfo(
             long startByte,
             long endByte,
-            long startLineNumber) {
+            long startLineNumber,
+            long lineCount) {
     }
 
     /**
@@ -571,9 +539,6 @@ public class LogParserService {
         int countUnparsedLine = 0;
 
         // Unparsed buffering state for this chunk
-        StringBuilder unparsedBuffer = new StringBuilder(1000);
-        long unparsedStartLine = -1;
-        long unparsedEndLine = -1;
 
         try (FileInputStream fis = new FileInputStream(file); FileChannel channel = fis.getChannel()) {
             channel.position(chunkInfo.startByte());
@@ -582,8 +547,9 @@ public class LogParserService {
             String line;
             long bytesReadInChunk = 0;
             long startPos = channel.position(); // Approximation
+            long linesRead = 0;
 
-            while ((line = reader.readLine()) != null) {
+            while (linesRead < chunkInfo.lineCount() && (line = reader.readLine()) != null) {
                 // Check boundary (approximate byte check logic from original)
                 // Original logic checked channel.position() <= chunkInfo.endByte()
                 // But Buffered reader buffers, so channel pos might be ahead.
@@ -608,37 +574,23 @@ public class LogParserService {
                 LogEntry logEntry = parseLine(line, currentLineNumber, pipeline, dateFormatter);
 
                 // --- Stream-Optimized combineUnparsedEntries Logic ---
-                if (!logEntry.getParsedFields().isEmpty()) {
-                    if (!unparsedBuffer.isEmpty()) {
-                        batch.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedBuffer.toString()));
-                        unparsedBuffer.setLength(0);
-                    }
-                    batch.add(logEntry);
-                    unparsedStartLine = -1;
-                    unparsedEndLine = -1;
-
-                    countUnparsedLine = 0;
-                } else {
-                    if (unparsedStartLine == -1) {
-                        unparsedStartLine = logEntry.getLineNumber();
-                    }
-                    unparsedEndLine = logEntry.getLineNumber();
-                    if (unparsedBuffer.length() < maxEntryUnparsed) {
-                        if (!unparsedBuffer.isEmpty()) {
-                            unparsedBuffer.append(System.lineSeparator());
-                        }
-                        unparsedBuffer.append(logEntry.getRawLog());
-                    }
-
-                    // Safety break for continuous garbage
+                if (logEntry.getParsedFields().isEmpty()) {
                     countUnparsedLine++;
-                    if (countUnparsedLine > maxEntryUnparsed) {
-                        break;
-                    }
+                } else {
+                    countUnparsedLine = 0;
                 }
+
+                if (countUnparsedLine > maxEntryUnparsed) {
+                    batch.add(new LogEntry(currentLineNumber, "*** WARNING: Parsing stopped for this chunk. Exceeded "
+                            + maxEntryUnparsed + " consecutive unparsed lines. Check your regex configuration. ***"));
+                    break;
+                }
+
+                batch.add(logEntry);
                 // -----------------------------------------------------
 
                 currentLineNumber++;
+                linesRead++;
 
                 // Flush Batch
                 if (batch.size() >= 1000) {
@@ -658,17 +610,9 @@ public class LogParserService {
                         startPos = currentPos; // Move marker
                     }
                 }
-
-                // Breaking condition
-                if (channel.position() > chunkInfo.endByte()) {
-                    break;
-                }
             }
 
             // Final Flush of unparsed buffer
-            if (!unparsedBuffer.isEmpty()) {
-                batch.add(new LogEntry(unparsedStartLine, unparsedEndLine, unparsedBuffer.toString()));
-            }
 
             // Final Flush of batch
             if (!batch.isEmpty()) {
