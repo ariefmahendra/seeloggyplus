@@ -61,7 +61,7 @@
                   </AnchorPane>
             </content>
           </Tab>
-          <Tab text="Main View">
+          <Tab text="Log Viewer">
             <content>
               <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                      <children>
@@ -81,24 +81,17 @@
                                     <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
                                     <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
                                     <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
-                                    <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
                                  </rowConstraints>
                                  <children>
-                                    <Label text="Window Size (rows):" />
-                                    <Spinner fx:id="mainWindowSizeSpinner" editable="true" GridPane.columnIndex="1">
-                                       <tooltip>
-                                          <Tooltip text="Range: 100 to 50000" />
-                                       </tooltip>
-                                    </Spinner>
-                                    <Label text="Tail Window Size (rows):" GridPane.rowIndex="1" />
-                                    <Spinner fx:id="tailWindowSizeSpinner" editable="true" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                    <Label text="Tail Window Size (rows):" />
+                                    <Spinner fx:id="tailWindowSizeSpinner" editable="true" GridPane.columnIndex="1">
                                        <tooltip>
                                           <Tooltip text="Range: 1000 to 100000" />
                                        </tooltip>
                                     </Spinner>
-                                    <Label text="Default Log Level:" GridPane.rowIndex="2" />
-                                    <ComboBox fx:id="mainDefaultLogLevelComboBox" prefWidth="150.0" GridPane.columnIndex="1" GridPane.rowIndex="2" />
-                                    <CheckBox fx:id="mainAutoRefreshCheckBox" mnemonicParsing="false" text="Enable Auto-Refresh by Default" GridPane.columnSpan="2" GridPane.rowIndex="3" />
+                                    <Label text="Default Log Level:" GridPane.rowIndex="1" />
+                                    <ComboBox fx:id="mainDefaultLogLevelComboBox" prefWidth="150.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                    <CheckBox fx:id="mainAutoRefreshCheckBox" mnemonicParsing="false" text="Enable Auto-Refresh by Default" GridPane.columnSpan="2" GridPane.rowIndex="2" />
                                  </children>
                               </GridPane>
                               <Separator prefWidth="200.0" />
@@ -150,19 +143,8 @@
                                     <CheckBox fx:id="ufmShowHiddenFilesCheckBox" mnemonicParsing="false" text="Show Hidden Files" GridPane.columnSpan="2" GridPane.rowIndex="1" />
                                  </children>
                               </GridPane>
-                           </children>
-                        </VBox>
-                     </children>
-                  </AnchorPane>
-               </content>
-            </Tab>
-            <Tab text="Log Preview">
-               <content>
-                  <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                     <children>
-                        <VBox layoutX="10.0" layoutY="10.0" spacing="10.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="10.0">
-                           <children>
-                              <Label text="Settings">
+                              <Separator prefWidth="200.0" />
+                              <Label text="Preview">
                                  <font>
                                     <Font name="System Bold" size="14.0" />
                                  </font>

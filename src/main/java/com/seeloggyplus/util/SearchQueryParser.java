@@ -1,10 +1,7 @@
 package com.seeloggyplus.util;
 
-import com.seeloggyplus.model.LogEntry;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -17,12 +14,11 @@ public class SearchQueryParser {
     // Regex untuk memecah query: mendukung "phrase search", (keyword), AND/OR/NOT
     // Memisahkan berdasarkan spasi, kecuali di dalam tanda kutip atau kurung
     private static final Pattern TOKEN_PATTERN = Pattern.compile(
-            "\"([^\"]*)\"|" +    // Group 1: Double quoted phrase
-            "'([^']*)'|" +     // Group 2: Single quoted phrase
-            "(AND|OR|NOT)|" +  // Group 3: Operators
-            "(\\w+)",          // Group 4: Regular words
-            Pattern.CASE_INSENSITIVE
-    );
+            "\"([^\"]*)\"|" + // Group 1: Double quoted phrase
+                    "'([^']*)'|" + // Group 2: Single quoted phrase
+                    "(AND|OR|NOT)|" + // Group 3: Operators
+                    "(\\w+)", // Group 4: Regular words
+            Pattern.CASE_INSENSITIVE);
 
     /**
      * Parses a search query string and returns a list of SearchTokens.
@@ -68,8 +64,10 @@ public class SearchQueryParser {
      * Represents a token in the parsed search query.
      */
     public static class SearchToken {
-        public enum Type { KEYWORD, PHRASE, OPERATOR_AND, OPERATOR_OR, OPERATOR_NOT }
-        
+        public enum Type {
+            KEYWORD, PHRASE, OPERATOR_AND, OPERATOR_OR, OPERATOR_NOT
+        }
+
         public String value;
         public Type type;
 
@@ -82,7 +80,7 @@ public class SearchQueryParser {
         public String toString() {
             return "SearchToken{"
                     + "value='" + value + "'"
-                    + ", type=" + type + 
+                    + ", type=" + type +
                     '}';
         }
     }

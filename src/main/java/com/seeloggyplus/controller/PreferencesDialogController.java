@@ -25,8 +25,6 @@ public class PreferencesDialogController {
     @FXML
     private ComboBox<String> appFontFamilyComboBox;
     @FXML
-    private Spinner<Integer> mainWindowSizeSpinner;
-    @FXML
     private Spinner<Integer> tailWindowSizeSpinner;
     @FXML
     private ComboBox<String> mainDefaultLogLevelComboBox;
@@ -72,8 +70,6 @@ public class PreferencesDialogController {
         int availableProcessors = Runtime.getRuntime().availableProcessors();
 
         appFontSizeSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(8, 30, 12));
-        mainWindowSizeSpinner
-                .setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(100, 50000, 5000, 100));
         tailWindowSizeSpinner
                 .setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1000, 100000, 20000, 1000));
         lpLineLimitSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 10000, 500, 50));
@@ -110,7 +106,6 @@ public class PreferencesDialogController {
         appFontSizeSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("app_font_size", "12")));
         appFontFamilyComboBox.getSelectionModel().select(getPreference("app_font_family", "Consolas"));
 
-        mainWindowSizeSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("main_window_size", "5000")));
         tailWindowSizeSpinner.getValueFactory()
                 .setValue(Integer.parseInt(getPreference("main_tail_window_size", "20000")));
         mainDefaultLogLevelComboBox.getSelectionModel().select(getPreference("main_default_log_level", "ALL"));
@@ -140,7 +135,6 @@ public class PreferencesDialogController {
         logger.info("handleSave() triggered. Committing spinner values...");
         // Commit spinners to ensure latest typed value is captured
         commitEditorText(appFontSizeSpinner);
-        commitEditorText(mainWindowSizeSpinner);
         commitEditorText(tailWindowSizeSpinner);
         commitEditorText(lpLineLimitSpinner);
         commitEditorText(sshThreadsSpinner);
@@ -149,7 +143,6 @@ public class PreferencesDialogController {
         savePreference("app_font_size", String.valueOf(appFontSizeSpinner.getValue()));
         savePreference("app_font_family", appFontFamilyComboBox.getValue());
 
-        savePreference("main_window_size", String.valueOf(mainWindowSizeSpinner.getValue()));
         savePreference("main_tail_window_size", String.valueOf(tailWindowSizeSpinner.getValue()));
         savePreference("main_default_log_level", mainDefaultLogLevelComboBox.getValue());
         savePreference("main_auto_refresh_enabled", String.valueOf(mainAutoRefreshCheckBox.isSelected()));
