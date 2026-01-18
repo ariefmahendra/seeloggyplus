@@ -26,9 +26,9 @@ import java.util.function.Predicate;
  * to be used by a single UI component (e.g., TableView) on the JavaFX
  * Application Thread.
  */
-public class LuceneLogEntrySource implements LogEntrySource {
+public class LuceneLogEntrySourceImpl implements LogEntrySource {
 
-    private static final Logger logger = LoggerFactory.getLogger(LuceneLogEntrySource.class);
+    private static final Logger logger = LoggerFactory.getLogger(LuceneLogEntrySourceImpl.class);
 
     private final SearchService searchService;
     private final String queryStr;
@@ -52,8 +52,8 @@ public class LuceneLogEntrySource implements LogEntrySource {
      * @param logParserService Parser service for extracting fields from raw logs.
      * @param parsingConfig    Configuration for parsing raw logs.
      */
-    public LuceneLogEntrySource(SearchService searchService, String queryStr, long fromTimestamp, long toTimestamp,
-            LogParser logParserService, ParsingConfig parsingConfig) {
+    public LuceneLogEntrySourceImpl(SearchService searchService, String queryStr, long fromTimestamp, long toTimestamp,
+                                    LogParser logParserService, ParsingConfig parsingConfig) {
         this.searchService = searchService;
         this.queryStr = queryStr != null ? queryStr : "";
         this.fromTimestamp = fromTimestamp;

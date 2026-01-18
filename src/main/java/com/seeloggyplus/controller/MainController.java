@@ -22,6 +22,10 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -31,7 +35,7 @@ import com.seeloggyplus.service.SearchService;
 import com.seeloggyplus.service.impl.LuceneIndexerServiceImpl;
 import com.seeloggyplus.service.LogParser;
 import com.seeloggyplus.service.impl.LogParserServiceImpl;
-import com.seeloggyplus.service.impl.LuceneLogEntrySource;
+import com.seeloggyplus.service.impl.LuceneLogEntrySourceImpl;
 import com.seeloggyplus.util.*;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.geometry.Side;
@@ -233,7 +237,7 @@ public class MainController {
     private LogEntrySource currentLogEntrySource;
     private LogEntrySource originalLogEntrySource;
     private ObservableList<LogEntry> visibleLogEntries;
-    private ParsingConfig currentParsingConfig;
+    private volatile ParsingConfig currentParsingConfig;
     private File currentFile;
     private boolean isIndexedMode = false;
     private static final long INDEXING_THRESHOLD_BYTES = 20 * 1024 * 1024;
@@ -242,11 +246,12 @@ public class MainController {
     private boolean isLeftPanelPinned = true;
     private boolean isBottomPanelPinned = true;
     private Task<?> currentLoadingTask = null;
-    private FileWatcher logFileWatcher;
+    private volatile FileWatcher logFileWatcher;
     private long localTailFilePointer = 0;
     private boolean tailColumnsAutoResized = false;
     private int windowSize = 5000;
     private int tailWindowSize = 20000;
+    private static final int MAX_TAIL_BUFFER_SIZE = 5000;
     private int sshDownloadThreads = 4;
     private int currentWindowStartIndex = 0;
     private boolean tailModeEnabled = false;
@@ -254,7 +259,9 @@ public class MainController {
     private long remoteTailLineCounter = 0;
     private String monitoringRemotePath;
     private final List<LogEntry> tailBuffer = Collections.synchronizedList(new ArrayList<>());
-    private Timeline tailPollingTimeline;
+    private volatile ScheduledExecutorService tailPollingExecutor;
+    private volatile ScheduledFuture<?> tailPollingTask;
+    private final Object tailLock = new Object();
 
     // state
     private volatile boolean tailFlushScheduled = false;
@@ -275,7 +282,7 @@ public class MainController {
         logFileService = new LogFileServiceImpl();
         serverManagementService = new ServerManagementServiceImpl();
         indexerService = new LuceneIndexerServiceImpl();
-        searchService = new LuceneSearchService();
+        searchService = new LuceneSearchServiceImpl();
 
         logFileWatcher = new LogFileWatcherImpl();
         try {
@@ -384,11 +391,8 @@ public class MainController {
             }
         });
 
-        leftPanelContextMenu.getItems().addAll(openFileMenuItem, changeParsingConfigMenuItem, new SeparatorMenuItem(),
-                deleteFromRecentMenuItem);
-        recentFilesListView
-                .setCellFactory(listView -> new com.seeloggyplus.ui.cell.RecentFileListCell(serverManagementService,
-                        () -> monitoringRemotePath));
+        leftPanelContextMenu.getItems().addAll(openFileMenuItem, changeParsingConfigMenuItem, new SeparatorMenuItem(), deleteFromRecentMenuItem);
+        recentFilesListView.setCellFactory(listView -> new com.seeloggyplus.ui.cell.RecentFileListCell(serverManagementService, () -> monitoringRemotePath));
         recentFilesListView.getStyleClass().add("recent-files-list");
         recentFilesListView.setItems(FXCollections.observableArrayList(recentFileService.findAll()));
         recentFilesListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
@@ -411,6 +415,7 @@ public class MainController {
 
     private void handleRecentFileSelectedWithConfig(RecentFilesDto recentFile, ParsingConfig parsingConfig) {
         logFileService.updateParsingConfigIdForLogFiles(parsingConfig.getId(), recentFile.logFile().getId());
+        refreshRecentFilesList();
         handleRecentFileSelected(recentFile);
     }
 
@@ -1341,7 +1346,7 @@ public class MainController {
         indexTask.setOnSucceeded(e -> {
             try {
                 searchService.openIndex(runId);
-                originalLogEntrySource = new LuceneLogEntrySource(searchService, null, 0, Long.MAX_VALUE,
+                originalLogEntrySource = new LuceneLogEntrySourceImpl(searchService, null, 0, Long.MAX_VALUE,
                         logParserService, parsingConfig);
                 currentLogEntrySource = originalLogEntrySource;
 
@@ -1682,28 +1687,20 @@ public class MainController {
 
         ParsingConfig updatedConfig = updatedConfigOpt.get();
 
-        if (configsAreEqual(currentParsingConfig, updatedConfig)) {
-            logger.info("Configuration data is identical. No re-parse needed.");
-            return;
-        }
-
         // Case 1: Local file is open
         if (currentFile != null) {
-            logger.info("Local file is active. Re-parsing '{}' with updated configuration '{}'.", currentFile.getName(),
-                    updatedConfig.getName());
+            logger.info("Local file is active. Re-parsing '{}' with updated configuration '{}'.", currentFile.getName(), updatedConfig.getName());
             openLocalLogFile(currentFile, false, updatedConfig);
         }
         // Case 2: Remote tail is active
         else if (tailModeEnabled && monitoringRemotePath != null && activeTailSshService != null) {
-            logger.info("Remote tail is active. Restarting tail for '{}' with updated configuration '{}'.",
-                    monitoringRemotePath, updatedConfig.getName());
+            logger.info("Remote tail is active. Restarting tail for '{}' with updated configuration '{}'.", monitoringRemotePath, updatedConfig.getName());
             if (currentLogFromDb != null && currentLogFromDb.getSshServerID() != null) {
                 SSHServerModel server = serverManagementService.getServerById(currentLogFromDb.getSshServerID());
                 if (server != null) {
                     startRemoteTail(monitoringRemotePath, activeTailSshService, updatedConfig, server);
                 } else {
-                    showError("Server Not Found",
-                            "Could not restart tail because the associated SSH server configuration was not found.");
+                    showError("Server Not Found", "Could not restart tail because the associated SSH server configuration was not found.");
                 }
             } else {
                 showError("Missing Information", "Could not restart tail because server information is missing.");
@@ -1990,7 +1987,8 @@ public class MainController {
             return;
         }
 
-        if (currentLogEntrySource == null || originalLogEntrySource == null) {
+        final LogEntrySource sourceToSearch = this.originalLogEntrySource;
+        if (sourceToSearch == null) {
             return;
         }
 
@@ -2020,7 +2018,7 @@ public class MainController {
                     final String finalQ = luceneQuery;
 
                     Platform.runLater(() -> {
-                        currentLogEntrySource = new LuceneLogEntrySource(searchService, finalQ, finalFrom, finalTo,
+                        currentLogEntrySource = new LuceneLogEntrySourceImpl(searchService, finalQ, finalFrom, finalTo,
                                 logParserService, currentParsingConfig);
                         int totalFiltered = currentLogEntrySource.getTotalEntries();
                         if (totalFiltered == 0) {
@@ -2033,7 +2031,10 @@ public class MainController {
                 } else {
                     final Predicate<LogEntry> searchPredicate = buildSearchPredicate(searchText, isRegex, caseSensitive,
                             selectedLevel, dateTimeFrom, dateTimeTo);
-                    LogEntrySource filteredSource = originalLogEntrySource.filter(searchPredicate);
+
+                    // Use captured local variable to prevent NPE if originalLogEntrySource becomes
+                    // null
+                    LogEntrySource filteredSource = sourceToSearch.filter(searchPredicate);
                     int totalFiltered = filteredSource.getTotalEntries();
 
                     Platform.runLater(() -> {
@@ -2835,6 +2836,9 @@ public class MainController {
         LogEntry entry = logParserService.parseLine(line, lineNumber, parsingConfig);
 
         synchronized (tailBuffer) {
+            if (tailBuffer.size() >= MAX_TAIL_BUFFER_SIZE) {
+                tailBuffer.remove(0); // Drop oldest entry to prevent OOM
+            }
             tailBuffer.add(entry);
         }
 
@@ -3364,35 +3368,68 @@ public class MainController {
         try {
             logger.info("Starting local tail for: {}", file.getAbsolutePath());
 
-            // Pre-load last N lines (Estimate 150 bytes per line)
-            long len = file.length();
-            long estimatedBytes = tailWindowSize * 150L;
-            localTailFilePointer = Math.max(0, len - estimatedBytes);
-            remoteTailLineCounter = 0;
+            // Initialize executor
+            tailPollingExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "LocalTail-Poller");
+                t.setDaemon(true);
+                return t;
+            });
 
-            // Read initial chunk safely
-            if (localTailFilePointer < len) {
-                logger.info("Pre-loading tail from offset: {}", localTailFilePointer);
-                readNewLocalLines(file);
-            } else {
-                localTailFilePointer = len;
-            }
+            // Offload initial read to background thread
+            tailPollingExecutor.submit(() -> {
+                try {
+                    long len = file.length();
+                    long estimatedBytes = tailWindowSize * 150L;
+                    localTailFilePointer = Math.max(0, len - estimatedBytes);
+                    remoteTailLineCounter = 0;
 
-            // Watch Service
-            logFileWatcher = new LogFileWatcherImpl();
-            logFileWatcher.start();
-            logFileWatcher.watchFile(file, (f, kind) -> {
-                if (kind == StandardWatchEventKinds.ENTRY_MODIFY) {
-                    readNewLocalLines(f);
+                    // Read initial chunk
+                    if (localTailFilePointer < len) {
+                        logger.info("Pre-loading tail from offset: {}", localTailFilePointer);
+                        readNewLocalLines(file);
+                    } else {
+                        localTailFilePointer = len;
+                    }
+
+                    // Watch Service
+                    try {
+                        if (Thread.currentThread().isInterrupted() || tailPollingExecutor.isShutdown()) {
+                            return;
+                        }
+
+                        synchronized (tailLock) {
+                            if (tailPollingExecutor == null || tailPollingExecutor.isShutdown()) {
+                                return;
+                            }
+                            logFileWatcher = new LogFileWatcherImpl();
+                            logFileWatcher.start();
+                            logFileWatcher.watchFile(file, (f, kind) -> {
+                                if (kind == StandardWatchEventKinds.ENTRY_MODIFY) {
+                                    readNewLocalLines(f);
+                                }
+                            });
+                        }
+                    } catch (Exception e) {
+                        logger.error("Failed to start watcher", e);
+                    }
+
+                } catch (Exception e) {
+                    logger.error("Failed to initialize local tail", e);
+                    Platform.runLater(() -> {
+                        showError("Tail Error", "Failed to start local tail: " + e.getMessage());
+                        disableTail();
+                    });
                 }
             });
 
-            // Polling Fallback (1s)
-            tailPollingTimeline = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
-                readNewLocalLines(file);
-            }));
-            tailPollingTimeline.setCycleCount(Animation.INDEFINITE);
-            tailPollingTimeline.play();
+            // Schedule Polling Fallback (1s)
+            tailPollingTask = tailPollingExecutor.scheduleWithFixedDelay(() -> {
+                try {
+                    readNewLocalLines(file);
+                } catch (Exception e) {
+                    logger.error("Error in tail polling", e);
+                }
+            }, 1, 1, TimeUnit.SECONDS);
 
         } catch (Exception e) {
             logger.error("Failed to start local tail", e);
@@ -3402,13 +3439,19 @@ public class MainController {
     }
 
     private void stopLocalTail() {
-        if (logFileWatcher != null) {
-            logFileWatcher.stop();
-            logFileWatcher = null;
+        synchronized (tailLock) {
+            if (logFileWatcher != null) {
+                logFileWatcher.stop();
+                logFileWatcher = null;
+            }
         }
-        if (tailPollingTimeline != null) {
-            tailPollingTimeline.stop();
-            tailPollingTimeline = null;
+        if (tailPollingTask != null) {
+            tailPollingTask.cancel(false);
+            tailPollingTask = null;
+        }
+        if (tailPollingExecutor != null) {
+            tailPollingExecutor.shutdownNow();
+            tailPollingExecutor = null;
         }
     }
 

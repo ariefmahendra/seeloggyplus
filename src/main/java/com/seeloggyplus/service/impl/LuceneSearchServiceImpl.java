@@ -14,7 +14,6 @@ import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,9 +40,9 @@ import java.util.regex.Pattern;
  * done.
  */
 @NoArgsConstructor
-public class LuceneSearchService implements SearchService {
+public class LuceneSearchServiceImpl implements SearchService {
 
-    private static final Logger logger = LoggerFactory.getLogger(LuceneSearchService.class);
+    private static final Logger logger = LoggerFactory.getLogger(LuceneSearchServiceImpl.class);
     private static final String INDEX_BASE_DIR = System.getProperty("java.io.tmpdir") + "/seeloggyplus/index/";
 
     private IndexReader reader;
@@ -71,7 +70,9 @@ public class LuceneSearchService implements SearchService {
             executor.shutdown();
         }
 
-        Directory dir = FSDirectory.open(indexPath);
+        // Use NIOFSDirectory to avoid MMapDirectory LinkageError with Java 21+ in some
+        // environments
+        Directory dir = new org.apache.lucene.store.NIOFSDirectory(indexPath);
         this.reader = DirectoryReader.open(dir);
 
         // Use WorkStealingPool for efficient parallel search across segments
@@ -208,8 +209,10 @@ public class LuceneSearchService implements SearchService {
      * {@inheritDoc}
      */
     @Override
-    public List<LogEntry> searchPageAfter(String queryStr, long fromTimestamp, long toTimestamp, Object afterToken, int limit) {
-        if (searcher == null) return Collections.emptyList();
+    public List<LogEntry> searchPageAfter(String queryStr, long fromTimestamp, long toTimestamp, Object afterToken,
+            int limit) {
+        if (searcher == null)
+            return Collections.emptyList();
 
         try {
             Query finalQuery = buildQuery(queryStr, fromTimestamp, toTimestamp);
@@ -371,10 +374,13 @@ public class LuceneSearchService implements SearchService {
 
             // Reconstruct parsed fields map
             Map<String, String> fields = new HashMap<>();
-            if (level != null) fields.put("level", level);
-            if (message != null) fields.put("message", message);
+            if (level != null)
+                fields.put("level", level);
+            if (message != null)
+                fields.put("message", message);
             // Add raw log as 'unparsed' fallback if needed
-            if (rawLog != null) fields.put("unparsed", rawLog);
+            if (rawLog != null)
+                fields.put("unparsed", rawLog);
 
             // Create LogEntry as 'Parsed'
             LogEntry entry = new LogEntry(lineNumber, rawLog, fields);

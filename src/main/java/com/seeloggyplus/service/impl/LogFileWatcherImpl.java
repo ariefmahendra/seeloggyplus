@@ -167,13 +167,11 @@ public class LogFileWatcherImpl implements FileWatcher {
 
                         if (listener != null) {
                             File modifiedFile = fullPath.toFile();
-                            Platform.runLater(() -> {
-                                try {
-                                    listener.onFileChanged(modifiedFile, kind);
-                                } catch (Exception e) {
-                                    logger.error("Error in file change listener", e);
-                                }
-                            });
+                            try {
+                                listener.onFileChanged(modifiedFile, kind);
+                            } catch (Exception e) {
+                                logger.error("Error in file change listener", e);
+                            }
                         }
                     }
                 }

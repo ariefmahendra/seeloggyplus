@@ -106,14 +106,15 @@ public class ParsingConfigController {
 
     // Common Date Patterns for Presets
     private static final String[] COMMON_DATE_PATTERNS = {
-            "yyyy-MM-dd HH:mm:ss.SSS", // ISO 8601 Extended
-            "yyyy-MM-dd HH:mm:ss", // ISO 8601 Simple
-            "dd/MMM/yyyy:HH:mm:ss Z", // Apache Common / Nginx
-            "MMM dd HH:mm:ss", // Syslog (Feb 01 12:00:00)
-            "yyyy-MM-dd", // Date Only
-            "HH:mm:ss.SSS", // Time Only
-            "yyyy/MM/dd HH:mm:ss", // Slash separated
-            "dd-MM-yyyy HH:mm:ss" // EU format
+            "yyyy-MM-dd HH:mm:ss.SSS",
+            "yyyy-MM-dd HH:mm:ss",
+            "dd/MMM/yyyy:HH:mm:ss Z",
+            "MMM dd HH:mm:ss",
+            "yyyy-MM-dd",
+            "HH:mm:ss.SSS",
+            "yyyy/MM/dd HH:mm:ss",
+            "dd-MM-yyyy HH:mm:ss",
+            "dd-MM-yyyy HH:mm:ss.SSS"
     };
 
     @FXML
@@ -124,14 +125,12 @@ public class ParsingConfigController {
         logParserService = new LogParserServiceImpl();
         configList = FXCollections.observableArrayList(parsingConfigService.findAll());
 
-        // Initialize ComboBox Presets
         timestampFormatField.setItems(FXCollections.observableArrayList(COMMON_DATE_PATTERNS));
 
         setupConfigList();
         setupDetailPanel();
         setupTestPanel();
         setupButtons();
-        setupContextMenu();
         setupBuilderToolbar();
 
         Platform.runLater(() -> {
@@ -385,9 +384,6 @@ public class ParsingConfigController {
     private void handleAdd() {
         ParsingConfig newConfig = new ParsingConfig();
         newConfig.setName("New Configuration");
-        newConfig.setDescription("Enter description here");
-        newConfig.setRegexPattern(
-                "(?<timestamp>\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})\\s+(?<level>\\w+)\\s+(?<message>.*)");
         configList.add(newConfig);
         configListView.getSelectionModel().select(newConfig);
     }
@@ -488,8 +484,7 @@ public class ParsingConfigController {
             addAppIcon(alert);
             alert.setTitle("Auto-Detect Format");
             alert.setHeaderText("Could not detect timestamp format");
-            alert.setContentText(
-                    "No timestamp group found in the pattern, or pattern is not recognized.\n\nPlease enter the format manually (e.g., yyyy-MM-dd HH:mm:ss.SSS)");
+            alert.setContentText("No timestamp group found in the pattern, or pattern is not recognized.\n\nPlease enter the format manually (e.g., yyyy-MM-dd HH:mm:ss.SSS)");
             alert.showAndWait();
         }
     }
@@ -635,25 +630,6 @@ public class ParsingConfigController {
         logger.info("Configuration saved and parent notified");
 
         closeDialog();
-    }
-
-    private void setupContextMenu() {
-        ContextMenu contextMenu = new ContextMenu();
-
-        MenuItem markTimestamp = new MenuItem("Mark as Timestamp");
-        markTimestamp.setOnAction(e -> handleMarkSelection("Timestamp"));
-
-        MenuItem markLevel = new MenuItem("Mark as Level");
-        markLevel.setOnAction(e -> handleMarkSelection("Level"));
-
-        MenuItem markMessage = new MenuItem("Mark as Message");
-        markMessage.setOnAction(e -> handleMarkSelection("Message"));
-
-        MenuItem markCustom = new MenuItem("Mark as Custom...");
-        markCustom.setOnAction(e -> handleMarkCustom());
-
-        contextMenu.getItems().addAll(markTimestamp, markLevel, markMessage, new SeparatorMenuItem(), markCustom);
-        sampleLogArea.setContextMenu(contextMenu);
     }
 
     // Phase 1.9+: Visual Builder Toolbar (UX Enhancement)

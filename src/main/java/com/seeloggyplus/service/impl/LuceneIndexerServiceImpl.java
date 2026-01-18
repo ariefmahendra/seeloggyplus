@@ -3,12 +3,12 @@ package com.seeloggyplus.service.impl;
 import com.seeloggyplus.model.LogEntry;
 import com.seeloggyplus.service.IndexerService;
 import lombok.NoArgsConstructor;
+import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.LockObtainFailedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +72,7 @@ public class LuceneIndexerServiceImpl implements IndexerService {
      * Base directory for all Lucene indexes.
      * Uses system temp directory to avoid permission issues.
      */
-    private static final String INDEX_BASE_DIR = System.getProperty("java.io.tmpdir") + "/seeloggyplus/index/";
+    private static final String INDEX_BASE_DIR = Paths.get( ".","/.data", "/index/").toString();
 
     /**
      * RAM buffer size for bulk indexing optimization (in MB).
@@ -160,7 +160,9 @@ public class LuceneIndexerServiceImpl implements IndexerService {
      * @throws IOException if writer cannot be opened
      */
     private void openIndexWriter() throws IOException {
-        this.directory = FSDirectory.open(this.indexPath);
+        // Use NIOFSDirectory to avoid MMapDirectory LinkageError with Java 21+ in some
+        // environments (missing MemorySegmentIndexInputProvider)
+        this.directory = new org.apache.lucene.store.NIOFSDirectory(this.indexPath);
         StandardAnalyzer analyzer = new StandardAnalyzer();
         IndexWriterConfig config = new IndexWriterConfig(analyzer);
         config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
@@ -381,13 +383,11 @@ public class LuceneIndexerServiceImpl implements IndexerService {
     public void clearIndex(String runId) {
         Path path = Paths.get(INDEX_BASE_DIR, runId);
         if (Files.exists(path)) {
-            try (Stream<Path> walk = Files.walk(path)) {
-                walk.sorted(Comparator.reverseOrder())
-                        .map(Path::toFile)
-                        .forEach(File::delete);
-                logger.info("Cleared index directory: {}", path);
-            } catch (IOException e) {
-                logger.warn("Failed to clear index directory: {}", path, e);
+            try {
+                FileUtils.deleteDirectory(new File(path.toUri()));
+                logger.info("Deleted index file: {}", path);
+            }  catch (IOException e) {
+                logger.warn("Failed to delete index file: {}", path, e);
             }
         }
     }

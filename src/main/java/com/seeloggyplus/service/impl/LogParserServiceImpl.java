@@ -13,7 +13,10 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -45,7 +48,8 @@ public class LogParserServiceImpl implements LogParser {
      * {@inheritDoc}
      */
     @Override
-    public List<LogEntry> parseFileParallel(File file, ParsingConfig config, ProgressCallback callback) throws IOException {
+    public List<LogEntry> parseFileParallel(File file, ParsingConfig config, ProgressCallback callback)
+            throws IOException {
         if (!file.exists() || !file.canRead()) {
             throw new IOException("File does not exist or cannot be read: " + file.getAbsolutePath());
         }
@@ -170,8 +174,7 @@ public class LogParserServiceImpl implements LogParser {
             return new LogEntry(lineNumber, line);
         }
 
-        // Check for parse failure tags
-        boolean parsed = !event.hasTag("_grokparsefailure") && !event.hasTag("_pipeline_error");
+        boolean parsed = !event.hasTag("_pipeline_error");
         if (event.getFields().isEmpty()) {
             parsed = false;
         }
@@ -187,11 +190,9 @@ public class LogParserServiceImpl implements LogParser {
             // Explicit Timestamp Parsing
             if (dateFormatter != null && stringFields.containsKey("timestamp")) {
                 try {
-                    java.time.LocalDateTime dt = java.time.LocalDateTime.parse(stringFields.get("timestamp"),
-                            dateFormatter);
+                    LocalDateTime dt = LocalDateTime.parse(stringFields.get("timestamp"), dateFormatter);
                     logEntry.setTimestamp(dt);
                 } catch (Exception e) {
-                    logger.debug("Failed to parse timestamp: {}", stringFields.get("timestamp"));
                     // Leave null
                 }
             }
@@ -216,7 +217,8 @@ public class LogParserServiceImpl implements LogParser {
 
         if (config == null || !config.isValid()) {
             result.setSuccess(false);
-            result.setMessage("Parsing configuration is invalid: " + (config != null ? config.getValidationError() : "null"));
+            result.setMessage(
+                    "Parsing configuration is invalid: " + (config != null ? config.getValidationError() : "null"));
             return result;
         }
 
@@ -247,10 +249,11 @@ public class LogParserServiceImpl implements LogParser {
                 result.setGroupNames(config.getGroupNames());
 
                 // Validate Timestamp Format if present
-                if (config.getTimestampFormat() != null && !config.getTimestampFormat().isEmpty() && stringFields.containsKey("timestamp")) {
+                if (config.getTimestampFormat() != null && !config.getTimestampFormat().isEmpty()
+                        && stringFields.containsKey("timestamp")) {
                     try {
                         DateTimeFormatter dtf = DateTimeFormatter.ofPattern(config.getTimestampFormat());
-                        java.time.LocalDateTime.parse(stringFields.get("timestamp"), dtf);
+                        LocalDateTime.parse(stringFields.get("timestamp"), dtf);
                         result.setMessage("Pattern matched successfully & Timestamp parsed validly.");
                     } catch (Exception e) {
                         result.setMessage("Pattern matched, BUT Timestamp format invalid: " + e.getMessage());
@@ -343,7 +346,10 @@ public class LogParserServiceImpl implements LogParser {
 
         try (FileInputStream fis = new FileInputStream(file); FileChannel channel = fis.getChannel()) {
             channel.position(chunkInfo.startByte());
-            BufferedReader reader = new BufferedReader(Channels.newReader(channel, StandardCharsets.UTF_8));
+            CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPLACE)
+                    .onUnmappableCharacter(CodingErrorAction.REPLACE);
+            BufferedReader reader = new BufferedReader(Channels.newReader(channel, decoder, -1));
 
             String line;
             long linesRead = 0;
@@ -381,7 +387,10 @@ public class LogParserServiceImpl implements LogParser {
 
         try (FileInputStream fis = new FileInputStream(file); FileChannel channel = fis.getChannel()) {
             channel.position(chunkInfo.startByte());
-            BufferedReader reader = new BufferedReader(Channels.newReader(channel, StandardCharsets.UTF_8));
+            CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPLACE)
+                    .onUnmappableCharacter(CodingErrorAction.REPLACE);
+            BufferedReader reader = new BufferedReader(Channels.newReader(channel, decoder, -1));
 
             String line;
             long startPos = channel.position();
@@ -454,8 +463,7 @@ public class LogParserServiceImpl implements LogParser {
                 if (b == '\n') {
                     currentLine++;
                     if (currentByte >= nextSplitTarget && chunks.size() < MAX_THREADS - 1) {
-                        chunks.add(new ChunkInfo(chunkStartByte, currentByte - 1, chunkStartLine,
-                                currentLine - chunkStartLine));
+                        chunks.add(new ChunkInfo(chunkStartByte, currentByte - 1, chunkStartLine, currentLine - chunkStartLine));
                         chunkStartByte = currentByte;
                         chunkStartLine = currentLine;
                         nextSplitTarget += targetChunkSize;
@@ -465,8 +473,7 @@ public class LogParserServiceImpl implements LogParser {
 
             // Final chunk
             if (currentByte > chunkStartByte) {
-                chunks.add(
-                        new ChunkInfo(chunkStartByte, currentByte, chunkStartLine, currentLine - chunkStartLine + 1));
+                chunks.add(new ChunkInfo(chunkStartByte, currentByte, chunkStartLine, currentLine - chunkStartLine + 1));
             }
         }
 
