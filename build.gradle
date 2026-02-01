@@ -43,18 +43,12 @@ dependencies {
     implementation 'commons-io:commons-io:2.14.0'
     implementation 'org.apache.commons:commons-lang3:3.18.0'
     implementation 'org.controlsfx:controlsfx:11.1.2'
-    implementation 'org.fxmisc.richtext:richtextfx:0.11.2'
+    implementation 'org.fxmisc.richtext:richtextfx:0.11.7'
     implementation 'de.jensd:fontawesomefx-fontawesome:4.7.0-9.1.2'
     implementation 'com.unboundid:unboundid-ldapsdk:7.0.3'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
     implementation 'io.krakens:java-grok:0.1.9'
-
-    // Apache Lucene (Phase 2: High Performance Search)
-    implementation 'org.apache.lucene:lucene-core:9.8.0'
-    implementation 'org.apache.lucene:lucene-queryparser:9.8.0'
-    implementation 'org.apache.lucene:lucene-analysis-common:9.8.0'
-    implementation 'org.apache.lucene:lucene-highlighter:9.8.0'
 
     // TestFX Integration Testing
     testImplementation 'org.testfx:testfx-core:4.0.17'
@@ -126,5 +120,25 @@ tasks.register('createPortableDist', Zip) {
         from('launcher.sh')
         from('launcher.properties')
         from('LAUNCHER_README.md')
+    }
+}
+
+runtime {
+    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
+    modules = [
+            'java.desktop', 'java.logging', 'java.naming', 'java.sql', 'java.xml',
+            'jdk.unsupported', 'java.scripting', 'java.management',
+            'jdk.crypto.ec', 'jdk.crypto.cryptoki',
+            'javafx.controls', 'javafx.fxml', 'javafx.web', 'javafx.graphics'
+    ]
+    
+    jpackage {
+        installerType = 'msi'
+        appVersion = project.version
+        imageName = 'SeeLoggyPlus'
+        skipInstaller = false
+        if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+             installerOptions = ['--win-menu', '--win-shortcut', '--win-dir-chooser']
+        }
     }
 }

@@ -15,7 +15,7 @@ public class AboutDialogController {
     private static final String VERSION;
 
     static {
-        String version = "DEV"; // Default version
+        String version = "DEV";
         try (java.io.InputStream input = AboutDialogController.class.getResourceAsStream("/version.properties")) {
             java.util.Properties prop = new java.util.Properties();
             if (input == null) {

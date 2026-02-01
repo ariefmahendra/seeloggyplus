@@ -136,6 +136,7 @@ public class UnifiedFileManagerDialogController {
 
     // --- Performance Enhancements ---
     private final java.util.Map<String, CacheEntry> directoryCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<String> favoritePathsCache = new java.util.HashSet<>();
     private static final long CACHE_DURATION_MS = 30 * 1000; // 30 seconds
     private boolean suppressAutoRefresh = false;
 
@@ -299,7 +300,7 @@ public class UnifiedFileManagerDialogController {
                 fileContextMenu.hide();
                 return;
             }
-            boolean isAlreadyFavorite = favoriteFolderService.isFavorite(selected.getPath(), getLocationIdForCurrent());
+            boolean isAlreadyFavorite = favoritePathsCache.contains(selected.getPath());
             addToFavoritesMenuItem.setVisible(!isAlreadyFavorite);
             removeFromFavoritesMenuItem.setVisible(isAlreadyFavorite);
         });
@@ -322,8 +323,7 @@ public class UnifiedFileManagerDialogController {
                     if (file.isDirectory()) {
                         icon.setIcon(FontAwesomeIcon.FOLDER);
                         icon.setFill(Color.DARKGOLDENROD);
-                        boolean isFavorite = favoriteFolderService.isFavorite(file.getPath(),
-                                getLocationIdForCurrent());
+                        boolean isFavorite = favoritePathsCache.contains(file.getPath());
                         if (isFavorite) {
                             getTableRow().setStyle("-fx-font-weight: bold;");
                         } else {
@@ -696,7 +696,7 @@ public class UnifiedFileManagerDialogController {
         if (selected == null || !selected.isDirectory()) {
             return;
         }
-        favoriteFolderService.isFavorite(selected.getPath(), getLocationIdForCurrent());
+
         // We need the ID to delete it.
         favoriteFolderService.getFavoritesForLocation(getLocationIdForCurrent()).stream()
                 .filter(fav -> fav.getPath().equals(selected.getPath()))
@@ -713,6 +713,10 @@ public class UnifiedFileManagerDialogController {
 
         String locationId = getLocationIdForCurrent();
         List<FavoriteFolder> favorites = favoriteFolderService.getFavoritesForLocation(locationId);
+
+        favoritePathsCache.clear();
+        favorites.forEach(f -> favoritePathsCache.add(f.getPath()));
+
         favoritesListView.setItems(FXCollections.observableArrayList(favorites));
     }
 

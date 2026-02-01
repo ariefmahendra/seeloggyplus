@@ -5,7 +5,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -14,8 +13,10 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * Model class for log parsing configuration using regex patterns with named groups
- * The named groups in the regex pattern will be used as column headers in the log table viewer
+ * Model class for log parsing configuration using regex patterns with named
+ * groups
+ * The named groups in the regex pattern will be used as column headers in the
+ * log table viewer
  */
 
 @Setter
@@ -123,20 +124,21 @@ public class ParsingConfig {
         if (regexPattern == null || regexPattern.isEmpty()) {
             return null;
         }
-        
+
         // Extract timestamp group pattern from regex
         Pattern timestampGroupPattern = Pattern.compile("\\(\\?<timestamp>([^)]+)\\)");
         Matcher matcher = timestampGroupPattern.matcher(regexPattern);
-        
+
         if (!matcher.find()) {
             return null; // No timestamp group found
         }
-        
+
         String timestampPattern = matcher.group(1);
-        
+
         // Common pattern mappings (regex pattern → date format)
         // Check from most specific to least specific
-        if (timestampPattern.contains("\\d{4}") && timestampPattern.contains("\\d{2}") && timestampPattern.contains("\\.\\d{3}")) {
+        if (timestampPattern.contains("\\d{4}") && timestampPattern.contains("\\d{2}")
+                && timestampPattern.contains("\\.\\d{3}")) {
             // Has year (4 digits), month/day (2 digits), and milliseconds
             if (timestampPattern.indexOf("\\d{4}") < timestampPattern.indexOf("\\d{2}")) {
                 // Year comes first: yyyy-MM-dd HH:mm:ss.SSS
@@ -155,11 +157,11 @@ public class ParsingConfig {
                 return "dd-MM-yyyy HH:mm:ss";
             }
         }
-        
+
         // Default fallback
         return "yyyy-MM-dd HH:mm:ss.SSS";
     }
-    
+
     /**
      * Create a copy of this configuration
      */
@@ -181,15 +183,38 @@ public class ParsingConfig {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         ParsingConfig that = (ParsingConfig) o;
         return Objects.equals(name, that.name) &&
-               Objects.equals(regexPattern, that.regexPattern);
+                Objects.equals(regexPattern, that.regexPattern);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(name, regexPattern);
+    }
+
+    public static final String RAW_CONFIG_ID = "raw_default";
+
+    /**
+     * Creates a default raw configuration that captures the entire line as a single
+     * message.
+     * This is used for the "Viewer First" experience where we don't force users to
+     * configure regex immediately.
+     */
+    public static ParsingConfig createRawConfig() {
+        ParsingConfig config = new ParsingConfig();
+        config.setId(RAW_CONFIG_ID);
+        config.setName("Raw Text");
+        config.setDescription("Default configuration for raw text viewing");
+        // Matches the entire line and puts it into a group named "message"
+        config.setRegexPattern("^(?<message>.*)$");
+        config.setTimestampFormat(null);
+        config.setDefault(true);
+        config.validatePattern();
+        return config;
     }
 }

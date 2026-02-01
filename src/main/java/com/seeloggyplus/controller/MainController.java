@@ -1,43 +1,32 @@
 package com.seeloggyplus.controller;
 
+import com.seeloggyplus.component.CanvasLogViewer;
+import com.seeloggyplus.service.impl.*;
+import com.seeloggyplus.util.*;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.util.Duration;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 
 import com.seeloggyplus.dto.RecentFilesDto;
 import com.seeloggyplus.model.*;
 import com.seeloggyplus.service.*;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.Future;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import com.seeloggyplus.service.impl.*;
-import com.seeloggyplus.service.IndexerService;
-import com.seeloggyplus.service.SearchService;
-import com.seeloggyplus.service.impl.LuceneIndexerServiceImpl;
-import com.seeloggyplus.service.LogParser;
-import com.seeloggyplus.service.impl.LogParserServiceImpl;
-import com.seeloggyplus.service.impl.LuceneLogEntrySourceImpl;
-import com.seeloggyplus.util.*;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.geometry.Side;
 import javafx.application.Platform;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -49,30 +38,22 @@ import javafx.scene.control.*;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
-import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import org.fxmisc.richtext.CodeArea;
+import org.fxmisc.flowless.VirtualizedScrollPane;
+import org.fxmisc.richtext.StyleClassedTextArea;
+import org.fxmisc.richtext.model.StyleSpans;
+import org.fxmisc.richtext.model.StyleSpansBuilder;
+import java.util.regex.Matcher;
+import java.util.Collection;
+import java.util.Collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Main Controller for SeeLoggyPlus application.
- * <p>
- * Handles the main UI interactions, file loading, parsing coordination, and
- * search functionality.
- * Implements high-performance log viewing using:
- * <ul>
- * <li>Virtual Threads for non-blocking I/O and heavy computation tasks
- * (parsing, indexing, searching).</li>
- * <li>JavaFX Task API for UI feedback (progress bars, status updates).</li>
- * <li>Virtual Scrolling via {@link TableView} for rendering large datasets
- * efficiently.</li>
- * <li>Lucene for disk-based indexing of extremely large files (>50MB).</li>
- * </ul>
- * </p>
- */
 public class MainController {
+    private static final String TOGGLE_SELECTED_STYLE = "-fx-background-color: #2196F3; -fx-text-fill: white;";
+    private static final String TOGGLE_DESELECTED_STYLE = "";
+
     // FXML Components - MenuBar
     @FXML
     private MenuBar menuBar;
@@ -82,8 +63,7 @@ public class MainController {
     private CheckMenuItem showLeftPanelMenuItem;
     @FXML
     private CheckMenuItem showBottomPanelMenuItem;
-    @FXML
-    private MenuItem parsingConfigMenuItem;
+
     @FXML
     private MenuItem serverManagementMenuItem;
     @FXML
@@ -115,6 +95,7 @@ public class MainController {
 
     @FXML
     private TextField searchField;
+
     @FXML
     private ToggleButton regexCheckBox;
     @FXML
@@ -124,49 +105,25 @@ public class MainController {
     @FXML
     private Button clearSearchButton;
     @FXML
-    private ComboBox<String> logLevelFilterComboBox;
-    @FXML
-    private TextField dateTimeFromField;
-    @FXML
-    private TextField dateTimeToField;
-    @FXML
     private VBox loadingOverlay;
     @FXML
     private Label loadingLabel;
     @FXML
     private ProgressIndicator loadingProgress;
     @FXML
-    public Button autoFitButton;
+    private StackPane logContainer;
+
+    // Root of the center area (clipped to avoid painting over top/bottom bars)
     @FXML
-    private TableView<LogEntry> logTableView;
+    private StackPane centerRoot;
     @FXML
-    private Button scrollToTopButton;
-    @FXML
-    private Button scrollToBottomButton;
+    private javafx.scene.shape.Rectangle centerClip;
     @FXML
     private Button refreshButton;
     @FXML
     private ToggleButton tailButton;
     @FXML
     private Button clearLogButton;
-
-    // FXML Components - Pagination Bar
-    @FXML
-    private HBox paginationBar;
-    @FXML
-    private Button firstPageButton;
-    @FXML
-    private Button prevPageButton;
-    @FXML
-    private HBox pageButtonsContainer;
-    @FXML
-    private Button nextPageButton;
-    @FXML
-    private Button lastPageButton;
-    @FXML
-    private Label pageInfoLabel;
-    @FXML
-    private ComboBox<Integer> pageSizeComboBox;
 
     // FXML Components - Bottom Panel (Log Detail)
     @FXML
@@ -177,10 +134,22 @@ public class MainController {
     private Button expandBottomPanelButton;
     @FXML
     private Button pinBottomPanelButton;
+
+    @FXML
+    private ToggleButton toggleLeftPanelButton;
+    @FXML
+    private ToggleButton toggleBottomPanelButton;
+
     @FXML
     private Label detailLabel;
     @FXML
-    private CodeArea detailTextArea;
+    private StackPane detailContainer;
+    private StyleClassedTextArea detailCodeArea;
+
+    // Layout State Variables
+    private double lastVerticalDividerPos = 0.7;
+    private double lastHorizontalDividerPos = 0.2;
+
     @FXML
     private ToggleButton prettifyJsonButton;
     @FXML
@@ -189,8 +158,8 @@ public class MainController {
     private Button copyButton;
     @FXML
     private Button clearDetailButton;
-
-    // Memory Monitor
+    @FXML
+    private Label statusLabel;
     @FXML
     private Label memoryStatusLabel;
     @FXML
@@ -200,62 +169,28 @@ public class MainController {
     private ParsingConfigService parsingConfigService;
     private RecentFileService recentFileService;
     private LogParser logParserService;
-    private PreferenceService preferenceService;
     private LogFileService logFileService;
     private ServerManagementService serverManagementService;
+    private PreferenceService preferenceService;
+
+    // Tail Service
+    private TailService tailService;
 
     private static final Logger logger = LoggerFactory.getLogger(MainController.class);
 
-    private static final List<DateTimeFormatter> DATE_TIME_FORMATTERS = Arrays.asList(
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"),
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSS"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss.SSS"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss.SSS"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"),
-            DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-
-    private static final List<DateTimeFormatter> DATE_ONLY_FORMATTERS = Arrays.asList(
-            DateTimeFormatter.ofPattern("yyyy-MM-dd"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-    private final Timer selectionTimer = new Timer("RecentFile-Selection-Timer", true);
-    private TimerTask selectionTask;
-    private static final long SELECTION_DELAY = 150;
-
     private LogFile currentLogFromDb;
-    private LogEntrySource currentLogEntrySource;
-    private LogEntrySource originalLogEntrySource;
-    private ObservableList<LogEntry> visibleLogEntries;
+
     private volatile ParsingConfig currentParsingConfig;
     private File currentFile;
-    private boolean isIndexedMode = false;
-    private static final long INDEXING_THRESHOLD_BYTES = 20 * 1024 * 1024;
-    private IndexerService indexerService;
-    private SearchService searchService;
     private boolean isLeftPanelPinned = true;
     private boolean isBottomPanelPinned = true;
     private Task<?> currentLoadingTask = null;
-    private int windowSize = 5000;
-    private int tailWindowSize = 20000;
     private static final int MAX_TAIL_BUFFER_SIZE = 5000;
     private int sshDownloadThreads = 4;
-    private int currentWindowStartIndex = 0;
     private boolean tailModeEnabled = false;
     private SSHServiceImpl activeTailSshService;
     private long remoteTailLineCounter = 0;
     private String monitoringRemotePath;
-    private final List<LogEntry> tailBuffer = Collections.synchronizedList(new ArrayList<>());
-
-    // Tail Service
-    private TailService tailService;
 
     // state
     private volatile boolean tailFlushScheduled = false;
@@ -264,7 +199,23 @@ public class MainController {
     private boolean autoPrettifyJson = false;
     private boolean autoPrettifyXml = false;
     private Predicate<LogEntry> currentTailFilterPredicate = null;
-    private boolean isSkippingFilterTrigger = false;
+    private final boolean isSkippingFilterTrigger = false;
+
+    private int totalEntries = 0;
+    private IntArrayList filteredIndexes = null;
+
+    private static final ForkJoinPool SEARCH_POOL = new ForkJoinPool(Runtime.getRuntime().availableProcessors());
+    private CanvasLogViewer canvasLogViewer;
+    private MappedFileReader mappedFileReader;
+    private LineOffsetIndex lineOffsetIndex;
+
+    // Persistent buffer for live tailing (CanvasLogViewer reads this)
+    private final List<LogEntry> liveTailList = Collections.synchronizedList(new ArrayList<>());
+
+    @FXML
+    private ToggleButton followTailButton;
+
+    private final LinkedList<LogEntry> tailBuffer = new LinkedList<>(); // Temp transfer buffer
 
     @FXML
     public void initialize() {
@@ -276,27 +227,49 @@ public class MainController {
         logParserService = new LogParserServiceImpl();
         logFileService = new LogFileServiceImpl();
         serverManagementService = new ServerManagementServiceImpl();
-        indexerService = new LuceneIndexerServiceImpl();
-        searchService = new LuceneSearchServiceImpl();
         tailService = new TailServiceImpl();
-
-        visibleLogEntries = FXCollections.observableArrayList();
 
         setupMenuBar();
         setupLeftPanel();
         setupCenterPanel();
         setupBottomPanel();
-        setupLogLevelFilter();
         setupKeyboardShortcuts();
         setupSearchFieldAutoCompletion();
 
-        setupSearchFieldAutoCompletion();
+        // Helper to update style based on state
+        configureToggleStyle(toggleLeftPanelButton);
+        configureToggleStyle(toggleBottomPanelButton);
+        configureToggleStyle(tailButton);
+        configureToggleStyle(followTailButton);
+        configureToggleStyle(regexCheckBox);
+        configureToggleStyle(caseSensitiveCheckBox);
+        configureToggleStyle(prettifyJsonButton);
+        configureToggleStyle(prettifyXmlButton);
+
+        // Bind Toolbar Toggles to Actions
+        if (toggleLeftPanelButton != null) {
+            toggleLeftPanelButton.setOnAction(e -> toggleLeftPanel());
+        }
+        if (toggleBottomPanelButton != null) {
+            toggleBottomPanelButton.setOnAction(e -> toggleBottomPanel());
+        }
 
         restorePanelVisibility();
         loadPreferences();
-        setupPagination();
 
         updateTailButtonState();
+        startMemoryMonitor();
+
+        // Ensure center content cannot paint outside its region (prevents 'menubar
+        // covered' glitches)
+        if (centerRoot != null && centerClip != null) {
+            centerClip.widthProperty().bind(centerRoot.widthProperty());
+            centerClip.heightProperty().bind(centerRoot.heightProperty());
+        }
+    }
+
+    private static double clampDivider(double v) {
+        return Math.max(0.05, Math.min(0.95, v));
     }
 
     private void updateTailButtonState() {
@@ -305,8 +278,12 @@ public class MainController {
 
         if (isRemote || isLocal) {
             tailButton.setDisable(false);
+            if (followTailButton != null)
+                followTailButton.setDisable(false);
         } else {
             tailButton.setDisable(true);
+            if (followTailButton != null)
+                followTailButton.setDisable(true);
             if (tailModeEnabled) {
                 disableTail();
             }
@@ -314,14 +291,10 @@ public class MainController {
     }
 
     private void showLoading(String message) {
-        showLoading(message, ProgressIndicator.INDETERMINATE_PROGRESS);
-    }
-
-    private void showLoading(String message, double progress) {
         if (loadingOverlay != null) {
             loadingLabel.setText(message);
             if (loadingProgress != null) {
-                loadingProgress.setProgress(progress);
+                loadingProgress.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
             }
             loadingOverlay.setVisible(true);
             loadingOverlay.setManaged(true);
@@ -343,25 +316,17 @@ public class MainController {
         showLeftPanelMenuItem.setOnAction(e -> toggleLeftPanel());
         showBottomPanelMenuItem.setOnAction(e -> toggleBottomPanel());
 
-        parsingConfigMenuItem.setOnAction(e -> handleParsingConfiguration());
         serverManagementMenuItem.setOnAction(e -> handleServerManagement());
         preferencesMenuItem.setOnAction(e -> handlePreferences());
 
         aboutMenuItem.setOnAction(e -> handleAbout());
+
+        // Protect MenuBar from collapsing
+        menuBar.setMinHeight(Region.USE_PREF_SIZE);
     }
 
     private void setupLeftPanel() {
         ContextMenu leftPanelContextMenu = new ContextMenu();
-        MenuItem changeParsingConfigMenuItem = new MenuItem("Change Parsing Configuration");
-        changeParsingConfigMenuItem.setOnAction(actionEvent -> {
-            RecentFilesDto selectedRecent = recentFilesListView.getSelectionModel().getSelectedItem();
-            if (selectedRecent != null) {
-                ParsingConfig parsingConfig = showParsingConfigSelectionDialog();
-                if (parsingConfig != null) {
-                    handleRecentFileSelectedWithConfig(selectedRecent, parsingConfig);
-                }
-            }
-        });
 
         MenuItem openFileMenuItem = new MenuItem("Open File");
         openFileMenuItem.setOnAction(actionEvent -> {
@@ -379,8 +344,7 @@ public class MainController {
             }
         });
 
-        leftPanelContextMenu.getItems().addAll(openFileMenuItem, changeParsingConfigMenuItem, new SeparatorMenuItem(),
-                deleteFromRecentMenuItem);
+        leftPanelContextMenu.getItems().addAll(openFileMenuItem, new SeparatorMenuItem(), deleteFromRecentMenuItem);
         recentFilesListView
                 .setCellFactory(listView -> new com.seeloggyplus.ui.cell.RecentFileListCell(serverManagementService,
                         () -> monitoringRemotePath));
@@ -404,12 +368,6 @@ public class MainController {
         updateLeftPanelDisplay();
     }
 
-    private void handleRecentFileSelectedWithConfig(RecentFilesDto recentFile, ParsingConfig parsingConfig) {
-        logFileService.updateParsingConfigIdForLogFiles(parsingConfig.getId(), recentFile.logFile().getId());
-        refreshRecentFilesList();
-        handleRecentFileSelected(recentFile);
-    }
-
     private void handleToggleLeftPanelPin() {
         isLeftPanelPinned = !isLeftPanelPinned;
         updateLeftPanelDisplay();
@@ -419,31 +377,55 @@ public class MainController {
         FontAwesomeIconView pinIcon = (FontAwesomeIconView) pinLeftPanelButton.getGraphic();
         FontAwesomeIconView expandIcon = (FontAwesomeIconView) expandLeftPanelButton.getGraphic();
 
+        if (horizontalSplitPane == null) {
+            return;
+        }
+
         if (isLeftPanelPinned) {
             pinIcon.setGlyphName("ANGLE_DOUBLE_LEFT");
+
             leftPanel.setVisible(true);
             leftPanel.setManaged(true);
             collapsedLeftPanel.setVisible(false);
             collapsedLeftPanel.setManaged(false);
+
             Platform.runLater(() -> {
-                double savedWidth = 200;
-                double totalWidth = horizontalSplitPane.getWidth();
-                if (totalWidth > 0) {
-                    double position = savedWidth / totalWidth;
-                    horizontalSplitPane.setDividerPositions(position);
-                } else {
-                    horizontalSplitPane.setDividerPositions(0.2);
-                }
+                horizontalSplitPane.applyCss();
+                horizontalSplitPane.layout();
+                double pos = lastHorizontalDividerPos > 0 ? lastHorizontalDividerPos : 0.2;
+                horizontalSplitPane.setDividerPositions(clampDivider(pos));
             });
+
+            if (toggleLeftPanelButton != null) {
+                toggleLeftPanelButton.setSelected(true);
+            }
         } else {
+            if (horizontalSplitPane.getDividerPositions().length > 0) {
+                lastHorizontalDividerPos = horizontalSplitPane.getDividerPositions()[0];
+            }
+
             expandIcon.setGlyphName("ANGLE_DOUBLE_RIGHT");
+
+            // Keep SplitPane items intact; just hide the left pane and move divider fully
+            // left.
             leftPanel.setVisible(false);
             leftPanel.setManaged(false);
+
             collapsedLeftPanel.setVisible(true);
-            collapsedLeftPanel.setManaged(true);
-            Platform.runLater(() -> horizontalSplitPane.setDividerPositions(0.0));
+            collapsedLeftPanel.setManaged(false);
+
+            Platform.runLater(() -> {
+                horizontalSplitPane.applyCss();
+                horizontalSplitPane.layout();
+                // push divider to extreme left so right area takes all the space
+                horizontalSplitPane.setDividerPositions(0.0);
+            });
         }
+
         showLeftPanelMenuItem.setSelected(isLeftPanelPinned);
+        if (toggleLeftPanelButton != null) {
+            toggleLeftPanelButton.setSelected(isLeftPanelPinned);
+        }
     }
 
     /**
@@ -467,39 +449,80 @@ public class MainController {
         });
     }
 
+    private static final String KEYWORDS_REGEX = "(?i)(ERROR|FATAL|EXCEPTION|WARN|INFO|DEBUG|TRACE)";
+    private static final Pattern KEYWORDS_PATTERN = Pattern.compile(KEYWORDS_REGEX);
+
     private void setupCenterPanel() {
-        logTableView.setItems(visibleLogEntries);
-        logTableView.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-        logTableView.getSelectionModel().setCellSelectionEnabled(false);
-        logTableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        logTableView.setFixedCellSize(24.0);
-        logTableView.setTableMenuButtonVisible(false);
-        logTableView.setPlaceholder(new javafx.scene.control.Label(""));
-        logTableView.setOnKeyPressed((KeyEvent event) -> {
-            if (event.isControlDown() && event.getCode() == KeyCode.C) {
-                copySelectionToClipboard(logTableView);
+        // Canvas-based Log Viewer (glogg-style, O(1) scroll)
+        // Canvas-based Log Viewer (glogg-style, O(1) scroll)
+        canvasLogViewer = new CanvasLogViewer();
+        canvasLogViewer.setTailBuffer(liveTailList);
+
+        // Bind Follow Button
+        if (followTailButton != null) {
+            // Initial state
+            followTailButton.setSelected(canvasLogViewer.isFollowTail());
+
+            // Viewer -> Button (Auto-disable updates button)
+            canvasLogViewer.setOnFollowTailChanged(isFollowing -> {
+                Platform.runLater(() -> followTailButton.setSelected(isFollowing));
+            });
+
+            // Button -> Viewer (Manual toggle)
+            followTailButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                canvasLogViewer.setFollowTail(newVal);
+            });
+        }
+
+        logContainer.getChildren().add(canvasLogViewer);
+
+        // Ensure it only ever sizes to the logContainer
+        StackPane.setAlignment(canvasLogViewer, javafx.geometry.Pos.CENTER);
+
+        // Bind to container size
+        canvasLogViewer.prefWidthProperty().bind(logContainer.widthProperty());
+        canvasLogViewer.prefHeightProperty().bind(logContainer.heightProperty());
+
+        // Guard rails: don't let it request infinite/out-of-parent sizes during
+        // relayout
+        canvasLogViewer.setMinSize(0, 0);
+        canvasLogViewer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
+        // Line click → show in detail panel
+        canvasLogViewer.setOnLineClick(lineNumber -> {
+            if (mappedFileReader != null && lineOffsetIndex != null) {
+                String content = mappedFileReader.readLine(lineOffsetIndex, lineNumber);
+                displayLogDetailFromCanvas(lineNumber, content);
             }
         });
-        logTableView
-                .getSelectionModel()
-                .selectedItemProperty()
-                .addListener((obs, oldVal, newVal) -> {
-                    if (newVal != null) {
-                        displayLogDetail(newVal);
-                    }
-                });
-        logTableView.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2) {
-                LogEntry selectedEntry = logTableView.getSelectionModel().getSelectedItem();
-                logger.info("Double-click detected. Entry: {}, isFilterActive: {}",
-                        selectedEntry != null ? "line " + selectedEntry.getLineNumber() : "null", isFilterActive());
-                if (selectedEntry != null && isFilterActive()) {
-                    jumpToOriginalPosition(selectedEntry);
-                } else if (selectedEntry != null) {
-                    logger.info("Jump skipped: filter not active");
-                }
+
+        // Double click → jump to original line (clears filter if active)
+        canvasLogViewer.setOnLineDoubleClick((lineNumber, content) -> {
+            logger.info("Double clicked line {}", lineNumber + 1);
+
+            // If filter is active, clear it and jump to original line
+            if (filteredIndexes != null) {
+                logger.info("Clearing filter and jumping to original line {}", lineNumber + 1);
+                searchField.clear();
+                filteredIndexes = null;
+                canvasLogViewer.clearFilter();
+                canvasLogViewer.clearSearchHighlight();
+                canvasLogViewer.jumpToLine(lineNumber);
+            }
+
+            displayLogDetailFromCanvas(lineNumber, content);
+        });
+
+        // Status update callback for bottom status bar
+        canvasLogViewer.setOnStatusUpdate((currentLine, total, percentage) -> {
+            if (statusLabel != null) {
+                String formatted = String.format("Line: %,d / %,d (%.1f%%)", currentLine, total, percentage);
+                statusLabel.setText(formatted);
             }
         });
+
+        // Setup Detail Panel (RichTextFX)
+        setupDetailPanel();
 
         searchField.setOnAction(e -> performSearch());
         searchField.setOnKeyPressed(event -> {
@@ -508,73 +531,424 @@ public class MainController {
             }
         });
         searchField.setTooltip(new Tooltip("Enter text to search. Press Ctrl+F to focus this field."));
-
         searchButton.setOnAction(e -> performSearch());
         searchButton.setTooltip(new Tooltip("Perform search (press Enter in text field)"));
-
         clearSearchButton.setOnAction(e -> clearSearch());
         clearSearchButton.setTooltip(new Tooltip("Clear search and filters (press Escape in text field)"));
-
-        autoFitButton.setOnAction(e -> {
-            autoResizeColumns(logTableView);
-            logger.info("Manual auto-fit columns triggered");
-        });
-        scrollToTopButton.setOnAction(e -> handleScrollToTop());
-        scrollToBottomButton.setOnAction(e -> handleScrollToBottom());
-
         refreshButton.setOnAction(e -> handleReload());
         clearLogButton.setOnAction(e -> handleClearLog());
+        refreshButton.setTooltip(new Tooltip("Reload current file or tailing session (Ctrl+R)"));
+
         refreshButton.setTooltip(new Tooltip("Reload current file or tailing session (Ctrl+R)"));
 
         tailButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal) {
                 enableTail();
-                tailButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
             } else {
                 disableTail();
-                tailButton.setStyle("");
             }
         });
 
         regexCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal) {
-                regexCheckBox.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
-            } else {
-                regexCheckBox.setStyle("");
-            }
             if (!isSkippingFilterTrigger) {
                 performSearch();
             }
         });
 
         caseSensitiveCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal) {
-                caseSensitiveCheckBox.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
-            } else {
-                caseSensitiveCheckBox.setStyle("");
-            }
             if (!isSkippingFilterTrigger) {
                 performSearch();
             }
         });
 
-        updateDateTimeFilterPromptText(null);
-        updateTableColumns(null);
-        logger.info("Virtual scrolling enabled with performance optimizations - smooth scrolling for large datasets");
+        logger.info("Canvas-based log viewer initialized.");
+    }
 
-        startMemoryMonitor();
+    private void configureToggleStyle(ToggleButton button) {
+        if (button == null)
+            return;
+
+        // Initial state
+        if (button.isSelected()) {
+            button.setStyle(TOGGLE_SELECTED_STYLE);
+        } else {
+            button.setStyle(TOGGLE_DESELECTED_STYLE);
+        }
+
+        // Listener
+        button.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
+                button.setStyle(TOGGLE_SELECTED_STYLE);
+            } else {
+                button.setStyle(TOGGLE_DESELECTED_STYLE);
+            }
+        });
+    }
+
+    private void normalizeLayoutState() {
+        Platform.runLater(() -> {
+            try {
+                // Left panel state
+                if (horizontalSplitPane != null) {
+                    if (isLeftPanelPinned) {
+                        if (leftPanel != null) {
+                            leftPanel.setVisible(true);
+                            leftPanel.setManaged(true);
+                        }
+                        if (collapsedLeftPanel != null) {
+                            collapsedLeftPanel.setVisible(false);
+                            collapsedLeftPanel.setManaged(false);
+                        }
+                        horizontalSplitPane.applyCss();
+                        horizontalSplitPane.layout();
+                        double pos = lastHorizontalDividerPos > 0 ? lastHorizontalDividerPos : 0.2;
+                        horizontalSplitPane.setDividerPositions(clampDivider(pos));
+                    } else {
+                        if (leftPanel != null) {
+                            leftPanel.setVisible(false);
+                            leftPanel.setManaged(false);
+                        }
+                        if (collapsedLeftPanel != null) {
+                            collapsedLeftPanel.setVisible(true);
+                            collapsedLeftPanel.setManaged(false);
+                        }
+                        horizontalSplitPane.applyCss();
+                        horizontalSplitPane.layout();
+                        horizontalSplitPane.setDividerPositions(0.0);
+                    }
+                }
+
+                // Bottom panel state
+                if (verticalSplitPane != null) {
+                    if (isBottomPanelPinned) {
+                        if (bottomPanel != null) {
+                            bottomPanel.setVisible(true);
+                            bottomPanel.setManaged(true);
+                        }
+                        if (collapsedBottomPanel != null) {
+                            collapsedBottomPanel.setVisible(false);
+                            collapsedBottomPanel.setManaged(false);
+                        }
+                        verticalSplitPane.applyCss();
+                        verticalSplitPane.layout();
+                        double pos = lastVerticalDividerPos > 0 ? lastVerticalDividerPos : 0.7;
+                        verticalSplitPane.setDividerPositions(clampDivider(pos));
+                    } else {
+                        if (bottomPanel != null) {
+                            bottomPanel.setVisible(false);
+                            bottomPanel.setManaged(false);
+                        }
+                        if (collapsedBottomPanel != null) {
+                            collapsedBottomPanel.setVisible(true);
+                            collapsedBottomPanel.setManaged(false);
+                        }
+                        verticalSplitPane.applyCss();
+                        verticalSplitPane.layout();
+                        verticalSplitPane.setDividerPositions(1.0);
+                    }
+                }
+            } catch (Exception ex) {
+                logger.warn("normalizeLayoutState failed", ex);
+            }
+        });
+    }
+
+    private void displayLogDetailFromCanvas(long lineNumber, String content) {
+        if (detailCodeArea != null && content != null) {
+            detailCodeArea.clear();
+            detailCodeArea.replaceText(0, 0, content);
+            detailLabel.setText("Line " + (lineNumber + 1));
+
+            if (autoPrettifyJson) {
+                prettifyJson();
+            } else if (autoPrettifyXml) {
+                prettifyXml();
+            }
+        }
+    }
+
+    private void performSearch() {
+        final String searchText = searchField.getText();
+        final boolean isRegex = regexCheckBox.isSelected();
+        final boolean caseSensitive = caseSensitiveCheckBox.isSelected();
+
+        logger.info("Search - Include: '{}', Regex: {}, CaseSensitive: {}",
+                searchText, isRegex, caseSensitive);
+
+        if (mappedFileReader == null || lineOffsetIndex == null) {
+            logger.warn("No file loaded for search");
+            return;
+        }
+
+        if (searchText == null || searchText.trim().isEmpty()) {
+            clearSearch();
+            return;
+        }
+
+        if (tailModeEnabled) {
+            // TAIL MODE: Highlight Only (No Hiding)
+            // We skip the expensive parallel search and just update the UI highlight.
+            String highlightPattern = searchText;
+            boolean highlightIsRegex = isRegex;
+
+            if (!isRegex) {
+                List<String> terms = extractSearchTerms(searchText);
+                if (!terms.isEmpty()) {
+                    highlightPattern = String.join("|", terms.stream()
+                            .map(java.util.regex.Pattern::quote)
+                            .toList());
+                    highlightIsRegex = true;
+                }
+            }
+
+            filteredIndexes = null;
+            canvasLogViewer.setFilteredIndexes(null); // Show all lines
+            canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
+
+            // Update the predicate for completeness (though primarily used in search mode)
+            try {
+                currentTailFilterPredicate = buildSearchPredicate(searchText, isRegex, caseSensitive);
+            } catch (Exception ex) {
+                logger.warn("Search predicate build failed", ex);
+            }
+
+            return;
+        }
+
+        showLoading("Searching...");
+
+        Task<IntArrayList> task = new Task<>() {
+            @Override
+            protected IntArrayList call() {
+                int total = lineOffsetIndex.getLineCount();
+                final Pattern pattern;
+                final Predicate<String> booleanPredicate;
+
+                if (isRegex) {
+                    try {
+                        int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
+                        pattern = Pattern.compile(searchText, flags);
+                    } catch (Exception e) {
+                        logger.warn("Invalid regex: {}", searchText);
+                        return new IntArrayList();
+                    }
+                    booleanPredicate = null;
+                } else {
+                    pattern = null;
+                    booleanPredicate = createBooleanSearchPredicate(searchText, caseSensitive);
+                }
+
+                int numThreads = Runtime.getRuntime().availableProcessors();
+                int chunkSize = Math.max(10000, (total + numThreads - 1) / numThreads);
+
+                logger.info("Parallel search: {} threads, {} lines/chunk, {} total lines", numThreads, chunkSize,
+                        total);
+
+                try {
+                    List<Future<IntArrayList>> futures = new java.util.ArrayList<>();
+
+                    // Submit chunk tasks
+                    for (int start = 0; start < total; start += chunkSize) {
+                        final int chunkStart = start;
+                        final int chunkEnd = Math.min(start + chunkSize, total);
+
+                        futures.add(SEARCH_POOL.submit(() -> {
+                            IntArrayList chunkMatches = new IntArrayList();
+
+                            for (int i = chunkStart; i < chunkEnd; i++) {
+                                if (isCancelled())
+                                    break;
+
+                                // Zero-allocation search using CharSequence matcher
+                                java.util.function.Predicate<CharSequence> matcher;
+                                if (pattern != null) {
+                                    matcher = cs -> pattern.matcher(cs).find();
+                                } else {
+                                    matcher = cs -> booleanPredicate.test(cs.toString());
+                                }
+
+                                if (mappedFileReader.lineMatches(lineOffsetIndex, i, matcher)) {
+                                    chunkMatches.add(i);
+                                }
+                            }
+
+                            return chunkMatches;
+                        }));
+                    }
+
+                    // Collect results with progress
+                    IntArrayList allMatches = new IntArrayList();
+                    int completedChunks = 0;
+
+                    for (var future : futures) {
+                        IntArrayList chunkResult = future.get();
+
+                        // Merge sorted (chunks are already in order)
+                        for (int i = 0; i < chunkResult.size(); i++) {
+                            allMatches.add(chunkResult.get(i));
+                        }
+
+                        completedChunks++;
+                        final int progress = completedChunks;
+                        final int totalChunks = futures.size();
+                        Platform.runLater(
+                                () -> showLoading(String.format("Searching: %d/%d chunks...", progress, totalChunks)));
+                    }
+
+                    return allMatches;
+
+                } catch (Exception e) {
+                    logger.error("Parallel search error", e);
+                    return new IntArrayList();
+                }
+                // Note: SEARCH_POOL is shared, do NOT shut down
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            IntArrayList matches = task.getValue();
+            logger.info("Search complete: {} matches found", matches.size());
+
+            filteredIndexes = matches;
+            canvasLogViewer.setFilteredIndexes(filteredIndexes);
+
+            // Enhanced Highlight Logic for Boolean Search
+            String highlightPattern = searchText;
+            boolean highlightIsRegex = isRegex;
+
+            if (!isRegex) {
+                // Parse boolean query to extract terms for highlighting
+                List<String> terms = extractSearchTerms(searchText);
+                if (!terms.isEmpty()) {
+                    highlightPattern = terms.stream()
+                            .map(java.util.regex.Pattern::quote)
+                            .collect(java.util.stream.Collectors.joining("|"));
+                    highlightIsRegex = true; // Highlight as Regex (OR logic)
+                }
+            }
+
+            // Apply highlight pattern regardless of match count (Canvas viewer handles this
+            // efficiently)
+            canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
+
+            // Log for debugging purposes
+            if (matches.size() > 100_000) {
+                logger.info("Large search result set: {} matches. Highlighting enabled.", matches.size());
+            }
+
+            hideLoading();
+        });
+
+        task.setOnFailed(e -> {
+            hideLoading();
+            Throwable ex = task.getException();
+            logger.error("Search failed", ex);
+            showError("Search Failed", ex.getMessage());
+        });
+
+        Thread.ofVirtual().start(task);
+    }
+
+    private void clearSearch() {
+        searchField.clear();
+        filteredIndexes = null;
+        canvasLogViewer.clearFilter();
+        canvasLogViewer.clearSearchHighlight();
+    }
+
+    /**
+     * Release mmap, index and filter resources.
+     * Call before loading new file, on clear, or on cancel.
+     */
+    private void cleanupFileResources() {
+        if (mappedFileReader != null) {
+            mappedFileReader.close();
+            mappedFileReader = null;
+        }
+        lineOffsetIndex = null;
+        filteredIndexes = null;
+        totalEntries = 0;
+        canvasLogViewer.clearFilter();
+        canvasLogViewer.clearSearchHighlight();
+        logger.info("File resources cleaned up");
+    }
+
+    private void loadFileWithParallelParsing(File file, LogFile logFile, boolean updateRecentFilesList) {
+        showLoading("Indexing file: " + file.getName() + " (scanning for lines...)");
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                RandomAccessFile raf = new RandomAccessFile(file, "r");
+                com.seeloggyplus.util.LineOffsetIndex index = new com.seeloggyplus.util.LineOffsetIndex();
+
+                long fileSize = raf.length();
+                index.buildIndex(raf, bytesProcessed -> {
+                    double percent = (double) bytesProcessed / fileSize * 100;
+                    Platform.runLater(() -> showLoading(
+                            String.format("Indexing: %.1f%% (%d lines found)", percent, index.getLineCount())));
+                });
+
+                raf.close();
+                logger.info("Indexing complete! {} lines indexed in {}", index.getLineCount(), file.getName());
+                MappedFileReader reader = new com.seeloggyplus.util.MappedFileReader(file);
+                lineOffsetIndex = index;
+                mappedFileReader = reader;
+                totalEntries = index.getLineCount();
+                return null;
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            logger.info("Index complete! {} entries available", totalEntries);
+
+            Platform.runLater(() -> {
+                canvasLogViewer.loadFile(mappedFileReader, lineOffsetIndex);
+                canvasLogViewer.jumpToLine(0);
+                logger.info("Canvas viewer initialized");
+            });
+
+            if (updateRecentFilesList) {
+                RecentFile recentFile = new RecentFile();
+                recentFile.setFileId(logFile.getId());
+                recentFile.setLastOpened(LocalDateTime.now());
+                recentFileService.save(logFile, recentFile);
+                refreshRecentFilesList();
+                logger.info("Added file to recent files: {}", file.getName());
+            }
+
+            selectRecentFile(file);
+
+            hideLoading();
+            updateTailButtonState();
+            currentLoadingTask = null;
+            logger.info("File loaded with Canvas-based viewer. RAM usage minimal.");
+        });
+
+        task.setOnFailed(e -> {
+            hideLoading();
+            Throwable ex = task.getException();
+            logger.error("Failed to index file", ex);
+            showError("Failed to load file", ex.getMessage());
+            currentLoadingTask = null;
+        });
+
+        task.setOnCancelled(e -> {
+            hideLoading();
+            logger.info("Indexing cancelled by user");
+            currentLoadingTask = null;
+        });
+
+        currentLoadingTask = task;
+        Thread.ofVirtual().start(task);
     }
 
     private void handleReload() {
         logger.info("Reload triggered by user.");
-
         if (tailModeEnabled && monitoringRemotePath != null && activeTailSshService != null) {
             logger.info("Reloading remote tail for '{}'.", monitoringRemotePath);
-
             if (currentLogFromDb != null && currentLogFromDb.getSshServerID() != null) {
                 SSHServerModel server = serverManagementService.getServerById(currentLogFromDb.getSshServerID());
                 if (server != null && currentParsingConfig != null) {
-
                     showLoading("Reloading remote tail...");
                     try {
                         String password = server.getPassword();
@@ -597,7 +971,6 @@ public class MainController {
             }
         } else if (currentFile != null) {
             logger.info("Reloading local file '{}'.", currentFile.getName());
-
             if (currentParsingConfig != null) {
                 showLoading("Reloading file...");
                 openLocalLogFile(currentFile, false, currentParsingConfig);
@@ -612,101 +985,19 @@ public class MainController {
     @FXML
     public void handleClearLog() {
         logger.info("User requested to clear log view");
-
-        // Stop tail mode if active
         if (tailModeEnabled) {
             disableTail();
         }
-
-        // Clear table view
-        visibleLogEntries.clear();
-
-        // Reset data sources
-        currentLogEntrySource = null;
-        originalLogEntrySource = null;
+        cleanupFileResources();
         currentFile = null;
         currentLogFromDb = null;
         currentParsingConfig = null;
-
-        // Clear filters
         clearSearch();
-
-        // Update UI state
         updateTailButtonState();
-
         logger.info("Log view cleared");
     }
 
-    private void handleScrollToTop() {
-        if (currentLogEntrySource == null || currentLogEntrySource.getTotalEntries() == 0) {
-            return;
-        }
-
-        showLoading("Jumping to top...");
-        Task<Void> loadTopTask = new Task<>() {
-            @Override
-            protected Void call() {
-                Platform.runLater(() -> loadWindow(0, false));
-                return null;
-            }
-        };
-
-        loadTopTask.setOnSucceeded(e -> {
-            hideLoading();
-            int displayedCount = visibleLogEntries.size();
-            logger.info("Scrolled to top, showing {} entries (window)", displayedCount);
-        });
-
-        loadTopTask.setOnFailed(e -> {
-            hideLoading();
-            logger.error("Failed to scroll to top", loadTopTask.getException());
-            showError("Scroll Error", "Failed to jump to top: " + loadTopTask.getException().getMessage());
-        });
-
-        Thread.ofVirtual().start(loadTopTask);
-    }
-
-    private void handleScrollToBottom() {
-        if (currentLogEntrySource == null || currentLogEntrySource.getTotalEntries() == 0) {
-            return;
-        }
-
-        showLoading("Jumping to bottom...");
-
-        Task<Void> scrollTask = new Task<>() {
-            @Override
-            protected Void call() {
-                Platform.runLater(() -> scrollToBottomAfterLoad());
-                return null;
-            }
-        };
-
-        scrollTask.setOnSucceeded(e -> Platform.runLater(() -> {
-            hideLoading();
-            int displayedCount = visibleLogEntries.size();
-            logger.info("Scrolled to bottom, showing {} entries (TAIL MODE)", displayedCount);
-        }));
-
-        scrollTask.setOnFailed(e -> {
-            hideLoading();
-            logger.error("Failed to scroll to bottom", scrollTask.getException());
-            showError("Scroll Error", "Failed to jump to bottom: " + scrollTask.getException().getMessage());
-        });
-
-        Thread.ofVirtual().start(scrollTask);
-    }
-
     private void setupBottomPanel() {
-        detailTextArea = new CodeArea();
-        detailTextArea.setEditable(false);
-        detailTextArea.setWrapText(true);
-        detailTextArea.setStyle("-fx-font-family: 'Consolas', 'Monaco', monospace; -fx-font-size: 12px;");
-
-        if (!bottomPanel.getChildren().contains(detailTextArea)) {
-            bottomPanel.getChildren().add(detailTextArea);
-            VBox.setVgrow(detailTextArea, Priority.ALWAYS);
-        }
-
         prettifyJsonButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
             autoPrettifyJson = newVal;
             preferenceService
@@ -729,25 +1020,35 @@ public class MainController {
                 prettifyXmlButton.setStyle("");
             }
         });
-
         copyButton.setOnAction(e -> copyDetailToClipboard());
         clearDetailButton.setOnAction(e -> clearDetail());
         pinBottomPanelButton.setOnAction(e -> handleToggleBottomPanelPin());
         expandBottomPanelButton.setOnAction(e -> handleToggleBottomPanelPin());
+
+        // Interactive Status Bar
+        if (statusLabel != null) {
+            statusLabel.setCursor(javafx.scene.Cursor.HAND);
+            statusLabel.setOnMouseClicked(e -> handleGoToLine());
+            statusLabel.setTooltip(new Tooltip("Click to Go To Line (Ctrl+G)"));
+            statusLabel.setOnMouseEntered(e -> statusLabel.setStyle(
+                    "-fx-font-family: 'Segoe UI', sans-serif; -fx-font-size: 11px; -fx-text-fill: #0066cc; -fx-underline: true;"));
+            statusLabel.setOnMouseExited(e -> statusLabel.setStyle(
+                    "-fx-font-family: 'Segoe UI', sans-serif; -fx-font-size: 11px; -fx-text-fill: #333333; -fx-underline: false;"));
+        }
+
         updateBottomPanelDisplay();
     }
 
     private void applyAutoPrettify() {
-        String currentText = detailTextArea.getText();
-        if (currentText == null || currentText.isEmpty()) {
+        if (detailCodeArea.getText() == null || detailCodeArea.getText().isEmpty()) {
             return;
         }
 
         if (autoPrettifyJson) {
-            prettifyJson(false);
+            prettifyJson();
         }
         if (autoPrettifyXml) {
-            prettifyXml(false);
+            prettifyXml();
         }
     }
 
@@ -760,54 +1061,56 @@ public class MainController {
         FontAwesomeIconView pinIcon = (FontAwesomeIconView) pinBottomPanelButton.getGraphic();
         FontAwesomeIconView expandIcon = (FontAwesomeIconView) expandBottomPanelButton.getGraphic();
 
+        if (verticalSplitPane == null) {
+            return;
+        }
+
         if (isBottomPanelPinned) {
             pinIcon.setGlyphName("ANGLE_DOUBLE_DOWN");
+
             bottomPanel.setVisible(true);
             bottomPanel.setManaged(true);
             collapsedBottomPanel.setVisible(false);
             collapsedBottomPanel.setManaged(false);
 
             Platform.runLater(() -> {
-                double savedHeight = 200;
-                if (verticalSplitPane != null) {
-                    double totalHeight = verticalSplitPane.getHeight();
-                    if (totalHeight > 0) {
-                        double position = 1.0 - (savedHeight / totalHeight);
-                        verticalSplitPane.setDividerPositions(position);
-                    } else {
-                        verticalSplitPane.setDividerPositions(0.7);
-                    }
-                }
+                verticalSplitPane.applyCss();
+                verticalSplitPane.layout();
+                double pos = lastVerticalDividerPos > 0 ? lastVerticalDividerPos : 0.7;
+                verticalSplitPane.setDividerPositions(clampDivider(pos));
             });
+
+            if (toggleBottomPanelButton != null) {
+                toggleBottomPanelButton.setSelected(true);
+            }
         } else {
+            if (verticalSplitPane.getDividerPositions().length > 0) {
+                lastVerticalDividerPos = verticalSplitPane.getDividerPositions()[0];
+            }
+
             expandIcon.setGlyphName("ANGLE_DOUBLE_LEFT");
             expandIcon.setRotate(90);
 
+            // Keep SplitPane items intact; just hide the bottom pane and move divider fully
+            // down.
             bottomPanel.setVisible(false);
             bottomPanel.setManaged(false);
 
             collapsedBottomPanel.setVisible(true);
-            collapsedBottomPanel.setManaged(true);
+            collapsedBottomPanel.setManaged(false);
 
-            if (verticalSplitPane != null) {
-                Platform.runLater(() -> verticalSplitPane.setDividerPositions(1.0));
-            }
+            Platform.runLater(() -> {
+                verticalSplitPane.applyCss();
+                verticalSplitPane.layout();
+                // push divider to extreme bottom so top area takes all the space
+                verticalSplitPane.setDividerPositions(1.0);
+            });
         }
-        showBottomPanelMenuItem.setSelected(isBottomPanelPinned);
-    }
 
-    private void setupLogLevelFilter() {
-        logLevelFilterComboBox.setItems(FXCollections.observableArrayList("ALL", "TRACE", "DEBUG", "INFO", "WARN",
-                "ERROR", "FATAL", "UNPARSED"));
-        logLevelFilterComboBox.getSelectionModel().select("ALL");
-        logLevelFilterComboBox.setOnAction(e -> {
-            if (isSkippingFilterTrigger) {
-                return;
-            }
-            String selected = logLevelFilterComboBox.getSelectionModel().getSelectedItem();
-            logger.info("Level filter changed to: {}", selected);
-            performSearch();
-        });
+        showBottomPanelMenuItem.setSelected(isBottomPanelPinned);
+        if (toggleBottomPanelButton != null) {
+            toggleBottomPanelButton.setSelected(isBottomPanelPinned);
+        }
     }
 
     private void setupKeyboardShortcuts() {
@@ -820,203 +1123,50 @@ public class MainController {
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN),
                 () -> searchField.requestFocus());
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN), this::handleReload);
-        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.PAGE_UP), this::showPreviousWindow);
-        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.PAGE_DOWN), this::showNextWindow);
+
+        // Panel Shortcuts
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.B, KeyCombination.CONTROL_DOWN),
+                this::toggleLeftPanel);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.J, KeyCombination.CONTROL_DOWN),
+                this::toggleBottomPanel);
     }
 
-    private void copySelectionToClipboard(TableView<?> table) {
-        StringBuilder sb = new StringBuilder();
-        ObservableList<TablePosition> selectedCells = table.getSelectionModel().getSelectedCells();
-
-        if (selectedCells.isEmpty()) {
+    @FXML
+    public void handleGoToLine() {
+        if (lineOffsetIndex == null) {
             return;
         }
 
-        int prevRow = -1;
-        for (TablePosition position : selectedCells) {
-            int row = position.getRow();
-            if (prevRow == -1) {
-                prevRow = row;
-            } else if (row != prevRow) {
-                sb.append('\n');
-                prevRow = row;
-            } else {
-                sb.append('\t');
-            }
-            Object cellData = position.getTableColumn().getCellObservableValue(row).getValue();
-            sb.append(cellData == null ? "" : cellData.toString());
+        long totalLines = lineOffsetIndex.getLineCount();
+        if (totalLines <= 0) {
+            return;
         }
 
-        ClipboardContent content = new ClipboardContent();
-        content.putString(sb.toString());
-        Clipboard.getSystemClipboard().setContent(content);
-    }
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Go To Line");
+        dialog.setHeaderText("Enter line number (1 - " + String.format("%,d", totalLines) + "):");
+        dialog.setContentText("Line:");
+        dialog.initOwner(menuBar.getScene().getWindow());
 
-    private void updateTableColumns(ParsingConfig config) {
-        logger.info("Updating table columns with config: {}", config != null ? config.getName() : "null");
-        logTableView.getColumns().clear();
-
-        TableColumn<LogEntry, String> lineCol = getLogEntryStringTableLineColumn();
-        logTableView.getColumns().add(lineCol);
-
-        if (config != null && config.isValid()) {
-            List<String> groupNames = config.getGroupNames();
-            logger.info("Config has {} named groups: {}", groupNames.size(), groupNames);
-
-            int unparsedColumnIndex = determineUnparsedColumnIndex(groupNames);
-            logger.info("Unparsed entries will be displayed in column index: {} ({})", unparsedColumnIndex,
-                    unparsedColumnIndex < groupNames.size() ? groupNames.get(unparsedColumnIndex) : "N/A");
-            for (int i = 0; i < groupNames.size(); i++) {
-                final int currentIndex = i;
-                final String groupName = groupNames.get(i);
-
-                TableColumn<LogEntry, String> column = new TableColumn<>(groupName);
-
-                column.setCellValueFactory(cellData -> {
-                    LogEntry entry = cellData.getValue();
-                    if (entry.isParsed()) {
-                        return new SimpleStringProperty(entry.getField(groupName));
-                    } else {
-                        if (currentIndex == unparsedColumnIndex) {
-                            return new SimpleStringProperty(entry.getRawLog());
-                        } else {
-                            return new SimpleStringProperty("");
-                        }
-                    }
-                });
-
-                if (currentIndex == unparsedColumnIndex) {
-                    column.setCellFactory(col -> new SingleLineLogCell());
+        dialog.showAndWait().ifPresent(input -> {
+            try {
+                long lineNumber = Long.parseLong(input.trim().replace(",", ""));
+                if (lineNumber >= 1 && lineNumber <= totalLines) {
+                    canvasLogViewer.jumpToLine(lineNumber - 1); // 0-based
+                    logger.info("Jumped to line {}", lineNumber);
+                } else {
+                    Alert alert = new Alert(Alert.AlertType.WARNING);
+                    alert.setTitle("Invalid Line");
+                    alert.setContentText("Line number must be between 1 and " + String.format("%,d", totalLines));
+                    alert.showAndWait();
                 }
-
-                if ("level".equalsIgnoreCase(groupName)) {
-                    column.setCellFactory(col -> new TableCell<>() {
-                        private Label badge = null;
-
-                        @Override
-                        protected void updateItem(String item, boolean empty) {
-                            super.updateItem(item, empty);
-
-                            if (item == null || empty) {
-                                setText(null);
-                                setGraphic(null);
-                            } else {
-                                LogEntry entry = getTableRow() != null ? getTableRow().getItem() : null;
-                                if (entry != null && !entry.isParsed()) {
-                                    if (badge == null) {
-                                        badge = new Label();
-                                    }
-                                    badge.setText("UNPARSED");
-                                    badge.setStyle(
-                                            "-fx-background-color: #FF9800; " +
-                                                    "-fx-text-fill: white; " +
-                                                    "-fx-padding: 3px 8px; " +
-                                                    "-fx-background-radius: 3px; " +
-                                                    "-fx-font-weight: bold; " +
-                                                    "-fx-font-size: 10px;");
-                                    setText(null);
-                                    setGraphic(badge);
-                                } else {
-                                    if (badge == null) {
-                                        badge = new Label();
-                                    }
-                                    badge.setText(item);
-                                    String bgColor = getLevelColor(item);
-                                    badge.setStyle(
-                                            "-fx-background-color: " + bgColor + "; " +
-                                                    "-fx-text-fill: white; " +
-                                                    "-fx-padding: 3px 8px; " +
-                                                    "-fx-background-radius: 3px; " +
-                                                    "-fx-font-weight: bold; " +
-                                                    "-fx-font-size: 10px;");
-                                    setText(null);
-                                    setGraphic(badge);
-                                }
-                            }
-                        }
-
-                        private String getLevelColor(String level) {
-                            if (level == null)
-                                return "#9E9E9E";
-
-                            return switch (level.toUpperCase()) {
-                                case "ERROR" -> "#F44336"; // Red
-                                case "FATAL" -> "#D32F2F"; // Dark Red
-                                case "WARN", "WARNING" -> "#FF9800"; // Orange
-                                case "INFO" -> "#2196F3"; // Blue
-                                case "DEBUG" -> "#4CAF50"; // Green
-                                case "TRACE" -> "#9E9E9E"; // Gray
-                                default -> "#607D8B"; // Blue Gray
-                            };
-                        }
-                    });
-                } else if (currentIndex != unparsedColumnIndex) {
-                    column.setCellFactory(col -> new SingleLineLogCell());
-                }
-
-                column.setMinWidth(80);
-                column.setSortable(false);
-                logTableView.getColumns().add(column);
+            } catch (NumberFormatException e) {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("Invalid Input");
+                alert.setContentText("Please enter a valid number.");
+                alert.showAndWait();
             }
-            logger.info("Created {} columns total (including line number)", logTableView.getColumns().size());
-        } else {
-            logger.warn("Config is null or invalid, using default raw log column");
-            TableColumn<LogEntry, String> rawCol = new TableColumn<>("Log Message");
-            rawCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getRawLog()));
-            rawCol.setPrefWidth(800);
-            rawCol.setSortable(false);
-            rawCol.setCellFactory(col -> new SingleLineLogCell());
-            logTableView.getColumns().add(rawCol);
-            logger.info("Created 2 columns (line number + raw log)");
-        }
-    }
-
-    private int determineUnparsedColumnIndex(List<String> groupNames) {
-        if (groupNames == null || groupNames.isEmpty()) {
-            return 0;
-        }
-
-        final int size = groupNames.size();
-
-        // 1. Priority: Exact or Strong Partial Match for "message", "msg", "content"
-        for (int i = 0; i < size; i++) {
-            String name = groupNames.get(i).toLowerCase();
-            if (name.equals("message") || name.equals("msg") || name.equals("content") || name.equals("messages")
-                    || name.contains("message")) {
-                return i;
-            }
-        }
-
-        // 2. Fallback: Check for other common names
-        for (int i = 0; i < size; i++) {
-            String name = groupNames.get(i).toLowerCase();
-            if (name.contains("text") || name.contains("data") || name.contains("payload")) {
-                return i;
-            }
-        }
-
-        // 3. Last Resort: Default to the last column (usually the message/payload
-        // column)
-        return size - 1;
-    }
-
-    private static TableColumn<LogEntry, String> getLogEntryStringTableLineColumn() {
-        TableColumn<LogEntry, String> lineCol = new TableColumn<>("Line");
-        lineCol.setCellValueFactory(cellData -> {
-            LogEntry entry = cellData.getValue();
-            String lineText;
-            if (entry.getLineNumber() != entry.getEndLineNumber()) {
-                lineText = entry.getLineNumber() + "-" + entry.getEndLineNumber();
-            } else {
-                lineText = String.valueOf(entry.getLineNumber());
-            }
-            return new SimpleStringProperty(lineText);
         });
-        lineCol.setPrefWidth(80);
-        lineCol.setMinWidth(80);
-        lineCol.setMaxWidth(120);
-        lineCol.setSortable(false);
-        return lineCol;
     }
 
     @FXML
@@ -1050,14 +1200,8 @@ public class MainController {
                 return;
             }
 
-            ParsingConfig selectedConfig = showParsingConfigSelectionDialog();
-            if (selectedConfig == null) {
-                logger.info("No parsing configuration selected, operation cancelled.");
-                if (sshService != null) {
-                    sshService.disconnect();
-                }
-                return;
-            }
+            ParsingConfig selectedConfig = ParsingConfig.createRawConfig();
+            logger.info("Using default RAW configuration for instant open.");
 
             if (selectedFile.getSourceType() == FileInfo.SourceType.LOCAL) {
                 openLocalLogFile(new File(selectedFile.getPath()), true, selectedConfig);
@@ -1087,7 +1231,6 @@ public class MainController {
             showError("Connection Error", "SSH connection is not active. Please re-select the file.");
             return;
         }
-
         showLoading("Downloading remote file: " + remoteFileName);
 
         Task<File> downloadTask = new Task<>() {
@@ -1097,7 +1240,6 @@ public class MainController {
                 String sanitizedName = new File(remoteFileName).getName();
                 File localTmpFile = new File(tempDir,
                         "seeloggyplus-" + System.currentTimeMillis() + "-" + sanitizedName);
-
                 logger.info("Downloading remote file {} to temporary path {}", remotePath,
                         localTmpFile.getAbsolutePath());
                 boolean success = sshService.downloadFileConcurrent(remotePath, localTmpFile.getAbsolutePath(),
@@ -1118,7 +1260,7 @@ public class MainController {
 
                             @Override
                             public void onComplete(long totalEntries) {
-                                // no-op
+                                logger.info("Download complete.");
                             }
                         });
 
@@ -1162,15 +1304,7 @@ public class MainController {
             logger.info("Previous task cancellation requested.");
         }
 
-        if (visibleLogEntries != null && !visibleLogEntries.isEmpty()) {
-            int previousSize = visibleLogEntries.size();
-            visibleLogEntries.clear();
-            logger.info("Cleared {} entries from memory", previousSize);
-        }
-
-        currentLogEntrySource = null;
-        originalLogEntrySource = null;
-
+        cleanupFileResources();
         Thread.ofVirtual().start(() -> {
             System.gc();
             logger.info("Memory cleanup (GC) triggered on background thread");
@@ -1192,16 +1326,18 @@ public class MainController {
             return;
         }
 
+        clearSearch();
+
         cancelCurrentLoadingTask();
         if (tailModeEnabled) {
             disableTail();
         }
 
+        // Make sure UI layout state is consistent before starting a new load.
+        normalizeLayoutState();
+
         currentFile = file;
         currentParsingConfig = parsingConfig;
-        updateDateTimeFilterPromptText(parsingConfig);
-        logger.info("Updated date filter prompt to match parsing config: {} (format: {})", parsingConfig.getName(),
-                parsingConfig.getTimestampFormat() != null ? parsingConfig.getTimestampFormat() : "default");
 
         LogFile logFile = getOrCreateLogFile(file, parsingConfig);
 
@@ -1215,209 +1351,9 @@ public class MainController {
         this.currentFile = file;
 
         long fileSizeInBytes = file.length();
-        logger.info("Starting to parse file: {} ({}) with config: {}", file.getName(),
-                FileUtils.formatFileSize(fileSizeInBytes), parsingConfig.getName());
-
-        if (fileSizeInBytes > INDEXING_THRESHOLD_BYTES) {
-            logger.info("File size ({}) exceeds threshold ({}). Switching to Indexed Mode (Lucene).",
-                    formatBytes(fileSizeInBytes), formatBytes(INDEXING_THRESHOLD_BYTES));
-            isIndexedMode = true;
-            startIndexingTask(file, parsingConfig, logFile, updateRecentFilesList);
-            return;
-        } else {
-            isIndexedMode = false;
-        }
-
-        logger.info("Using parallel parsing strategy (RAM) with virtual scrolling");
-        loadFileWithParallelParsing(file, parsingConfig, logFile, updateRecentFilesList);
-    }
-
-    private void loadFileWithParallelParsing(File file, ParsingConfig parsingConfig, LogFile logFile,
-            boolean updateRecentFilesList) {
-        showLoading("Parsing file: " + file.getName());
-
-        Task<List<LogEntry>> task = getListTask(file, parsingConfig);
-
-        task.setOnSucceeded(e -> {
-            List<LogEntry> entries = task.getValue();
-            logger.info("Parsing complete! Loaded {} entries", entries.size());
-            originalLogEntrySource = new ListLogEntrySourceImpl(entries);
-            currentLogEntrySource = originalLogEntrySource;
-
-            updateTableColumns(currentParsingConfig);
-            logger.info("Updated table columns for config: {}", currentParsingConfig.getName());
-
-            Platform.runLater(() -> {
-                int total = currentLogEntrySource.getTotalEntries();
-                loadWindow(Math.max(0, total - windowSize), true);
-                logger.info("Initial window loaded after parse");
-                autoResizeColumns(logTableView);
-            });
-
-            if (updateRecentFilesList) {
-                RecentFile recentFile = new RecentFile();
-                recentFile.setFileId(logFile.getId());
-                recentFile.setLastOpened(LocalDateTime.now());
-                recentFileService.save(logFile, recentFile);
-                refreshRecentFilesList();
-                logger.info("Added file to recent files: {}", file.getName());
-            }
-
-            // Auto-select the current file in the recent files list for better UX
-            selectRecentFile(file);
-
-            hideLoading();
-            updateTailButtonState();
-            currentLoadingTask = null;
-
-            // Trigger GC to clean up parsing garbage
-            Thread.ofVirtual().start(() -> {
-                System.gc();
-                logger.info("Post-parse GC triggered");
-            });
-        });
-
-        task.setOnFailed(e ->
-
-        {
-            hideLoading();
-            Throwable ex = task.getException();
-            logger.error("Failed to parse file", ex);
-            showError("Failed to load file", ex.getMessage());
-            currentLoadingTask = null;
-        });
-
-        task.setOnCancelled(e -> {
-            hideLoading();
-            logger.info("Parsing cancelled by user");
-            currentLoadingTask = null;
-        });
-
-        currentLoadingTask = task;
-        Thread.ofVirtual().start(task);
-    }
-
-    private void startIndexingTask(File file, ParsingConfig parsingConfig, LogFile logFile,
-            boolean updateRecentFilesList) {
-        String runId = file.getName() + "_" + file.lastModified();
-        showLoading("Indexing file: " + file.getName() + " (Optimized for Large Files)");
-
-        Task<Void> indexTask = new Task<>() {
-            @Override
-            protected Void call() throws Exception {
-                indexerService.initializeIndex(runId);
-                logParserService.indexFileParallel(file, parsingConfig, indexerService,
-                        new LogParser.ProgressCallback() {
-                            @Override
-                            public void onProgress(double progress, long bytesProcessed, long totalBytes) {
-                                updateProgress(bytesProcessed, totalBytes);
-                                Platform.runLater(() -> {
-                                    if (loadingOverlay != null && loadingOverlay.isVisible()) {
-                                        if (loadingProgress != null) {
-                                            loadingProgress.setProgress(progress);
-                                        }
-                                        loadingLabel.setText(String.format("Indexing... %.1f%% (%s / %s)",
-                                                progress * 100, formatBytes(bytesProcessed), formatBytes(totalBytes)));
-                                    }
-                                });
-                            }
-
-                            @Override
-                            public void onComplete(long totalEntries) {
-                                Platform.runLater(
-                                        () -> logger.info("Indexing complete! indexed {} entries", totalEntries));
-                            }
-                        });
-
-                indexerService.commit();
-                return null;
-            }
-        };
-
-        indexTask.setOnSucceeded(e -> {
-            try {
-                searchService.openIndex(runId);
-                originalLogEntrySource = new LuceneLogEntrySourceImpl(searchService, null, 0, Long.MAX_VALUE,
-                        logParserService, parsingConfig);
-                currentLogEntrySource = originalLogEntrySource;
-
-                // CRITICAL: Free the huge in-memory list from the initial load
-                // The previous ListLogEntrySourceImpl is now dereferenced (if no other refs
-                // exist)
-                // Force GC to reclaim 1.5GB+ RAM immediately to prevent lag during navigation
-                System.gc();
-                logger.info("Forced GC to reclaim memory after switching to Indexed Mode");
-
-                updateTableColumns(parsingConfig);
-
-                Platform.runLater(() -> {
-                    updateTableColumns(parsingConfig);
-                    int total = currentLogEntrySource.getTotalEntries();
-                    int totalPages = PaginationUtils.calculateTotalPages(total, windowSize);
-                    int lastPageStart = PaginationUtils.calculateStartIndex(totalPages, windowSize);
-
-                    loadWindow(lastPageStart, true);
-                    logger.info("Initial indexed window loaded");
-                    autoResizeColumns(logTableView);
-                });
-
-                if (updateRecentFilesList) {
-                    RecentFile recentFile = new RecentFile();
-                    recentFile.setFileId(logFile.getId());
-                    recentFile.setLastOpened(LocalDateTime.now());
-                    recentFileService.save(logFile, recentFile);
-                    refreshRecentFilesList();
-                }
-
-                hideLoading();
-                updateTailButtonState();
-                currentLoadingTask = null;
-            } catch (Exception ex) {
-                logger.error("Failed to open index after indexing", ex);
-                showError("Index Error", "Failed to open search index: " + ex.getMessage());
-            }
-        });
-
-        indexTask.setOnFailed(e -> {
-            hideLoading();
-            Throwable ex = indexTask.getException();
-            logger.error("Failed to index file", ex);
-            showError("Indexing Failed", ex.getMessage());
-            currentLoadingTask = null;
-        });
-
-        currentLoadingTask = indexTask;
-        Thread.ofVirtual().start(indexTask);
-    }
-
-    private Task<List<LogEntry>> getListTask(File file, ParsingConfig parsingConfig) {
-        final ParsingConfig configToUse = parsingConfig;
-
-        return new Task<>() {
-            @Override
-            protected List<LogEntry> call() throws IOException {
-                return logParserService.parseFileParallel(file, configToUse, new LogParser.ProgressCallback() {
-                    @Override
-                    public void onProgress(double progress, long bytesProcessed, long totalBytes) {
-                        updateProgress(bytesProcessed, totalBytes);
-                        Platform.runLater(() -> {
-                            if (loadingOverlay != null && loadingOverlay.isVisible()) {
-                                if (loadingProgress != null) {
-                                    loadingProgress.setProgress(progress);
-                                }
-                                loadingLabel.setText(String.format("Parsing... %.1f%% (%s / %s)", progress * 100,
-                                        formatBytes(bytesProcessed), formatBytes(totalBytes)));
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onComplete(long totalEntries) {
-                        Platform.runLater(() -> logger.info("Parsed {} entries", totalEntries));
-                    }
-                });
-            }
-        };
+        logger.info("Starting to load file: {} ({}) - Notepad++ Style (RAM-based)", file.getName(),
+                FileUtils.formatFileSize(fileSizeInBytes));
+        loadFileWithParallelParsing(file, logFile, updateRecentFilesList);
     }
 
     private LogFile getOrCreateLogFile(File file, ParsingConfig parsingConfig) {
@@ -1456,69 +1392,6 @@ public class MainController {
         } catch (Exception ex) {
             logger.error("Error in getOrCreateLogFile for: {}", file.getAbsolutePath(), ex);
             return null;
-        }
-    }
-
-    private ParsingConfig showParsingConfigSelectionDialog() {
-        try {
-            FXMLLoader loader = new FXMLLoader(
-                    getClass().getResource("/fxml/ParsingConfigurationSelectionDialog.fxml"));
-            DialogPane dialogPane = loader.load();
-
-            ParsingConfigurationSelectionDialogController controller = loader.getController();
-
-            Dialog<ButtonType> dialog = new Dialog<>();
-            dialog.setTitle("Select Parsing Configuration");
-            dialog.initModality(Modality.WINDOW_MODAL);
-            dialog.initOwner(menuBar.getScene().getWindow());
-            dialog.setDialogPane(dialogPane);
-
-            Optional<ButtonType> result = showAndWaitAndRestore(dialog);
-
-            if (result.isPresent() && result.get() == ButtonType.OK) {
-                if (controller.isValidSelection()) {
-                    ParsingConfig selected = controller.getSelectedConfig();
-                    logger.info("Selected parsing configuration: {}", selected != null ? selected.getName() : "null");
-                    return selected;
-                } else {
-                    logger.info("Invalid configuration selected");
-                    return null;
-                }
-            }
-
-            logger.info("Dialog cancelled or closed");
-            return null;
-        } catch (IOException e) {
-            logger.error("Failed to open parsing configuration selection dialog", e);
-            showError("Failed to open dialog", e.getMessage());
-            return null;
-        }
-    }
-
-    private void handleParsingConfiguration() {
-        try {
-            Stage mainStage = (Stage) menuBar.getScene().getWindow();
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ParsingConfigDialog.fxml"));
-            Parent root = loader.load();
-
-            ParsingConfigController controller = loader.getController();
-            controller.setOnConfigChangedCallback(this::handleParsingConfigChanged);
-
-            Stage dialog = new Stage();
-            dialog.setTitle("Parsing Configuration");
-            dialog.initOwner(mainStage);
-            dialog.initModality(Modality.WINDOW_MODAL);
-            addAppIcon(dialog);
-            Scene scene = new Scene(root);
-            dialog.setScene(scene);
-            dialog.setWidth(1000);
-            dialog.setHeight(800);
-
-            dialog.showAndWait();
-            logger.info("Parsing config dialog closed, returning to previous view");
-        } catch (IOException e) {
-            logger.error("Failed to open parsing configuration dialog", e);
-            showError("Failed to open parsing configuration", e.getMessage());
         }
     }
 
@@ -1577,7 +1450,6 @@ public class MainController {
     private void loadPreferences() {
         logger.info("Loading preferences...");
 
-        // Font settings - Default to Consolas for better code readability
         String fontFamily = preferenceService.getPreferencesByCode("app_font_family").orElse("Consolas");
         String fontSizeStr = preferenceService.getPreferencesByCode("app_font_size").orElse("12");
         int fontSize = 12;
@@ -1588,18 +1460,10 @@ public class MainController {
         }
 
         String fontStyle = String.format("-fx-font-family: '%s'; -fx-font-size: %dpx;", fontFamily, fontSize);
-        logTableView.setStyle(fontStyle);
-        detailTextArea.setStyle(fontStyle);
-
-        // Window size
-        String windowSizeStr = preferenceService.getPreferencesByCode("main_window_size").orElse("5000");
-        try {
-            this.windowSize = Integer.parseInt(windowSizeStr);
-        } catch (NumberFormatException e) {
-            logger.warn("Invalid window size preference: {}", windowSizeStr);
+        if (detailCodeArea != null) {
+            detailCodeArea.setStyle(fontStyle);
         }
 
-        // SSH Threads
         String threadsStr = preferenceService.getPreferencesByCode("ssh_download_threads").orElse("4");
         try {
             this.sshDownloadThreads = Integer.parseInt(threadsStr);
@@ -1607,35 +1471,17 @@ public class MainController {
             logger.warn("Invalid ssh threads preference: {}", threadsStr);
         }
 
-        // Auto prettify
         this.autoPrettifyJson = Boolean
                 .parseBoolean(preferenceService.getPreferencesByCode("main_auto_prettify_json").orElse("false"));
         this.autoPrettifyXml = Boolean
                 .parseBoolean(preferenceService.getPreferencesByCode("main_auto_prettify_xml").orElse("false"));
 
-        // Default log level
-        String defaultLevel = preferenceService.getPreferencesByCode("main_default_log_level").orElse("ALL");
-        if (logLevelFilterComboBox.getSelectionModel().isEmpty()
-                || "ALL".equals(logLevelFilterComboBox.getSelectionModel().getSelectedItem())) {
-            logLevelFilterComboBox.getSelectionModel().select(defaultLevel);
-        }
-
-        // Tail window size
-        String tailWindowSizeStr = preferenceService.getPreferencesByCode("main_tail_window_size").orElse("20000");
-        try {
-            this.tailWindowSize = Integer.parseInt(tailWindowSizeStr);
-        } catch (NumberFormatException e) {
-            logger.warn("Invalid tail window size preference: {}", tailWindowSizeStr);
-        }
-
-        logger.info("Preferences loaded: font={} {}, windowSize={}, tailWindowSize={}, threads={}",
-                fontFamily, fontSize, windowSize, tailWindowSize, sshDownloadThreads);
+        logger.info("Preferences loaded: font={} {}, threads={}", fontFamily, fontSize, sshDownloadThreads);
 
         if (autoPrettifyJson || autoPrettifyXml) {
             applyAutoPrettify();
         }
 
-        // Update toggle button states
         prettifyJsonButton.setSelected(autoPrettifyJson);
         prettifyXmlButton.setSelected(autoPrettifyXml);
     }
@@ -1643,7 +1489,6 @@ public class MainController {
     static void restoreWindow(Stage mainStage, boolean wasMaximized, double oldX, double oldY, double oldWidth,
             double oldHeight, Parent root, Stage dialog) {
         dialog.setScene(new Scene(root));
-
         dialog.showAndWait();
 
         Platform.runLater(() -> {
@@ -1656,65 +1501,6 @@ public class MainController {
                 mainStage.setHeight(oldHeight);
             }
         });
-    }
-
-    private void handleParsingConfigChanged() {
-        logger.info("Parsing configuration changed, checking if current file or tail session needs re-parsing.");
-
-        if (currentParsingConfig == null) {
-            logger.info("No parsing configuration is currently active. Skipping reload.");
-            return;
-        }
-
-        Optional<ParsingConfig> updatedConfigOpt = parsingConfigService.findById(currentParsingConfig.getId());
-
-        if (updatedConfigOpt.isEmpty()) {
-            logger.warn("Current parsing config (ID: {}) no longer exists in the database.",
-                    currentParsingConfig.getId());
-            showInfo("Configuration Deleted",
-                    "The parsing configuration in use has been deleted. Please reload the file or restart the tail with a new configuration.");
-            return;
-        }
-
-        ParsingConfig updatedConfig = updatedConfigOpt.get();
-
-        // Case 1: Local file is open
-        if (currentFile != null) {
-            logger.info("Local file is active. Re-parsing '{}' with updated configuration '{}'.", currentFile.getName(),
-                    updatedConfig.getName());
-            openLocalLogFile(currentFile, false, updatedConfig);
-        }
-        // Case 2: Remote tail is active
-        else if (tailModeEnabled && monitoringRemotePath != null && activeTailSshService != null) {
-            logger.info("Remote tail is active. Restarting tail for '{}' with updated configuration '{}'.",
-                    monitoringRemotePath, updatedConfig.getName());
-            if (currentLogFromDb != null && currentLogFromDb.getSshServerID() != null) {
-                SSHServerModel server = serverManagementService.getServerById(currentLogFromDb.getSshServerID());
-                if (server != null) {
-                    startRemoteTail(monitoringRemotePath, activeTailSshService, updatedConfig, server);
-                } else {
-                    showError("Server Not Found",
-                            "Could not restart tail because the associated SSH server configuration was not found.");
-                }
-            } else {
-                showError("Missing Information", "Could not restart tail because server information is missing.");
-            }
-        } else {
-            logger.info("No active file or tail session to apply configuration changes to.");
-        }
-
-        refreshRecentFilesList();
-    }
-
-    private boolean configsAreEqual(ParsingConfig config1, ParsingConfig config2) {
-        if (config1 == null || config2 == null) {
-            return config1 == config2;
-        }
-
-        return Objects.equals(config1.getName(), config2.getName()) &&
-                Objects.equals(config1.getRegexPattern(), config2.getRegexPattern()) &&
-                Objects.equals(config1.getDescription(), config2.getDescription()) &&
-                Objects.equals(config1.getTimestampFormat(), config2.getTimestampFormat());
     }
 
     private void handleRecentFileSelected(RecentFilesDto recentFile) {
@@ -1739,7 +1525,6 @@ public class MainController {
                         throw new IOException("SSH server configuration with ID " + sshServerId + " was not found.");
                     }
 
-                    // --- Password prompt (must run on FX thread) ---
                     final CompletableFuture<String> passwordFuture = new CompletableFuture<>();
                     Platform.runLater(() -> {
                         String password = server.getPassword();
@@ -1753,8 +1538,7 @@ public class MainController {
                             passwordFuture.complete(password);
                         }
                     });
-
-                    String password = passwordFuture.get(); // Wait for password from UI
+                    String password = passwordFuture.get();
                     if (password == null) {
                         logger.info("User cancelled password prompt for remote recent file.");
                         updateMessage("SSH connection cancelled.");
@@ -1787,12 +1571,10 @@ public class MainController {
                 SSHServiceImpl sshService = connectTask.getValue();
                 if (sshService != null) {
                     logger.info("SSH connected for remote recent file, proceeding to tail.");
-                    ParsingConfig config = getParsingConfigForLogFile(logFile, recentFile.parsingConfig());
-                    if (config != null) {
-                        resetFilters();
-                        startRemoteTail(logFile.getFilePath(), sshService, config,
-                                serverManagementService.getServerById(logFile.getSshServerID()));
-                    }
+                    ParsingConfig config = ParsingConfig.createRawConfig();
+                    resetFilters();
+                    startRemoteTail(logFile.getFilePath(), sshService, config,
+                            serverManagementService.getServerById(logFile.getSshServerID()));
                 }
 
             });
@@ -1814,409 +1596,64 @@ public class MainController {
                 return;
             }
 
-            ParsingConfig parsingConfig = getParsingConfigForLogFile(logFile, recentFile.parsingConfig());
-            if (parsingConfig != null) {
-                logger.info("Opening recent file: {} with parsing config: {} (ID: {})", file.getName(),
-                        parsingConfig.getName(), parsingConfig.getId());
-                resetFilters();
-                openLocalLogFile(file, false, parsingConfig);
-            }
+            ParsingConfig parsingConfig = ParsingConfig.createRawConfig();
+            logger.info("Opening recent file: {} with RAW config", file.getName());
+            resetFilters();
+            openLocalLogFile(file, false, parsingConfig);
         }
-    }
-
-    private ParsingConfig getParsingConfigForLogFile(LogFile logFile, ParsingConfig initialConfig) {
-        if (initialConfig != null) {
-            logger.info("Using ParsingConfig from DTO - ID: {}, Name: {}, Valid: {}", initialConfig.getId(),
-                    initialConfig.getName(), initialConfig.isValid());
-            return initialConfig;
-        }
-
-        String parsingConfigId = logFile.getParsingConfigurationID();
-        ParsingConfig configFromDb = getParsingConfig(parsingConfigId);
-
-        if (configFromDb != null) {
-            return configFromDb;
-        }
-
-        logger.warn("No parsing config associated with file: {}, showing selection dialog", logFile.getName());
-        ParsingConfig selectedConfig = showParsingConfigSelectionDialog();
-        if (selectedConfig == null) {
-            logger.info("No parsing configuration selected, operation cancelled");
-            return null;
-        }
-        return selectedConfig;
-    }
-
-    private ParsingConfig getParsingConfig(String parsingConfigId) {
-        logger.info("Attempting to load config from database with ID: {}", parsingConfigId);
-        ParsingConfig parsingConfig = null;
-
-        if (parsingConfigId != null && !parsingConfigId.isEmpty()) {
-            parsingConfig = parsingConfigService.findById(parsingConfigId).orElse(null);
-
-            if (parsingConfig != null) {
-                logger.info("Loaded ParsingConfig from database - ID: {}, Name: {}, Valid: {}", parsingConfig.getId(),
-                        parsingConfig.getName(), parsingConfig.isValid());
-            } else {
-                logger.warn("ParsingConfig with ID {} not found in database", parsingConfigId);
-            }
-        }
-        return parsingConfig;
     }
 
     private void resetFilters() {
-        logger.info("Resetting all filters to default state");
-        searchField.clear();
-        logLevelFilterComboBox.getSelectionModel().select("ALL");
-        regexCheckBox.setSelected(false);
-        caseSensitiveCheckBox.setSelected(false);
-        dateTimeFromField.clear();
-        dateTimeToField.clear();
-        logger.info(
-                "Filters reset: Level=ALL, Search='', Regex=false, CaseSensitive=false, HideUnparsed=false, DateTime=empty");
-    }
-
-    private void clearDateFilter() {
-        logger.info("Clearing date/time filter");
-        dateTimeFromField.clear();
-        dateTimeToField.clear();
-    }
-
-    private LocalDateTime parseDateTimeFilter(String input) {
-        if (input == null || input.trim().isEmpty()) {
-            return null;
-        }
-
-        String trimmed = input.trim();
-
-        for (DateTimeFormatter formatter : DATE_TIME_FORMATTERS) {
-            try {
-                return LocalDateTime.parse(trimmed, formatter);
-            } catch (DateTimeParseException e) {
-                // Ignore and try next
-            }
-        }
-
-        for (DateTimeFormatter formatter : DATE_ONLY_FORMATTERS) {
-            try {
-                return java.time.LocalDate.parse(trimmed, formatter).atStartOfDay();
-            } catch (DateTimeParseException e) {
-                // Ignore and try next
-            }
-        }
-
-        logger.debug("Could not parse date/time: {}", trimmed);
-        return null;
-    }
-
-    private LocalDateTime parseEntryTimestamp(LogEntry entry) {
-        if (entry.isParsed()) {
-            LocalDateTime timestamp = entry.getTimestamp();
-            if (timestamp != null) {
-                return timestamp;
-            }
-
-            if (currentParsingConfig != null && currentParsingConfig.getTimestampFormat() != null) {
-                String timestampStr = entry.getField("timestamp");
-                if (timestampStr != null && !timestampStr.isEmpty()) {
-                    try {
-                        DateTimeFormatter configFormatter = DateTimeFormatter
-                                .ofPattern(currentParsingConfig.getTimestampFormat());
-                        return LocalDateTime.parse(timestampStr, configFormatter);
-                    } catch (Exception e) {
-                        logger.debug("Failed to parse timestamp with config format: {}", e.getMessage());
-                    }
-                }
-            }
-
-            String timestampStr = entry.getField("timestamp");
-            if (timestampStr != null && !timestampStr.isEmpty()) {
-                return parseDateTimeFilter(timestampStr);
-            }
-        }
-
-        String rawLog = entry.getRawLog();
-        if (rawLog != null && rawLog.length() > 19) {
-            String possibleTimestamp = rawLog.substring(0, Math.min(23, rawLog.length())); // 23 for milliseconds
-            return parseDateTimeFilter(possibleTimestamp);
-        }
-
-        return null;
-    }
-
-    private void performSearch() {
-        final String searchText = searchField.getText();
-        final boolean isRegex = regexCheckBox.isSelected();
-        final boolean caseSensitive = caseSensitiveCheckBox.isSelected();
-        final String selectedLevel = logLevelFilterComboBox.getSelectionModel().getSelectedItem();
-        final String dateTimeFrom = dateTimeFromField.getText();
-        final String dateTimeTo = dateTimeToField.getText();
-
-        logger.info("Search - Level: {}, Text: '{}', Regex: {}, CaseSensitive: {}", selectedLevel, searchText, isRegex,
-                caseSensitive);
-
-        if (originalLogEntrySource == null && tailModeEnabled) {
-            Predicate<LogEntry> searchPredicate;
-            try {
-                searchPredicate = buildSearchPredicate(searchText, isRegex, caseSensitive, selectedLevel, dateTimeFrom,
-                        dateTimeTo);
-            } catch (Exception e) {
-                logger.error("Failed to build search predicate for tail mode", e);
-                showError("Search Error", e.getMessage());
-                return;
-            }
-
-            currentTailFilterPredicate = searchPredicate;
-
-            List<LogEntry> current = new ArrayList<>(visibleLogEntries);
-            List<LogEntry> filtered = new ArrayList<>();
-            for (LogEntry entry : current) {
-                if (searchPredicate.test(entry)) {
-                    filtered.add(entry);
-                }
-            }
-
-            visibleLogEntries.setAll(filtered);
-            logger.info("Tail search applied. Showing {} entries in current window", filtered.size());
-            return;
-        }
-
-        final LogEntrySource sourceToSearch = this.originalLogEntrySource;
-        if (sourceToSearch == null) {
-            return;
-        }
-
-        Task<Void> task = new Task<>() {
-            @Override
-            protected Void call() {
-                if (isIndexedMode) {
-                    long fromT = 0;
-                    long toT = Long.MAX_VALUE;
-                    try {
-                        LocalDateTime f = parseDateTimeFilter(dateTimeFrom);
-                        if (f != null) {
-                            fromT = f.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
-                        }
-                        LocalDateTime t = parseDateTimeFilter(dateTimeTo);
-                        if (t != null) {
-                            toT = t.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
-                        }
-                    } catch (Exception e) {
-                        logger.warn("Date parse error for search", e);
-                    }
-
-                    String luceneQuery = buildLuceneQueryString(searchText, isRegex, caseSensitive, selectedLevel);
-
-                    final long finalFrom = fromT;
-                    final long finalTo = toT;
-                    final String finalQ = luceneQuery;
-
-                    Platform.runLater(() -> {
-                        currentLogEntrySource = new LuceneLogEntrySourceImpl(searchService, finalQ, finalFrom, finalTo,
-                                logParserService, currentParsingConfig);
-                        int totalFiltered = currentLogEntrySource.getTotalEntries();
-                        if (totalFiltered == 0) {
-                            visibleLogEntries.clear();
-                            return;
-                        }
-                        loadWindow(0, false);
-                    });
-
-                } else {
-                    final Predicate<LogEntry> searchPredicate = buildSearchPredicate(searchText, isRegex, caseSensitive,
-                            selectedLevel, dateTimeFrom, dateTimeTo);
-
-                    // Use captured local variable to prevent NPE if originalLogEntrySource becomes
-                    // null
-                    LogEntrySource filteredSource = sourceToSearch.filter(searchPredicate);
-                    int totalFiltered = filteredSource.getTotalEntries();
-
-                    Platform.runLater(() -> {
-                        currentLogEntrySource = filteredSource;
-                        currentTailFilterPredicate = searchPredicate;
-
-                        if (totalFiltered == 0) {
-                            visibleLogEntries.clear();
-                            return;
-                        }
-                        loadWindow(0, false);
-                    });
-                }
-                return null;
-            }
-        };
-
-        task.setOnFailed(e -> {
-            Throwable ex = task.getException();
-            logger.error("Search failed", ex);
-            showError("Search Failed", ex.getMessage());
-        });
-
-        Thread.ofVirtual().start(task);
-    }
-
-    private void clearSearch() {
-        searchField.clear();
-        logLevelFilterComboBox.getSelectionModel().select("ALL");
-        dateTimeFromField.clear();
-        dateTimeToField.clear();
-        currentTailFilterPredicate = null;
-
-        if (originalLogEntrySource != null) {
-            currentLogEntrySource = originalLogEntrySource;
-
-            int totalEntries = originalLogEntrySource.getTotalEntries();
-            loadWindow(Math.max(0, totalEntries - windowSize), true);
-        } else {
-            visibleLogEntries.clear();
-        }
-    }
-
-    private boolean isFilterActive() {
-        if (currentLogEntrySource != originalLogEntrySource) {
-            return true;
-        }
-
-        String searchText = searchField.getText();
-        boolean hasSearchText = searchText != null && !searchText.trim().isEmpty();
-
-        String selectedLevel = logLevelFilterComboBox.getSelectionModel().getSelectedItem();
-        boolean hasLevelFilter = selectedLevel != null && !selectedLevel.equals("ALL");
-
-        String dateTimeFrom = dateTimeFromField.getText();
-        boolean hasFromDate = dateTimeFrom != null && !dateTimeFrom.trim().isEmpty();
-
-        String dateTimeTo = dateTimeToField.getText();
-        boolean hasToDate = dateTimeTo != null && !dateTimeTo.trim().isEmpty();
-
-        return hasSearchText || hasLevelFilter || hasFromDate || hasToDate;
-    }
-
-    private void jumpToOriginalPosition(LogEntry selectedEntry) {
-        if (selectedEntry == null || originalLogEntrySource == null) {
-            return;
-        }
-
-        long targetLineNumber = selectedEntry.getLineNumber();
-        logger.info("Double-click detected: Jumping to original position (line {}) from filtered view",
-                targetLineNumber);
-
-        isSkippingFilterTrigger = true;
-        try {
+        if (searchField != null)
             searchField.clear();
-            logLevelFilterComboBox.getSelectionModel().select("ALL");
-            dateTimeFromField.clear();
-            dateTimeToField.clear();
-        } finally {
-            isSkippingFilterTrigger = false;
+        if (regexCheckBox != null)
+            regexCheckBox.setSelected(false);
+        if (caseSensitiveCheckBox != null)
+            caseSensitiveCheckBox.setSelected(false);
+        if (searchField != null) {
+            searchField.setStyle("");
         }
-
-        currentLogEntrySource = originalLogEntrySource;
-        currentTailFilterPredicate = null;
-
-        int targetIndex;
-        if (isIndexedMode && searchService != null) {
-            targetIndex = (int) searchService.getOffsetForLineNumber(targetLineNumber);
-            logger.info("Calculated target index for line {}: {}", targetLineNumber, targetIndex);
-        } else {
-            targetIndex = (int) (targetLineNumber - 1);
-        }
-
-        int totalEntries = originalLogEntrySource.getTotalEntries();
-
-        if (targetIndex < 0 || targetIndex >= totalEntries) {
-            logger.warn("Target index {} out of range [0, {}]", targetIndex, totalEntries);
-            return;
-        }
-
-        int targetPage = PaginationUtils.calculateCurrentPage(targetIndex, windowSize);
-        int pageStartIndex = PaginationUtils.calculateStartIndex(targetPage, windowSize);
-
-        logger.info("Target line {} -> index {}, page {}, pageStartIndex {}", targetLineNumber, targetIndex, targetPage,
-                pageStartIndex);
-        loadWindow(pageStartIndex, false);
-
-        Platform.runLater(() -> {
-            int actualPosition = -1;
-            for (int i = 0; i < visibleLogEntries.size(); i++) {
-                if (visibleLogEntries.get(i).getLineNumber() == targetLineNumber) {
-                    actualPosition = i;
-                    break;
-                }
-            }
-
-            if (actualPosition >= 0) {
-                logTableView.scrollTo(Math.max(0, actualPosition - 5));
-                logTableView.getSelectionModel().clearSelection();
-                logTableView.getSelectionModel().select(actualPosition);
-                logTableView.getFocusModel().focus(actualPosition);
-                logTableView.requestFocus();
-                logger.info("Successfully jumped to line {} at page {} position {}", targetLineNumber, targetPage,
-                        actualPosition);
-            } else {
-                logger.warn("Target line {} not found in loaded page. PageStart={}, Entries loaded={}",
-                        targetLineNumber, pageStartIndex, visibleLogEntries.size());
-                if (!visibleLogEntries.isEmpty()) {
-                    LogEntry first = visibleLogEntries.getFirst();
-                    LogEntry last = visibleLogEntries.getLast();
-                    logger.warn("Page contains lines {} to {}", first.getLineNumber(), last.getLineNumber());
-                }
-            }
-        });
+        logger.info("Filters reset to default");
     }
 
-    private void updateDateTimeFilterPromptText(ParsingConfig config) {
-        String promptText;
-
-        if (config != null && config.getTimestampFormat() != null) {
-            promptText = config.getTimestampFormat();
-            logger.info("Setting date filter prompt to config format: '{}' (from config: {})", promptText,
-                    config.getName());
-        } else {
-            promptText = "yyyy-MM-dd HH:mm:ss";
-            logger.info("Setting date filter prompt to default format: '{}' (config: {})", promptText,
-                    config != null ? "null format" : "null config");
+    private void setupDetailPanel() {
+        detailCodeArea = new StyleClassedTextArea();
+        detailCodeArea.setEditable(false);
+        detailCodeArea.setWrapText(true);
+        detailCodeArea.getStyleClass().add("detail-area");
+        try {
+            detailCodeArea.getStylesheets()
+                    .add(Objects.requireNonNull(getClass().getResource("/style/richtext.css")).toExternalForm());
+        } catch (Exception e) {
+            logger.warn("CSS load fail");
         }
-
-        Platform.runLater(() -> {
-            dateTimeFromField.setPromptText(promptText);
-            dateTimeToField.setPromptText(promptText);
-            logger.debug("Prompt text set to fields: '{}'", promptText);
-        });
-
-        String tooltipText = "Enter date/time in format: " + promptText +
-                "\n\nSupported formats:" +
-                "\n• " + promptText +
-                "\n• yyyy-MM-dd (date only)" +
-                "\n• dd-MM-yyyy HH:mm:ss" +
-                "\nOr any common date format";
-
-        Platform.runLater(() -> {
-            Tooltip fromTooltip = new Tooltip(tooltipText);
-            Tooltip toTooltip = new Tooltip(tooltipText);
-
-            dateTimeFromField.setTooltip(fromTooltip);
-            dateTimeToField.setTooltip(toTooltip);
-            logger.debug("Tooltips set for date filter fields");
-        });
+        VirtualizedScrollPane<StyleClassedTextArea> vsp = new VirtualizedScrollPane<>(detailCodeArea);
+        detailContainer.getChildren().add(vsp);
     }
 
-    private void displayLogDetail(LogEntry entry) {
-        if (entry == null) {
-            detailTextArea.clear();
-            detailLabel.setText("Log Detail");
-            return;
+    private StyleSpans<Collection<String>> computeHighlightingSpans(String text) {
+        Matcher matcher = KEYWORDS_PATTERN.matcher(text);
+        int lastKwEnd = 0;
+        StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
+        while (matcher.find()) {
+            String styleClass = switch (matcher.group().toUpperCase()) {
+                case "ERROR", "FATAL", "EXCEPTION" -> "error";
+                case "WARN" -> "warn";
+                case "INFO" -> "info";
+                case "DEBUG" -> "debug";
+                case "TRACE" -> "trace";
+                default -> "default";
+            };
+            spansBuilder.add(Collections.emptyList(), matcher.start() - lastKwEnd);
+            spansBuilder.add(Collections.singleton(styleClass), matcher.end() - matcher.start());
+            lastKwEnd = matcher.end();
         }
-
-        detailLabel.setText("Log Detail - Line " + entry.getLineNumber());
-        detailTextArea.clear();
-        detailTextArea.replaceText(entry.getRawLog());
-
-        applyAutoPrettify();
+        spansBuilder.add(Collections.emptyList(), text.length() - lastKwEnd);
+        return spansBuilder.create();
     }
 
-    private void prettifyJson(boolean showInfoWhenNotFound) {
-        String fullText = detailTextArea.getText();
+    private void prettifyJson() {
+        String fullText = detailCodeArea.getText();
         if (fullText == null || fullText.isEmpty()) {
             return;
         }
@@ -2245,14 +1682,17 @@ public class MainController {
         }
 
         if (!newTextBuilder.toString().equals(fullText)) {
-            detailTextArea.replaceText(newTextBuilder.toString());
-        } else if (showInfoWhenNotFound) {
-            showInfo("No JSON Found", "No valid JSON found in the log detail.");
+            detailCodeArea.replaceText(newTextBuilder.toString());
+            try {
+                detailCodeArea.setStyleSpans(0, computeHighlightingSpans(newTextBuilder.toString()));
+            } catch (Exception e) {
+                logger.warn("CSS load fail in pretty json");
+            }
         }
     }
 
-    private void prettifyXml(boolean showInfoWhenNotFound) {
-        String fullText = detailTextArea.getText();
+    private void prettifyXml() {
+        String fullText = detailCodeArea.getText();
         if (fullText == null || fullText.isEmpty()) {
             return;
         }
@@ -2281,14 +1721,17 @@ public class MainController {
         }
 
         if (!newTextBuilder.toString().equals(fullText)) {
-            detailTextArea.replaceText(newTextBuilder.toString());
-        } else if (showInfoWhenNotFound) {
-            showInfo("No XML Found", "No valid XML found in the log detail.");
+            detailCodeArea.replaceText(newTextBuilder.toString());
+            try {
+                detailCodeArea.setStyleSpans(0, computeHighlightingSpans(newTextBuilder.toString()));
+            } catch (Exception e) {
+                logger.warn("CSS load fail in pretty xml");
+            }
         }
     }
 
     private void copyDetailToClipboard() {
-        String text = detailTextArea.getText();
+        String text = detailCodeArea.getText();
         javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
         javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
         content.putString(text);
@@ -2296,7 +1739,7 @@ public class MainController {
     }
 
     private void clearDetail() {
-        detailTextArea.clear();
+        detailCodeArea.clear();
         detailLabel.setText("Log Detail");
     }
 
@@ -2328,20 +1771,8 @@ public class MainController {
         updateBottomPanelDisplay();
     }
 
-    private void scrollToBottomAfterLoad() {
-        if (currentLogEntrySource == null) {
-            return;
-        }
-
-        int totalEntries = currentLogEntrySource.getTotalEntries();
-        logger.info("Scroll to bottom using windowing (total={})", totalEntries);
-
-        loadWindow(Math.max(0, totalEntries - windowSize), true);
-    }
-
     private void handleClearRecentFiles() {
         ObservableList<RecentFilesDto> selected = recentFilesListView.getSelectionModel().getSelectedItems();
-
         if (selected != null && !selected.isEmpty()) {
             int count = selected.size();
 
@@ -2384,7 +1815,6 @@ public class MainController {
         if (result.isPresent() && result.get() == ButtonType.OK) {
             recentFileService.deleteAll();
             logFileService.deleteAllLogFiles();
-            logTableView.getItems().clear();
             stopRemoteTail();
             clearSearch();
             refreshRecentFilesList();
@@ -2426,198 +1856,6 @@ public class MainController {
         Platform.exit();
     }
 
-    private void loadWindow(int startIndex, boolean scrollToBottom) {
-        if (currentLogEntrySource == null) {
-            return;
-        }
-
-        int total = currentLogEntrySource.getTotalEntries();
-        if (total == 0) {
-            visibleLogEntries.clear();
-            return;
-        }
-
-        int from = Math.max(0, startIndex);
-        if (from >= total) {
-            from = Math.max(0, total - windowSize);
-        }
-
-        int to = Math.min(from + windowSize, total);
-        int limit = to - from;
-
-        currentWindowStartIndex = from;
-
-        List<LogEntry> windowEntries = currentLogEntrySource.getEntries(from, limit);
-        visibleLogEntries.setAll(windowEntries);
-
-        int actualDisplayed = visibleLogEntries.size();
-
-        if (!visibleLogEntries.isEmpty()) {
-            if (scrollToBottom) {
-                logTableView.scrollTo(visibleLogEntries.size() - 1);
-            } else {
-                logTableView.scrollTo(0);
-            }
-        }
-        buildPaginationBar(actualDisplayed);
-    }
-
-    private void showPreviousWindow() {
-        if (currentLogEntrySource == null || currentLogEntrySource.getTotalEntries() == 0) {
-            return;
-        }
-
-        int currentPage = PaginationUtils.calculateCurrentPage(currentWindowStartIndex, windowSize);
-        if (currentPage > 1) {
-            goToPage(currentPage - 1);
-        }
-    }
-
-    private void showNextWindow() {
-        if (currentLogEntrySource == null || currentLogEntrySource.getTotalEntries() == 0) {
-            return;
-        }
-
-        int total = currentLogEntrySource.getTotalEntries();
-        int totalPages = PaginationUtils.calculateTotalPages(total, windowSize);
-        int currentPage = PaginationUtils.calculateCurrentPage(currentWindowStartIndex, windowSize);
-
-        if (currentPage < totalPages) {
-            goToPage(currentPage + 1);
-        }
-    }
-
-    private void setupPagination() {
-        firstPageButton.setOnAction(e -> goToFirstPage());
-        prevPageButton.setOnAction(e -> showPreviousWindow());
-        nextPageButton.setOnAction(e -> showNextWindow());
-        lastPageButton.setOnAction(e -> goToLastPage());
-
-        pageSizeComboBox.setItems(FXCollections.observableArrayList(100, 500, 1000, 2000, 5000));
-        pageSizeComboBox.setValue(windowSize);
-        pageSizeComboBox.setOnAction(e -> {
-            Integer newSize = pageSizeComboBox.getValue();
-            if (newSize != null && newSize != windowSize) {
-                windowSize = newSize;
-                preferenceService
-                        .saveOrUpdatePreferences(new Preference("main_window_size", String.valueOf(windowSize)));
-                logger.info("Page size changed to: {}", windowSize);
-                if (currentLogEntrySource != null && currentLogEntrySource.getTotalEntries() > 0) {
-                    goToFirstPage();
-                }
-            }
-        });
-
-        paginationBar.setVisible(false);
-        logger.info("Pagination bar initialized");
-    }
-
-    private void goToFirstPage() {
-        if (currentLogEntrySource == null || currentLogEntrySource.getTotalEntries() == 0) {
-            return;
-        }
-        loadWindow(0, false);
-    }
-
-    private void goToLastPage() {
-        if (currentLogEntrySource == null || currentLogEntrySource.getTotalEntries() == 0) {
-            return;
-        }
-        int total = currentLogEntrySource.getTotalEntries();
-        int totalPages = PaginationUtils.calculateTotalPages(total, windowSize);
-        int startIndex = PaginationUtils.calculateStartIndex(totalPages, windowSize);
-        loadWindow(startIndex, false);
-    }
-
-    private void goToPage(int pageNumber) {
-        int startIndex = PaginationUtils.calculateStartIndex(pageNumber, windowSize);
-        loadWindow(startIndex, false);
-    }
-
-    private void buildPaginationBar(int actualDisplayed) {
-        if (tailModeEnabled) {
-            paginationBar.setVisible(false);
-            paginationBar.setManaged(false);
-            return;
-        }
-
-        if (currentLogEntrySource == null) {
-            paginationBar.setVisible(false);
-            return;
-        }
-
-        int totalEntries = currentLogEntrySource.getTotalEntries();
-        if (totalEntries == 0 || actualDisplayed == 0) {
-            paginationBar.setVisible(false);
-            return;
-        }
-
-        paginationBar.setVisible(true);
-
-        int totalPages = PaginationUtils.calculateTotalPages(totalEntries, windowSize);
-        int currentPage = PaginationUtils.calculateCurrentPage(currentWindowStartIndex, windowSize);
-
-        // Ensure current page doesn't exceed total pages
-        if (currentPage > totalPages) {
-            currentPage = totalPages;
-        }
-
-        // Update page info label with actual displayed count
-        pageInfoLabel.setText(String.format("Page %d of %d (%d items)", currentPage, totalPages, actualDisplayed));
-
-        // Enable/disable nav buttons
-        firstPageButton.setDisable(currentPage == 1);
-        prevPageButton.setDisable(currentPage == 1);
-        nextPageButton.setDisable(currentPage == totalPages);
-        lastPageButton.setDisable(currentPage == totalPages);
-
-        // Build numbered page buttons
-        // Build page input field
-        pageButtonsContainer.getChildren().clear();
-
-        TextField pageInput = new TextField(String.valueOf(currentPage));
-        pageInput.setPrefWidth(60);
-        pageInput.setPromptText("Page");
-
-        // Allow only numbers
-        pageInput.textProperty().addListener((obs, oldVal, newVal) -> {
-            if (!newVal.matches("\\d*")) {
-                pageInput.setText(newVal.replaceAll("[^\\d]", ""));
-            }
-        });
-
-        final int finalCurrentPage = currentPage;
-        Runnable goToPageAction = () -> {
-            try {
-                if (pageInput.getText().isEmpty())
-                    return;
-                int targetPage = Integer.parseInt(pageInput.getText());
-                if (targetPage < 1)
-                    targetPage = 1;
-                if (targetPage > totalPages)
-                    targetPage = totalPages;
-
-                if (targetPage != finalCurrentPage) {
-                    goToPage(targetPage);
-                }
-            } catch (NumberFormatException e) {
-                // Ignore invalid input
-            }
-        };
-
-        pageInput.setOnAction(e -> goToPageAction.run());
-
-        Button goButton = new Button("Go");
-        goButton.setOnAction(e -> goToPageAction.run());
-
-        Label gotoLabel = new Label("Go to:");
-        gotoLabel.setStyle("-fx-alignment: center-right; -fx-padding: 0 5 0 0;"); /* Add padding */
-
-        pageButtonsContainer.getChildren().addAll(gotoLabel, pageInput, goButton);
-
-        logger.debug("Pagination bar updated: page {} of {}", currentPage, totalPages);
-    }
-
     @FXML
     private void enableTail() {
         boolean isRemote = (currentLogFromDb != null && currentLogFromDb.isRemote());
@@ -2644,25 +1882,21 @@ public class MainController {
             return;
         }
 
-        // Common UI setup for Tail Mode
-        togglePagination(false);
         tailModeEnabled = true;
-        if (!tailButton.isSelected())
+        if (!tailButton.isSelected()) {
             tailButton.setSelected(true);
-        tailButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+        }
+        // Style handled by listener
 
-        // Prepare Buffer
-        visibleLogEntries.clear();
+        // Clear live buffer for new session
+        liveTailList.clear();
+        canvasLogViewer.refreshTail(); // Updates view to show cleared state
+
         remoteTailLineCounter = 0;
 
         try {
-            currentTailFilterPredicate = buildSearchPredicate(
-                    searchField.getText(),
-                    regexCheckBox.isSelected(),
-                    caseSensitiveCheckBox.isSelected(),
-                    logLevelFilterComboBox.getSelectionModel().getSelectedItem(),
-                    dateTimeFromField.getText(),
-                    dateTimeToField.getText());
+            currentTailFilterPredicate = buildSearchPredicate(searchField.getText(), regexCheckBox.isSelected(),
+                    caseSensitiveCheckBox.isSelected());
         } catch (Exception e) {
             logger.warn("Tail filter error", e);
         }
@@ -2677,37 +1911,10 @@ public class MainController {
     private void startRemoteTailInternal() {
         String sshServerId = currentLogFromDb.getSshServerID();
         SSHServerModel server = serverManagementService.getServerById(sshServerId);
-
-        // Logic extracted from original enableTail
-        // Connect SSH... (Simplified for brevity, assuming connection management logic
-        // logic handled or we reuse active helper)
-        // For now, I will assume the original logic handles connection prompting.
-        // Wait, I replaced the original huge enableTail block.
-        // I must restore the SSH connection logic!
-
-        // Re-implementing SSH Connection logic briefly:
         if (server == null) {
             showError("Error", "Server not found");
-            return;
         }
-
-        // Password/Connect logic...
-        // To avoid code duplication and complexity in this ReplaceChunk,
-        // Ideally I should utilize a helper or keep the original block structure but
-        // simplified.
-
-        // Since I'm replacing the WHOLE enableTail, I MUST include SSH logic.
-        // ... (See below for full implementation)
-
-        // Actually, better strategy: Keep original enableTail for Remote, just ADD
-        // Local branch??
-        // Current enableTail returns if !remote.
-        // I will Rewrite enableTail to handle both.
-
-        // See 'ReplacementContent' below for full implementation.
     }
-
-    // Fallback: I will implement the full enableTail with both branches.
 
     private void disableTail() {
         tailModeEnabled = false;
@@ -2717,7 +1924,6 @@ public class MainController {
         tailButton.setStyle("");
         stopRemoteTail();
         stopLocalTail();
-        togglePagination(true);
         logger.info("Tail mode DISABLED");
     }
 
@@ -2730,24 +1936,19 @@ public class MainController {
         this.remoteTailLineCounter = 0;
         this.currentParsingConfig = parsingConfig;
         this.currentFile = null;
-        this.originalLogEntrySource = null;
-        this.currentLogEntrySource = null;
-        this.tailColumnsAutoResized = false;
 
-        updateTableColumns(parsingConfig);
-        visibleLogEntries.clear();
+        // Clear live buffer for new session
+        liveTailList.clear();
+        canvasLogViewer.refreshTail();
+
+        logger.info("ListView ready for config: {}", parsingConfig.getName());
 
         tailModeEnabled = true;
-        tailButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+        // tailButton style handled by listener
 
         try {
-            currentTailFilterPredicate = buildSearchPredicate(
-                    searchField.getText(),
-                    regexCheckBox.isSelected(),
-                    caseSensitiveCheckBox.isSelected(),
-                    logLevelFilterComboBox.getSelectionModel().getSelectedItem(),
-                    dateTimeFromField.getText(),
-                    dateTimeToField.getText());
+            currentTailFilterPredicate = buildSearchPredicate(searchField.getText(), regexCheckBox.isSelected(),
+                    caseSensitiveCheckBox.isSelected());
             logger.info("Tail filter initialized from current UI filters.");
         } catch (Exception e) {
             logger.error("Failed to build tail filter predicate", e);
@@ -2757,9 +1958,7 @@ public class MainController {
 
         updateTailButtonState();
 
-        sshService.tailFile(
-                remotePath,
-                windowSize, line -> handleTailLineBackground(line, parsingConfig),
+        sshService.tailFile(remotePath, MAX_TAIL_BUFFER_SIZE, line -> handleTailLineBackground(line, parsingConfig),
                 error -> Platform.runLater(() -> {
                     logger.error("Remote tail error: {}", error);
                     showError("Remote Tail Error", error);
@@ -2827,12 +2026,10 @@ public class MainController {
 
     private synchronized void handleTailLineBackground(String line, ParsingConfig parsingConfig) {
         long lineNumber = ++remoteTailLineCounter;
-
         LogEntry entry = logParserService.parseLine(line, lineNumber, parsingConfig);
-
         synchronized (tailBuffer) {
             if (tailBuffer.size() >= MAX_TAIL_BUFFER_SIZE) {
-                tailBuffer.remove(0); // Drop oldest entry to prevent OOM
+                tailBuffer.removeFirst();
             }
             tailBuffer.add(entry);
         }
@@ -2840,89 +2037,21 @@ public class MainController {
         scheduleTailFlush();
     }
 
-    private String buildLuceneQueryString(String searchText, boolean isRegex, boolean caseSensitive,
-            String selectedLevel) {
-        StringBuilder sb = new StringBuilder();
-        boolean hasClause = false;
-
-        // Level
-        if (selectedLevel != null && !"ALL".equals(selectedLevel)) {
-            if ("UNPARSED".equals(selectedLevel)) {
-                sb.append("level:\"\"");
-            } else {
-                sb.append("level:").append(selectedLevel);
-            }
-            hasClause = true;
-        }
-
-        // Text
-        if (searchText != null && !searchText.trim().isEmpty()) {
-            if (hasClause)
-                sb.append(" AND ");
-
-            if (isRegex) {
-                sb.append("/").append(searchText).append("/");
-            } else {
-                sb.append("(").append(searchText).append(")");
-            }
-        }
-
-        return sb.toString();
-    }
-
-    private Predicate<LogEntry> buildSearchPredicate(String searchText, boolean isRegex, boolean caseSensitive,
-            String selectedLevel, String dateTimeFrom, String dateTimeTo) {
-        final LocalDateTime filterFrom = parseDateTimeFilter(dateTimeFrom);
-        final LocalDateTime filterTo = parseDateTimeFilter(dateTimeTo);
-        final boolean hasDateFilter = filterFrom != null || filterTo != null;
-
+    private Predicate<LogEntry> buildSearchPredicate(String searchText, boolean isRegex, boolean caseSensitive) {
         final boolean hasTextSearch = searchText != null && !searchText.trim().isEmpty();
-
-        final Pattern compiledPattern;
+        final Pattern compiledIncludePattern;
         if (isRegex && hasTextSearch) {
             int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
             try {
-                compiledPattern = Pattern.compile(searchText, flags);
+                compiledIncludePattern = Pattern.compile(searchText, flags);
             } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid regex pattern: " + e.getMessage(), e);
+                throw new IllegalArgumentException("Invalid include regex: " + e.getMessage(), e);
             }
         } else {
-            compiledPattern = null;
+            compiledIncludePattern = null;
         }
 
-        final boolean hasLevelFilter = selectedLevel != null && !selectedLevel.equals("ALL");
-        final boolean filterUnparsedOnly = "UNPARSED".equals(selectedLevel);
-
         return entry -> {
-            // 2. Level filter
-            if (hasLevelFilter) {
-                if (filterUnparsedOnly) {
-                    return !entry.isParsed();
-                }
-                if (!entry.isParsed()) {
-                    return false;
-                }
-                String entryLevel = entry.getLevel();
-                if (entryLevel == null || !entryLevel.equalsIgnoreCase(selectedLevel)) {
-                    return false;
-                }
-            }
-
-            // 3. Date filter
-            if (hasDateFilter) {
-                LocalDateTime entryTime = parseEntryTimestamp(entry);
-                if (entryTime == null) {
-                    return false;
-                }
-                if (filterFrom != null && entryTime.isBefore(filterFrom)) {
-                    return false;
-                }
-                if (filterTo != null && entryTime.isAfter(filterTo)) {
-                    return false;
-                }
-            }
-
-            // 4. Text / regex filter
             if (hasTextSearch) {
                 String raw = entry.getRawLog();
                 if (raw == null) {
@@ -2930,9 +2059,8 @@ public class MainController {
                 }
 
                 if (isRegex) {
-                    return compiledPattern.matcher(raw).find();
+                    return compiledIncludePattern.matcher(raw).find();
                 } else {
-                    // Use boolean search predicate (AND, OR, NOT)
                     return createBooleanSearchPredicate(searchText, caseSensitive).test(raw);
                 }
             }
@@ -2945,12 +2073,10 @@ public class MainController {
             return s -> true;
         }
 
-        // Split by OR first (lowest precedence)
         String[] orParts = query.split("\\s+OR\\s+");
         Predicate<String> orPredicate = null;
 
         for (String orPart : orParts) {
-            // Split by AND (higher precedence)
             String[] andParts = orPart.split("\\s+AND\\s+");
             Predicate<String> andPredicate = null;
 
@@ -2994,13 +2120,39 @@ public class MainController {
         return orPredicate != null ? orPredicate : s -> false;
     }
 
+    private List<String> extractSearchTerms(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Set<String> terms = new LinkedHashSet<>();
+        String[] orParts = query.split("\\s+OR\\s+");
+
+        for (String orPart : orParts) {
+            String[] andParts = orPart.split("\\s+AND\\s+");
+            for (String andPart : andParts) {
+                String term = andPart.trim();
+                boolean isNot = false;
+
+                if (term.startsWith("NOT ")) {
+                    isNot = true;
+                    term = term.substring(4).trim();
+                }
+
+                if (!isNot && !term.isEmpty()) {
+                    terms.add(term);
+                }
+            }
+        }
+
+        return new ArrayList<>(terms);
+    }
+
     private void setupSearchFieldAutoCompletion() {
         ContextMenu suggestionsMenu = new ContextMenu();
-
         MenuItem itemAnd = new MenuItem("AND");
         MenuItem itemOr = new MenuItem("OR");
         MenuItem itemNot = new MenuItem("NOT");
-
         itemAnd.setOnAction(e -> insertSearchTerm("AND"));
         itemOr.setOnAction(e -> insertSearchTerm("OR"));
         itemNot.setOnAction(e -> insertSearchTerm("NOT"));
@@ -3022,7 +2174,6 @@ public class MainController {
         String currentText = searchField.getText();
         int caretPosition = searchField.getCaretPosition();
 
-        // Insert term with surrounding spaces if needed
         String before = currentText.substring(0, caretPosition);
         String after = currentText.substring(caretPosition);
 
@@ -3041,8 +2192,9 @@ public class MainController {
     }
 
     private void scheduleTailFlush() {
-        if (tailFlushScheduled)
+        if (tailFlushScheduled) {
             return;
+        }
         tailFlushScheduled = true;
 
         Platform.runLater(() -> {
@@ -3050,49 +2202,35 @@ public class MainController {
 
             List<LogEntry> toAdd;
             synchronized (tailBuffer) {
-                if (tailBuffer.isEmpty())
+                if (tailBuffer.isEmpty()) {
                     return;
+                }
                 toAdd = new ArrayList<>(tailBuffer);
                 tailBuffer.clear();
             }
 
-            List<LogEntry> filtered = toAdd;
-            if (currentTailFilterPredicate != null) {
-                filtered = new ArrayList<>();
-                for (LogEntry e : toAdd) {
-                    try {
-                        if (currentTailFilterPredicate.test(e)) {
-                            filtered.add(e);
-                        }
-                    } catch (Exception ex) {
-                        logger.warn("Error applying tail filter", ex);
-                    }
-                }
+            // TAIL MODE: Show ALL lines, no hiding. Highlighting is handled by
+            // CanvasLogViewer.
+            // Add ALL lines to the live buffer (no filtering here).
+            liveTailList.addAll(toAdd);
+
+            // Limit live list size (e.g. 50k lines) to prevent OOM
+            if (liveTailList.size() > 50000) {
+                int removeCount = liveTailList.size() - 50000;
+                liveTailList.subList(0, removeCount).clear();
             }
 
-            if (filtered.isEmpty()) {
-                return;
-            }
+            // Sync Highlight Pattern from Search Field if needed
+            // This ensures that even if user didn't press Enter,
+            // the viewer knows what pattern to highlight (handled by performSearch
+            // listeners)
 
-            visibleLogEntries.addAll(filtered);
+            // Notify viewer to refresh
+            canvasLogViewer.refreshTail();
 
-            int overflow = visibleLogEntries.size() - tailWindowSize;
-            if (overflow > 0) {
-                visibleLogEntries.remove(0, overflow);
-            }
-
-            if (!visibleLogEntries.isEmpty()) {
-                int lastIndex = visibleLogEntries.size() - 1;
-                logTableView.scrollTo(lastIndex);
-
-                LogEntry last = visibleLogEntries.get(lastIndex);
-                detailLabel.setText("Remote Tail - Line " + last.getLineNumber());
-            }
-
-            if (!tailColumnsAutoResized && !visibleLogEntries.isEmpty()) {
+            if (!tailColumnsAutoResized) {
                 tailColumnsAutoResized = true;
-                autoResizeColumns(logTableView);
-                logger.info("Auto-resize columns after first tail batch");
+                logger.debug("Tail batch displayed: {} lines", toAdd.size());
             }
         });
     }
@@ -3141,8 +2279,8 @@ public class MainController {
                 }
             }
 
-            logger.info("Temp cleanup completed. Deleted: {}, Failed: {}, Dir: {}",
-                    successCount, failCount, tmpDirPath);
+            logger.info("Temp cleanup completed. Deleted: {}, Failed: {}, Dir: {}", successCount, failCount,
+                    tmpDirPath);
         } catch (Exception e) {
             logger.error("Error while cleaning up temp files", e);
         }
@@ -3177,90 +2315,6 @@ public class MainController {
         });
     }
 
-    private void autoResizeColumns(TableView<LogEntry> tableView) {
-        if (tableView.getItems() == null || tableView.getItems().isEmpty()) {
-            return;
-        }
-
-        logger.info("Auto-fitting columns for {} entries...", tableView.getItems().size());
-        long startTime = System.currentTimeMillis();
-
-        int totalSize = tableView.getItems().size();
-        List<LogEntry> sample;
-
-        if (totalSize <= 1000) {
-            sample = tableView.getItems();
-            logger.debug("Using all {} entries for auto-fit", totalSize);
-        } else {
-            int sampleSize = Math.min(3000, totalSize / 10);
-            sample = new ArrayList<>(sampleSize);
-
-            int startSample = 1000;
-            sample.addAll(tableView.getItems().subList(0, startSample));
-
-            if (totalSize > 2000) {
-                int midStart = (totalSize - 1000) / 2;
-                int midEnd = Math.min(midStart + 1000, totalSize);
-                sample.addAll(tableView.getItems().subList(midStart, midEnd));
-            }
-
-            int endStart = Math.max(startSample, totalSize - 1000);
-            sample.addAll(tableView.getItems().subList(endStart, totalSize));
-
-            logger.debug("Using smart sample of {} entries from {} total for auto-fit", sample.size(), totalSize);
-        }
-
-        Text measureText = new Text();
-        measureText.setStyle("-fx-font-family: 'System'; -fx-font-size: 12px;");
-
-        for (TableColumn<LogEntry, ?> col : tableView.getColumns()) {
-            if ("Line".equals(col.getText())) {
-                continue;
-            }
-
-            double maxWidth = 0;
-
-            measureText.setText(col.getText());
-            maxWidth = Math.max(maxWidth, measureText.getLayoutBounds().getWidth());
-
-            for (LogEntry entry : sample) {
-                try {
-                    if (col.getCellObservableValue(entry) != null &&
-                            col.getCellObservableValue(entry).getValue() != null) {
-
-                        String cellValue = col.getCellObservableValue(entry).getValue().toString();
-
-                        if (cellValue.length() > 500) {
-                            cellValue = cellValue.substring(0, 500);
-                        }
-
-                        measureText.setText(cellValue);
-                        double width = measureText.getLayoutBounds().getWidth();
-                        maxWidth = Math.max(maxWidth, width);
-                    }
-                } catch (Exception e) {
-                    logger.debug("Error measuring cell width: {}", e.getMessage());
-                }
-            }
-
-            double padding = 50.0;
-            double newWidth = maxWidth + padding;
-
-            double minWidth = col.getMinWidth() > 0 ? col.getMinWidth() : 80.0;
-            double maxAllowedWidth = 1200.0;
-
-            newWidth = Math.max(minWidth, newWidth);
-            newWidth = Math.min(maxAllowedWidth, newWidth);
-
-            col.setPrefWidth(newWidth);
-
-            logger.debug("Column '{}': width = {}", col.getText(), (int) newWidth);
-        }
-
-        long duration = System.currentTimeMillis() - startTime;
-        logger.info("Auto-fit completed in {}ms", duration);
-    }
-
     private <T> Optional<T> showAndWaitAndRestore(Dialog<T> dialog) {
         Stage mainStage = (Stage) menuBar.getScene().getWindow();
         boolean wasMaximized = mainStage.isMaximized();
@@ -3269,7 +2323,6 @@ public class MainController {
         double oldWidth = mainStage.getWidth();
         double oldHeight = mainStage.getHeight();
 
-        // Ensure the dialog has an owner, which is crucial for modality behavior
         if (dialog.getOwner() == null) {
             dialog.initOwner(mainStage);
         }
@@ -3280,10 +2333,8 @@ public class MainController {
             if (wasMaximized) {
                 mainStage.setMaximized(true);
             } else {
-                // Check if the stage was unintentionally moved or resized
-                if (mainStage.getX() != oldX || mainStage.getY() != oldY ||
-                        mainStage.getWidth() != oldWidth || mainStage.getHeight() != oldHeight) {
-
+                if (mainStage.getX() != oldX || mainStage.getY() != oldY || mainStage.getWidth() != oldWidth
+                        || mainStage.getHeight() != oldHeight) {
                     mainStage.setX(oldX);
                     mainStage.setY(oldY);
                     mainStage.setWidth(oldWidth);
@@ -3319,8 +2370,9 @@ public class MainController {
     }
 
     private void updateMemoryStatus() {
-        if (memoryStatusLabel == null || memoryBar == null)
+        if (memoryStatusLabel == null || memoryBar == null) {
             return;
+        }
 
         Runtime runtime = Runtime.getRuntime();
         long total = runtime.totalMemory();
@@ -3337,7 +2389,6 @@ public class MainController {
         String text = String.format("Used: %.0f MB / Total: %.0f MB (Max: %.0f MB)", usedMb, totalMb, maxMb);
         memoryStatusLabel.setText(text);
 
-        // Color coding
         if (progress > 0.85) {
             memoryBar.setStyle("-fx-accent: #f44336; -fx-control-inner-background: #e0e0e0;"); // Red
         } else if (progress > 0.60) {
@@ -3349,31 +2400,26 @@ public class MainController {
         memoryBar.setProgress(progress);
     }
 
-    private void togglePagination(boolean visible) {
-        if (paginationBar != null) {
-            paginationBar.setVisible(visible);
-            paginationBar.setManaged(visible);
-        }
-    }
-
     private void startLocalTail(File file) {
         stopLocalTail();
+
+        // Clear live list
+        liveTailList.clear();
+        canvasLogViewer.refreshTail();
+
         logger.info("Starting local tail (TailService) for: {}", file.getAbsolutePath());
 
-        Thread starterThread = new Thread(() -> {
-            tailService.startLocalTail(
-                    file,
-                    this::handleTailLineBackgroundFromService,
-                    ex -> {
-                        if (ex instanceof java.io.FileNotFoundException) {
-                            Platform.runLater(() -> showInfo("Tail Info", "File not found or renamed."));
-                        } else {
-                            logger.error("Tailer error", ex);
-                        }
-                    },
-                    true // loadContext = true to show initial context (end of file)
-            );
-        }, "TailService-Starter");
+        Thread starterThread = new Thread(() -> tailService.startLocalTail(
+                file,
+                this::handleTailLineBackgroundFromService,
+                ex -> {
+                    if (ex instanceof FileNotFoundException) {
+                        Platform.runLater(() -> showInfo("Tail Info", "File not found or renamed."));
+                    } else {
+                        logger.error("Tailer error", ex);
+                    }
+                },
+                true), "TailService-Starter");
         starterThread.setDaemon(true);
         starterThread.start();
     }
@@ -3385,28 +2431,6 @@ public class MainController {
     private void stopLocalTail() {
         if (tailService != null) {
             tailService.stopTail();
-        }
-    }
-
-    private static class SingleLineLogCell extends TableCell<LogEntry, String> {
-        @Override
-        protected void updateItem(String item, boolean empty) {
-            super.updateItem(item, empty);
-
-            if (empty || item == null) {
-                setText(null);
-                setGraphic(null);
-                setTooltip(null);
-            } else {
-                setText(item);
-                setGraphic(null);
-                // Standard single line behavior with ellipsis is default for Labeled
-                // Add tooltip for full content
-                Tooltip tooltip = new Tooltip(item);
-                tooltip.setWrapText(true);
-                tooltip.setMaxWidth(600); // Reasonable max width for tooltip
-                setTooltip(tooltip);
-            }
         }
     }
 }

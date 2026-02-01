@@ -74,22 +74,6 @@ public interface LogParser {
     List<LogEntry> parseFileParallel(File file, ParsingConfig config, ProgressCallback callback) throws IOException;
 
     /**
-     * Indexes a file directly into Lucene using parallel processing.
-     * <p>
-     * Designed for memory efficiency by streaming chunks directly to the
-     * IndexerService
-     * without holding the entire result set in memory.
-     *
-     * @param file     The source file to index.
-     * @param config   The configuration defining regex patterns.
-     * @param indexer  The target IndexerService.
-     * @param callback Optional callback for progress updates.
-     * @throws IOException If file access fails.
-     */
-    void indexFileParallel(File file, ParsingConfig config, IndexerService indexer, ProgressCallback callback)
-            throws IOException;
-
-    /**
      * Parses a single line string into a LogEntry.
      *
      * @param line       Raw text line.

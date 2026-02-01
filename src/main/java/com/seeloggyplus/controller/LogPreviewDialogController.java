@@ -36,11 +36,7 @@ public class LogPreviewDialogController {
     @FXML
     private Label fileNameLabel;
     @FXML
-    private TableView<LogLine> logTableView;
-    @FXML
-    private TableColumn<LogLine, Long> lineColumn;
-    @FXML
-    private TableColumn<LogLine, String> contentColumn;
+    private ListView<LogLine> logListView;
     @FXML
     private ProgressIndicator progressIndicator;
     @FXML
@@ -53,24 +49,18 @@ public class LogPreviewDialogController {
         preferenceService = new PreferenceServiceImpl();
         loadPreferences();
 
-        lineColumn.setCellValueFactory(new PropertyValueFactory<>("lineNumber"));
-        contentColumn.setCellValueFactory(new PropertyValueFactory<>("content"));
-        logTableView.setItems(logLines);
+        logListView.setItems(logLines);
+        logListView.setCellFactory(lv -> new LogLineCell());
 
-        // Enable cell selection and copy-paste
-        logTableView.getSelectionModel().setCellSelectionEnabled(true);
-        logTableView.getSelectionModel().setSelectionMode(javafx.scene.control.SelectionMode.MULTIPLE);
-        logTableView.setOnKeyPressed(event -> {
+        // Enable selection and copy-paste
+        logListView.getSelectionModel().setSelectionMode(javafx.scene.control.SelectionMode.MULTIPLE);
+        logListView.setOnKeyPressed(event -> {
             if (new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.C,
                     javafx.scene.input.KeyCombination.CONTROL_DOWN).match(event)) {
-                copySelectionToClipboard(logTableView);
+                copySelectionToClipboard();
                 event.consume();
             }
         });
-
-        // Make columns resizable
-        lineColumn.prefWidthProperty().bind(logTableView.widthProperty().multiply(0.1)); // 10% width
-        contentColumn.prefWidthProperty().bind(logTableView.widthProperty().multiply(0.9)); // 90% width
 
         closeButton.setOnAction(e -> closeDialog());
     }
@@ -95,16 +85,12 @@ public class LogPreviewDialogController {
         }
 
         String fontStyle = String.format("-fx-font-family: '%s'; -fx-font-size: %dpx;", fontFamily, fontSize);
-        logTableView.setStyle(fontStyle);
+        logListView.setStyle(fontStyle);
     }
 
     /**
-     * Loads a preview of the file content (local or remote) into the table,
-     * limited to the first PREVIEW_LINE_LIMIT lines.
-     * 
-     * @param fileInfo   The file to preview.
-     * @param sshService An active SSH service, if the file is remote. Can be null
-     *                   for local files.
+     * Loads a preview of the file content (local or remote) into the list,
+     * limited to the first previewLineLimit lines.
      */
     public void loadFile(FileInfo fileInfo, SSHServiceImpl sshService) {
         fileNameLabel.setText(String.format("Preview: %s (first %d lines)", fileInfo.getPath(), previewLineLimit));
@@ -156,30 +142,12 @@ public class LogPreviewDialogController {
         new Thread(loadTask).start();
     }
 
-    @SuppressWarnings("unchecked")
-    private void copySelectionToClipboard(final TableView<?> table) {
-        final ObservableList<TablePosition<?, ?>> selectedCells = (ObservableList<TablePosition<?, ?>>) (Object) table.getSelectionModel().getSelectedCells();
-        if (selectedCells.isEmpty()) {
-            return;
-        }
-
-        // Group by row index
-        final java.util.Map<Integer, List<TablePosition<?, ?>>> rowMap = new java.util.TreeMap<>();
-        for (final TablePosition<?, ?> pos : selectedCells) {
-            rowMap.computeIfAbsent(pos.getRow(), k -> new ArrayList<>()).add(pos);
-        }
-
+    private void copySelectionToClipboard() {
         final StringBuilder clipboardString = new StringBuilder();
-        for (final java.util.List<TablePosition<?, ?>> row : rowMap.values()) {
-            row.sort(Comparator.comparingInt(TablePosition::getColumn));
-
-            final String rowString = row.stream()
-                    .map(pos -> {
-                        final Object cellData = table.getColumns().get(pos.getColumn()).getCellData(pos.getRow());
-                        return cellData == null ? "" : cellData.toString();
-                    })
-                    .collect(java.util.stream.Collectors.joining("\t"));
-            clipboardString.append(rowString).append('\n');
+        for (LogLine line : logListView.getSelectionModel().getSelectedItems()) {
+            if (line != null) {
+                clipboardString.append(line.getLineNumber()).append("\t").append(line.getContent()).append("\n");
+            }
         }
 
         final ClipboardContent content = new ClipboardContent();
@@ -210,6 +178,21 @@ public class LogPreviewDialogController {
 
         public String getContent() {
             return content;
+        }
+    }
+
+    /**
+     * ListCell implementation for LogLine.
+     */
+    private static class LogLineCell extends ListCell<LogLine> {
+        @Override
+        protected void updateItem(LogLine item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null) {
+                setText(null);
+            } else {
+                setText(String.format("%d | %s", item.getLineNumber(), item.getContent()));
+            }
         }
     }
 }

@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * In-memory implementation of {@link LogEntrySource}.
@@ -55,17 +54,17 @@ public class ListLogEntrySourceImpl implements LogEntrySource {
         return allEntries.subList(fromIndex, toIndex);
     }
 
-    /**
-     * Filters the entries in memory and returns a new source.
-     *
-     * @param predicate Filtering condition
-     * @return New ListLogEntrySourceImpl with filtered results
-     */
+    @Override
+    public LogEntry getEntry(int index) {
+        if (index < 0 || index >= allEntries.size()) {
+            throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + allEntries.size());
+        }
+        return allEntries.get(index);
+    }
+
     @Override
     public LogEntrySource filter(Predicate<LogEntry> predicate) {
-        List<LogEntry> filteredList = allEntries.stream()
-                .filter(predicate)
-                .collect(Collectors.toList());
-        return new ListLogEntrySourceImpl(filteredList);
+        // Deprecated/Unused in new Windowed architecture
+        return this;
     }
 }

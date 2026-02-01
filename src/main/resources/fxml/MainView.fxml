@@ -5,9 +5,11 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
+<?import javafx.scene.shape.Rectangle?>
 <BorderPane minHeight="400" minWidth="600" prefHeight="800" prefWidth="1200.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
     <top>
-        <VBox>
+        <!-- Keep the top area always above the center content -->
+        <VBox pickOnBounds="true" mouseTransparent="false">
             <MenuBar fx:id="menuBar">
                 <!-- File Menu -->
                 <Menu text="File">
@@ -17,16 +19,16 @@
                 </Menu>
 
                 <!-- View Menu -->
-                <Menu fx:id="viewMenu" text="View">
+                <Menu text="View">
                     <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel" />
                     <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel" />
                     <SeparatorMenuItem />
+                    <MenuItem accelerator="Ctrl+G" onAction="#handleGoToLine" text="Go To Line..." />
                     <MenuItem accelerator="F5" text="Refresh" />
                 </Menu>
 
                 <!-- Settings Menu -->
                 <Menu text="Settings">
-                    <MenuItem fx:id="parsingConfigMenuItem" accelerator="Ctrl+P" text="Parsing Configuration..." />
                     <MenuItem fx:id="serverManagementMenuItem" accelerator="Ctrl+M" text="Server Management..." />
                     <SeparatorMenuItem />
                     <MenuItem fx:id="preferencesMenuItem" text="Preferences..." />
@@ -40,37 +42,32 @@
 
             <!-- Toolbar -->
             <ToolBar>
+                <ToggleButton fx:id="toggleLeftPanelButton" selected="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="FOLDER_OPEN" size="12" />
+                    </graphic>
+                     <tooltip>
+                        <Tooltip text="Show/Hide Recent Files Panel (Ctrl+B)" />
+                    </tooltip>
+                </ToggleButton>
+                <ToggleButton fx:id="toggleBottomPanelButton" selected="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="FILE_TEXT" size="12" />
+                    </graphic>
+                     <tooltip>
+                        <Tooltip text="Show/Hide Detail Panel (Ctrl+J)" />
+                    </tooltip>
+                </ToggleButton>
+                <Separator orientation="VERTICAL" />
                 <Label text="Search:" />
-                <TextField fx:id="searchField" prefWidth="300" promptText="Enter search text or regex...">
+                <TextField fx:id="searchField" prefWidth="250" promptText="Include (Search)...">
                     <font>
                         <Font size="10.0" />
                     </font>
                 </TextField>
+
                 <ToggleButton fx:id="regexCheckBox" text="Regex" />
                 <ToggleButton fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
-                <Separator orientation="VERTICAL" />
-                <Label text="Level:" />
-                <ComboBox fx:id="logLevelFilterComboBox" prefHeight="16.0" prefWidth="115.0" promptText="All Levels" styleClass="small-combo-box" stylesheets="@../style/components.css" />
-                <Separator orientation="VERTICAL" />
-                <Label text="From:" />
-                <TextField fx:id="dateTimeFromField" prefWidth="150" promptText="yyyy-MM-dd HH:mm:ss">
-                    <font>
-                        <Font size="10.0" />
-                    </font>
-                    <tooltip>
-                        <Tooltip text="Start date/time (yyyy-MM-dd HH:mm:ss)" />
-                    </tooltip>
-                </TextField>
-                <Label text="To:" />
-                <TextField fx:id="dateTimeToField" prefWidth="150" promptText="yyyy-MM-dd HH:mm:ss">
-                    <font>
-                        <Font size="10.0" />
-                    </font>
-                    <tooltip>
-                        <Tooltip text="End date/time (yyyy-MM-dd HH:mm:ss)" />
-                    </tooltip>
-                </TextField>
-                <Separator orientation="VERTICAL" />
                 <Button fx:id="searchButton">
                     <graphic>
                         <FontAwesomeIconView glyphName="SEARCH" size="12" />
@@ -88,14 +85,6 @@
                     </tooltip>
                 </Button>
                 <Separator orientation="VERTICAL" />
-                <Button fx:id="autoFitButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="COLUMNS" size="12" />
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Auto Fit Table Columns" />
-                    </tooltip>
-                </Button>
                 <Button fx:id="refreshButton">
                     <graphic>
                         <FontAwesomeIconView glyphName="REFRESH" size="12" />
@@ -104,29 +93,20 @@
                         <Tooltip text="Reload Log" />
                     </tooltip>
                 </Button>
-                <Button fx:id="scrollToTopButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="ARROW_UP" size="12" />
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Scroll to Top" />
-                    </tooltip>
-                </Button>
-
-                <Button fx:id="scrollToBottomButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="ARROW_DOWN" size="12" />
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Scroll to Bottom" />
-                    </tooltip>
-                </Button>
                 <ToggleButton fx:id="tailButton">
                     <graphic>
                         <FontAwesomeIconView glyphName="EYE" size="12" />
                     </graphic>
                     <tooltip>
-                        <Tooltip text="Tail (follow last entries)" />
+                        <Tooltip text="Tail (Enable Tail Mode)" />
+                    </tooltip>
+                </ToggleButton>
+                <ToggleButton fx:id="followTailButton" selected="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="ARROW_DOWN" size="12" />
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Smart Follow (Auto-scroll to bottom)" />
                     </tooltip>
                 </ToggleButton>
                 <Separator orientation="VERTICAL" />
@@ -144,7 +124,8 @@
 
     <!-- Center: Main Content -->
     <center>
-        <StackPane>
+        <!-- Clip center so children cannot paint outside this region -->
+        <StackPane fx:id="centerRoot" pickOnBounds="true">
             <BorderPane xmlns="http://javafx.com/javafx">
                 <!-- Collapsed Left Panel (appears when leftPanel is unpinned) -->
                 <left>
@@ -202,7 +183,7 @@
                         <BorderPane>
                             <!-- Collapsed Bottom Panel (appears when bottomPanel is unpinned) -->
                             <bottom>
-                                <HBox fx:id="collapsedBottomPanel" alignment="CENTER_LEFT" managed="false" prefHeight="20" spacing="10" visible="false">
+                                <HBox fx:id="collapsedBottomPanel" alignment="CENTER_LEFT" prefHeight="20" spacing="10" visible="false">
                                     <padding>
                                         <Insets bottom="5" left="5" right="5" top="5" />
                                     </padding>
@@ -231,48 +212,7 @@
                                             <Insets bottom="5" left="5" right="5" top="5" />
                                         </padding>
 
-                                        <TableView fx:id="logTableView" stylesheets="@../style/highlight.css" VBox.vgrow="ALWAYS">
-                                            <placeholder>
-                                                <Label text="No log file loaded. Open a file to view logs." />
-                                            </placeholder>
-                                        </TableView>
-                                        
-                                        <!-- Pagination Bar -->
-                                        <HBox fx:id="paginationBar" alignment="CENTER" spacing="5" styleClass="pagination-bar">
-                                            <padding>
-                                                <Insets bottom="5" left="10" right="10" top="5" />
-                                            </padding>
-                                            <Button fx:id="firstPageButton" text="«" minWidth="32">
-                                                <tooltip>
-                                                    <Tooltip text="First Page" />
-                                                </tooltip>
-                                            </Button>
-                                            <Button fx:id="prevPageButton" text="‹" minWidth="32">
-                                                <tooltip>
-                                                    <Tooltip text="Previous Page" />
-                                                </tooltip>
-                                            </Button>
-                                            <HBox fx:id="pageButtonsContainer" alignment="CENTER" spacing="3" />
-                                            <Button fx:id="nextPageButton" text="›" minWidth="32">
-                                                <tooltip>
-                                                    <Tooltip text="Next Page" />
-                                                </tooltip>
-                                            </Button>
-                                            <Button fx:id="lastPageButton" text="»" minWidth="32">
-                                                <tooltip>
-                                                    <Tooltip text="Last Page" />
-                                                </tooltip>
-                                            </Button>
-                                            <Separator orientation="VERTICAL" />
-                                            <Label fx:id="pageInfoLabel" text="Page 1 of 1" />
-                                            <Separator orientation="VERTICAL" />
-                                            <Label text="Per page:" />
-                                            <ComboBox fx:id="pageSizeComboBox" prefWidth="90">
-                                                <tooltip>
-                                                    <Tooltip text="Items per page" />
-                                                </tooltip>
-                                            </ComboBox>
-                                        </HBox>
+                                        <StackPane fx:id="logContainer" VBox.vgrow="ALWAYS" />
                                     </VBox>
 
                                     <!-- Bottom Panel: Log Detail -->
@@ -332,6 +272,12 @@
                                                 </Button>
                                             </HBox>
                                         </HBox>
+                                        
+                                        <StackPane fx:id="detailContainer" VBox.vgrow="ALWAYS" style="-fx-border-color: #cccccc; -fx-border-width: 1;">
+                                             <padding>
+                                                 <Insets bottom="0" left="0" right="0" top="0"/>
+                                             </padding>
+                                        </StackPane>
                                     </VBox>
                                 </SplitPane>
                             </center>
@@ -339,9 +285,9 @@
                     </SplitPane>
                 </center>
             </BorderPane>
-            
+
             <!-- Loading Overlay -->
-            <VBox fx:id="loadingOverlay" alignment="CENTER" visible="false" style="-fx-background-color: rgba(0, 0, 0, 0.4);">
+            <VBox fx:id="loadingOverlay" alignment="CENTER" visible="false" mouseTransparent="false" pickOnBounds="true" style="-fx-background-color: rgba(0, 0, 0, 0.4);">
                 <VBox alignment="CENTER" spacing="15" style="-fx-background-color: white; -fx-background-radius: 8; -fx-padding: 25; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 10, 0, 0, 0); -fx-min-width: 300; -fx-max-width: 400;">
                     <ProgressIndicator fx:id="loadingProgress" minWidth="60" minHeight="60" maxWidth="60" maxHeight="60" />
                     <Label text="Processing Request..." textFill="#333333">
@@ -354,22 +300,31 @@
                             <Font size="14.0" />
                         </font>
                     </Label>
-                    <Button fx:id="cancelProcessingButton" text="Cancel" onAction="#handleCancelProcessing" style="-fx-base: #ffdddd; -fx-text-fill: #cc0000; -fx-border-color: #cc0000; -fx-border-radius: 3; -fx-background-radius: 3;">
+                    <Button text="Cancel" onAction="#handleCancelProcessing" style="-fx-base: #ffdddd; -fx-text-fill: #cc0000; -fx-border-color: #cc0000; -fx-border-radius: 3; -fx-background-radius: 3;">
                         <tooltip>
                             <Tooltip text="Stop current operation" />
                         </tooltip>
                     </Button>
                 </VBox>
             </VBox>
+
+            <!-- NOTE: clip Rectangle size is set/bound in controller (FXML binding to width/height isn't reliable here). -->
+            <clip>
+                <Rectangle fx:id="centerClip" />
+            </clip>
         </StackPane>
     </center>
 
-
-
-
-
     <bottom>
-        <HBox alignment="CENTER_RIGHT" spacing="10" style="-fx-padding: 3 10 3 10; -fx-background-color: #f0f0f0; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;">
+        <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-padding: 3 10 3 10; -fx-background-color: #f0f0f0; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;">
+            <!-- Status Info (left side) -->
+            <Label fx:id="statusLabel" text="Line: 0 / 0 (0%)" style="-fx-font-family: 'Segoe UI', sans-serif; -fx-font-size: 11px; -fx-text-fill: #333333;"/>
+            <Separator orientation="VERTICAL" />
+            
+            <!-- Spacer to push memory stats to right -->
+            <Region HBox.hgrow="ALWAYS" />
+            
+            <!-- Memory Stats (right side) -->
              <Button text="GC" onAction="#handleGC" style="-fx-font-size: 10px; -fx-padding: 2 5;">
                 <tooltip><Tooltip text="Minta Garbage Collection (System.gc())" /></tooltip>
              </Button>

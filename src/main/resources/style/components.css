@@ -15,6 +15,81 @@
     -fx-alignment: TOP_LEFT;
 }
 
+/* 
+   Headerless Mode for Raw View 
+   Hides the column header area completely to mimic a text editor
+*/
+.header-hidden .column-header-background {
+    -fx-max-height: 0;
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    visibility: hidden;
+}
+
+.header-hidden .column-header {
+    visibility: hidden;
+}
+
+/* ============================================
+   ListView Log Viewer Performance Optimizations
+   Aggressive optimizations for smooth scrolling with 1M+ rows
+   ============================================ */
+
+/* Fixed cell size for smooth virtualization */
+.list-view .list-cell {
+    -fx-cell-size: 24px;
+    -fx-padding: 0 8px;
+    -fx-font-family: 'Consolas', 'Monaco', monospace;
+    -fx-font-size: 12px;
+
+    /* Aggressive caching for maximum performance */
+    -fx-cache: true;
+    -fx-cache-hint: speed;
+
+    /* Optimize text rendering */
+    -fx-font-smoothing-type: lcd;
+
+    /* Reduce layout overhead */
+    -fx-background-insets: 0;
+    -fx-snap-to-pixel: false;
+}
+
+/* Optimize virtual flow for large datasets */
+.list-view .virtual-flow {
+    -fx-cache: true;
+    -fx-cache-hint: speed;
+    -fx-snap-to-pixel: false;
+}
+
+/* Disable smooth scrolling animation to reduce overhead */
+.list-view {
+    -fx-smooth: false;
+}
+
+/* Optimized scrollbar styling - simpler for better performance */
+.list-view .virtual-flow .scroll-bar:vertical,
+.list-view .virtual-flow .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+}
+
+.list-view .virtual-flow .scroll-bar .thumb {
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+/* Optimize scrollbar track for faster rendering */
+.list-view .virtual-flow .scroll-bar .track {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+}
+
+/* Remove increment/decrement button animations */
+.list-view .virtual-flow .scroll-bar .increment-button,
+.list-view .virtual-flow .scroll-bar .decrement-button {
+    -fx-background-radius: 0;
+    -fx-padding: 0;
+}
+
 /* ============================================
    Recent Files List Styling
    ============================================ */

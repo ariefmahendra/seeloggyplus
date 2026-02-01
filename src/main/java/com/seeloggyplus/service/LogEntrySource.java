@@ -35,11 +35,28 @@ public interface LogEntrySource {
     List<LogEntry> getEntries(int offset, int limit);
 
     /**
-     * Creates a NEW LogEntrySource filtered by the given predicate.
-     * The original source remains unchanged (immutability preferred).
+     * Retrieves a single entry by its global zero-based index.
      *
-     * @param predicate The condition to test each log entry.
-     * @return A new LogEntrySource containing only matching entries.
+     * @param index The index of the entry.
+     * @return The LogEntry at the specified index.
      */
+    LogEntry getEntry(int index);
+
+    /**
+     * Helper to get the effective size based on whether filtering is active.
+     */
+    default int getFilteredSize(com.seeloggyplus.util.IntArrayList filteredIndexes) {
+        return filteredIndexes == null ? getTotalEntries() : filteredIndexes.size();
+    }
+
+    /**
+     * Helper to get a LogEntry by its filtered index.
+     * Maps the filtered index to the real underlying index.
+     */
+    default LogEntry getByFilteredIndex(int filteredIndex, com.seeloggyplus.util.IntArrayList filteredIndexes) {
+        int realIndex = (filteredIndexes == null) ? filteredIndex : filteredIndexes.get(filteredIndex);
+        return getEntry(realIndex);
+    }
+
     LogEntrySource filter(Predicate<LogEntry> predicate);
 }

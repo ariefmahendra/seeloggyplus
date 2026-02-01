@@ -51,7 +51,7 @@
     -fx-padding: 2 4 2 4;
 }
 
-/* Selected row - keep colors visible but slightly muted */
+/* Selected row - simplified for performance */
 .table-row-cell:selected .log-level-fatal,
 .table-row-cell:selected .log-level-error,
 .table-row-cell:selected .log-level-warn,
@@ -61,12 +61,24 @@
     -fx-opacity: 0.8;  /* Slightly transparent when selected */
 }
 
-/* Hover effect for better UX */
-.table-row-cell:hover .log-level-fatal,
-.table-row-cell:hover .log-level-error,
-.table-row-cell:hover .log-level-warn,
-.table-row-cell:hover .log-level-info,
-.table-row-cell:hover .log-level-debug,
-.table-row-cell:hover .log-level-trace {
-    -fx-opacity: 0.9;
+/* ============================================
+   Raw Mode Row Highlighting (Backgrounds)
+   Optimized for scroll performance
+   ============================================ */
+
+.log-row-error {
+    -fx-background-color: #ffebee; /* Very Light Red */
+    /* Disable cache to avoid memory overhead with 1M+ rows */
+}
+
+.log-row-error:selected {
+     -fx-background-color: #ffcdd2; /* Darker Red for selection */
+}
+
+.log-row-warn {
+    -fx-background-color: #fffde7; /* Very Light Yellow */
+}
+
+.log-row-warn:selected {
+    -fx-background-color: #fff9c4; /* Darker Yellow for selection */
 }

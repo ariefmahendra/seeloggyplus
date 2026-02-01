@@ -1,0 +1,50 @@
+/* RichTextFX Styling */
+
+.log-area {
+    -fx-background-color: white;
+}
+
+.styled-text-area {
+    -fx-background-color: white;
+}
+
+/* Keywords */
+.error {
+    -fx-fill: #D32F2F;
+    -fx-font-weight: bold;
+}
+
+.warn {
+    -fx-fill: #F57C00;
+    -fx-font-weight: bold;
+}
+
+.info {
+    -fx-fill: #1976D2;
+}
+
+.debug {
+    -fx-fill: #388E3C;
+}
+
+.trace {
+    -fx-fill: #757575;
+}
+
+.default {
+    -fx-fill: black;
+}
+
+/* Selection */
+/* Selection (The highlight background) */
+.selection {
+    -fx-fill: #2196F3;
+    /* Blue highlight */
+    -fx-stroke: transparent;
+}
+
+/* Line Highlighting */
+.selected-line {
+    -fx-background-color: #E3F2FD;
+    /* Light Blue 50 */
+}
