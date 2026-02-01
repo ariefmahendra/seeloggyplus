@@ -14,20 +14,9 @@ import org.slf4j.LoggerFactory;
 public class RecentFileListCell extends ListCell<RecentFilesDto> {
     private static final Logger logger = LoggerFactory.getLogger(RecentFileListCell.class);
     private final ServerManagementService serverManagementService;
-    // We need a way to access the current monitoring path from MainController,
-    // or pass it in. Since it changes, maybe passing a Supplier or just ignoring
-    // the "(Monitoring)" text for now
-    // or making it a property. For simplicity in refactoring, let's pass the
-    // current path or null.
-    // But ListCell is created by a factory.
-    // Better approach: The factory in MainController will create this and pass the
-    // current monitoring path reference/supplier if needed.
-    // Or simpler: Just keep it simple for now.
-
     private final Supplier<String> monitoringRemotePathSupplier;
 
-    public RecentFileListCell(ServerManagementService serverManagementService,
-            Supplier<String> monitoringRemotePathSupplier) {
+    public RecentFileListCell(ServerManagementService serverManagementService, Supplier<String> monitoringRemotePathSupplier) {
         this.serverManagementService = serverManagementService;
         this.monitoringRemotePathSupplier = monitoringRemotePathSupplier;
     }
@@ -35,7 +24,6 @@ public class RecentFileListCell extends ListCell<RecentFilesDto> {
     @Override
     protected void updateItem(RecentFilesDto item, boolean empty) {
         super.updateItem(item, empty);
-
         if (empty || item == null) {
             setText(null);
             setGraphic(null);
@@ -83,19 +71,10 @@ public class RecentFileListCell extends ListCell<RecentFilesDto> {
             Label sizeLabel = new Label(logFile.getSize());
             sizeLabel.getStyleClass().add("size-label");
 
-            Label configLabel = new Label();
-            if (item.parsingConfig() != null) {
-                configLabel.setText("Config: " + item.parsingConfig().getName());
-            } else {
-                configLabel.setText("Config: Unknown");
-            }
-            configLabel.setStyle("-fx-font-size: 11px;");
-            configLabel.getStyleClass().add("config-label");
-
             if (serverLabel != null) {
-                vbox.getChildren().addAll(nameLabel, serverLabel, pathLabel, sizeLabel, configLabel);
+                vbox.getChildren().addAll(nameLabel, serverLabel, pathLabel, sizeLabel);
             } else {
-                vbox.getChildren().addAll(nameLabel, pathLabel, sizeLabel, configLabel);
+                vbox.getChildren().addAll(nameLabel, pathLabel, sizeLabel);
             }
 
             setGraphic(vbox);

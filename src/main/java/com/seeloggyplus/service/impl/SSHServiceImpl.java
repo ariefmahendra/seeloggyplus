@@ -157,19 +157,44 @@ public class SSHServiceImpl implements SSHService {
                     channel = (ChannelExec) session.openChannel("exec");
                     activeTailChannel = channel;
 
-                    String command = String.format("tail -n %d -F %s", lines, escapeShellArgument(remotePath));
+                    // Force PTY allocation to prevent output buffering on some servers
+                    channel.setPty(true);
+
+                    // Add -s 0.2 to force check every 200ms (bypassing broken inotify on WSL)
+                    String command = String.format("tail -n %d -F -s 0.2 %s", lines, escapeShellArgument(remotePath));
                     channel.setCommand(command);
 
                     InputStream in = channel.getInputStream();
                     channel.connect();
                     logger.info("Tail started: {}", remotePath);
 
-                    try (BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                        String line;
-                        while (isTailing.get() && (line = reader.readLine()) != null) {
-                            logConsumer.accept(line);
+                    byte[] buffer = new byte[8192];
+                    java.io.ByteArrayOutputStream lineBuffer = new java.io.ByteArrayOutputStream();
+
+                    int bytesRead;
+                    while (isTailing.get()) {
+                        bytesRead = in.read(buffer);
+                        if (bytesRead == -1) {
+                            logger.info("SSH Tail: EOF reached (bytesRead=-1).");
+                            break;
                         }
+
+                        for (int i = 0; i < bytesRead; i++) {
+                            byte b = buffer[i];
+                            if (b == '\n') {
+                                // Flush line
+                                String l = lineBuffer.toString(StandardCharsets.UTF_8);
+                                logConsumer.accept(l);
+                                lineBuffer.reset();
+                            } else if (b != '\r') {
+                                lineBuffer.write(b);
+                            }
+                        }
+                    }
+
+                    if (lineBuffer.size() > 0) {
+                        logger.info("SSH Tail: Flushing remaining buffer.");
+                        logConsumer.accept(lineBuffer.toString(StandardCharsets.UTF_8));
                     }
 
                     int exit = channel.getExitStatus();

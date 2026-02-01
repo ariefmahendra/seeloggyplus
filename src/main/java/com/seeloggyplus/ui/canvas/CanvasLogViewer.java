@@ -1,4 +1,4 @@
-package com.seeloggyplus.component;
+package com.seeloggyplus.ui.canvas;
 
 import com.seeloggyplus.util.LineOffsetIndex;
 import com.seeloggyplus.util.MappedFileReader;
@@ -164,6 +164,32 @@ public class CanvasLogViewer extends GridPane {
     }
 
     /**
+     * Resets the viewer state (clears file reader, index, and lines).
+     * Used when switching to a mode that doesn't use a local file (e.g., Remote
+     * Tail).
+     */
+    public void resetView() {
+        this.reader = null;
+        this.index = null;
+        this.fileLineCount = 0;
+        this.totalLines = tailBuffer.size();
+        this.currentTopLine = 0;
+        this.selectedLine = -1;
+        this.selectedLineIndexes.clear();
+        this.filteredIndexes = null;
+        this.filteredCount = 0;
+        this.followTail = true; // Always start following tail when resetting
+        if (onFollowTailChanged != null) {
+            onFollowTailChanged.accept(true);
+        }
+
+        leftMargin = 80; // Reset to default
+        updateScrollBar();
+        render();
+        logger.info("CanvasLogViewer reset.");
+    }
+
+    /**
      * Load a file for viewing.
      */
     public void loadFile(MappedFileReader reader, LineOffsetIndex index) {
@@ -262,12 +288,14 @@ public class CanvasLogViewer extends GridPane {
      */
     public void refreshTail() {
         this.totalLines = fileLineCount + tailBuffer.size();
-
         if (followTail) {
             scrollToBottom();
         } else {
             updateScrollBar();
             render();
+            // Ensure status update even if not following tail
+            long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
+            fireStatusUpdate(effectiveLines);
         }
     }
 
@@ -277,6 +305,7 @@ public class CanvasLogViewer extends GridPane {
         currentTopLine = max;
         vScrollBar.setValue(max);
         render();
+        fireStatusUpdate(effectiveLines);
     }
 
     /**
@@ -312,11 +341,16 @@ public class CanvasLogViewer extends GridPane {
      * Jump to specific line number (0-based).
      */
     public void jumpToLine(long line) {
+        if (followTail) {
+            setFollowTail(false);
+        }
         currentTopLine = Math.max(0, Math.min(line, totalLines - visibleLineCount));
         selectedLine = line;
 
         vScrollBar.setValue(currentTopLine);
         render();
+        long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
+        fireStatusUpdate(effectiveLines);
     }
 
     private void render() {
@@ -325,7 +359,8 @@ public class CanvasLogViewer extends GridPane {
         gc.setFill(BG_COLOR);
         gc.fillRect(0, 0, width, height);
 
-        if (reader == null) {
+        // Allow rendering if we have either a reader OR a tail buffer
+        if (reader == null && tailBuffer.isEmpty()) {
             return;
         }
 
@@ -349,13 +384,8 @@ public class CanvasLogViewer extends GridPane {
             }
 
             int y = PADDING + i * LINE_HEIGHT;
-            if (viewIndex == selectedLine) {
-                gc.setFill(SELECTION_COLOR);
-                gc.fillRect(leftMargin, y, width - leftMargin, LINE_HEIGHT);
-            }
-
             String line = getLineContent(actualLineIndex);
-            renderLineContent(line, leftMargin, y, i);
+            renderLineContent(line, leftMargin, y, actualLineIndex);
         }
         gc.restore();
         gc.setFill(LINE_NUM_BG);
@@ -383,7 +413,7 @@ public class CanvasLogViewer extends GridPane {
         }
     }
 
-    private void renderLineContent(String line, double x, double y, long relativeIndex) {
+    private void renderLineContent(String line, double x, double y, long globalIndex) {
         gc.setFont(MONO_FONT);
         double drawX = x - currentScrollX;
 
@@ -394,7 +424,6 @@ public class CanvasLogViewer extends GridPane {
 
         Color baseColor = TEXT_COLOR;
 
-        long globalIndex = currentTopLine + relativeIndex;
         boolean isSelected = selectedLineIndexes.contains(globalIndex);
 
         // 1. Draw Selection Background (FIRST)
@@ -432,7 +461,7 @@ public class CanvasLogViewer extends GridPane {
 
     private void setupMouseHandlers() {
         canvas.setOnScroll(e -> {
-            if (reader == null) {
+            if (reader == null && tailBuffer.isEmpty()) {
                 return;
             }
 
@@ -477,7 +506,7 @@ public class CanvasLogViewer extends GridPane {
         });
 
         canvas.setOnMousePressed(e -> {
-            if (reader == null) {
+            if (reader == null && tailBuffer.isEmpty()) {
                 return;
             }
 
@@ -492,7 +521,13 @@ public class CanvasLogViewer extends GridPane {
                 return;
             }
 
-            long globalIndex = currentTopLine + viewLine;
+            long listIndex = currentTopLine + viewLine;
+            long globalIndex;
+            if (filteredIndexes != null && listIndex < filteredIndexes.size()) {
+                globalIndex = filteredIndexes.get((int) listIndex);
+            } else {
+                globalIndex = listIndex;
+            }
 
             if (e.getButton() == MouseButton.SECONDARY) {
                 if (!selectedLineIndexes.contains(globalIndex)) {
@@ -516,7 +551,13 @@ public class CanvasLogViewer extends GridPane {
                 dragStartViewLine = viewLine;
                 dragEndViewLine = viewLine;
                 selectedLineIndexes.clear();
-                selectedLineIndexes.add(globalIndex);
+
+                // Ensure we don't select out of bounds
+                long effective = (filteredIndexes != null) ? filteredCount : totalLines;
+                if (listIndex < effective) {
+                    selectedLineIndexes.add(globalIndex);
+                }
+
                 handleMouseClick(e);
                 render();
             }
@@ -536,9 +577,20 @@ public class CanvasLogViewer extends GridPane {
 
                 long start = Math.min(dragStartViewLine, dragEndViewLine);
                 long end = Math.max(dragStartViewLine, dragEndViewLine);
+                long effective = (filteredIndexes != null) ? filteredCount : totalLines;
 
                 for (long i = start; i <= end; i++) {
-                    selectedLineIndexes.add(currentTopLine + i);
+                    long listIdx = currentTopLine + i;
+                    if (listIdx >= effective)
+                        break;
+
+                    long mappedIdx;
+                    if (filteredIndexes != null) {
+                        mappedIdx = filteredIndexes.get((int) listIdx);
+                    } else {
+                        mappedIdx = listIdx;
+                    }
+                    selectedLineIndexes.add(mappedIdx);
                 }
                 render();
             }
@@ -552,7 +604,7 @@ public class CanvasLogViewer extends GridPane {
     }
 
     private void handleMouseClick(MouseEvent e) {
-        if (reader == null) {
+        if (reader == null && tailBuffer.isEmpty()) {
             return;
         }
 
@@ -582,7 +634,7 @@ public class CanvasLogViewer extends GridPane {
     private void setupKeyboardHandlers() {
         canvas.setFocusTraversable(true);
         canvas.setOnKeyPressed(e -> {
-            if (reader == null) {
+            if (reader == null && tailBuffer.isEmpty()) {
                 return;
             }
 
@@ -747,4 +799,116 @@ public class CanvasLogViewer extends GridPane {
     public interface LineDoubleClickHandler {
         void handle(long lineNumber, String lineContent);
     }
+
+    public int getCurrentTopLine() {
+        return (int) currentTopLine;
+    }
+
+    public int getSelectedIndex() {
+        return (int) selectedLine;
+    }
+
+    public int getItemCount() {
+        return (int) ((filteredIndexes != null) ? filteredCount : totalLines);
+    }
+
+    public void selectLine(long line) {
+        if (line >= 0 && line < getItemCount()) {
+            selectedLine = line;
+            selectedLineIndexes.clear();
+
+            // Map view index to global index for selection set
+            long globalIndex;
+            if (filteredIndexes != null) {
+                globalIndex = filteredIndexes.get((int) line);
+            } else {
+                globalIndex = line;
+            }
+            selectedLineIndexes.add(globalIndex);
+
+            render();
+        }
+    }
+
+    /**
+     * Scans for the next line matching the current search pattern.
+     * Used in Tail Mode (Highlight Only).
+     */
+    public int findNextMatch(int startLine, boolean forward) {
+        if (searchPattern == null) {
+            return -1;
+        }
+
+        int count = getItemCount();
+        int current = startLine;
+
+        // Safety bound to prevent infinite loops or freezing UI on massive logs
+        // We scan at most 5000 lines per call for responsiveness
+        int scanned = 0;
+        int maxScan = 5000;
+
+        while (scanned < maxScan) {
+            if (current < 0 || current >= count) {
+                break;
+            }
+
+            // Get content (mapped from filter if active, though tail mode usually isn't
+            // filtered here)
+            long globalIndex;
+            if (filteredIndexes != null) {
+                globalIndex = filteredIndexes.get(current);
+            } else {
+                globalIndex = current;
+            }
+
+            String lineContent = getLineContent(globalIndex);
+            if (searchPattern.matcher(lineContent).find()) {
+                return current;
+            }
+
+            if (forward) {
+                current++;
+            } else {
+                current--;
+            }
+            scanned++;
+        }
+
+        return -1;
+    }
+
+    public int countMatches() {
+        if (searchPattern == null) {
+            return 0;
+        }
+
+        int count = getItemCount();
+        int matches = 0;
+
+        // Safety: Limit scan to avoid main thread freeze
+        int scanLimit = 50000;
+        int limit = Math.min(count, scanLimit);
+
+        for (int i = 0; i < limit; i++) {
+            // Get content
+            long globalIndex;
+            if (filteredIndexes != null) {
+                globalIndex = filteredIndexes.get(i);
+            } else {
+                globalIndex = i;
+            }
+
+            String lineContent = getLineContent(globalIndex);
+            if (searchPattern.matcher(lineContent).find()) {
+                matches++;
+            }
+        }
+
+        return matches;
+    }
+
+    public boolean hasSearchHighlight() {
+        return searchPattern != null;
+    }
+
 }

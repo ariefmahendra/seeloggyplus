@@ -8,8 +8,7 @@
 <?import javafx.scene.shape.Rectangle?>
 <BorderPane minHeight="400" minWidth="600" prefHeight="800" prefWidth="1200.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
     <top>
-        <!-- Keep the top area always above the center content -->
-        <VBox pickOnBounds="true" mouseTransparent="false">
+        <VBox>
             <MenuBar fx:id="menuBar">
                 <!-- File Menu -->
                 <Menu text="File">
@@ -84,6 +83,7 @@
                         <Tooltip text="Clear All Filters" />
                     </tooltip>
                 </Button>
+                <com.seeloggyplus.ui.search.SearchNavigator fx:id="searchNavigator" />
                 <Separator orientation="VERTICAL" />
                 <Button fx:id="refreshButton">
                     <graphic>
@@ -124,10 +124,8 @@
 
     <!-- Center: Main Content -->
     <center>
-        <!-- Clip center so children cannot paint outside this region -->
-        <StackPane fx:id="centerRoot" pickOnBounds="true">
+        <StackPane fx:id="centerRoot">
             <BorderPane xmlns="http://javafx.com/javafx">
-                <!-- Collapsed Left Panel (appears when leftPanel is unpinned) -->
                 <left>
                     <VBox fx:id="collapsedLeftPanel" alignment="TOP_CENTER" managed="false" prefWidth="20" spacing="10" visible="false">
                         <padding>
@@ -147,7 +145,6 @@
 
                 <center>
                     <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
-                        <!-- Left Panel: Recent Files -->
                         <VBox fx:id="leftPanel" minWidth="200" prefWidth="250" spacing="5">
                             <padding>
                                 <Insets bottom="5" left="5" right="5" top="5" />
@@ -179,9 +176,7 @@
                             </Button>
                         </VBox>
 
-                        <!-- Right Panel: Log Viewer and Detail -->
                         <BorderPane>
-                            <!-- Collapsed Bottom Panel (appears when bottomPanel is unpinned) -->
                             <bottom>
                                 <HBox fx:id="collapsedBottomPanel" alignment="CENTER_LEFT" prefHeight="20" spacing="10" visible="false">
                                     <padding>
@@ -275,7 +270,7 @@
                                         
                                         <StackPane fx:id="detailContainer" VBox.vgrow="ALWAYS" style="-fx-border-color: #cccccc; -fx-border-width: 1;">
                                              <padding>
-                                                 <Insets bottom="0" left="0" right="0" top="0"/>
+                                                 <Insets/>
                                              </padding>
                                         </StackPane>
                                     </VBox>
@@ -287,7 +282,7 @@
             </BorderPane>
 
             <!-- Loading Overlay -->
-            <VBox fx:id="loadingOverlay" alignment="CENTER" visible="false" mouseTransparent="false" pickOnBounds="true" style="-fx-background-color: rgba(0, 0, 0, 0.4);">
+            <VBox fx:id="loadingOverlay" alignment="CENTER" visible="false" style="-fx-background-color: rgba(0, 0, 0, 0.4);">
                 <VBox alignment="CENTER" spacing="15" style="-fx-background-color: white; -fx-background-radius: 8; -fx-padding: 25; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 10, 0, 0, 0); -fx-min-width: 300; -fx-max-width: 400;">
                     <ProgressIndicator fx:id="loadingProgress" minWidth="60" minHeight="60" maxWidth="60" maxHeight="60" />
                     <Label text="Processing Request..." textFill="#333333">

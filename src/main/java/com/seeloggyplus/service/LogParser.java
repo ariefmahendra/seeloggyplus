@@ -81,7 +81,7 @@ public interface LogParser {
      * @param config     Parsing configuration.
      * @return Parsed LogEntry object.
      */
-    LogEntry parseLine(String line, long lineNumber, ParsingConfig config);
+    LogEntry parseLine(String line, long lineNumber);
 
     /**
      * Validates a parsing configuration against a sample log line.

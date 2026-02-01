@@ -1,11 +1,13 @@
 package com.seeloggyplus.controller;
 
-import com.seeloggyplus.component.CanvasLogViewer;
+import com.seeloggyplus.ui.canvas.CanvasLogViewer;
 import com.seeloggyplus.service.impl.*;
+import com.seeloggyplus.ui.cell.RecentFileListCell;
 import com.seeloggyplus.util.*;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.scene.Cursor;
 import javafx.util.Duration;
 
 import com.seeloggyplus.dto.RecentFilesDto;
@@ -139,6 +141,8 @@ public class MainController {
     private ToggleButton toggleLeftPanelButton;
     @FXML
     private ToggleButton toggleBottomPanelButton;
+    @FXML
+    private com.seeloggyplus.ui.search.SearchNavigator searchNavigator;
 
     @FXML
     private Label detailLabel;
@@ -193,8 +197,10 @@ public class MainController {
     private String monitoringRemotePath;
 
     // state
-    private volatile boolean tailFlushScheduled = false;
+    private final java.util.concurrent.atomic.AtomicBoolean tailFlushScheduled = new java.util.concurrent.atomic.AtomicBoolean(
+            false);
     private boolean tailColumnsAutoResized = false;
+    private boolean isProgrammaticUpdate = false; // Prevent listener loops
 
     private boolean autoPrettifyJson = false;
     private boolean autoPrettifyXml = false;
@@ -260,8 +266,6 @@ public class MainController {
         updateTailButtonState();
         startMemoryMonitor();
 
-        // Ensure center content cannot paint outside its region (prevents 'menubar
-        // covered' glitches)
         if (centerRoot != null && centerClip != null) {
             centerClip.widthProperty().bind(centerRoot.widthProperty());
             centerClip.heightProperty().bind(centerRoot.heightProperty());
@@ -278,12 +282,15 @@ public class MainController {
 
         if (isRemote || isLocal) {
             tailButton.setDisable(false);
-            if (followTailButton != null)
+            if (followTailButton != null) {
                 followTailButton.setDisable(false);
+            }
         } else {
             tailButton.setDisable(true);
-            if (followTailButton != null)
+            if (followTailButton != null) {
                 followTailButton.setDisable(true);
+                followTailButton.setSelected(false);
+            }
             if (tailModeEnabled) {
                 disableTail();
             }
@@ -321,7 +328,6 @@ public class MainController {
 
         aboutMenuItem.setOnAction(e -> handleAbout());
 
-        // Protect MenuBar from collapsing
         menuBar.setMinHeight(Region.USE_PREF_SIZE);
     }
 
@@ -345,9 +351,8 @@ public class MainController {
         });
 
         leftPanelContextMenu.getItems().addAll(openFileMenuItem, new SeparatorMenuItem(), deleteFromRecentMenuItem);
-        recentFilesListView
-                .setCellFactory(listView -> new com.seeloggyplus.ui.cell.RecentFileListCell(serverManagementService,
-                        () -> monitoringRemotePath));
+        recentFilesListView.setCellFactory(
+                listView -> new RecentFileListCell(serverManagementService, () -> monitoringRemotePath));
         recentFilesListView.getStyleClass().add("recent-files-list");
         recentFilesListView.setItems(FXCollections.observableArrayList(recentFileService.findAll()));
         recentFilesListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
@@ -453,54 +458,48 @@ public class MainController {
     private static final Pattern KEYWORDS_PATTERN = Pattern.compile(KEYWORDS_REGEX);
 
     private void setupCenterPanel() {
-        // Canvas-based Log Viewer (glogg-style, O(1) scroll)
-        // Canvas-based Log Viewer (glogg-style, O(1) scroll)
         canvasLogViewer = new CanvasLogViewer();
         canvasLogViewer.setTailBuffer(liveTailList);
-
-        // Bind Follow Button
         if (followTailButton != null) {
-            // Initial state
             followTailButton.setSelected(canvasLogViewer.isFollowTail());
-
-            // Viewer -> Button (Auto-disable updates button)
-            canvasLogViewer.setOnFollowTailChanged(isFollowing -> {
-                Platform.runLater(() -> followTailButton.setSelected(isFollowing));
-            });
-
-            // Button -> Viewer (Manual toggle)
-            followTailButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
-                canvasLogViewer.setFollowTail(newVal);
-            });
+            canvasLogViewer.setOnFollowTailChanged(
+                    isFollowing -> Platform.runLater(() -> followTailButton.setSelected(isFollowing)));
+            followTailButton.selectedProperty()
+                    .addListener((obs, oldVal, newVal) -> canvasLogViewer.setFollowTail(newVal));
         }
 
         logContainer.getChildren().add(canvasLogViewer);
-
-        // Ensure it only ever sizes to the logContainer
         StackPane.setAlignment(canvasLogViewer, javafx.geometry.Pos.CENTER);
 
-        // Bind to container size
         canvasLogViewer.prefWidthProperty().bind(logContainer.widthProperty());
         canvasLogViewer.prefHeightProperty().bind(logContainer.heightProperty());
-
-        // Guard rails: don't let it request infinite/out-of-parent sizes during
-        // relayout
         canvasLogViewer.setMinSize(0, 0);
         canvasLogViewer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        // Line click → show in detail panel
         canvasLogViewer.setOnLineClick(lineNumber -> {
+            String content = null;
             if (mappedFileReader != null && lineOffsetIndex != null) {
-                String content = mappedFileReader.readLine(lineOffsetIndex, lineNumber);
-                displayLogDetailFromCanvas(lineNumber, content);
+                if (lineNumber < lineOffsetIndex.getLineCount()) {
+                    content = mappedFileReader.readLine(lineOffsetIndex, lineNumber);
+                }
             }
+
+            if ((content == null || content.isEmpty()) && tailModeEnabled && !liveTailList.isEmpty()) {
+                long fileLineCount = (lineOffsetIndex != null) ? lineOffsetIndex.getLineCount() : 0;
+                long bufferIndex = lineNumber - fileLineCount;
+                if (bufferIndex >= 0 && bufferIndex < liveTailList.size()) {
+                    LogEntry entry = liveTailList.get((int) bufferIndex);
+                    content = entry.getRawLog();
+                    if (content == null) {
+                        content = "";
+                    }
+                }
+            }
+            displayLogDetailFromCanvas(lineNumber, Objects.requireNonNullElse(content, ""));
         });
 
-        // Double click → jump to original line (clears filter if active)
         canvasLogViewer.setOnLineDoubleClick((lineNumber, content) -> {
             logger.info("Double clicked line {}", lineNumber + 1);
-
-            // If filter is active, clear it and jump to original line
             if (filteredIndexes != null) {
                 logger.info("Clearing filter and jumping to original line {}", lineNumber + 1);
                 searchField.clear();
@@ -513,15 +512,18 @@ public class MainController {
             displayLogDetailFromCanvas(lineNumber, content);
         });
 
-        // Status update callback for bottom status bar
         canvasLogViewer.setOnStatusUpdate((currentLine, total, percentage) -> {
             if (statusLabel != null) {
-                String formatted = String.format("Line: %,d / %,d (%.1f%%)", currentLine, total, percentage);
+                String formatted;
+                if (tailModeEnabled) {
+                    formatted = String.format("Line: %,d / %,d", currentLine, total);
+                } else {
+                    formatted = String.format("Line: %,d / %,d (%.1f%%)", currentLine, total, percentage);
+                }
                 statusLabel.setText(formatted);
             }
         });
 
-        // Setup Detail Panel (RichTextFX)
         setupDetailPanel();
 
         searchField.setOnAction(e -> performSearch());
@@ -539,9 +541,16 @@ public class MainController {
         clearLogButton.setOnAction(e -> handleClearLog());
         refreshButton.setTooltip(new Tooltip("Reload current file or tailing session (Ctrl+R)"));
 
+        if (searchNavigator != null) {
+            searchNavigator.setOnNext(this::navigateNextMatch);
+            searchNavigator.setOnPrevious(this::navigatePreviousMatch);
+        }
+
         refreshButton.setTooltip(new Tooltip("Reload current file or tailing session (Ctrl+R)"));
 
         tailButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (isProgrammaticUpdate)
+                return;
             if (newVal) {
                 enableTail();
             } else {
@@ -565,17 +574,16 @@ public class MainController {
     }
 
     private void configureToggleStyle(ToggleButton button) {
-        if (button == null)
+        if (button == null) {
             return;
+        }
 
-        // Initial state
         if (button.isSelected()) {
             button.setStyle(TOGGLE_SELECTED_STYLE);
         } else {
             button.setStyle(TOGGLE_DESELECTED_STYLE);
         }
 
-        // Listener
         button.selectedProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal) {
                 button.setStyle(TOGGLE_SELECTED_STYLE);
@@ -675,7 +683,7 @@ public class MainController {
         logger.info("Search - Include: '{}', Regex: {}, CaseSensitive: {}",
                 searchText, isRegex, caseSensitive);
 
-        if (mappedFileReader == null || lineOffsetIndex == null) {
+        if ((mappedFileReader == null || lineOffsetIndex == null) && !tailModeEnabled) {
             logger.warn("No file loaded for search");
             return;
         }
@@ -704,6 +712,12 @@ public class MainController {
             filteredIndexes = null;
             canvasLogViewer.setFilteredIndexes(null); // Show all lines
             canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
+
+            if (searchNavigator != null) {
+                // In tail mode, count matches in current buffer
+                int matches = canvasLogViewer.countMatches();
+                searchNavigator.setMatchCount(matches);
+            }
 
             // Update the predicate for completeness (though primarily used in search mode)
             try {
@@ -836,6 +850,10 @@ public class MainController {
                 logger.info("Large search result set: {} matches. Highlighting enabled.", matches.size());
             }
 
+            if (searchNavigator != null) {
+                searchNavigator.setMatchCount(matches.size());
+            }
+
             hideLoading();
         });
 
@@ -849,11 +867,58 @@ public class MainController {
         Thread.ofVirtual().start(task);
     }
 
+    private void navigateNextMatch() {
+        if (tailModeEnabled) {
+            int currentLine = canvasLogViewer.getCurrentTopLine();
+            int nextLine = canvasLogViewer.findNextMatch(currentLine + 1, true);
+            if (nextLine != -1) {
+                canvasLogViewer.jumpToLine(nextLine);
+                canvasLogViewer.selectLine(nextLine);
+            }
+        } else {
+            // Normal Mode (Filtered)
+            int current = canvasLogViewer.getSelectedIndex();
+            int next = current + 1;
+            if (next < canvasLogViewer.getItemCount()) {
+                canvasLogViewer.selectLine(next);
+                // Ensure visible - selectLine calls render but doesn't scroll if out of view
+                // Actually jumpToLine ensures view. selectLine just updates highlight.
+                // We should check visibility or just jump.
+                // jumpToLine sets topLine. To keep context we might want to just ensure it's in
+                // view.
+                // But CanvasLogViewer.jumpToLine puts it at top. That's fine for "Find Next".
+                canvasLogViewer.jumpToLine(next);
+            }
+        }
+    }
+
+    private void navigatePreviousMatch() {
+        if (tailModeEnabled) {
+            int currentLine = canvasLogViewer.getCurrentTopLine();
+            int prevLine = canvasLogViewer.findNextMatch(currentLine - 1, false);
+            if (prevLine != -1) {
+                canvasLogViewer.jumpToLine(prevLine);
+                canvasLogViewer.selectLine(prevLine);
+            }
+        } else {
+            // Normal Mode (Filtered)
+            int current = canvasLogViewer.getSelectedIndex();
+            int prev = current - 1;
+            if (prev >= 0) {
+                canvasLogViewer.selectLine(prev);
+                canvasLogViewer.jumpToLine(prev);
+            }
+        }
+    }
+
     private void clearSearch() {
         searchField.clear();
         filteredIndexes = null;
         canvasLogViewer.clearFilter();
         canvasLogViewer.clearSearchHighlight();
+        if (searchNavigator != null) {
+            searchNavigator.clear();
+        }
     }
 
     /**
@@ -957,8 +1022,10 @@ public class MainController {
                         }
                         activeTailSshService.connect(server.getHost(), server.getPort(), server.getUsername(),
                                 password);
-                        startRemoteTail(monitoringRemotePath, activeTailSshService, currentParsingConfig, server);
+                        startRemoteTail(monitoringRemotePath, activeTailSshService, server);
+                        hideLoading(); // Ensure loading is hidden after starting tail
                     } catch (Exception e) {
+                        hideLoading(); // Hide loading on error too
                         logger.error("Failed to re-connect for tail reload", e);
                         showError("Reload Error", "Failed to re-connect to server: " + e.getMessage());
                     }
@@ -971,12 +1038,8 @@ public class MainController {
             }
         } else if (currentFile != null) {
             logger.info("Reloading local file '{}'.", currentFile.getName());
-            if (currentParsingConfig != null) {
-                showLoading("Reloading file...");
-                openLocalLogFile(currentFile, false, currentParsingConfig);
-            } else {
-                showError("Reload Error", "Could not reload file: no parsing configuration is active.");
-            }
+            showLoading("Reloading file...");
+            openLocalLogFile(currentFile, false);
         } else {
             logger.warn("Reload triggered but no active file or tail session.");
         }
@@ -989,11 +1052,18 @@ public class MainController {
             disableTail();
         }
         cleanupFileResources();
+        liveTailList.clear();
+        if (canvasLogViewer != null) {
+            canvasLogViewer.resetView();
+        }
         currentFile = null;
         currentLogFromDb = null;
         currentParsingConfig = null;
         clearSearch();
         updateTailButtonState();
+        if (followTailButton != null) {
+            Platform.runLater(() -> followTailButton.setSelected(false));
+        }
         logger.info("Log view cleared");
     }
 
@@ -1025,9 +1095,8 @@ public class MainController {
         pinBottomPanelButton.setOnAction(e -> handleToggleBottomPanelPin());
         expandBottomPanelButton.setOnAction(e -> handleToggleBottomPanelPin());
 
-        // Interactive Status Bar
         if (statusLabel != null) {
-            statusLabel.setCursor(javafx.scene.Cursor.HAND);
+            statusLabel.setCursor(Cursor.HAND);
             statusLabel.setOnMouseClicked(e -> handleGoToLine());
             statusLabel.setTooltip(new Tooltip("Click to Go To Line (Ctrl+G)"));
             statusLabel.setOnMouseEntered(e -> statusLabel.setStyle(
@@ -1123,50 +1192,11 @@ public class MainController {
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN),
                 () -> searchField.requestFocus());
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN), this::handleReload);
-
-        // Panel Shortcuts
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.B, KeyCombination.CONTROL_DOWN),
                 this::toggleLeftPanel);
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.J, KeyCombination.CONTROL_DOWN),
                 this::toggleBottomPanel);
-    }
 
-    @FXML
-    public void handleGoToLine() {
-        if (lineOffsetIndex == null) {
-            return;
-        }
-
-        long totalLines = lineOffsetIndex.getLineCount();
-        if (totalLines <= 0) {
-            return;
-        }
-
-        TextInputDialog dialog = new TextInputDialog();
-        dialog.setTitle("Go To Line");
-        dialog.setHeaderText("Enter line number (1 - " + String.format("%,d", totalLines) + "):");
-        dialog.setContentText("Line:");
-        dialog.initOwner(menuBar.getScene().getWindow());
-
-        dialog.showAndWait().ifPresent(input -> {
-            try {
-                long lineNumber = Long.parseLong(input.trim().replace(",", ""));
-                if (lineNumber >= 1 && lineNumber <= totalLines) {
-                    canvasLogViewer.jumpToLine(lineNumber - 1); // 0-based
-                    logger.info("Jumped to line {}", lineNumber);
-                } else {
-                    Alert alert = new Alert(Alert.AlertType.WARNING);
-                    alert.setTitle("Invalid Line");
-                    alert.setContentText("Line number must be between 1 and " + String.format("%,d", totalLines));
-                    alert.showAndWait();
-                }
-            } catch (NumberFormatException e) {
-                Alert alert = new Alert(Alert.AlertType.WARNING);
-                alert.setTitle("Invalid Input");
-                alert.setContentText("Please enter a valid number.");
-                alert.showAndWait();
-            }
-        });
     }
 
     @FXML
@@ -1200,19 +1230,16 @@ public class MainController {
                 return;
             }
 
-            ParsingConfig selectedConfig = ParsingConfig.createRawConfig();
-            logger.info("Using default RAW configuration for instant open.");
-
             if (selectedFile.getSourceType() == FileInfo.SourceType.LOCAL) {
-                openLocalLogFile(new File(selectedFile.getPath()), true, selectedConfig);
+                openLocalLogFile(new File(selectedFile.getPath()), true);
                 if (sshService != null) {
                     sshService.disconnect();
                 }
             } else {
                 if (action == UnifiedFileManagerDialogController.OpenAction.OPEN) {
-                    openRemoteLogFile(selectedFile, sshService, selectedConfig);
+                    openRemoteLogFile(selectedFile.getPath(), selectedFile.getName(), sshService);
                 } else if (action == UnifiedFileManagerDialogController.OpenAction.TAIL) {
-                    startRemoteTail(selectedFile.getPath(), sshService, selectedConfig, sshServer);
+                    startRemoteTail(selectedFile.getPath(), sshService, sshServer);
                 }
             }
         } catch (IOException e) {
@@ -1221,12 +1248,7 @@ public class MainController {
         }
     }
 
-    private void openRemoteLogFile(FileInfo remoteFile, SSHServiceImpl sshService, ParsingConfig parsingConfig) {
-        openRemoteLogFile(remoteFile.getPath(), remoteFile.getName(), sshService, parsingConfig);
-    }
-
-    private void openRemoteLogFile(String remotePath, String remoteFileName, SSHServiceImpl sshService,
-            ParsingConfig parsingConfig) {
+    private void openRemoteLogFile(String remotePath, String remoteFileName, SSHServiceImpl sshService) {
         if (sshService == null || !sshService.isConnected()) {
             showError("Connection Error", "SSH connection is not active. Please re-select the file.");
             return;
@@ -1276,7 +1298,7 @@ public class MainController {
         downloadTask.setOnSucceeded(e -> {
             File localFile = downloadTask.getValue();
             hideLoading();
-            openLocalLogFile(localFile, true, parsingConfig);
+            openLocalLogFile(localFile, true); // Removed parsingConfig
             sshService.disconnect();
         });
 
@@ -1313,24 +1335,24 @@ public class MainController {
         logger.info("Memory cleanup requested");
     }
 
-    private void openLocalLogFile(File file, boolean updateRecentFilesList, ParsingConfig parsingConfig) {
+    private void openLocalLogFile(File file, boolean updateRecentFilesList) {
         if (file == null || !file.exists()) {
             logger.error("File does not exist: {}", file);
             showError("File Error", "The selected file does not exist or cannot be accessed.");
             return;
         }
 
-        if (parsingConfig == null) {
-            logger.warn("Parsing config is null");
-            showInfo("Log Parsing Configuration", "Parsing Configuration Not Ready. Please Setup First.");
-            return;
-        }
+        ParsingConfig parsingConfig = ParsingConfig.createRawConfig(); // Created internally
+        logger.info("Using default RAW configuration for local file: {}", file.getAbsolutePath());
 
         clearSearch();
 
         cancelCurrentLoadingTask();
         if (tailModeEnabled) {
             disableTail();
+        }
+        if (followTailButton != null) {
+            followTailButton.setSelected(false);
         }
 
         // Make sure UI layout state is consistent before starting a new load.
@@ -1339,7 +1361,7 @@ public class MainController {
         currentFile = file;
         currentParsingConfig = parsingConfig;
 
-        LogFile logFile = getOrCreateLogFile(file, parsingConfig);
+        LogFile logFile = getOrCreateLogFile(file);
 
         if (logFile == null) {
             logger.error("Failed to get or create log file record for: {}", file.getAbsolutePath());
@@ -1356,8 +1378,9 @@ public class MainController {
         loadFileWithParallelParsing(file, logFile, updateRecentFilesList);
     }
 
-    private LogFile getOrCreateLogFile(File file, ParsingConfig parsingConfig) {
+    private LogFile getOrCreateLogFile(File file) {
         try {
+            ParsingConfig parsingConfig = ParsingConfig.createRawConfig(); // Internal default
             LogFile existingLogFile = logFileService.getLogFileByPathAndName(file.getName(), file.getAbsolutePath());
 
             if (existingLogFile != null) {
@@ -1571,9 +1594,8 @@ public class MainController {
                 SSHServiceImpl sshService = connectTask.getValue();
                 if (sshService != null) {
                     logger.info("SSH connected for remote recent file, proceeding to tail.");
-                    ParsingConfig config = ParsingConfig.createRawConfig();
                     resetFilters();
-                    startRemoteTail(logFile.getFilePath(), sshService, config,
+                    startRemoteTail(logFile.getFilePath(), sshService,
                             serverManagementService.getServerById(logFile.getSshServerID()));
                 }
 
@@ -1596,10 +1618,9 @@ public class MainController {
                 return;
             }
 
-            ParsingConfig parsingConfig = ParsingConfig.createRawConfig();
             logger.info("Opening recent file: {} with RAW config", file.getName());
             resetFilters();
-            openLocalLogFile(file, false, parsingConfig);
+            openLocalLogFile(file, false);
         }
     }
 
@@ -1913,13 +1934,72 @@ public class MainController {
         SSHServerModel server = serverManagementService.getServerById(sshServerId);
         if (server == null) {
             showError("Error", "Server not found");
+            disableTail();
+            return;
         }
+
+        String remotePath = currentLogFromDb.getFilePath();
+        if (remotePath == null || remotePath.isEmpty()) {
+            showError("Error", "Remote path is missing");
+            disableTail();
+            return;
+        }
+
+        // Logic to get password (saved or prompt)
+        String password = server.getPassword();
+        if (password == null || password.isBlank()) {
+            com.seeloggyplus.util.PasswordPromptDialog prompt = new com.seeloggyplus.util.PasswordPromptDialog(
+                    server.getHost(), server.getUsername());
+            Optional<String> result = prompt.showAndWait();
+            if (result.isPresent() && !result.get().isBlank()) {
+                password = result.get();
+            } else {
+                disableTail();
+                return;
+            }
+        }
+        final String finalPassword = password;
+
+        showLoading("Connecting to " + server.getHost() + "...");
+
+        Task<Boolean> connectTask = new Task<>() {
+            private final SSHServiceImpl sshService = new SSHServiceImpl();
+
+            @Override
+            protected Boolean call() throws Exception {
+                return sshService.connect(server.getHost(), server.getPort(), server.getUsername(), finalPassword);
+            }
+
+            @Override
+            protected void succeeded() {
+                if (getValue()) {
+                    hideLoading();
+                    // Assuming we have parsing config setup
+                    startRemoteTail(remotePath, sshService, server); // Removed currentParsingConfig
+                } else {
+                    hideLoading();
+                    showError("Connection Failed", "Could not connect to " + server.getHost());
+                    disableTail();
+                }
+            }
+
+            @Override
+            protected void failed() {
+                hideLoading();
+                showError("Connection Error", getException().getMessage());
+                disableTail();
+            }
+        };
+
+        new Thread(connectTask).start();
     }
 
     private void disableTail() {
         tailModeEnabled = false;
         if (tailButton.isSelected()) {
+            isProgrammaticUpdate = true;
             tailButton.setSelected(false);
+            isProgrammaticUpdate = false;
         }
         tailButton.setStyle("");
         stopRemoteTail();
@@ -1927,24 +2007,41 @@ public class MainController {
         logger.info("Tail mode DISABLED");
     }
 
-    private void startRemoteTail(String remotePath, SSHServiceImpl sshService, ParsingConfig parsingConfig,
-            SSHServerModel server) {
+    private void startRemoteTail(String remotePath, SSHServiceImpl sshService, SSHServerModel server) {
         stopRemoteTail();
-        saveRemoteTailToRecent(remotePath, parsingConfig, server);
+        clearSearch(); // Reset search/filters when starting new tail
+
+        saveRemoteTailToRecent(remotePath, server);
+
+        // The parsing config is now created and set within saveRemoteTailToRecent
+        // and assigned to currentLogFromDb.
+        // We need to retrieve it from currentLogFromDb or re-create it here if not
+        // already set.
+        // For now, let's assume currentLogFromDb is set by saveRemoteTailToRecent
+        // and we can get the config from there.
+        ParsingConfig rawConfig = ParsingConfig.createRawConfig(); // Re-create for local use if not already set
+        if (currentLogFromDb != null && currentLogFromDb.getParsingConfigurationID() != null) {
+            rawConfig = parsingConfigService.findById(currentLogFromDb.getParsingConfigurationID())
+                    .orElse(ParsingConfig.createRawConfig());
+        }
 
         this.activeTailSshService = sshService;
         this.remoteTailLineCounter = 0;
-        this.currentParsingConfig = parsingConfig;
+        this.currentParsingConfig = rawConfig; // Used rawConfig
         this.currentFile = null;
 
-        // Clear live buffer for new session
         liveTailList.clear();
-        canvasLogViewer.refreshTail();
-
-        logger.info("ListView ready for config: {}", parsingConfig.getName());
-
+        canvasLogViewer.setTailBuffer(liveTailList);
+        canvasLogViewer.resetView(); // Clean slate for remote tail
+        logger.info("ListView ready for config: {}", rawConfig.getName()); // Used rawConfig
+        tailFlushScheduled.set(false); // Force reset flush lock
+        tailColumnsAutoResized = false; // Force reset log flag
         tailModeEnabled = true;
-        // tailButton style handled by listener
+        if (!tailButton.isSelected()) {
+            isProgrammaticUpdate = true;
+            tailButton.setSelected(true);
+            isProgrammaticUpdate = false;
+        }
 
         try {
             currentTailFilterPredicate = buildSearchPredicate(searchField.getText(), regexCheckBox.isSelected(),
@@ -1958,7 +2055,11 @@ public class MainController {
 
         updateTailButtonState();
 
-        sshService.tailFile(remotePath, MAX_TAIL_BUFFER_SIZE, line -> handleTailLineBackground(line, parsingConfig),
+        // Design Pattern Compliance: Use SSHService's tailFile which handles 'tail -n
+        // <lines> -F'
+        // This provides the initial 100 lines (Pre-fetch) AND starts the real-time
+        // stream.
+        sshService.tailFile(remotePath, 100, line -> handleTailLineBackground(line),
                 error -> Platform.runLater(() -> {
                     logger.error("Remote tail error: {}", error);
                     showError("Remote Tail Error", error);
@@ -1966,8 +2067,9 @@ public class MainController {
                 }));
     }
 
-    private void saveRemoteTailToRecent(String remotePath, ParsingConfig parsingConfig, SSHServerModel server) {
+    private void saveRemoteTailToRecent(String remotePath, SSHServerModel server) {
         try {
+            ParsingConfig parsingConfig = ParsingConfig.createRawConfig(); // Internal default
             String fileName = new File(remotePath).getName();
             LogFile logFile = logFileService.getLogFileByPathAndName(fileName, remotePath);
 
@@ -1987,6 +2089,8 @@ public class MainController {
                 logFile.setRemote(true);
                 logFile.setSshServerID(server.getId());
                 logFile.setParsingConfigurationID(parsingConfig.getId());
+                logFile.setModified(String.valueOf(System.currentTimeMillis()));
+                logFile.setSize("-"); // Reset size for tail
                 logFileService.updateLogFile(logFile);
                 logger.info("Updated existing LogFile for remote tail: id={}, path={}", logFile.getId(), remotePath);
             }
@@ -2024,9 +2128,9 @@ public class MainController {
         }
     }
 
-    private synchronized void handleTailLineBackground(String line, ParsingConfig parsingConfig) {
+    private synchronized void handleTailLineBackground(String line) {
         long lineNumber = ++remoteTailLineCounter;
-        LogEntry entry = logParserService.parseLine(line, lineNumber, parsingConfig);
+        LogEntry entry = logParserService.parseLine(line, lineNumber);
         synchronized (tailBuffer) {
             if (tailBuffer.size() >= MAX_TAIL_BUFFER_SIZE) {
                 tailBuffer.removeFirst();
@@ -2192,45 +2296,46 @@ public class MainController {
     }
 
     private void scheduleTailFlush() {
-        if (tailFlushScheduled) {
+        if (!tailFlushScheduled.compareAndSet(false, true)) {
             return;
         }
-        tailFlushScheduled = true;
 
         Platform.runLater(() -> {
-            tailFlushScheduled = false;
+            // logger.info("FX Thread: Flushing tail buffer..."); // DEBUG
+            tailFlushScheduled.set(false);
 
-            List<LogEntry> toAdd;
-            synchronized (tailBuffer) {
-                if (tailBuffer.isEmpty()) {
-                    return;
+            try {
+                List<LogEntry> toAdd;
+                synchronized (tailBuffer) {
+                    if (tailBuffer.isEmpty()) {
+                        return;
+                    }
+                    toAdd = new ArrayList<>(tailBuffer);
+                    tailBuffer.clear();
                 }
-                toAdd = new ArrayList<>(tailBuffer);
-                tailBuffer.clear();
-            }
 
-            // TAIL MODE: Show ALL lines, no hiding. Highlighting is handled by
-            // CanvasLogViewer.
-            // Add ALL lines to the live buffer (no filtering here).
-            liveTailList.addAll(toAdd);
+                liveTailList.addAll(toAdd);
 
-            // Limit live list size (e.g. 50k lines) to prevent OOM
-            if (liveTailList.size() > 50000) {
-                int removeCount = liveTailList.size() - 50000;
-                liveTailList.subList(0, removeCount).clear();
-            }
+                // Limit Logic here
+                if (liveTailList.size() > 50000) {
+                    int removeCount = liveTailList.size() - 50000;
+                    liveTailList.subList(0, removeCount).clear();
+                }
 
-            // Sync Highlight Pattern from Search Field if needed
-            // This ensures that even if user didn't press Enter,
-            // the viewer knows what pattern to highlight (handled by performSearch
-            // listeners)
+                canvasLogViewer.refreshTail();
 
-            // Notify viewer to refresh
-            canvasLogViewer.refreshTail();
+                if (tailModeEnabled && canvasLogViewer.hasSearchHighlight()) {
+                    if (searchNavigator != null) {
+                        searchNavigator.setMatchCount(canvasLogViewer.countMatches());
+                    }
+                }
 
-            if (!tailColumnsAutoResized) {
-                tailColumnsAutoResized = true;
-                logger.debug("Tail batch displayed: {} lines", toAdd.size());
+                if (!tailColumnsAutoResized) {
+                    tailColumnsAutoResized = true;
+                    logger.debug("Tail batch displayed: {} lines", toAdd.size());
+                }
+            } catch (Throwable t) {
+                logger.error("CRITICAL ERROR in tail flush", t);
             }
         });
     }
@@ -2402,16 +2507,12 @@ public class MainController {
 
     private void startLocalTail(File file) {
         stopLocalTail();
-
-        // Clear live list
         liveTailList.clear();
         canvasLogViewer.refreshTail();
-
         logger.info("Starting local tail (TailService) for: {}", file.getAbsolutePath());
-
         Thread starterThread = new Thread(() -> tailService.startLocalTail(
                 file,
-                this::handleTailLineBackgroundFromService,
+                this::handleTailLineBackground,
                 ex -> {
                     if (ex instanceof FileNotFoundException) {
                         Platform.runLater(() -> showInfo("Tail Info", "File not found or renamed."));
@@ -2424,8 +2525,36 @@ public class MainController {
         starterThread.start();
     }
 
-    private void handleTailLineBackgroundFromService(String line) {
-        handleTailLineBackground(line, currentParsingConfig);
+    @FXML
+    public void handleGoToLine() {
+        if (canvasLogViewer == null) {
+            return;
+        }
+
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Go to Line");
+        dialog.setHeaderText("Enter line number:");
+        dialog.setContentText("Line number:");
+
+        try {
+            Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
+            addAppIcon(stage);
+        } catch (Exception e) {
+            logger.warn("failed to load icon");
+        }
+
+        showAndWaitAndRestore(dialog).ifPresent(result -> {
+            try {
+                String clean = result.replaceAll("[,.]", "").trim();
+                long line = Long.parseLong(clean);
+                if (line > 0) {
+                    canvasLogViewer.jumpToLine(line - 1);
+                }
+                followTailButton.setSelected(false);
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid line number");
+            }
+        });
     }
 
     private void stopLocalTail() {

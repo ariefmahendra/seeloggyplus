@@ -2,9 +2,7 @@ package com.seeloggyplus.service.impl;
 
 import com.seeloggyplus.model.LogEntry;
 import com.seeloggyplus.model.ParsingConfig;
-import com.seeloggyplus.pipeline.Event;
 import com.seeloggyplus.pipeline.Pipeline;
-import com.seeloggyplus.pipeline.filters.RegexFilter;
 import com.seeloggyplus.service.LogParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +13,6 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -40,7 +37,6 @@ public class LogParserServiceImpl implements LogParser {
 
     private static final Logger logger = LoggerFactory.getLogger(LogParserServiceImpl.class);
     private static final int MAX_THREADS = Runtime.getRuntime().availableProcessors();
-    // private static final int MAX_ENTRY_UNPARSED = 10000; // No longer used
     private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
     /**
@@ -97,8 +93,7 @@ public class LogParserServiceImpl implements LogParser {
      * {@inheritDoc}
      */
     @Override
-    public LogEntry parseLine(String line, long lineNumber, ParsingConfig config) {
-        // Parsing concept removed, returns raw entry
+    public LogEntry parseLine(String line, long lineNumber) {
         return new LogEntry(lineNumber, line);
     }
 
