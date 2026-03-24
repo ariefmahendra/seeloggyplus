@@ -22,7 +22,8 @@ public class TailServiceImpl implements TailService {
 
     // Constants for behavior
     private static final int TAIL_DELAY_MILLIS = 500;
-    private static final int TAIL_WINDOW_ESTIMATED_BYTES = 20000 * 150; // Approx 20k lines
+    private static final int DEFAULT_CONTEXT_ROWS = 20000;
+    private static final int ESTIMATED_BYTES_PER_LINE = 150;
 
     private Tailer tailer;
     private Thread tailerThread;
@@ -31,6 +32,12 @@ public class TailServiceImpl implements TailService {
     @Override
     public void startLocalTail(File file, Consumer<String> lineConsumer, Consumer<Exception> errorHandler,
             boolean loadContext) {
+        startLocalTail(file, lineConsumer, errorHandler, loadContext, DEFAULT_CONTEXT_ROWS);
+    }
+
+    @Override
+    public void startLocalTail(File file, Consumer<String> lineConsumer, Consumer<Exception> errorHandler,
+            boolean loadContext, int contextRows) {
         stopTail(); // Ensure previous session is closed
 
         if (file == null || !file.exists()) {
@@ -40,12 +47,13 @@ public class TailServiceImpl implements TailService {
             return;
         }
 
-        logger.info("Starting local tail service for: {} (loadContext={})", file.getAbsolutePath(), loadContext);
+        logger.info("Starting local tail service for: {} (loadContext={}, contextRows={})",
+                file.getAbsolutePath(), loadContext, contextRows);
         isRunning = true;
 
         // 1. Load Initial Context (Optional)
         if (loadContext) {
-            loadInitialTailContext(file, lineConsumer);
+            loadInitialTailContext(file, lineConsumer, contextRows);
         }
 
         // 2. Start Tailer
@@ -59,6 +67,11 @@ public class TailServiceImpl implements TailService {
 
             @Override
             public void handle(Exception ex) {
+                // InterruptedException is expected when stopTail() interrupts the thread
+                if (ex instanceof InterruptedException) {
+                    logger.debug("Tailer thread interrupted (normal shutdown)");
+                    return;
+                }
                 logger.error("Tailer error", ex);
                 if (errorHandler != null) {
                     errorHandler.accept(ex);
@@ -99,11 +112,12 @@ public class TailServiceImpl implements TailService {
         return isRunning;
     }
 
-    private void loadInitialTailContext(File file, Consumer<String> lineConsumer) {
+    private void loadInitialTailContext(File file, Consumer<String> lineConsumer, int contextRows) {
+        long estimatedBytes = (long) contextRows * ESTIMATED_BYTES_PER_LINE;
         long len = file.length();
-        long startPos = Math.max(0, len - TAIL_WINDOW_ESTIMATED_BYTES);
+        long startPos = Math.max(0, len - estimatedBytes);
 
-        logger.info("Loading initial tail context from offset: {}", startPos);
+        logger.info("Loading initial tail context from offset: {} (contextRows={})", startPos, contextRows);
 
         try (FileInputStream fis = new FileInputStream(file)) {
             fis.skip(startPos);

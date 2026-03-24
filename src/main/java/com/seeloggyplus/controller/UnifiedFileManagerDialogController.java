@@ -137,8 +137,9 @@ public class UnifiedFileManagerDialogController {
     // --- Performance Enhancements ---
     private final java.util.Map<String, CacheEntry> directoryCache = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Set<String> favoritePathsCache = new java.util.HashSet<>();
-    private static final long CACHE_DURATION_MS = 30 * 1000; // 30 seconds
+    private static final long CACHE_DURATION_MS = 60 * 1000; // 60 seconds
     private boolean suppressAutoRefresh = false;
+    private String cachedFavoritesLocationId = null; // Track which location favorites are cached for
 
     @FXML
     public void initialize() {
@@ -430,6 +431,7 @@ public class UnifiedFileManagerDialogController {
         backHistory.clear();
         forwardHistory.clear();
         directoryCache.clear(); // Clear cache when changing location
+        cachedFavoritesLocationId = null; // Force favorites reload for new location
         updateNavigationButtons();
         loadFavoritesForCurrentLocation();
 
@@ -447,8 +449,10 @@ public class UnifiedFileManagerDialogController {
         String password = server.getPassword();
         if (password == null || password.isBlank()) {
             logger.info("Password for server {} is not saved, prompting user.", server.getName());
+            suppressAutoRefresh = true; // Prevent focus-triggered refresh while dialog is open
             PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
             Optional<String> result = prompt.showAndWait();
+            suppressAutoRefresh = true; // Re-set: closing dialog triggers focus gain before connect finishes
 
             if (result.isPresent() && !result.get().isBlank()) {
                 password = result.get();
@@ -687,6 +691,7 @@ public class UnifiedFileManagerDialogController {
             return;
         }
         favoriteFolderService.addFavorite(selected.getName(), selected.getPath(), getLocationIdForCurrent());
+        cachedFavoritesLocationId = null; // Invalidate favorites cache
         loadFavoritesForCurrentLocation();
         fileTable.refresh(); // To update styling
     }
@@ -703,6 +708,7 @@ public class UnifiedFileManagerDialogController {
                 .findFirst()
                 .ifPresent(fav -> favoriteFolderService.removeFavorite(fav.getId()));
 
+        cachedFavoritesLocationId = null; // Invalidate favorites cache
         loadFavoritesForCurrentLocation();
         fileTable.refresh(); // To update styling
     }
@@ -712,10 +718,17 @@ public class UnifiedFileManagerDialogController {
             return;
 
         String locationId = getLocationIdForCurrent();
+
+        // Skip DB query if favorites for this location are already cached
+        if (locationId.equals(cachedFavoritesLocationId)) {
+            return;
+        }
+
         List<FavoriteFolder> favorites = favoriteFolderService.getFavoritesForLocation(locationId);
 
         favoritePathsCache.clear();
         favorites.forEach(f -> favoritePathsCache.add(f.getPath()));
+        cachedFavoritesLocationId = locationId;
 
         favoritesListView.setItems(FXCollections.observableArrayList(favorites));
     }

@@ -211,7 +211,7 @@
                                     </VBox>
 
                                     <!-- Bottom Panel: Log Detail -->
-                                    <VBox fx:id="bottomPanel" minHeight="150" prefHeight="200" spacing="5">
+                                    <VBox fx:id="bottomPanel" minHeight="80" prefHeight="180" spacing="5">
                                         <padding>
                                             <Insets bottom="5" left="5" right="5" top="5" />
                                         </padding>

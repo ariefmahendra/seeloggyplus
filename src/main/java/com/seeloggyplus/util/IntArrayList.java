@@ -33,6 +33,15 @@ public class IntArrayList {
         return data[index];
     }
 
+    public void set(int index, int value) {
+        rangeCheck(index);
+        data[index] = value;
+    }
+
+    public void removeLast() {
+        if (size > 0) size--;
+    }
+
     public int size() {
         return size;
     }

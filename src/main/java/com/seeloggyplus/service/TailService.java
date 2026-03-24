@@ -27,6 +27,20 @@ public interface TailService {
             boolean loadContext);
 
     /**
+     * Starts tailing a local file with a configurable initial context window.
+     *
+     * @param file             The local file to tail.
+     * @param lineConsumer     Consumer that will receive each new line.
+     * @param errorHandler     Consumer that will receive any exceptions.
+     * @param loadContext      Whether to load initial context from the end of file.
+     * @param contextRows      Number of initial rows to load as context.
+     */
+    default void startLocalTail(File file, Consumer<String> lineConsumer, Consumer<Exception> errorHandler,
+            boolean loadContext, int contextRows) {
+        startLocalTail(file, lineConsumer, errorHandler, loadContext);
+    }
+
+    /**
      * Stops the currently active tailing process, if any.
      * Cleanly shuts down threads and releases resources.
      */

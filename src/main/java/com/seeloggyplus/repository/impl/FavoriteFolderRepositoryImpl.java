@@ -19,17 +19,16 @@ public class FavoriteFolderRepositoryImpl implements FavoriteFolderRepository {
     public FavoriteFolder save(FavoriteFolder favoriteFolder) {
         String sql = "INSERT INTO favorite_folders(name, path, locationId) VALUES(?, ?, ?)";
         Connection conn = DatabaseConfig.getInstance().getConnection();
-        try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, favoriteFolder.getName());
             pstmt.setString(2, favoriteFolder.getPath());
             pstmt.setString(3, favoriteFolder.getLocationId());
-            int affectedRows = pstmt.executeUpdate();
+            pstmt.executeUpdate();
 
-            if (affectedRows > 0) {
-                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        favoriteFolder.setId(generatedKeys.getInt(1));
-                    }
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery("SELECT last_insert_rowid()")) {
+                if (rs.next()) {
+                    favoriteFolder.setId(rs.getInt(1));
                 }
             }
             logger.info("Saved favorite folder: {}", favoriteFolder.getName());

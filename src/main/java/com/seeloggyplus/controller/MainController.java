@@ -6,6 +6,7 @@ import com.seeloggyplus.ui.cell.RecentFileListCell;
 import com.seeloggyplus.util.*;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
+import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
 import javafx.scene.Cursor;
 import javafx.util.Duration;
@@ -187,10 +188,38 @@ public class MainController {
     private volatile ParsingConfig currentParsingConfig;
     private File currentFile;
     private boolean isLeftPanelPinned = true;
+
+    /**
+     * Snapshot of the last opened session (local or remote) so that
+     * "clear → refresh" can reload it.  Replaced atomically whenever a
+     * new file/tail is opened; never partially mutated.
+     */
+    private static class LastSession {
+        enum Type { LOCAL, REMOTE }
+        final Type type;
+        final File localFile;            // non-null for LOCAL
+        final String remotePath;         // non-null for REMOTE
+        final LogFile logFromDb;         // non-null for REMOTE
+        final SSHServiceImpl sshService; // non-null for REMOTE
+
+        static LastSession local(File file) {
+            return new LastSession(Type.LOCAL, file, null, null, null);
+        }
+        static LastSession remote(String path, LogFile logFile, SSHServiceImpl ssh) {
+            return new LastSession(Type.REMOTE, null, path, logFile, ssh);
+        }
+        private LastSession(Type t, File f, String rp, LogFile lf, SSHServiceImpl ssh) {
+            this.type = t; this.localFile = f; this.remotePath = rp;
+            this.logFromDb = lf; this.sshService = ssh;
+        }
+    }
+    private LastSession lastSession;
+
     private boolean isBottomPanelPinned = true;
     private Task<?> currentLoadingTask = null;
     private static final int MAX_TAIL_BUFFER_SIZE = 5000;
     private int sshDownloadThreads = 4;
+    private int tailWindowSize = 20000;
     private boolean tailModeEnabled = false;
     private SSHServiceImpl activeTailSshService;
     private long remoteTailLineCounter = 0;
@@ -205,6 +234,8 @@ public class MainController {
     private boolean autoPrettifyJson = false;
     private boolean autoPrettifyXml = false;
     private Predicate<LogEntry> currentTailFilterPredicate = null;
+    private Pattern currentTailSearchPattern = null; // Compiled pattern for incremental tail search
+    private int tailSearchScannedUpTo = 0; // liveTailList index up to which search has been performed
     private final boolean isSkippingFilterTrigger = false;
 
     private int totalEntries = 0;
@@ -214,6 +245,12 @@ public class MainController {
     private CanvasLogViewer canvasLogViewer;
     private MappedFileReader mappedFileReader;
     private LineOffsetIndex lineOffsetIndex;
+    private int currentMatchIndex = -1;
+    private PauseTransition searchDebounce;
+    private Task<?> currentSearchTask;
+    private volatile long searchGeneration = 0;
+    private com.seeloggyplus.ui.search.SearchResultPanel searchResultPanel;
+    private SplitPane searchSplitPane;
 
     // Persistent buffer for live tailing (CanvasLogViewer reads this)
     private final List<LogEntry> liveTailList = Collections.synchronizedList(new ArrayList<>());
@@ -297,18 +334,35 @@ public class MainController {
         }
     }
 
+    private PauseTransition loadingDelay; // Delay before showing loading overlay to avoid flicker
+
     private void showLoading(String message) {
-        if (loadingOverlay != null) {
-            loadingLabel.setText(message);
-            if (loadingProgress != null) {
-                loadingProgress.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-            }
-            loadingOverlay.setVisible(true);
-            loadingOverlay.setManaged(true);
+        if (loadingOverlay == null) return;
+
+        loadingLabel.setText(message);
+        if (loadingProgress != null) {
+            loadingProgress.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         }
+
+        // If overlay is already visible (long operation with progress updates), just update text
+        if (loadingOverlay.isVisible()) return;
+
+        // Delay showing the overlay to avoid flicker on fast operations
+        if (loadingDelay == null) {
+            loadingDelay = new PauseTransition(Duration.millis(350));
+            loadingDelay.setOnFinished(e -> {
+                loadingOverlay.setVisible(true);
+                loadingOverlay.setManaged(true);
+            });
+        }
+        loadingDelay.playFromStart();
     }
 
     private void hideLoading() {
+        // Cancel pending show — operation finished before delay elapsed
+        if (loadingDelay != null) {
+            loadingDelay.stop();
+        }
         if (loadingOverlay != null) {
             loadingOverlay.setVisible(false);
             loadingOverlay.setManaged(false);
@@ -438,17 +492,24 @@ public class MainController {
      * This improves UX by keeping the current file highlighted.
      */
     private void selectRecentFile(File file) {
-        if (file == null || recentFilesListView == null) {
+        if (file == null) return;
+        selectRecentFileByPath(file.getAbsolutePath());
+    }
+
+    /**
+     * Selects the recent file entry matching the given path (local absolute path or remote path).
+     */
+    private void selectRecentFileByPath(String targetPath) {
+        if (targetPath == null || recentFilesListView == null) {
             return;
         }
-
-        String targetPath = file.getAbsolutePath();
         Platform.runLater(() -> {
+            recentFilesListView.getSelectionModel().clearSelection();
             for (RecentFilesDto dto : recentFilesListView.getItems()) {
                 if (dto != null && dto.logFile() != null && targetPath.equals(dto.logFile().getFilePath())) {
                     recentFilesListView.getSelectionModel().select(dto);
                     recentFilesListView.scrollTo(dto);
-                    break;
+                    return;
                 }
             }
         });
@@ -469,6 +530,7 @@ public class MainController {
         }
 
         logContainer.getChildren().add(canvasLogViewer);
+        logContainer.setMinSize(0, 0);
         StackPane.setAlignment(canvasLogViewer, javafx.geometry.Pos.CENTER);
 
         canvasLogViewer.prefWidthProperty().bind(logContainer.widthProperty());
@@ -476,36 +538,46 @@ public class MainController {
         canvasLogViewer.setMinSize(0, 0);
         canvasLogViewer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        canvasLogViewer.setOnLineClick(lineNumber -> {
-            String content = null;
-            if (mappedFileReader != null && lineOffsetIndex != null) {
-                if (lineNumber < lineOffsetIndex.getLineCount()) {
-                    content = mappedFileReader.readLine(lineOffsetIndex, lineNumber);
-                }
+        // Search Result Panel — shown to the right of the log viewer when search is active
+        searchResultPanel = new com.seeloggyplus.ui.search.SearchResultPanel();
+        searchResultPanel.setOnLineSelected((listIndex, globalLine, content) -> {
+            canvasLogViewer.jumpToLine(globalLine);
+            canvasLogViewer.selectLine(globalLine);
+            displayLogDetailFromCanvas(globalLine, content);
+            // Sync navigator status with panel click
+            if (filteredIndexes != null && searchNavigator != null) {
+                currentMatchIndex = listIndex + 1;
+                searchNavigator.updateStatus(listIndex + 1, filteredIndexes.size());
             }
+        });
 
-            if ((content == null || content.isEmpty()) && tailModeEnabled && !liveTailList.isEmpty()) {
-                long fileLineCount = (lineOffsetIndex != null) ? lineOffsetIndex.getLineCount() : 0;
-                long bufferIndex = lineNumber - fileLineCount;
-                if (bufferIndex >= 0 && bufferIndex < liveTailList.size()) {
-                    LogEntry entry = liveTailList.get((int) bufferIndex);
-                    content = entry.getRawLog();
-                    if (content == null) {
-                        content = "";
-                    }
-                }
-            }
-            displayLogDetailFromCanvas(lineNumber, Objects.requireNonNullElse(content, ""));
+        // Wrap logContainer + searchResultPanel in a horizontal SplitPane
+        VBox logParent = (VBox) logContainer.getParent();
+        int logIdx = logParent.getChildren().indexOf(logContainer);
+        SplitPane searchSplit = new SplitPane();
+        searchSplit.setOrientation(javafx.geometry.Orientation.HORIZONTAL);
+        searchSplit.setMinSize(0, 0);
+        searchSplit.getItems().add(logContainer);
+        // searchResultPanel is added/removed dynamically when search results appear/clear
+        VBox.setVgrow(searchSplit, Priority.ALWAYS);
+        logParent.getChildren().set(logIdx, searchSplit);
+        logParent.setMinHeight(0);
+        this.searchSplitPane = searchSplit;
+
+        canvasLogViewer.setOnLineClick((lineNumber, lineContent) -> {
+            displayLogDetailFromCanvas(lineNumber, Objects.requireNonNullElse(lineContent, ""));
         });
 
         canvasLogViewer.setOnLineDoubleClick((lineNumber, content) -> {
             logger.info("Double clicked line {}", lineNumber + 1);
             if (filteredIndexes != null) {
-                logger.info("Clearing filter and jumping to original line {}", lineNumber + 1);
+                logger.info("Clearing search and jumping to original line {}", lineNumber + 1);
                 searchField.clear();
                 filteredIndexes = null;
                 canvasLogViewer.clearFilter();
                 canvasLogViewer.clearSearchHighlight();
+                hideSearchResultPanel();
+                if (searchNavigator != null) searchNavigator.clear();
                 canvasLogViewer.jumpToLine(lineNumber);
             }
 
@@ -526,10 +598,45 @@ public class MainController {
 
         setupDetailPanel();
 
-        searchField.setOnAction(e -> performSearch());
+        searchField.setOnAction(e -> {
+            if (searchNavigator != null && searchNavigator.isVisible()
+                    && searchField.getText() != null && !searchField.getText().isEmpty()) {
+                // Results already showing — Enter navigates to next match
+                navigateNextMatch();
+            } else {
+                performSearch();
+            }
+        });
         searchField.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ESCAPE) {
                 clearSearch();
+            }
+        });
+
+        // Incremental search: debounce 300ms after typing
+        searchDebounce = new PauseTransition(Duration.millis(300));
+        searchDebounce.setOnFinished(evt -> performSearch());
+        searchField.textProperty().addListener((obs, oldText, newText) -> {
+            if (newText != null && !newText.isEmpty()) {
+                searchDebounce.playFromStart();
+            } else {
+                searchDebounce.stop();
+                // Only clear if there was actually a previous search
+                if (oldText != null && !oldText.isEmpty()) {
+                    filteredIndexes = null;
+                    currentMatchIndex = -1;
+                    searchGeneration++;
+                    if (currentSearchTask != null && currentSearchTask.isRunning()) {
+                        currentSearchTask.cancel(true);
+                    }
+                    canvasLogViewer.clearFilter();
+                    canvasLogViewer.clearSearchHighlight();
+                    if (searchNavigator != null) searchNavigator.clear();
+                    hideSearchResultPanel();
+                    if (tailModeEnabled && !canvasLogViewer.isFollowTail()) {
+                        canvasLogViewer.setFollowTail(true);
+                    }
+                }
             }
         });
         searchField.setTooltip(new Tooltip("Enter text to search. Press Ctrl+F to focus this field."));
@@ -694,8 +801,7 @@ public class MainController {
         }
 
         if (tailModeEnabled) {
-            // TAIL MODE: Highlight Only (No Hiding)
-            // We skip the expensive parallel search and just update the UI highlight.
+            // TAIL MODE: Highlight + Search Result Panel (same UX as local file mode)
             String highlightPattern = searchText;
             boolean highlightIsRegex = isRegex;
 
@@ -709,17 +815,66 @@ public class MainController {
                 }
             }
 
-            filteredIndexes = null;
+            // Compile the search pattern for matching against tail buffer lines
+            final Pattern matchPattern;
+            try {
+                int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
+                matchPattern = Pattern.compile(
+                        highlightIsRegex ? highlightPattern : Pattern.quote(highlightPattern), flags);
+            } catch (Exception ex) {
+                logger.warn("Invalid search pattern for tail mode", ex);
+                return;
+            }
+
+            filteredIndexes = new IntArrayList();
             canvasLogViewer.setFilteredIndexes(null); // Show all lines
             canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
 
-            if (searchNavigator != null) {
-                // In tail mode, count matches in current buffer
-                int matches = canvasLogViewer.countMatches();
-                searchNavigator.setMatchCount(matches);
+            // Scan current liveTailList for matches
+            // In tail mode, globalIndex == index in liveTailList (tailBuffer in canvas)
+            // Canvas sees these as fileLineCount + bufferIndex, but fileLineCount is 0 in tail mode
+            List<LogEntry> snapshot;
+            synchronized (liveTailList) {
+                snapshot = new ArrayList<>(liveTailList);
+            }
+            for (int i = 0; i < snapshot.size(); i++) {
+                LogEntry entry = snapshot.get(i);
+                String raw = entry != null ? entry.getRawLog() : "";
+                if (matchPattern.matcher(raw).find()) {
+                    filteredIndexes.add(i);
+                }
             }
 
-            // Update the predicate for completeness (though primarily used in search mode)
+            // Pause follow-tail so user can navigate search results
+            if (canvasLogViewer.isFollowTail()) {
+                canvasLogViewer.setFollowTail(false);
+            }
+
+            if (searchNavigator != null) {
+                searchNavigator.setMatchCount(filteredIndexes.size());
+            }
+
+            // Show search result panel with tail-mode resolver
+            if (filteredIndexes.size() > 0) {
+                showSearchResultPanelForTail(filteredIndexes, matchPattern);
+                // Jump to first match
+                int firstLine = filteredIndexes.get(0);
+                canvasLogViewer.jumpToLine(firstLine);
+                canvasLogViewer.selectLine(firstLine);
+                currentMatchIndex = 1;
+                if (searchNavigator != null) {
+                    searchNavigator.updateStatus(1, filteredIndexes.size());
+                }
+            } else {
+                hideSearchResultPanel();
+                currentMatchIndex = -1;
+            }
+
+            // Store pattern for incremental tail search
+            currentTailSearchPattern = matchPattern;
+            tailSearchScannedUpTo = snapshot.size(); // mark how far we've scanned
+
+            // Update the predicate for completeness
             try {
                 currentTailFilterPredicate = buildSearchPredicate(searchText, isRegex, caseSensitive);
             } catch (Exception ex) {
@@ -730,6 +885,12 @@ public class MainController {
         }
 
         showLoading("Searching...");
+
+        // Cancel any in-flight search task to prevent stale results overwriting
+        if (currentSearchTask != null && currentSearchTask.isRunning()) {
+            currentSearchTask.cancel(true);
+        }
+        final long thisGeneration = ++searchGeneration;
 
         Task<IntArrayList> task = new Task<>() {
             @Override
@@ -820,104 +981,185 @@ public class MainController {
         };
 
         task.setOnSucceeded(e -> {
+            // Discard stale results — a newer search was already started
+            if (thisGeneration != searchGeneration) {
+                logger.info("Discarding stale search results (gen {} vs current {})", thisGeneration, searchGeneration);
+                return;
+            }
+
             IntArrayList matches = task.getValue();
             logger.info("Search complete: {} matches found", matches.size());
 
+            // Store matches for navigation but do NOT filter the view —
+            // all lines remain visible, matches are only highlighted.
             filteredIndexes = matches;
-            canvasLogViewer.setFilteredIndexes(filteredIndexes);
+            canvasLogViewer.setFilteredIndexes(null); // Show all lines
 
             // Enhanced Highlight Logic for Boolean Search
             String highlightPattern = searchText;
             boolean highlightIsRegex = isRegex;
 
             if (!isRegex) {
-                // Parse boolean query to extract terms for highlighting
                 List<String> terms = extractSearchTerms(searchText);
                 if (!terms.isEmpty()) {
                     highlightPattern = terms.stream()
                             .map(java.util.regex.Pattern::quote)
                             .collect(java.util.stream.Collectors.joining("|"));
-                    highlightIsRegex = true; // Highlight as Regex (OR logic)
+                    highlightIsRegex = true;
                 }
             }
 
-            // Apply highlight pattern regardless of match count (Canvas viewer handles this
-            // efficiently)
             canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
 
-            // Log for debugging purposes
-            if (matches.size() > 100_000) {
-                logger.info("Large search result set: {} matches. Highlighting enabled.", matches.size());
-            }
+            // Compile pattern for search result panel highlight
+            Pattern compiledHighlight = null;
+            try {
+                int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
+                compiledHighlight = Pattern.compile(
+                        highlightIsRegex ? highlightPattern : Pattern.quote(highlightPattern), flags);
+            } catch (Exception ignored) {}
 
             if (searchNavigator != null) {
                 searchNavigator.setMatchCount(matches.size());
+            }
+
+            // Show search result panel with clickable list of matched lines
+            if (matches.size() > 0) {
+                showSearchResultPanel(matches, compiledHighlight);
+                // Jump to first match
+                int firstLine = matches.get(0);
+                canvasLogViewer.jumpToLine(firstLine);
+                canvasLogViewer.selectLine(firstLine);
+                currentMatchIndex = 1;
+                if (searchNavigator != null) {
+                    searchNavigator.updateStatus(1, matches.size());
+                }
+            } else {
+                hideSearchResultPanel();
+                currentMatchIndex = -1;
             }
 
             hideLoading();
         });
 
         task.setOnFailed(e -> {
+            if (thisGeneration != searchGeneration) return;
             hideLoading();
             Throwable ex = task.getException();
             logger.error("Search failed", ex);
             showError("Search Failed", ex.getMessage());
         });
 
+        currentSearchTask = task;
         Thread.ofVirtual().start(task);
     }
 
     private void navigateNextMatch() {
-        if (tailModeEnabled) {
-            int currentLine = canvasLogViewer.getCurrentTopLine();
-            int nextLine = canvasLogViewer.findNextMatch(currentLine + 1, true);
-            if (nextLine != -1) {
-                canvasLogViewer.jumpToLine(nextLine);
-                canvasLogViewer.selectLine(nextLine);
-            }
-        } else {
-            // Normal Mode (Filtered)
-            int current = canvasLogViewer.getSelectedIndex();
-            int next = current + 1;
-            if (next < canvasLogViewer.getItemCount()) {
-                canvasLogViewer.selectLine(next);
-                // Ensure visible - selectLine calls render but doesn't scroll if out of view
-                // Actually jumpToLine ensures view. selectLine just updates highlight.
-                // We should check visibility or just jump.
-                // jumpToLine sets topLine. To keep context we might want to just ensure it's in
-                // view.
-                // But CanvasLogViewer.jumpToLine puts it at top. That's fine for "Find Next".
-                canvasLogViewer.jumpToLine(next);
-            }
+        // Unified navigation using filteredIndexes for both local and tail mode
+        if (filteredIndexes == null || filteredIndexes.size() == 0) return;
+        int total = filteredIndexes.size();
+
+        if (currentMatchIndex < 0) currentMatchIndex = 0;
+        int nextIdx = currentMatchIndex; // 0-based index into filteredIndexes
+        if (nextIdx >= total) nextIdx = 0; // wrap
+
+        int globalLine = filteredIndexes.get(nextIdx);
+        canvasLogViewer.jumpToLine(globalLine);
+        canvasLogViewer.selectLine(globalLine);
+        currentMatchIndex = nextIdx + 1; // advance for next call
+        if (searchNavigator != null) {
+            searchNavigator.updateStatus(nextIdx + 1, total);
+        }
+        if (searchResultPanel != null) {
+            searchResultPanel.selectIndex(nextIdx);
         }
     }
 
     private void navigatePreviousMatch() {
-        if (tailModeEnabled) {
-            int currentLine = canvasLogViewer.getCurrentTopLine();
-            int prevLine = canvasLogViewer.findNextMatch(currentLine - 1, false);
-            if (prevLine != -1) {
-                canvasLogViewer.jumpToLine(prevLine);
-                canvasLogViewer.selectLine(prevLine);
-            }
-        } else {
-            // Normal Mode (Filtered)
-            int current = canvasLogViewer.getSelectedIndex();
-            int prev = current - 1;
-            if (prev >= 0) {
-                canvasLogViewer.selectLine(prev);
-                canvasLogViewer.jumpToLine(prev);
-            }
+        // Unified navigation using filteredIndexes for both local and tail mode
+        if (filteredIndexes == null || filteredIndexes.size() == 0) return;
+        int total = filteredIndexes.size();
+
+        int prevIdx = currentMatchIndex - 2; // currentMatchIndex is 1-based "next to visit"
+        if (prevIdx < 0) prevIdx = total - 1; // wrap
+
+        int globalLine = filteredIndexes.get(prevIdx);
+        canvasLogViewer.jumpToLine(globalLine);
+        canvasLogViewer.selectLine(globalLine);
+        currentMatchIndex = prevIdx + 1;
+        if (searchNavigator != null) {
+            searchNavigator.updateStatus(prevIdx + 1, total);
+        }
+        if (searchResultPanel != null) {
+            searchResultPanel.selectIndex(prevIdx);
         }
     }
 
     private void clearSearch() {
         searchField.clear();
         filteredIndexes = null;
+        currentMatchIndex = -1;
+        currentTailSearchPattern = null;
+        tailSearchScannedUpTo = 0;
+        // Invalidate any in-flight search tasks
+        searchGeneration++;
+        if (currentSearchTask != null && currentSearchTask.isRunning()) {
+            currentSearchTask.cancel(true);
+        }
         canvasLogViewer.clearFilter();
         canvasLogViewer.clearSearchHighlight();
         if (searchNavigator != null) {
             searchNavigator.clear();
+        }
+        hideSearchResultPanel();
+        // Restore follow-tail when clearing search in tail mode
+        if (tailModeEnabled && !canvasLogViewer.isFollowTail()) {
+            canvasLogViewer.setFollowTail(true);
+        }
+    }
+
+    private void showSearchResultPanel(IntArrayList matches, Pattern highlightPattern) {
+        if (searchResultPanel == null || searchSplitPane == null) return;
+        // Set resolver so panel can lazily fetch line content
+        searchResultPanel.setLineContentResolver(idx -> {
+            if (mappedFileReader != null && lineOffsetIndex != null && idx < lineOffsetIndex.getLineCount()) {
+                return mappedFileReader.readLine(lineOffsetIndex, idx);
+            }
+            return "";
+        });
+        searchResultPanel.setSearchPattern(highlightPattern);
+        searchResultPanel.showResults(matches, lineOffsetIndex != null ? lineOffsetIndex.getLineCount() : 0);
+        if (!searchSplitPane.getItems().contains(searchResultPanel)) {
+            searchSplitPane.getItems().add(searchResultPanel);
+            Platform.runLater(() -> searchSplitPane.setDividerPositions(0.75));
+        }
+    }
+
+    private void hideSearchResultPanel() {
+        if (searchResultPanel == null || searchSplitPane == null) return;
+        searchResultPanel.clear();
+        searchSplitPane.getItems().remove(searchResultPanel);
+    }
+
+    /**
+     * Show search result panel for tail mode. Uses liveTailList as the content source.
+     */
+    private void showSearchResultPanelForTail(IntArrayList matches, Pattern highlightPattern) {
+        if (searchResultPanel == null || searchSplitPane == null) return;
+        // Resolver reads from liveTailList by index
+        searchResultPanel.setLineContentResolver(idx -> {
+            int i = (int) idx;
+            if (i >= 0 && i < liveTailList.size()) {
+                LogEntry entry = liveTailList.get(i);
+                return entry != null ? entry.getRawLog() : "";
+            }
+            return "";
+        });
+        searchResultPanel.setSearchPattern(highlightPattern);
+        searchResultPanel.showResults(matches, liveTailList.size());
+        if (!searchSplitPane.getItems().contains(searchResultPanel)) {
+            searchSplitPane.getItems().add(searchResultPanel);
+            Platform.runLater(() -> searchSplitPane.setDividerPositions(0.75));
         }
     }
 
@@ -935,10 +1177,21 @@ public class MainController {
         totalEntries = 0;
         canvasLogViewer.clearFilter();
         canvasLogViewer.clearSearchHighlight();
+        hideSearchResultPanel();
         logger.info("File resources cleaned up");
     }
 
     private void loadFileWithParallelParsing(File file, LogFile logFile, boolean updateRecentFilesList) {
+        loadFileWithParallelParsing(file, logFile, updateRecentFilesList, false, true);
+    }
+
+    private void loadFileWithParallelParsing(File file, LogFile logFile, boolean updateRecentFilesList,
+            boolean jumpToEnd) {
+        loadFileWithParallelParsing(file, logFile, updateRecentFilesList, jumpToEnd, true);
+    }
+
+    private void loadFileWithParallelParsing(File file, LogFile logFile, boolean updateRecentFilesList,
+            boolean jumpToEnd, boolean selectInRecent) {
         showLoading("Indexing file: " + file.getName() + " (scanning for lines...)");
         Task<Void> task = new Task<>() {
             @Override
@@ -968,7 +1221,11 @@ public class MainController {
 
             Platform.runLater(() -> {
                 canvasLogViewer.loadFile(mappedFileReader, lineOffsetIndex);
-                canvasLogViewer.jumpToLine(0);
+                if (jumpToEnd && totalEntries > 0) {
+                    canvasLogViewer.jumpToLine(totalEntries - 1);
+                } else {
+                    canvasLogViewer.jumpToLine(0);
+                }
                 logger.info("Canvas viewer initialized");
             });
 
@@ -981,7 +1238,9 @@ public class MainController {
                 logger.info("Added file to recent files: {}", file.getName());
             }
 
-            selectRecentFile(file);
+            if (selectInRecent) {
+                selectRecentFile(file);
+            }
 
             hideLoading();
             updateTailButtonState();
@@ -1009,41 +1268,111 @@ public class MainController {
 
     private void handleReload() {
         logger.info("Reload triggered by user.");
+
+        // 1. Active remote tail — just restart it
         if (tailModeEnabled && monitoringRemotePath != null && activeTailSshService != null) {
-            logger.info("Reloading remote tail for '{}'.", monitoringRemotePath);
-            if (currentLogFromDb != null && currentLogFromDb.getSshServerID() != null) {
-                SSHServerModel server = serverManagementService.getServerById(currentLogFromDb.getSshServerID());
-                if (server != null && currentParsingConfig != null) {
-                    showLoading("Reloading remote tail...");
-                    try {
-                        String password = server.getPassword();
-                        if (password == null || password.isBlank()) {
-                            logger.warn("Cannot get password for reload, relying on existing session.");
-                        }
-                        activeTailSshService.connect(server.getHost(), server.getPort(), server.getUsername(),
-                                password);
-                        startRemoteTail(monitoringRemotePath, activeTailSshService, server);
-                        hideLoading(); // Ensure loading is hidden after starting tail
-                    } catch (Exception e) {
-                        hideLoading(); // Hide loading on error too
-                        logger.error("Failed to re-connect for tail reload", e);
-                        showError("Reload Error", "Failed to re-connect to server: " + e.getMessage());
-                    }
-                } else {
-                    showError("Reload Error",
-                            "Could not reload tail: missing server or parsing configuration information.");
-                }
-            } else {
-                showError("Reload Error", "Could not reload tail: missing log file database information.");
-            }
-        } else if (currentFile != null) {
+            reloadActiveRemoteTail();
+            return;
+        }
+
+        // 2. Active local file — reload it
+        if (currentFile != null) {
             logger.info("Reloading local file '{}'.", currentFile.getName());
             showLoading("Reloading file...");
             openLocalLogFile(currentFile, false);
-        } else {
+            return;
+        }
+
+        // 3. Nothing active — try to restore from lastSession
+        if (lastSession == null) {
             logger.warn("Reload triggered but no active file or tail session.");
+            return;
+        }
+
+        if (lastSession.type == LastSession.Type.LOCAL) {
+            if (lastSession.localFile != null && lastSession.localFile.exists()) {
+                logger.info("Reloading last local file '{}'.", lastSession.localFile.getName());
+                showLoading("Reloading file...");
+                openLocalLogFile(lastSession.localFile, false);
+            }
+        } else {
+            reloadLastRemoteTail();
         }
     }
+
+    private void reloadActiveRemoteTail() {
+        logger.info("Reloading active remote tail for '{}'.", monitoringRemotePath);
+        if (currentLogFromDb == null || currentLogFromDb.getSshServerID() == null) {
+            showError("Reload Error", "Missing log file database information.");
+            return;
+        }
+        SSHServerModel server = serverManagementService.getServerById(currentLogFromDb.getSshServerID());
+        if (server == null || currentParsingConfig == null) {
+            showError("Reload Error", "Missing server or parsing configuration.");
+            return;
+        }
+        showLoading("Reloading remote tail...");
+        try {
+            String password = server.getPassword();
+            if (password == null || password.isBlank()) {
+                logger.warn("Cannot get password for reload, relying on existing session.");
+            }
+            activeTailSshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
+            startRemoteTail(monitoringRemotePath, activeTailSshService, server);
+        } catch (Exception e) {
+            logger.error("Failed to re-connect for tail reload", e);
+            showError("Reload Error", "Failed to re-connect to server: " + e.getMessage());
+        } finally {
+            hideLoading();
+        }
+    }
+
+    private void reloadLastRemoteTail() {
+        if (lastSession == null || lastSession.logFromDb == null || lastSession.logFromDb.getSshServerID() == null) {
+            showError("Reload Error", "No remote session to reload.");
+            return;
+        }
+        String remotePath = lastSession.remotePath;
+        LogFile logFromDb = lastSession.logFromDb;
+        SSHServiceImpl savedSsh = lastSession.sshService;
+
+        logger.info("Reloading last remote tail for '{}'.", remotePath);
+        SSHServerModel server = serverManagementService.getServerById(logFromDb.getSshServerID());
+        if (server == null) {
+            showError("Reload Error", "Server configuration not found.");
+            return;
+        }
+
+        currentLogFromDb = logFromDb;
+        showLoading("Reconnecting to " + server.getHost() + "...");
+
+        SSHServiceImpl sshService = (savedSsh != null && savedSsh.isConnected()) ? savedSsh : new SSHServiceImpl();
+
+        Task<Boolean> connectTask = new Task<>() {
+            @Override
+            protected Boolean call() {
+                if (sshService.isConnected()) return true;
+                String password = server.getPassword();
+                if (password == null || password.isBlank()) return false;
+                return sshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
+            }
+        };
+        connectTask.setOnSucceeded(e -> {
+            hideLoading();
+            if (connectTask.getValue()) {
+                tailModeEnabled = true;
+                startRemoteTail(remotePath, sshService, server);
+            } else {
+                showError("Reload Error", "Could not reconnect to " + server.getHost());
+            }
+        });
+        connectTask.setOnFailed(e -> {
+            hideLoading();
+            showError("Reload Error", "Reconnection failed: " + connectTask.getException().getMessage());
+        });
+        new Thread(connectTask).start();
+    }
+
 
     @FXML
     public void handleClearLog() {
@@ -1061,6 +1390,7 @@ public class MainController {
         currentParsingConfig = null;
         clearSearch();
         updateTailButtonState();
+        recentFilesListView.getSelectionModel().clearSelection();
         if (followTailButton != null) {
             Platform.runLater(() -> followTailButton.setSelected(false));
         }
@@ -1196,7 +1526,12 @@ public class MainController {
                 this::toggleLeftPanel);
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.J, KeyCombination.CONTROL_DOWN),
                 this::toggleBottomPanel);
-
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.G, KeyCombination.CONTROL_DOWN),
+                this::handleGoToLine);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F3),
+                this::navigateNextMatch);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F3, KeyCombination.SHIFT_DOWN),
+                this::navigatePreviousMatch);
     }
 
     @FXML
@@ -1349,16 +1684,24 @@ public class MainController {
 
         cancelCurrentLoadingTask();
         if (tailModeEnabled) {
-            disableTail();
+            disableTail(true); // skipReindex: we're about to load a different file
         }
         if (followTailButton != null) {
             followTailButton.setSelected(false);
         }
 
+        // Always clear tail buffers when loading a new file to prevent stale tail data from appearing
+        synchronized (tailBuffer) {
+            tailBuffer.clear();
+        }
+        liveTailList.clear();
+        tailFlushScheduled.set(false);
+
         // Make sure UI layout state is consistent before starting a new load.
         normalizeLayoutState();
 
         currentFile = file;
+        lastSession = LastSession.local(file);
         currentParsingConfig = parsingConfig;
 
         LogFile logFile = getOrCreateLogFile(file);
@@ -1499,7 +1842,15 @@ public class MainController {
         this.autoPrettifyXml = Boolean
                 .parseBoolean(preferenceService.getPreferencesByCode("main_auto_prettify_xml").orElse("false"));
 
-        logger.info("Preferences loaded: font={} {}, threads={}", fontFamily, fontSize, sshDownloadThreads);
+        String tailWindowStr = preferenceService.getPreferencesByCode("main_tail_window_size").orElse("20000");
+        try {
+            this.tailWindowSize = Integer.parseInt(tailWindowStr);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid tail window size preference: {}", tailWindowStr);
+        }
+
+        logger.info("Preferences loaded: font={} {}, threads={}, tailWindowSize={}", fontFamily, fontSize,
+                sshDownloadThreads, tailWindowSize);
 
         if (autoPrettifyJson || autoPrettifyXml) {
             applyAutoPrettify();
@@ -1530,7 +1881,7 @@ public class MainController {
         hideLoading();
         cancelCurrentLoadingTask();
         if (tailModeEnabled) {
-            disableTail();
+            disableTail(true); // skipReindex: a new file/tail is about to be loaded
         }
         LogFile logFile = recentFile.logFile();
 
@@ -1995,6 +2346,15 @@ public class MainController {
     }
 
     private void disableTail() {
+        disableTail(false);
+    }
+
+    /**
+     * Disable tail mode. If {@code skipReindex} is true, the current file will NOT
+     * be re-indexed (useful when a different file is about to be loaded immediately
+     * after, avoiding a race between two async loadFileWithParallelParsing tasks).
+     */
+    private void disableTail(boolean skipReindex) {
         tailModeEnabled = false;
         if (tailButton.isSelected()) {
             isProgrammaticUpdate = true;
@@ -2004,6 +2364,29 @@ public class MainController {
         tailButton.setStyle("");
         stopRemoteTail();
         stopLocalTail();
+
+        // Clear both tail buffers to prevent stale data from bleeding into the next file load
+        synchronized (tailBuffer) {
+            tailBuffer.clear();
+        }
+        liveTailList.clear();
+        tailFlushScheduled.set(false);
+        currentTailSearchPattern = null;
+        tailSearchScannedUpTo = 0;
+
+        // Atomically transition the viewer out of tail mode
+        canvasLogViewer.exitTailMode();
+
+        // For local files: re-index so new lines appended during tail are visible,
+        // but only when we're staying on the same file (not switching to a different one).
+        if (!skipReindex && currentFile != null && currentFile.exists()) {
+            logger.info("Re-indexing local file after tail: {}", currentFile.getName());
+            LogFile logFile = currentLogFromDb != null ? currentLogFromDb : getOrCreateLogFile(currentFile);
+            if (logFile != null) {
+                loadFileWithParallelParsing(currentFile, logFile, false, true, false);
+            }
+        }
+
         logger.info("Tail mode DISABLED");
     }
 
@@ -2029,6 +2412,9 @@ public class MainController {
         this.remoteTailLineCounter = 0;
         this.currentParsingConfig = rawConfig; // Used rawConfig
         this.currentFile = null;
+
+        // Save for reload after clear
+        this.lastSession = LastSession.remote(remotePath, this.currentLogFromDb, sshService);
 
         liveTailList.clear();
         canvasLogViewer.setTailBuffer(liveTailList);
@@ -2057,9 +2443,8 @@ public class MainController {
 
         // Design Pattern Compliance: Use SSHService's tailFile which handles 'tail -n
         // <lines> -F'
-        // This provides the initial 100 lines (Pre-fetch) AND starts the real-time
-        // stream.
-        sshService.tailFile(remotePath, 100, line -> handleTailLineBackground(line),
+        // This provides the initial lines (Pre-fetch) AND starts the real-time stream.
+        sshService.tailFile(remotePath, tailWindowSize, line -> handleTailLineBackground(line),
                 error -> Platform.runLater(() -> {
                     logger.error("Remote tail error: {}", error);
                     showError("Remote Tail Error", error);
@@ -2116,12 +2501,14 @@ public class MainController {
             this.currentLogFromDb = logFile;
             this.monitoringRemotePath = remotePath;
 
+            final String pathToSelect = remotePath;
             Platform.runLater(() -> {
                 if (createdNewRecent) {
                     refreshRecentFilesList();
                 } else {
                     recentFilesListView.refresh();
                 }
+                selectRecentFileByPath(pathToSelect);
             });
         } catch (Exception e) {
             logger.error("Failed to save remote tail to recent for path {}", remotePath, e);
@@ -2301,8 +2688,15 @@ public class MainController {
         }
 
         Platform.runLater(() -> {
-            // logger.info("FX Thread: Flushing tail buffer..."); // DEBUG
             tailFlushScheduled.set(false);
+
+            // Guard: don't flush if tail mode was disabled while this was queued
+            if (!tailModeEnabled) {
+                synchronized (tailBuffer) {
+                    tailBuffer.clear();
+                }
+                return;
+            }
 
             try {
                 List<LogEntry> toAdd;
@@ -2314,17 +2708,63 @@ public class MainController {
                     tailBuffer.clear();
                 }
 
+                int oldSize = liveTailList.size();
                 liveTailList.addAll(toAdd);
 
                 // Limit Logic here
+                int trimmed = 0;
                 if (liveTailList.size() > 50000) {
-                    int removeCount = liveTailList.size() - 50000;
-                    liveTailList.subList(0, removeCount).clear();
+                    trimmed = liveTailList.size() - 50000;
+                    liveTailList.subList(0, trimmed).clear();
                 }
 
                 canvasLogViewer.refreshTail();
 
-                if (tailModeEnabled && canvasLogViewer.hasSearchHighlight()) {
+                // Incremental search: scan new lines and append matches to result panel
+                if (tailModeEnabled && currentTailSearchPattern != null && filteredIndexes != null) {
+                    // If buffer was trimmed, adjust existing filteredIndexes in-place
+                    if (trimmed > 0) {
+                        int removedMatchCount = 0;
+                        int writeIdx = 0;
+                        for (int i = 0; i < filteredIndexes.size(); i++) {
+                            int shifted = filteredIndexes.get(i) - trimmed;
+                            if (shifted >= 0) {
+                                filteredIndexes.set(writeIdx++, shifted);
+                            } else {
+                                removedMatchCount++;
+                            }
+                        }
+                        // Remove trailing entries that were compacted
+                        while (filteredIndexes.size() > writeIdx) {
+                            filteredIndexes.removeLast();
+                        }
+                        tailSearchScannedUpTo = Math.max(0, tailSearchScannedUpTo - trimmed);
+                        if (removedMatchCount > 0 && searchResultPanel != null) {
+                            searchResultPanel.trimFromStart(removedMatchCount);
+                        }
+                    }
+
+                    // Scan ONLY lines that haven't been scanned yet
+                    IntArrayList newMatches = new IntArrayList();
+                    for (int i = tailSearchScannedUpTo; i < liveTailList.size(); i++) {
+                        LogEntry entry = liveTailList.get(i);
+                        String raw = entry != null ? entry.getRawLog() : "";
+                        if (currentTailSearchPattern.matcher(raw).find()) {
+                            filteredIndexes.add(i);
+                            newMatches.add(i);
+                        }
+                    }
+                    tailSearchScannedUpTo = liveTailList.size();
+
+                    // Update search result panel — since panel.matchedLines is the same
+                    // reference as filteredIndexes, we only need to sync itemCount/cache.
+                    if (newMatches.size() > 0 && searchResultPanel != null) {
+                        searchResultPanel.syncItemCount();
+                    }
+                    if (searchNavigator != null) {
+                        searchNavigator.setMatchCount(filteredIndexes.size());
+                    }
+                } else if (tailModeEnabled && canvasLogViewer.hasSearchHighlight()) {
                     if (searchNavigator != null) {
                         searchNavigator.setMatchCount(canvasLogViewer.countMatches());
                     }
@@ -2509,18 +2949,28 @@ public class MainController {
         stopLocalTail();
         liveTailList.clear();
         canvasLogViewer.refreshTail();
-        logger.info("Starting local tail (TailService) for: {}", file.getAbsolutePath());
+
+        // If the file is already loaded in the viewer, skip initial context load
+        // to avoid duplicating lines that are already displayed from the file index.
+        boolean needsContext = (mappedFileReader == null || lineOffsetIndex == null);
+
+        logger.info("Starting local tail (TailService) for: {} (loadContext={})", file.getAbsolutePath(),
+                needsContext);
         Thread starterThread = new Thread(() -> tailService.startLocalTail(
                 file,
                 this::handleTailLineBackground,
                 ex -> {
+                    if (ex instanceof InterruptedException) {
+                        // Normal shutdown, ignore
+                        return;
+                    }
                     if (ex instanceof FileNotFoundException) {
                         Platform.runLater(() -> showInfo("Tail Info", "File not found or renamed."));
                     } else {
                         logger.error("Tailer error", ex);
                     }
                 },
-                true), "TailService-Starter");
+                needsContext, tailWindowSize), "TailService-Starter");
         starterThread.setDaemon(true);
         starterThread.start();
     }

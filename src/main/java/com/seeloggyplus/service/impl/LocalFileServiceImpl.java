@@ -9,25 +9,32 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * Implementation of {@link LocalFileService} for local file system operations.
  * <p>
- * Handles file listing, attribute reading (permissions, ownership), and basic
- * file system verification using NIO.2.
+ * Optimized for performance: uses DirectoryStream instead of Files.list(),
+ * reads only BasicFileAttributes in a single syscall per file, and detects
+ * the OS once to avoid repeated POSIX permission checks on Windows.
  */
 @RequiredArgsConstructor
 public class LocalFileServiceImpl implements LocalFileService {
 
     private static final Logger logger = LoggerFactory.getLogger(LocalFileServiceImpl.class);
+    private static final boolean IS_POSIX = isPosixFileSystem();
 
-    /**
-     * {@inheritDoc}
-     */
+    private static boolean isPosixFileSystem() {
+        try {
+            return FileSystems.getDefault().supportedFileAttributeViews().contains("posix");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @Override
     public String getHomeDirectory() {
         return System.getProperty("user.home");
@@ -36,39 +43,35 @@ public class LocalFileServiceImpl implements LocalFileService {
     /**
      * Lists files and directories in the specified path.
      * <p>
-     * Converts each entry to a {@link FileInfo} object with populated metadata.
-     * If attribute reading fails for a specific file, it degrades gracefully
-     * by logging a warning and returning partial info.
-     *
-     * @param directoryPath Absolute path to list
-     * @return List of FileInfo objects
-     * @throws IOException if path is invalid or inaccessible
+     * Uses DirectoryStream for lower overhead than Files.list()/Stream.
+     * Reads only BasicFileAttributes (single syscall per file).
+     * Skips expensive owner lookup and permission checks for faster listing.
      */
     @Override
     public List<FileInfo> listFiles(String directoryPath) throws IOException {
-        Path path = Paths.get(directoryPath);
+        Path dirPath = Paths.get(directoryPath);
 
-        if (!Files.exists(path)) {
+        if (!Files.exists(dirPath)) {
             throw new IOException("Path does not exist: " + directoryPath);
         }
-        if (!Files.isDirectory(path)) {
+        if (!Files.isDirectory(dirPath)) {
             throw new IOException("Path is not a directory: " + directoryPath);
         }
 
-        try (Stream<Path> stream = Files.list(path)) {
-            return stream
-                    .map(this::mapPathToFileInfo)
-                    .collect(Collectors.toList());
+        List<FileInfo> result = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dirPath)) {
+            for (Path entry : stream) {
+                result.add(mapPathToFileInfo(entry));
+            }
         } catch (SecurityException e) {
             throw new IOException("Permission denied accessing: " + directoryPath, e);
         }
+        return result;
     }
 
     /**
-     * Maps a {@link Path} to a {@link FileInfo} object, extracting attributes.
-     *
-     * @param path The file path to process
-     * @return Populated FileInfo object
+     * Maps a Path to FileInfo using a single readAttributes call.
+     * Owner and permissions are loaded lazily (set to defaults here).
      */
     private FileInfo mapPathToFileInfo(Path path) {
         FileInfo fileInfo = new FileInfo();
@@ -77,54 +80,31 @@ public class LocalFileServiceImpl implements LocalFileService {
         fileInfo.setSourceType(FileInfo.SourceType.LOCAL);
 
         try {
-            BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class);
+            BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class,
+                    LinkOption.NOFOLLOW_LINKS);
             fileInfo.setDirectory(attrs.isDirectory());
             fileInfo.setSize(attrs.isDirectory() ? 0 : attrs.size());
             fileInfo.setModifiedTime(attrs.lastModifiedTime().toMillis());
-
-            setFileOwner(path, fileInfo);
-            fileInfo.setPermissions(getPermissionsString(path));
-
+            // Skip owner and permissions for speed — set lightweight defaults
+            fileInfo.setOwner("-");
+            fileInfo.setPermissions(IS_POSIX ? getPermissionsStringFast(path) : "-");
         } catch (IOException e) {
             logger.warn("Failed to read attributes for file: {}", path, e);
             fileInfo.setDirectory(Files.isDirectory(path));
-            fileInfo.setPermissions("???");
-            fileInfo.setOwner("?");
+            fileInfo.setPermissions("-");
+            fileInfo.setOwner("-");
         }
 
         return fileInfo;
     }
 
     /**
-     * Attempts to set the file owner.
-     * Gracefully handles cases where owner attribute is not supported or
-     * accessible.
+     * Fast POSIX permission string — only called on POSIX systems.
      */
-    private void setFileOwner(Path path, FileInfo fileInfo) {
+    private String getPermissionsStringFast(Path path) {
         try {
-            UserPrincipal owner = Files.getOwner(path);
-            fileInfo.setOwner(owner.getName());
-        } catch (Exception e) {
-            fileInfo.setOwner("-");
-        }
-    }
-
-    /**
-     * formatted permission string (e.g., "rwxr-xr-x" or "rw-r--r--").
-     * Falls back to simple r/w/x check if POSIX attributes are not supported (e.g.
-     * Windows).
-     *
-     * @param path File path
-     * @return Permission string
-     */
-    private String getPermissionsString(Path path) {
-        try {
-            Set<PosixFilePermission> perms = Files.getPosixFilePermissions(path);
+            Set<PosixFilePermission> perms = Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS);
             return PosixFilePermissions.toString(perms);
-        } catch (UnsupportedOperationException e) {
-            return (Files.isReadable(path) ? "r" : "-") +
-                    (Files.isWritable(path) ? "w" : "-") +
-                    (Files.isExecutable(path) ? "x" : "-");
         } catch (IOException e) {
             return "---------";
         }
