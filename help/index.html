@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SeeLoggyPlus — User Guide</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <h2>SeeLoggyPlus</h2>
+        <span class="version">User Guide — v0.2.0</span>
+    </div>
+    <nav>
+        <ul>
+            <li class="nav-group">Overview</li>
+            <li><a href="#getting-started">Getting Started</a></li>
+            <li><a href="#main-interface">Main Interface</a></li>
+
+            <li class="nav-group">Features</li>
+            <li><a href="#open-local-file">Opening Local Files</a></li>
+            <li><a href="#remote-file">Remote File Browser</a></li>
+            <li><a href="#tail-mode">Tail Mode</a></li>
+            <li><a href="#search">Search &amp; Filtering</a></li>
+            <li><a href="#search-result-panel">Search Result Panel</a></li>
+            <li><a href="#detail-panel">Detail Panel</a></li>
+
+            <li class="nav-group">Reference</li>
+            <li><a href="#keyboard-shortcuts">Keyboard Shortcuts</a></li>
+            <li><a href="#preferences">Preferences</a></li>
+            <li><a href="#server-management">Server Management</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+        </ul>
+    </nav>
+</aside>
+
+<main class="content">
+
+    <!-- ===== GETTING STARTED ===== -->
+    <section id="getting-started">
+        <h1>Getting Started</h1>
+        <p>
+            SeeLoggyPlus is a fast, lightweight log viewer for developers and operations teams.
+            Browse local log files, monitor remote servers in real-time over SSH, and pinpoint
+            issues quickly with powerful search and filtering.
+        </p>
+
+        <h3>Quick Start</h3>
+        <ol>
+            <li>Open a log file via <b>File → Open Local File</b>, or select one from the Recent Files panel.</li>
+            <li>Type a keyword in the search bar to highlight and locate matching entries.</li>
+            <li>Click the <b>Tail</b> button to monitor a file for new entries in real-time.</li>
+            <li>Add an SSH server under <b>Settings → Server Management</b> to browse and tail remote logs.</li>
+        </ol>
+
+        <figure class="screenshot">
+            <img src="screenshots/main-window.png" alt="Main Window">
+            <figcaption>The main application window after opening a log file.</figcaption>
+        </figure>
+    </section>
+
+    <!-- ===== MAIN INTERFACE ===== -->
+    <section id="main-interface">
+        <h1>Main Interface</h1>
+        <p>The workspace is organized into the following areas:</p>
+
+        <figure class="screenshot">
+            <img src="screenshots/interface-overview.png" alt="Interface Overview">
+            <figcaption>Layout overview of the main interface.</figcaption>
+        </figure>
+
+        <table class="layout-table">
+            <tbody>
+                <tr><td>Menu Bar</td><td>File operations, view toggles, settings, and help.</td></tr>
+                <tr><td>Toolbar</td><td>Search bar, tail toggle, follow tail, reload, and quick actions.</td></tr>
+                <tr><td>Left Panel</td><td>Recent files list. Click any entry to reopen it. Can be pinned or collapsed.</td></tr>
+                <tr><td>Log Viewer</td><td>The central canvas displaying log lines with line numbers, log-level coloring, and search highlights.</td></tr>
+                <tr><td>Search Result Panel</td><td>Appears on the right when a search is active. Lists all matched lines with click-to-jump.</td></tr>
+                <tr><td>Detail Panel</td><td>Bottom panel showing the full content of the selected line, with JSON/XML prettify.</td></tr>
+                <tr><td>Status Bar</td><td>Current line position, total line count, and memory usage.</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ===== OPENING LOCAL FILES ===== -->
+    <section id="open-local-file">
+        <h1>Opening Local Files</h1>
+        <p>You can open a local log file in several ways:</p>
+        <ul>
+            <li><b>File → Open Local File</b> — opens a standard file picker.</li>
+            <li><b>Recent Files panel</b> — click any previously opened file to reload it.</li>
+            <li><b>File → Unified File Manager</b> — browse your file system with a built-in file preview.</li>
+        </ul>
+
+        <figure class="screenshot">
+            <img src="screenshots/open-local-file.png" alt="Open Local File">
+            <figcaption>Selecting a log file through the Unified File Manager.</figcaption>
+        </figure>
+
+        <p>
+            Large files are indexed in the background. A progress indicator appears in the toolbar
+            during indexing; once complete, the full file is available for instant navigation.
+        </p>
+    </section>
+
+    <!-- ===== REMOTE FILE BROWSER ===== -->
+    <section id="remote-file">
+        <h1>Remote File Browser</h1>
+        <p>Connect to remote servers over SSH to browse, download, and open log files without leaving the application.</p>
+
+        <h3>Steps</h3>
+        <ol>
+            <li>Register a server in <b>Settings → Server Management</b>.</li>
+            <li>Open <b>File → Unified File Manager</b> and select the server from the dropdown.</li>
+            <li>Navigate the remote file system and double-click a file to download and open it.</li>
+        </ol>
+
+        <figure class="screenshot">
+            <img src="screenshots/remote-file-browser.png" alt="Remote File Browser">
+            <figcaption>Browsing a remote server's file system over SSH.</figcaption>
+        </figure>
+
+        <div class="tip">
+            <b>Tip:</b> Downloaded files are saved to the directory configured in
+            <b>Preferences → SSH → Download Directory</b>. You can clean up old downloads from the same settings page.
+        </div>
+    </section>
+
+    <!-- ===== TAIL MODE ===== -->
+    <section id="tail-mode">
+        <h1>Tail Mode</h1>
+        <p>
+            Tail mode streams new log entries as they are written, similar to
+            <code>tail -f</code> on Linux. It works for both local and remote files.
+        </p>
+
+        <h3>Local Tail</h3>
+        <p>With a local file open, click the <b>Tail</b> button in the toolbar. New lines appended to the file appear automatically.</p>
+
+        <h3>Remote Tail</h3>
+        <p>For remote files, tail mode opens a persistent SSH connection and streams output in real-time.</p>
+
+        <figure class="screenshot">
+            <img src="screenshots/tail-mode.png" alt="Tail Mode">
+            <figcaption>Monitoring a log file in real-time with tail mode enabled.</figcaption>
+        </figure>
+
+        <h3>Follow Tail</h3>
+        <p>
+            When <b>Follow Tail</b> is active, the view stays pinned to the bottom so you always see the latest entries.
+            Scrolling up pauses follow automatically; scrolling back to the bottom re-enables it.
+        </p>
+    </section>
+
+    <!-- ===== SEARCH & FILTERING ===== -->
+    <section id="search">
+        <h1>Search &amp; Filtering</h1>
+        <p>The search bar in the toolbar provides fast, flexible text search across the entire log.</p>
+
+        <figure class="screenshot">
+            <img src="screenshots/search.png" alt="Search">
+            <figcaption>Search results highlighted in the log viewer with the result panel open.</figcaption>
+        </figure>
+
+        <table>
+            <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td>Incremental search</td><td>Results update as you type, with a short debounce to avoid flicker.</td></tr>
+                <tr><td>Regex</td><td>Enable the <b>Regex</b> checkbox to use regular expressions.</td></tr>
+                <tr><td>Case Sensitive</td><td>Enable <b>Case Sensitive</b> for exact-case matching.</td></tr>
+                <tr><td>Boolean operators</td><td>Combine terms with <code>AND</code>, <code>OR</code>, <code>NOT</code> (e.g. <code>ERROR AND timeout</code>).</td></tr>
+                <tr><td>Highlight</td><td>Matching text is highlighted in yellow throughout the log viewer.</td></tr>
+                <tr><td>Navigation</td><td>Press <kbd>F3</kbd> / <kbd>Shift+F3</kbd> to jump between matches.</td></tr>
+                <tr><td>Position indicator</td><td>The toolbar shows <i>"N of M"</i> to track your current position.</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ===== SEARCH RESULT PANEL ===== -->
+    <section id="search-result-panel">
+        <h1>Search Result Panel</h1>
+        <p>When a search produces results, a panel slides in on the right listing every matched line.</p>
+
+        <figure class="screenshot">
+            <img src="screenshots/search-result-panel.png" alt="Search Result Panel">
+            <figcaption>The search result panel showing matched lines with highlighted keywords.</figcaption>
+        </figure>
+
+        <ul>
+            <li>Each row displays the line number and content, with matching text highlighted.</li>
+            <li>Click any row to jump directly to that line in the log viewer.</li>
+            <li>Supports both vertical and horizontal scrolling for long lines.</li>
+            <li>In tail mode, new matches are appended to the list automatically as they arrive.</li>
+        </ul>
+    </section>
+
+    <!-- ===== DETAIL PANEL ===== -->
+    <section id="detail-panel">
+        <h1>Detail Panel</h1>
+        <p>
+            Click or arrow-key to a log line to display its full content in the bottom panel.
+            This is especially useful for inspecting long entries or embedded structured data.
+        </p>
+
+        <figure class="screenshot">
+            <img src="screenshots/detail-panel.png" alt="Detail Panel">
+            <figcaption>Detail panel showing a prettified JSON payload.</figcaption>
+        </figure>
+
+        <ul>
+            <li><b>Auto Prettify JSON</b> — Formats embedded JSON for readability.</li>
+            <li><b>Auto Prettify XML</b> — Formats embedded XML.</li>
+            <li><b>Copy</b> — Copies the panel content to the clipboard.</li>
+            <li>The panel can be pinned open or collapsed via the pin icon.</li>
+        </ul>
+    </section>
+
+    <!-- ===== KEYBOARD SHORTCUTS ===== -->
+    <section id="keyboard-shortcuts">
+        <h1>Keyboard Shortcuts</h1>
+        <table>
+            <thead>
+                <tr><th>Shortcut</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><kbd>F1</kbd></td><td>Open this help page</td></tr>
+                <tr><td><kbd>Ctrl+O</kbd></td><td>Open a local file</td></tr>
+                <tr><td><kbd>Ctrl+F</kbd></td><td>Focus the search bar</td></tr>
+                <tr><td><kbd>F3</kbd></td><td>Jump to next search match</td></tr>
+                <tr><td><kbd>Shift+F3</kbd></td><td>Jump to previous search match</td></tr>
+                <tr><td><kbd>Ctrl+G</kbd></td><td>Go to a specific line number</td></tr>
+                <tr><td><kbd>Ctrl+R</kbd></td><td>Reload the current file or tail session</td></tr>
+                <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Move selection up / down in the log viewer</td></tr>
+                <tr><td><kbd>Page Up</kbd> / <kbd>Page Down</kbd></td><td>Scroll one page up / down</td></tr>
+                <tr><td><kbd>Ctrl+Home</kbd></td><td>Jump to the first line</td></tr>
+                <tr><td><kbd>Ctrl+End</kbd></td><td>Jump to the last line</td></tr>
+                <tr><td><kbd>Ctrl+C</kbd></td><td>Copy selected lines to clipboard</td></tr>
+                <tr><td><kbd>Escape</kbd></td><td>Clear the current search</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ===== PREFERENCES ===== -->
+    <section id="preferences">
+        <h1>Preferences</h1>
+        <p>Open via <b>Settings → Preferences</b>. All settings are persisted locally and apply immediately after saving.</p>
+
+        <figure class="screenshot">
+            <img src="screenshots/preferences.png" alt="Preferences">
+            <figcaption>The Preferences dialog.</figcaption>
+        </figure>
+
+        <h3>General</h3>
+        <table class="layout-table">
+            <tbody>
+                <tr><td>Font Size / Family</td><td>Font used in the detail panel and file previews.</td></tr>
+                <tr><td>Max Memory (GB)</td><td>Maximum JVM heap size. Requires a restart to take effect.</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Log Viewer</h3>
+        <table class="layout-table">
+            <tbody>
+                <tr><td>Tail Window Size</td><td>Maximum number of lines retained in the tail buffer (default 20 000).</td></tr>
+                <tr><td>Preview Line Limit</td><td>Number of lines shown when previewing a file in the file manager.</td></tr>
+                <tr><td>Auto Prettify JSON / XML</td><td>Automatically format structured data in the detail panel.</td></tr>
+            </tbody>
+        </table>
+
+        <h3>SSH</h3>
+        <table class="layout-table">
+            <tbody>
+                <tr><td>Download Threads</td><td>Parallel threads used when downloading remote files.</td></tr>
+                <tr><td>Connection Timeout</td><td>SSH connection timeout in seconds.</td></tr>
+                <tr><td>Download Directory</td><td>Folder where downloaded remote files are saved. Defaults to the system temp directory.</td></tr>
+                <tr><td>Clean Downloads</td><td>Deletes all previously downloaded files from the download directory.</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ===== SERVER MANAGEMENT ===== -->
+    <section id="server-management">
+        <h1>Server Management</h1>
+        <p>Add, edit, and remove SSH server connections via <b>Settings → Server Management</b>.</p>
+
+        <figure class="screenshot">
+            <img src="screenshots/server-management.png" alt="Server Management">
+            <figcaption>The Server Management dialog.</figcaption>
+        </figure>
+
+        <table class="layout-table">
+            <tbody>
+                <tr><td>Add</td><td>Register a new server with host, port, username, and password.</td></tr>
+                <tr><td>Edit</td><td>Update an existing server's configuration.</td></tr>
+                <tr><td>Delete</td><td>Remove a server from the list.</td></tr>
+                <tr><td>Test Connection</td><td>Verify connectivity before saving.</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ===== TROUBLESHOOTING ===== -->
+    <section id="troubleshooting">
+        <h1>Troubleshooting</h1>
+
+        <div class="faq">
+            <h3>The application runs out of memory</h3>
+            <p>Increase <b>Max Memory</b> in <b>Preferences → General</b> and restart the application.</p>
+        </div>
+
+        <div class="faq">
+            <h3>Remote connection fails</h3>
+            <ul>
+                <li>Double-check the host, port, and credentials in Server Management.</li>
+                <li>Ensure SSH is enabled and reachable on the remote server.</li>
+                <li>Try increasing the <b>Connection Timeout</b> in Preferences.</li>
+            </ul>
+        </div>
+
+        <div class="faq">
+            <h3>Search feels slow on very large files</h3>
+            <p>
+                Search runs in parallel across multiple CPU cores. If a regex pattern causes
+                excessive backtracking, try simplifying it. Plain-text and boolean searches
+                are generally faster than complex regex.
+            </p>
+        </div>
+
+        <div class="faq">
+            <h3>Tail mode shows stale data after switching files</h3>
+            <p>The view should reset automatically. If stale content persists, press <kbd>Ctrl+R</kbd> to force a reload.</p>
+        </div>
+    </section>
+
+    <footer>
+        <p>SeeLoggyPlus v0.2.0 &mdash; &copy; 2025&ndash;2026 SeeLoggyPlus</p>
+    </footer>
+
+</main>
+
+<script>
+// Active nav highlighting on scroll
+const sections = document.querySelectorAll('section');
+const navLinks = document.querySelectorAll('.sidebar nav a');
+
+function updateActiveNav() {
+    let current = '';
+    sections.forEach(s => {
+        if (window.scrollY >= s.offsetTop - 120) current = s.id;
+    });
+    navLinks.forEach(link => {
+        link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+    });
+}
+
+window.addEventListener('scroll', updateActiveNav, { passive: true });
+document.addEventListener('DOMContentLoaded', updateActiveNav);
+
+// Smooth scroll for nav clicks
+navLinks.forEach(link => {
+    link.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(link.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+});
+
+// Graceful fallback for missing screenshots
+document.querySelectorAll('.screenshot img').forEach(img => {
+    img.addEventListener('error', function() {
+        this.style.display = 'none';
+        const notice = document.createElement('div');
+        notice.className = 'screenshot-missing';
+        notice.textContent = 'Screenshot not available';
+        this.parentElement.insertBefore(notice, this);
+    });
+});
+</script>
+
+</body>
+</html>

@@ -29,25 +29,25 @@ public class PreferencesDialogController {
     @FXML
     private Spinner<Integer> tailWindowSizeSpinner;
     @FXML
-    private ComboBox<String> mainDefaultLogLevelComboBox;
-    @FXML
-    private CheckBox mainAutoRefreshCheckBox;
-    @FXML
     private CheckBox mainAutoPrettifyJsonCheckBox;
     @FXML
     private CheckBox mainAutoPrettifyXmlCheckBox;
-    @FXML
-    private TextField ufmDefaultPathField;
-    @FXML
-    private Button ufmBrowsePathButton;
-    @FXML
-    private CheckBox ufmShowHiddenFilesCheckBox;
     @FXML
     private Spinner<Integer> lpLineLimitSpinner;
     @FXML
     private Spinner<Integer> sshThreadsSpinner;
     @FXML
     private Spinner<Integer> sshTimeoutSpinner;
+    @FXML
+    private TextField sshDownloadDirField;
+    @FXML
+    private Button sshDownloadDirBrowseButton;
+    @FXML
+    private Button sshOpenDownloadDirButton;
+    @FXML
+    private Button sshCleanDownloadsButton;
+    @FXML
+    private Label sshDownloadInfoLabel;
     @FXML
     private Button saveButton;
     @FXML
@@ -63,7 +63,6 @@ public class PreferencesDialogController {
 
         setupSpinners();
         setupFontFamilyComboBox();
-        setupLogLevelComboBox();
         setupButtons();
         loadPreferences();
     }
@@ -94,15 +93,12 @@ public class PreferencesDialogController {
         appFontFamilyComboBox.setItems(FXCollections.observableArrayList(javafx.scene.text.Font.getFamilies()));
     }
 
-    private void setupLogLevelComboBox() {
-        mainDefaultLogLevelComboBox.setItems(FXCollections.observableArrayList(
-                "ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"));
-    }
-
     private void setupButtons() {
         saveButton.setOnAction(e -> handleSave());
         cancelButton.setOnAction(e -> closeDialog());
-        ufmBrowsePathButton.setOnAction(e -> handleBrowsePath());
+        sshDownloadDirBrowseButton.setOnAction(e -> handleBrowseDownloadDir());
+        sshOpenDownloadDirButton.setOnAction(e -> handleOpenDownloadDir());
+        sshCleanDownloadsButton.setOnAction(e -> handleCleanDownloads());
     }
 
     private void loadPreferences() {
@@ -112,19 +108,17 @@ public class PreferencesDialogController {
 
         tailWindowSizeSpinner.getValueFactory()
                 .setValue(Integer.parseInt(getPreference("main_tail_window_size", "20000")));
-        mainDefaultLogLevelComboBox.getSelectionModel().select(getPreference("main_default_log_level", "ALL"));
-        mainAutoRefreshCheckBox.setSelected(Boolean.parseBoolean(getPreference("main_auto_refresh_enabled", "true")));
         mainAutoPrettifyJsonCheckBox
                 .setSelected(Boolean.parseBoolean(getPreference("main_auto_prettify_json", "false")));
         mainAutoPrettifyXmlCheckBox.setSelected(Boolean.parseBoolean(getPreference("main_auto_prettify_xml", "false")));
-
-        ufmDefaultPathField.setText(getPreference("ufm_default_local_path", System.getProperty("user.home")));
-        ufmShowHiddenFilesCheckBox.setSelected(Boolean.parseBoolean(getPreference("ufm_show_hidden_files", "false")));
 
         lpLineLimitSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("lp_line_limit", "500")));
 
         sshThreadsSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("ssh_download_threads", "4")));
         sshTimeoutSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("ssh_connection_timeout", "60")));
+
+        sshDownloadDirField.setText(getPreference("ssh_download_directory", ""));
+        updateDownloadInfo();
     }
 
     private String getPreference(String key, String defaultValue) {
@@ -153,18 +147,14 @@ public class PreferencesDialogController {
         updateLauncherConfig(appMaxMemorySpinner.getValue());
 
         savePreference("main_tail_window_size", String.valueOf(tailWindowSizeSpinner.getValue()));
-        savePreference("main_default_log_level", mainDefaultLogLevelComboBox.getValue());
-        savePreference("main_auto_refresh_enabled", String.valueOf(mainAutoRefreshCheckBox.isSelected()));
         savePreference("main_auto_prettify_json", String.valueOf(mainAutoPrettifyJsonCheckBox.isSelected()));
         savePreference("main_auto_prettify_xml", String.valueOf(mainAutoPrettifyXmlCheckBox.isSelected()));
-
-        savePreference("ufm_default_local_path", ufmDefaultPathField.getText());
-        savePreference("ufm_show_hidden_files", String.valueOf(ufmShowHiddenFilesCheckBox.isSelected()));
 
         savePreference("lp_line_limit", String.valueOf(lpLineLimitSpinner.getValue()));
 
         savePreference("ssh_download_threads", String.valueOf(sshThreadsSpinner.getValue()));
         savePreference("ssh_connection_timeout", String.valueOf(sshTimeoutSpinner.getValue()));
+        savePreference("ssh_download_directory", sshDownloadDirField.getText() != null ? sshDownloadDirField.getText().trim() : "");
 
         logger.info("Preferences saved.");
 
@@ -198,15 +188,6 @@ public class PreferencesDialogController {
         preferenceService.saveOrUpdatePreferences(new Preference(key, value));
     }
 
-    private void handleBrowsePath() {
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Select Default Path");
-        File selectedDirectory = directoryChooser.showDialog(saveButton.getScene().getWindow());
-        if (selectedDirectory != null) {
-            ufmDefaultPathField.setText(selectedDirectory.getAbsolutePath());
-        }
-    }
-
     private void updateLauncherConfig(int maxMemoryGb) {
         try {
             java.io.File configFile = new java.io.File("launcher.properties");
@@ -231,6 +212,90 @@ public class PreferencesDialogController {
         } catch (Exception e) {
             logger.error("Failed to update launcher.properties", e);
         }
+    }
+
+    private void handleBrowseDownloadDir() {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Select Download Directory");
+        String current = sshDownloadDirField.getText();
+        if (current != null && !current.isBlank()) {
+            File dir = new File(current);
+            if (dir.isDirectory()) {
+                chooser.setInitialDirectory(dir);
+            }
+        }
+        File selected = chooser.showDialog(saveButton.getScene().getWindow());
+        if (selected != null) {
+            sshDownloadDirField.setText(selected.getAbsolutePath());
+            updateDownloadInfo();
+        }
+    }
+
+    private void handleOpenDownloadDir() {
+        File dir = resolveDownloadDir();
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+        try {
+            java.awt.Desktop.getDesktop().open(dir);
+        } catch (Exception e) {
+            logger.error("Failed to open download directory", e);
+        }
+    }
+
+    private void handleCleanDownloads() {
+        File dir = resolveDownloadDir();
+        File[] files = dir.listFiles((d, name) -> name.startsWith("seeloggyplus-"));
+        if (files == null || files.length == 0) {
+            sshDownloadInfoLabel.setText("No download files found.");
+            return;
+        }
+
+        long totalSize = 0;
+        for (File f : files) totalSize += f.length();
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Clean Downloads");
+        confirm.setHeaderText("Delete " + files.length + " file(s)?");
+        confirm.setContentText(String.format("Total size: %s\nDirectory: %s",
+                formatSize(totalSize), dir.getAbsolutePath()));
+
+        Optional<ButtonType> result = confirm.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            int deleted = 0;
+            for (File f : files) {
+                if (f.delete()) deleted++;
+            }
+            logger.info("Cleaned {} of {} download files", deleted, files.length);
+            updateDownloadInfo();
+        }
+    }
+
+    private File resolveDownloadDir() {
+        String path = sshDownloadDirField.getText();
+        if (path != null && !path.isBlank()) {
+            return new File(path);
+        }
+        return new File(System.getProperty("java.io.tmpdir"));
+    }
+
+    private void updateDownloadInfo() {
+        File dir = resolveDownloadDir();
+        File[] files = dir.listFiles((d, name) -> name.startsWith("seeloggyplus-"));
+        if (files == null || files.length == 0) {
+            sshDownloadInfoLabel.setText("No download files");
+            return;
+        }
+        long totalSize = 0;
+        for (File f : files) totalSize += f.length();
+        sshDownloadInfoLabel.setText(files.length + " file(s), " + formatSize(totalSize));
+    }
+
+    private String formatSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
+        if (bytes < 1024 * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024));
+        return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
     }
 
     private void closeDialog() {

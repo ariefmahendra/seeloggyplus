@@ -35,6 +35,8 @@
 
                 <!-- Help Menu -->
                 <Menu text="Help">
+                    <MenuItem fx:id="helpContentsMenuItem" text="Help Contents" accelerator="F1" />
+                    <SeparatorMenuItem />
                     <MenuItem fx:id="aboutMenuItem" text="About" />
                 </Menu>
             </MenuBar>

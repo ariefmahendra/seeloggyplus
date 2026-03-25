@@ -72,6 +72,8 @@ public class MainController {
     @FXML
     private MenuItem aboutMenuItem;
     @FXML
+    private MenuItem helpContentsMenuItem;
+    @FXML
     private MenuItem preferencesMenuItem;
 
     // FXML Components - Main Layout
@@ -219,6 +221,7 @@ public class MainController {
     private Task<?> currentLoadingTask = null;
     private static final int MAX_TAIL_BUFFER_SIZE = 5000;
     private int sshDownloadThreads = 4;
+    private String sshDownloadDirectory = ""; // Custom download dir, empty = system temp
     private int tailWindowSize = 20000;
     private boolean tailModeEnabled = false;
     private SSHServiceImpl activeTailSshService;
@@ -381,6 +384,7 @@ public class MainController {
         preferencesMenuItem.setOnAction(e -> handlePreferences());
 
         aboutMenuItem.setOnAction(e -> handleAbout());
+        helpContentsMenuItem.setOnAction(e -> handleHelpContents());
 
         menuBar.setMinHeight(Region.USE_PREF_SIZE);
     }
@@ -830,9 +834,21 @@ public class MainController {
             canvasLogViewer.setFilteredIndexes(null); // Show all lines
             canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
 
-            // Scan current liveTailList for matches
-            // In tail mode, globalIndex == index in liveTailList (tailBuffer in canvas)
-            // Canvas sees these as fileLineCount + bufferIndex, but fileLineCount is 0 in tail mode
+            // Scan FILE lines first (if a file is loaded alongside tail)
+            long tailOffset = canvasLogViewer.getFileLineCount();
+            if (mappedFileReader != null && lineOffsetIndex != null && tailOffset > 0) {
+                int fileLines = lineOffsetIndex.getLineCount();
+                for (int i = 0; i < fileLines; i++) {
+                    CharSequence line = mappedFileReader.readLine(lineOffsetIndex, i);
+                    if (line != null && matchPattern.matcher(line).find()) {
+                        filteredIndexes.add(i);
+                    }
+                }
+                logger.info("Tail search: {} matches in file lines (0..{})", filteredIndexes.size(), fileLines);
+            }
+
+            // Then scan tail buffer lines.
+            // Canvas sees tail buffer as fileLineCount + bufferIndex.
             List<LogEntry> snapshot;
             synchronized (liveTailList) {
                 snapshot = new ArrayList<>(liveTailList);
@@ -841,7 +857,7 @@ public class MainController {
                 LogEntry entry = snapshot.get(i);
                 String raw = entry != null ? entry.getRawLog() : "";
                 if (matchPattern.matcher(raw).find()) {
-                    filteredIndexes.add(i);
+                    filteredIndexes.add((int) (tailOffset + i));
                 }
             }
 
@@ -1146,17 +1162,27 @@ public class MainController {
      */
     private void showSearchResultPanelForTail(IntArrayList matches, Pattern highlightPattern) {
         if (searchResultPanel == null || searchSplitPane == null) return;
-        // Resolver reads from liveTailList by index
+        // Resolver: idx can be a file line (< tailOffset) or tail buffer line (>= tailOffset).
+        long tailOffset = canvasLogViewer.getFileLineCount();
         searchResultPanel.setLineContentResolver(idx -> {
-            int i = (int) idx;
-            if (i >= 0 && i < liveTailList.size()) {
-                LogEntry entry = liveTailList.get(i);
-                return entry != null ? entry.getRawLog() : "";
+            if (idx < tailOffset) {
+                // File line
+                if (mappedFileReader != null && lineOffsetIndex != null && idx < lineOffsetIndex.getLineCount()) {
+                    return mappedFileReader.readLine(lineOffsetIndex, idx);
+                }
+            } else {
+                // Tail buffer line
+                int bufferIdx = (int) (idx - tailOffset);
+                if (bufferIdx >= 0 && bufferIdx < liveTailList.size()) {
+                    LogEntry entry = liveTailList.get(bufferIdx);
+                    return entry != null ? entry.getRawLog() : "";
+                }
             }
             return "";
         });
         searchResultPanel.setSearchPattern(highlightPattern);
-        searchResultPanel.showResults(matches, liveTailList.size());
+        long totalLines = tailOffset + liveTailList.size();
+        searchResultPanel.showResults(matches, (int) totalLines);
         if (!searchSplitPane.getItems().contains(searchResultPanel)) {
             searchSplitPane.getItems().add(searchResultPanel);
             Platform.runLater(() -> searchSplitPane.setDividerPositions(0.75));
@@ -1226,6 +1252,7 @@ public class MainController {
                 } else {
                     canvasLogViewer.jumpToLine(0);
                 }
+                canvasLogViewer.requestCanvasFocus();
                 logger.info("Canvas viewer initialized");
             });
 
@@ -1593,9 +1620,12 @@ public class MainController {
         Task<File> downloadTask = new Task<>() {
             @Override
             protected File call() throws Exception {
-                String tempDir = System.getProperty("java.io.tmpdir");
+                String downloadDir = (sshDownloadDirectory != null && !sshDownloadDirectory.isBlank())
+                        ? sshDownloadDirectory : System.getProperty("java.io.tmpdir");
+                File dir = new File(downloadDir);
+                if (!dir.exists()) dir.mkdirs();
                 String sanitizedName = new File(remoteFileName).getName();
-                File localTmpFile = new File(tempDir,
+                File localTmpFile = new File(dir,
                         "seeloggyplus-" + System.currentTimeMillis() + "-" + sanitizedName);
                 logger.info("Downloading remote file {} to temporary path {}", remotePath,
                         localTmpFile.getAbsolutePath());
@@ -1803,8 +1833,8 @@ public class MainController {
             addAppIcon(dialog);
             dialog.setScene(new Scene(root));
             dialog.setResizable(false);
-            dialog.setWidth(400);
-            dialog.setHeight(400);
+            dialog.setWidth(550);
+            dialog.setHeight(480);
 
             dialog.showAndWait();
         } catch (IOException e) {
@@ -1836,6 +1866,8 @@ public class MainController {
         } catch (NumberFormatException e) {
             logger.warn("Invalid ssh threads preference: {}", threadsStr);
         }
+
+        this.sshDownloadDirectory = preferenceService.getPreferencesByCode("ssh_download_directory").orElse("");
 
         this.autoPrettifyJson = Boolean
                 .parseBoolean(preferenceService.getPreferencesByCode("main_auto_prettify_json").orElse("false"));
@@ -2216,6 +2248,30 @@ public class MainController {
         } catch (IOException e) {
             logger.error("Failed to open About dialog", e);
             showError("Error", "Could not open About dialog: " + e.getMessage());
+        }
+    }
+
+    private void handleHelpContents() {
+        try {
+            // Look for help files relative to the application directory
+            File appDir = new File(System.getProperty("user.dir"));
+            File helpFile = new File(appDir, "help/index.html");
+
+            if (!helpFile.exists()) {
+                // Fallback: try extracting from resources to temp
+                java.net.URL helpUrl = getClass().getResource("/help/index.html");
+                if (helpUrl != null) {
+                    java.awt.Desktop.getDesktop().browse(helpUrl.toURI());
+                    return;
+                }
+                showError("Help Not Found", "Help file not found at: " + helpFile.getAbsolutePath());
+                return;
+            }
+
+            java.awt.Desktop.getDesktop().browse(helpFile.toURI());
+        } catch (Exception e) {
+            logger.error("Failed to open help", e);
+            showError("Help Error", "Could not open help: " + e.getMessage());
         }
     }
 
@@ -2722,13 +2778,15 @@ public class MainController {
 
                 // Incremental search: scan new lines and append matches to result panel
                 if (tailModeEnabled && currentTailSearchPattern != null && filteredIndexes != null) {
+                    long tailOffset = canvasLogViewer.getFileLineCount();
+
                     // If buffer was trimmed, adjust existing filteredIndexes in-place
                     if (trimmed > 0) {
                         int removedMatchCount = 0;
                         int writeIdx = 0;
                         for (int i = 0; i < filteredIndexes.size(); i++) {
                             int shifted = filteredIndexes.get(i) - trimmed;
-                            if (shifted >= 0) {
+                            if (shifted >= (int) tailOffset) {
                                 filteredIndexes.set(writeIdx++, shifted);
                             } else {
                                 removedMatchCount++;
@@ -2750,8 +2808,9 @@ public class MainController {
                         LogEntry entry = liveTailList.get(i);
                         String raw = entry != null ? entry.getRawLog() : "";
                         if (currentTailSearchPattern.matcher(raw).find()) {
-                            filteredIndexes.add(i);
-                            newMatches.add(i);
+                            int globalIdx = (int) (tailOffset + i);
+                            filteredIndexes.add(globalIdx);
+                            newMatches.add(globalIdx);
                         }
                     }
                     tailSearchScannedUpTo = liveTailList.size();
@@ -2791,44 +2850,43 @@ public class MainController {
     }
 
     private void cleanupTempFiles() {
-        try {
-            String tmpDirPath = System.getProperty("java.io.tmpdir");
-            File tmpDir = new File(tmpDirPath);
-
-            if (!tmpDir.exists() || !tmpDir.isDirectory()) {
-                logger.warn("Temp directory does not exist or is not a directory: {}", tmpDirPath);
-                return;
-            }
-
-            File[] files = tmpDir.listFiles((dir, name) -> name.startsWith("seeloggyplus-"));
-            if (files == null || files.length == 0) {
-                logger.info("No seeloggyplus temp files to delete in {}", tmpDirPath);
-                return;
-            }
-
-            int successCount = 0;
-            int failCount = 0;
-
-            for (File f : files) {
-                try {
-                    if (f.delete()) {
-                        successCount++;
-                        logger.info("Deleted temp file: {}", f.getAbsolutePath());
-                    } else {
-                        failCount++;
-                        logger.warn("Failed to delete temp file: {}", f.getAbsolutePath());
-                    }
-                } catch (Exception ex) {
-                    failCount++;
-                    logger.error("Error deleting temp file: {}", f.getAbsolutePath(), ex);
-                }
-            }
-
-            logger.info("Temp cleanup completed. Deleted: {}, Failed: {}, Dir: {}", successCount, failCount,
-                    tmpDirPath);
-        } catch (Exception e) {
-            logger.error("Error while cleaning up temp files", e);
+        // Scan both system temp dir and custom download dir
+        Set<String> dirsToClean = new java.util.LinkedHashSet<>();
+        dirsToClean.add(System.getProperty("java.io.tmpdir"));
+        if (sshDownloadDirectory != null && !sshDownloadDirectory.isBlank()) {
+            dirsToClean.add(sshDownloadDirectory);
         }
+
+        int totalSuccess = 0;
+        int totalFail = 0;
+
+        for (String dirPath : dirsToClean) {
+            try {
+                File dir = new File(dirPath);
+                if (!dir.exists() || !dir.isDirectory()) continue;
+
+                File[] files = dir.listFiles((d, name) -> name.startsWith("seeloggyplus-"));
+                if (files == null || files.length == 0) continue;
+
+                for (File f : files) {
+                    try {
+                        if (f.delete()) {
+                            totalSuccess++;
+                            logger.info("Deleted temp file: {}", f.getAbsolutePath());
+                        } else {
+                            totalFail++;
+                        }
+                    } catch (Exception ex) {
+                        totalFail++;
+                        logger.error("Error deleting temp file: {}", f.getAbsolutePath(), ex);
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Error cleaning directory: {}", dirPath, e);
+            }
+        }
+
+        logger.info("Temp cleanup completed. Deleted: {}, Failed: {}", totalSuccess, totalFail);
     }
 
     private String formatBytes(long bytes) {

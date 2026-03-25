@@ -129,6 +129,7 @@ public class CanvasLogViewer extends GridPane {
         vScrollBar = new ScrollBar();
         vScrollBar.setOrientation(javafx.geometry.Orientation.VERTICAL);
         vScrollBar.setVisibleAmount(50);
+        vScrollBar.setUnitIncrement(1); // Arrow button clicks scroll 1 line
         // Stabilize scrollbar thickness so layout math doesn't oscillate
         vScrollBar.setPrefWidth(16);
         vScrollBar.setMinWidth(16);
@@ -138,6 +139,7 @@ public class CanvasLogViewer extends GridPane {
         hScrollBar.setMin(0);
         hScrollBar.setMax(2000);
         hScrollBar.setVisibleAmount(800);
+        hScrollBar.setUnitIncrement(20); // Arrow button clicks scroll 20px horizontally
         // Stabilize scrollbar thickness
         hScrollBar.setPrefHeight(16);
         hScrollBar.setMinHeight(16);
@@ -654,6 +656,9 @@ public class CanvasLogViewer extends GridPane {
                 return;
             }
 
+            // Grab focus so keyboard navigation works on canvas
+            canvas.requestFocus();
+
             // Hide previous context menu if visible
             if (currentContextMenu != null) {
                 currentContextMenu.hide();
@@ -813,20 +818,61 @@ public class CanvasLogViewer extends GridPane {
                 return;
             }
 
+            long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
+            long maxTop = Math.max(0, effectiveLines - visibleLineCount);
+
+            if (e.getCode() == KeyCode.DOWN || e.getCode() == KeyCode.UP) {
+                // Move selection by one line and scroll if needed
+                long currentSel = selectedLine >= 0 ? selectedLine : currentTopLine;
+                long newSel;
+                if (e.getCode() == KeyCode.DOWN) {
+                    newSel = Math.min(currentSel + 1, effectiveLines - 1);
+                } else {
+                    newSel = Math.max(currentSel - 1, 0);
+                }
+
+                // Update selection
+                selectedLine = newSel;
+                selectionAnchor = newSel;
+                selectedLineIndexes.clear();
+                long globalIdx = (filteredIndexes != null) ? filteredIndexes.get((int) newSel) : newSel;
+                selectedLineIndexes.add(globalIdx);
+
+                // Scroll to keep selection visible
+                if (newSel < currentTopLine) {
+                    currentTopLine = newSel;
+                } else if (newSel >= currentTopLine + visibleLineCount) {
+                    currentTopLine = newSel - visibleLineCount + 1;
+                }
+                currentTopLine = Math.max(0, Math.min(currentTopLine, maxTop));
+                smoothScrollY = currentTopLine;
+                targetScrollY = currentTopLine;
+                scrollOffsetY = 0;
+                vScrollBar.setValue(currentTopLine);
+                lineCacheStartLine = -1;
+                render();
+                fireStatusUpdate(effectiveLines);
+
+                // Fire click handler so detail panel updates
+                String content = getLineContent(globalIdx);
+                if (onLineClick != null) {
+                    onLineClick.handle(globalIdx, content);
+                }
+
+                e.consume();
+                return;
+            }
+
             long newTop = currentTopLine;
 
-            if (e.getCode() == KeyCode.DOWN) {
-                newTop = Math.min(currentTopLine + 1, totalLines - visibleLineCount);
-            } else if (e.getCode() == KeyCode.UP) {
-                newTop = Math.max(currentTopLine - 1, 0);
-            } else if (e.getCode() == KeyCode.PAGE_DOWN) {
-                newTop = Math.min(currentTopLine + visibleLineCount, totalLines - visibleLineCount);
+            if (e.getCode() == KeyCode.PAGE_DOWN) {
+                newTop = Math.min(currentTopLine + visibleLineCount, maxTop);
             } else if (e.getCode() == KeyCode.PAGE_UP) {
                 newTop = Math.max(currentTopLine - visibleLineCount, 0);
             } else if (e.getCode() == KeyCode.HOME && e.isControlDown()) {
                 newTop = 0;
             } else if (e.getCode() == KeyCode.END && e.isControlDown()) {
-                newTop = totalLines - visibleLineCount;
+                newTop = maxTop;
             }
 
             if (newTop != currentTopLine) {
@@ -835,7 +881,9 @@ public class CanvasLogViewer extends GridPane {
                 targetScrollY = currentTopLine;
                 scrollOffsetY = 0;
                 vScrollBar.setValue(currentTopLine);
+                lineCacheStartLine = -1;
                 render();
+                fireStatusUpdate(effectiveLines);
             }
 
             e.consume();
@@ -1042,6 +1090,16 @@ public class CanvasLogViewer extends GridPane {
 
     public int getCurrentTopLine() {
         return (int) currentTopLine;
+    }
+
+    /** Returns the number of lines from the indexed file (excludes tail buffer). */
+    public long getFileLineCount() {
+        return fileLineCount;
+    }
+
+    /** Request focus on the canvas so keyboard navigation works. */
+    public void requestCanvasFocus() {
+        canvas.requestFocus();
     }
 
     public int getSelectedIndex() {

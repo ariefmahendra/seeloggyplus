@@ -6,42 +6,42 @@
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.*?>
-<VBox alignment="TOP_CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="400.0" spacing="10.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.AboutDialogController">
+<VBox alignment="TOP_CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="420.0" spacing="12.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.AboutDialogController">
    <padding>
-      <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+      <Insets bottom="24.0" left="28.0" right="28.0" top="24.0" />
    </padding>
    <children>
-       <ImageView fitHeight="100.0" fitWidth="100.0" pickOnBounds="true" preserveRatio="true" smooth="true">
+       <ImageView fitHeight="80.0" fitWidth="80.0" pickOnBounds="true" preserveRatio="true" smooth="true">
            <image>
                <Image url="@../images/app-icon.png" />
            </image>
        </ImageView>
       <Label text="SeeLoggyPlus">
          <font>
-            <Font name="System Bold" size="24.0" />
+            <Font name="System Bold" size="22.0" />
          </font>
       </Label>
-      <Label fx:id="versionLabel">
+      <Label fx:id="versionLabel" textFill="#555555">
          <font>
-            <Font size="14.0" />
+            <Font size="13.0" />
          </font>
       </Label>
       <Separator prefWidth="200.0" />
-      <TextFlow textAlignment="CENTER">
+      <TextFlow textAlignment="CENTER" lineSpacing="3.0">
          <children>
-            <Text strokeType="OUTSIDE" strokeWidth="0.0" text="A powerful, enterprise-grade log viewer and analyzer for local and remote log files. Designed for performance and ease of use." />
+            <Text strokeType="OUTSIDE" strokeWidth="0.0" text="A fast, lightweight log viewer built for developers and ops teams. Browse local log files, monitor remote servers in real-time over SSH, and quickly find what you need with powerful search and filtering." wrappingWidth="360.0">
+               <font>
+                  <Font size="12.0" />
+               </font>
+            </Text>
          </children>
       </TextFlow>
-      <VBox alignment="CENTER" spacing="5.0">
-         <children>
-            <Label text="© 2025 SeeLoggyPlus Team. All rights reserved." textFill="#757575">
-               <font>
-                  <Font size="11.0" />
-               </font>
-            </Label>
-         </children>
-      </VBox>
       <Separator prefWidth="200.0" />
+      <Label text="© 2025–2026 SeeLoggyPlus" textFill="#757575">
+         <font>
+            <Font size="11.0" />
+         </font>
+      </Label>
       <Button fx:id="closeButton" defaultButton="true" mnemonicParsing="false" prefWidth="100.0" text="Close" />
    </children>
 </VBox>
