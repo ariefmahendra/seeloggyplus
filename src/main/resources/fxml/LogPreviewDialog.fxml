@@ -11,7 +11,7 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.controller.LogPreviewDialogController"
-            prefWidth="800" prefHeight="600">
+            prefWidth="700" prefHeight="500">
 
     <top>
         <VBox alignment="CENTER_LEFT" spacing="5">

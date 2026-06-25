@@ -3,6 +3,7 @@ plugins {
     id 'application'
     id 'org.openjfx.javafxplugin' version '0.1.0'
     id 'org.beryx.runtime' version '1.13.1'
+    id 'jacoco'
 }
 
 group = 'com.seeloggyplus'
@@ -140,5 +141,17 @@ runtime {
         if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
              installerOptions = ['--win-menu', '--win-shortcut', '--win-dir-chooser']
         }
+    }
+}
+
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
     }
 }

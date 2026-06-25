@@ -121,6 +121,9 @@ public class UnifiedFileManagerDialogController {
     // Services
     private LocalFileService localFileService;
     private ServerManagementService serverManagementService;
+    private java.util.function.Supplier<com.seeloggyplus.service.impl.SSHServiceImpl> sshServiceFactory = com.seeloggyplus.service.impl.SSHServiceImpl::new;
+
+
     private FavoriteFolderService favoriteFolderService;
 
     private ObservableList<FileInfo> allFiles;
@@ -130,7 +133,9 @@ public class UnifiedFileManagerDialogController {
     private String currentPath;
     private LocationItem currentLocation;
     private FileInfo selectedFileResult;
-    private SSHServiceImpl activeSshService;
+    private com.seeloggyplus.service.impl.SSHServiceImpl activeSshService;
+    private Task<Boolean> currentConnectTask;
+    private Task<List<FileInfo>> currentLoadTask;
     @Getter
     private OpenAction openAction = OpenAction.OPEN;
 
@@ -440,7 +445,7 @@ public class UnifiedFileManagerDialogController {
             navigateTo(localFileService.getHomeDirectory());
         } else {
             // This is a remote server, create a new service and connect
-            activeSshService = new SSHServiceImpl();
+            activeSshService = sshServiceFactory.get();
             connectToRemote(location.server);
         }
     }
@@ -469,6 +474,10 @@ public class UnifiedFileManagerDialogController {
         progressIndicator.setVisible(true);
         allFiles.clear();
 
+        if (currentConnectTask != null && currentConnectTask.isRunning()) {
+            currentConnectTask.cancel(true);
+        }
+
         Task<Boolean> connectTask = new Task<>() {
             @Override
             protected Boolean call() {
@@ -477,8 +486,10 @@ public class UnifiedFileManagerDialogController {
                         finalPassword);
             }
         };
+        currentConnectTask = connectTask;
 
         connectTask.setOnSucceeded(e -> {
+            if (connectTask != currentConnectTask) return;
             if (connectTask.getValue()) {
                 serverManagementService.updateServerLastUsed(server.getId());
                 updateStatus("Connected to " + server.getHost());
@@ -493,6 +504,7 @@ public class UnifiedFileManagerDialogController {
         });
 
         connectTask.setOnFailed(e -> {
+            if (connectTask != currentConnectTask) return;
             updateStatus("Connection failed");
             progressIndicator.setVisible(false);
             Throwable ex = connectTask.getException();
@@ -578,6 +590,10 @@ public class UnifiedFileManagerDialogController {
         updateStatus("Loading " + path + "...");
         progressIndicator.setVisible(true);
 
+        if (currentLoadTask != null && currentLoadTask.isRunning()) {
+            currentLoadTask.cancel(true);
+        }
+
         Task<List<FileInfo>> loadTask = new Task<>() {
             @Override
             protected List<FileInfo> call() throws Exception {
@@ -619,8 +635,10 @@ public class UnifiedFileManagerDialogController {
                 return files;
             }
         };
+        currentLoadTask = loadTask;
 
         loadTask.setOnSucceeded(e -> {
+            if (loadTask != currentLoadTask) return;
             List<FileInfo> loadedFiles = loadTask.getValue();
             directoryCache.put(path, new CacheEntry(loadedFiles)); // Update cache
             allFiles.setAll(loadedFiles);
@@ -633,6 +651,7 @@ public class UnifiedFileManagerDialogController {
         });
 
         loadTask.setOnFailed(e -> {
+            if (loadTask != currentLoadTask) return;
             progressIndicator.setVisible(false);
             updateStatus("Error loading files");
             Throwable ex = loadTask.getException();
@@ -944,7 +963,7 @@ public class UnifiedFileManagerDialogController {
         return selectedFileResult;
     }
 
-    public SSHServiceImpl getSshService() {
+    public com.seeloggyplus.service.impl.SSHServiceImpl getSshService() {
         return activeSshService;
     }
 

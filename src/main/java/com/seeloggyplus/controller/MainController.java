@@ -1203,7 +1203,6 @@ public class MainController {
         totalEntries = 0;
         canvasLogViewer.clearFilter();
         canvasLogViewer.clearSearchHighlight();
-        hideSearchResultPanel();
         logger.info("File resources cleaned up");
     }
 
@@ -1408,10 +1407,6 @@ public class MainController {
             disableTail();
         }
         cleanupFileResources();
-        liveTailList.clear();
-        if (canvasLogViewer != null) {
-            canvasLogViewer.resetView();
-        }
         currentFile = null;
         currentLogFromDb = null;
         currentParsingConfig = null;
