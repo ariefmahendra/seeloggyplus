@@ -580,6 +580,7 @@ public class UnifiedFileManagerDialogController {
             if (sortOrder.isEmpty()) return;
             TableColumn<FileInfo, ?> col = sortOrder.get(0);
             String encoded = col.getId() + ":" + col.getSortType().name();
+            logger.info("saveSortOrdering: key={}, value={}", sortKey(), encoded);
             preferenceService.saveOrUpdatePreferences(new Preference(sortKey(), encoded));
         } catch (Exception e) {
             logger.warn("Failed to save sort ordering", e);
@@ -589,6 +590,7 @@ public class UnifiedFileManagerDialogController {
     private void restoreSortOrdering() {
         try {
             Optional<String> pref = preferenceService.getPreferencesByCode(sortKey());
+            logger.info("restoreSortOrdering: key={}, pref={}", sortKey(), pref.orElse("(empty)"));
             if (pref.isEmpty() || pref.get().isBlank()) {
                 fileTable.getSortOrder().clear();
                 return;
@@ -601,16 +603,29 @@ public class UnifiedFileManagerDialogController {
             Optional<TableColumn<FileInfo, ?>> col = fileTable.getColumns().stream()
                 .filter(c -> parts[0].equals(c.getId()))
                 .findFirst();
+            logger.info("restoreSortOrdering: looking for col='{}', found={}", parts[0], col.isPresent());
             if (col.isEmpty()) {
                 fileTable.getSortOrder().clear();
                 return;
             }
-            // ponytail: setSortType AFTER setAll — JavaFX resets sortType when a column is
-            // added to sortOrder, so we must apply direction last.
+            TableColumn.SortType direction = TableColumn.SortType.valueOf(parts[1]);
+            // ponytail: suppress save during restore to avoid listener re-saving stale direction.
+            // Apply direction, add to sort order, then re-apply direction in runLater to survive
+            // any JavaFX internal resets during the sort-order change event processing.
             suppressSortSave = true;
+            col.get().setSortType(direction);
             fileTable.getSortOrder().setAll(col.get());
-            col.get().setSortType(TableColumn.SortType.valueOf(parts[1]));
+            col.get().setSortType(direction);
+            fileTable.sort();
             suppressSortSave = false;
+            // Belt-and-suspenders: re-apply after current event loop in case JavaFX resets it
+            Platform.runLater(() -> {
+                suppressSortSave = true;
+                col.get().setSortType(direction);
+                fileTable.sort();
+                suppressSortSave = false;
+            });
+            logger.info("restoreSortOrdering: applied col={}, dir={}", col.get().getId(), col.get().getSortType());
         } catch (Exception e) {
             logger.warn("Failed to restore sort ordering", e);
             suppressSortSave = false;
