@@ -395,22 +395,29 @@ public class UnifiedFileManagerDialogController {
             }
         });
 
-        // ponytail: listen to both sort order changes AND sort type toggles.
-        // Sort order list changes when user clicks a new column.
-        // Sort type changes when user clicks the same column again (ASC→DESC toggle).
-        // Delay save to next pulse so JavaFX finishes its internal state updates first.
-        fileTable.getSortOrder().addListener((ListChangeListener<? super TableColumn<FileInfo, ?>>) c -> {
-            if (!suppressSortSave) Platform.runLater(() -> saveSortOrdering());
-        });
+        // ponytail: single unified save trigger for all sort state changes.
+        // JavaFX column header click cycles: ASC → DESC → clear.
+        // We listen to BOTH list changes (new column / clear) and sortType toggles (ASC↔DESC),
+        // but coalesce into one deferred save so we always read final state.
+        Runnable deferredSave = new Runnable() {
+            private boolean scheduled = false;
+            @Override public void run() {
+                if (suppressSortSave) return;
+                if (!scheduled) {
+                    scheduled = true;
+                    Platform.runLater(() -> {
+                        scheduled = false;
+                        if (!suppressSortSave) saveSortOrdering();
+                    });
+                }
+            }
+        };
 
-        // Track sortType changes on each sortable column for ASC/DESC toggle detection
+        fileTable.getSortOrder().addListener((ListChangeListener<? super TableColumn<FileInfo, ?>>) c -> deferredSave.run());
+
         for (TableColumn<FileInfo, ?> col : fileTable.getColumns()) {
             if (col.isSortable()) {
-                col.sortTypeProperty().addListener((obs, oldDir, newDir) -> {
-                    if (!suppressSortSave && fileTable.getSortOrder().contains(col)) {
-                        Platform.runLater(() -> saveSortOrdering());
-                    }
-                });
+                col.sortTypeProperty().addListener((obs, oldDir, newDir) -> deferredSave.run());
             }
         }
 
@@ -594,7 +601,12 @@ public class UnifiedFileManagerDialogController {
         if (suppressSortSave) return;
         try {
             var sortOrder = fileTable.getSortOrder();
-            if (sortOrder.isEmpty()) return;
+            if (sortOrder.isEmpty()) {
+                // 3rd click (clear) — remove preference so default sort is used on next open
+                logger.info("saveSortOrdering: key={}, value=(cleared)", sortKey());
+                preferenceService.saveOrUpdatePreferences(new Preference(sortKey(), ""));
+                return;
+            }
             TableColumn<FileInfo, ?> col = sortOrder.get(0);
             String encoded = col.getId() + ":" + col.getSortType().name();
             logger.info("saveSortOrdering: key={}, value={}", sortKey(), encoded);
