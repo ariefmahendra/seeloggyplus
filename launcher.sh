@@ -31,11 +31,16 @@ fi
 
 # Determine which Java to use
 JAVA_CMD="java"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ -n "$CUSTOM_JAVA_HOME" ]; then
     # Use custom Java path from config
     JAVA_CMD="$CUSTOM_JAVA_HOME/bin/java"
     echo "Using custom Java: $JAVA_CMD"
+elif [ -d "$SCRIPT_DIR/jre" ]; then
+    # Use bundled JRE
+    JAVA_CMD="$SCRIPT_DIR/jre/bin/java"
+    echo "Using bundled JRE: $JAVA_CMD"
 elif [ -n "$JAVA_HOME" ]; then
     # Use JAVA_HOME environment variable
     JAVA_CMD="$JAVA_HOME/bin/java"

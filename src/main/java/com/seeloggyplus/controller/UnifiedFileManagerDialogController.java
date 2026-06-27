@@ -2,12 +2,15 @@ package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.FavoriteFolder;
 import com.seeloggyplus.model.FileInfo;
+import com.seeloggyplus.model.Preference;
 import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.service.FavoriteFolderService;
 import com.seeloggyplus.service.LocalFileService;
+import com.seeloggyplus.service.PreferenceService;
 import com.seeloggyplus.service.ServerManagementService;
 import com.seeloggyplus.service.impl.FavoriteFolderServiceImpl;
 import com.seeloggyplus.service.impl.LocalFileServiceImpl;
+import com.seeloggyplus.service.impl.PreferenceServiceImpl;
 import com.seeloggyplus.service.impl.SSHServiceImpl;
 import com.seeloggyplus.service.impl.ServerManagementServiceImpl;
 import com.seeloggyplus.util.PasswordPromptDialog;
@@ -16,6 +19,7 @@ import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
@@ -38,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Stack;
@@ -121,6 +126,7 @@ public class UnifiedFileManagerDialogController {
     // Services
     private LocalFileService localFileService;
     private ServerManagementService serverManagementService;
+    private PreferenceService preferenceService;
     private java.util.function.Supplier<com.seeloggyplus.service.impl.SSHServiceImpl> sshServiceFactory = com.seeloggyplus.service.impl.SSHServiceImpl::new;
 
 
@@ -144,6 +150,7 @@ public class UnifiedFileManagerDialogController {
     private final java.util.Set<String> favoritePathsCache = new java.util.HashSet<>();
     private static final long CACHE_DURATION_MS = 60 * 1000; // 60 seconds
     private boolean suppressAutoRefresh = false;
+    private boolean suppressSortSave = false;
     private String cachedFavoritesLocationId = null; // Track which location favorites are cached for
 
     @FXML
@@ -153,6 +160,7 @@ public class UnifiedFileManagerDialogController {
         localFileService = new LocalFileServiceImpl();
         serverManagementService = new ServerManagementServiceImpl();
         favoriteFolderService = new FavoriteFolderServiceImpl();
+        preferenceService = new PreferenceServiceImpl();
 
         allFiles = FXCollections.observableArrayList();
         filteredFiles = new FilteredList<>(allFiles, p -> true);
@@ -368,7 +376,17 @@ public class UnifiedFileManagerDialogController {
         });
 
         SortedList<FileInfo> sortedData = new SortedList<>(filteredFiles);
-        sortedData.comparatorProperty().bind(fileTable.comparatorProperty());
+        // ponytail: fallback comparator — directories first, then modified desc, tie-break name asc
+        // When user clicks a column header, fileTable.comparatorProperty() becomes non-null and overrides this.
+        // getSortOrder().clear() in loadFiles() resets back to this default after each load.
+        Comparator<FileInfo> defaultSort = Comparator
+            .comparing((FileInfo f) -> f.getName().equals("..") ? 0 : (f.isDirectory() ? 1 : 2))
+            .thenComparing(f -> f.getModified() != null ? f.getModified() : java.time.LocalDateTime.MIN,
+                           Comparator.reverseOrder())
+            .thenComparing(f -> f.getName().toLowerCase());
+        sortedData.comparatorProperty().bind(
+            fileTable.comparatorProperty().map(c -> c != null ? c : defaultSort)
+        );
         fileTable.setItems(sortedData);
 
         fileTable.setOnMouseClicked(event -> {
@@ -376,6 +394,8 @@ public class UnifiedFileManagerDialogController {
                 handleFileDoubleClick();
             }
         });
+
+        fileTable.getSortOrder().addListener((ListChangeListener<? super TableColumn<FileInfo, ?>>) c -> saveSortOrdering());
 
         fileTable.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             boolean isFileSelected = (newVal != null && newVal.isFile());
@@ -442,7 +462,10 @@ public class UnifiedFileManagerDialogController {
 
         if (location.server == null) {
             // This is a local drive, no connection needed
-            navigateTo(localFileService.getHomeDirectory());
+            String lastPath = preferenceService.getPreferencesByCode(lastPathKey())
+                .filter(p -> !p.isBlank())
+                .orElse(localFileService.getHomeDirectory());
+            navigateTo(lastPath);
         } else {
             // This is a remote server, create a new service and connect
             activeSshService = sshServiceFactory.get();
@@ -493,7 +516,10 @@ public class UnifiedFileManagerDialogController {
             if (connectTask.getValue()) {
                 serverManagementService.updateServerLastUsed(server.getId());
                 updateStatus("Connected to " + server.getHost());
-                navigateTo(server.getDefaultPath() != null ? server.getDefaultPath() : "/");
+                String lastPath = preferenceService.getPreferencesByCode(lastPathKey())
+                    .filter(p -> !p.isBlank())
+                    .orElse(server.getDefaultPath() != null ? server.getDefaultPath() : "/");
+                navigateTo(lastPath);
             } else {
                 updateStatus("Connection failed");
                 progressIndicator.setVisible(false);
@@ -535,6 +561,63 @@ public class UnifiedFileManagerDialogController {
         }
     }
 
+    private String lastPathKey() {
+        return currentLocation == null || currentLocation.server == null
+            ? "file_manager_last_path_local"
+            : "file_manager_last_path_" + currentLocation.server.getName();
+    }
+
+    private String sortKey() {
+        return currentLocation == null || currentLocation.server == null
+            ? "file_manager_sort_local"
+            : "file_manager_sort_" + currentLocation.server.getName();
+    }
+
+    private void saveSortOrdering() {
+        if (suppressSortSave) return;
+        try {
+            var sortOrder = fileTable.getSortOrder();
+            if (sortOrder.isEmpty()) return;
+            TableColumn<FileInfo, ?> col = sortOrder.get(0);
+            String encoded = col.getId() + ":" + col.getSortType().name();
+            preferenceService.saveOrUpdatePreferences(new Preference(sortKey(), encoded));
+        } catch (Exception e) {
+            logger.warn("Failed to save sort ordering", e);
+        }
+    }
+
+    private void restoreSortOrdering() {
+        try {
+            Optional<String> pref = preferenceService.getPreferencesByCode(sortKey());
+            if (pref.isEmpty() || pref.get().isBlank()) {
+                fileTable.getSortOrder().clear();
+                return;
+            }
+            String[] parts = pref.get().split(":");
+            if (parts.length != 2) {
+                fileTable.getSortOrder().clear();
+                return;
+            }
+            Optional<TableColumn<FileInfo, ?>> col = fileTable.getColumns().stream()
+                .filter(c -> parts[0].equals(c.getId()))
+                .findFirst();
+            if (col.isEmpty()) {
+                fileTable.getSortOrder().clear();
+                return;
+            }
+            // ponytail: setSortType AFTER setAll — JavaFX resets sortType when a column is
+            // added to sortOrder, so we must apply direction last.
+            suppressSortSave = true;
+            fileTable.getSortOrder().setAll(col.get());
+            col.get().setSortType(TableColumn.SortType.valueOf(parts[1]));
+            suppressSortSave = false;
+        } catch (Exception e) {
+            logger.warn("Failed to restore sort ordering", e);
+            suppressSortSave = false;
+            fileTable.getSortOrder().clear();
+        }
+    }
+
     private void navigateTo(String path) {
         if (path == null || path.isEmpty())
             return;
@@ -549,6 +632,9 @@ public class UnifiedFileManagerDialogController {
 
         currentPath = normalizedNewPath;
         pathField.setText(currentPath);
+        if (preferenceService != null) {
+            preferenceService.saveOrUpdatePreferences(new Preference(lastPathKey(), currentPath));
+        }
         loadFiles(currentPath);
         updateNavigationButtons();
     }
@@ -642,6 +728,7 @@ public class UnifiedFileManagerDialogController {
             List<FileInfo> loadedFiles = loadTask.getValue();
             directoryCache.put(path, new CacheEntry(loadedFiles)); // Update cache
             allFiles.setAll(loadedFiles);
+            restoreSortOrdering(); // restores saved sort or falls back to defaultSort
             itemCountLabel.setText(allFiles.size() + " items");
             progressIndicator.setVisible(false);
             updateStatus("Ready");

@@ -29,11 +29,16 @@ if exist "%CONFIG_FILE%" (
 
 REM Determine which Java to use
 set JAVA_CMD=java
+set SCRIPT_DIR=%~dp0
 
 if not "!CUSTOM_JAVA_HOME!"=="" (
     REM Use custom Java path from config
     set JAVA_CMD=!CUSTOM_JAVA_HOME!\bin\java.exe
     echo Using custom Java: !JAVA_CMD!
+) else if exist "%SCRIPT_DIR%jre\bin\java.exe" (
+    REM Use bundled JRE
+    set JAVA_CMD=%SCRIPT_DIR%jre\bin\java.exe
+    echo Using bundled JRE: !JAVA_CMD!
 ) else if not "%JAVA_HOME%"=="" (
     REM Use JAVA_HOME environment variable
     set JAVA_CMD=%JAVA_HOME%\bin\java.exe

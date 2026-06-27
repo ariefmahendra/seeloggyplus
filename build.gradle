@@ -2,7 +2,6 @@ plugins {
     id 'java'
     id 'application'
     id 'org.openjfx.javafxplugin' version '0.1.0'
-    id 'org.beryx.runtime' version '1.13.1'
     id 'jacoco'
 }
 
@@ -49,6 +48,7 @@ dependencies {
     implementation 'com.unboundid:unboundid-ldapsdk:7.0.3'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.0'
     implementation 'io.krakens:java-grok:0.1.9'
 
     // TestFX Integration Testing
@@ -56,6 +56,9 @@ dependencies {
     testImplementation 'org.testfx:testfx-junit5:4.0.17'
     testImplementation 'org.hamcrest:hamcrest:2.2'
     testImplementation 'org.assertj:assertj-core:3.24.2'
+
+    // jqwik Property-Based Testing
+    testImplementation 'net.jqwik:jqwik:1.9.2'
 }
 
 // Generates a version.properties file from the project version
@@ -83,17 +86,8 @@ application {
     applicationName = 'SeeloggyPlus'
 }
 
-runtime {
-    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
-    modules = [
-            'java.desktop', 'java.logging', 'java.naming', 'java.sql', 'java.xml',
-            'jdk.unsupported', 'java.scripting', 'java.management',
-            'jdk.crypto.ec', 'jdk.crypto.cryptoki',
-            'javafx.controls', 'javafx.fxml', 'javafx.web', 'javafx.graphics'
-    ]
-}
-
 tasks.register('fatJar', Jar) {
+    dependsOn processResources
     archiveClassifier = 'all'
     archiveFileName = "seeloggyplus-all.jar"
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -102,7 +96,7 @@ tasks.register('fatJar', Jar) {
     with jar
 }
 
-tasks.register('createPortableDist', Zip) {
+tasks.register('packagePortableWithoutJRE', Zip) {
     group = 'distribution'
     description = 'create zip portable distribution without bundled JRE'
 
@@ -121,25 +115,85 @@ tasks.register('createPortableDist', Zip) {
         from('launcher.sh')
         from('launcher.properties')
         from('LAUNCHER_README.md')
+        from('help') {
+            into('help')
+        }
     }
 }
 
-runtime {
-    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
-    modules = [
+// ---------------------------------------------------------------------------
+// Custom JRE creation using jlink (without JavaFX modules — they're in the fat JAR)
+// ---------------------------------------------------------------------------
+tasks.register('createCustomJre', Exec) {
+    group = 'distribution'
+    description = 'Create a minimal custom JRE using jlink'
+
+    def jreOutput = file("${buildDir}/custom-jre")
+    def jlinkModules = [
             'java.desktop', 'java.logging', 'java.naming', 'java.sql', 'java.xml',
             'jdk.unsupported', 'java.scripting', 'java.management',
             'jdk.crypto.ec', 'jdk.crypto.cryptoki',
-            'javafx.controls', 'javafx.fxml', 'javafx.web', 'javafx.graphics'
-    ]
-    
-    jpackage {
-        installerType = 'msi'
-        appVersion = project.version
-        imageName = 'SeeLoggyPlus'
-        skipInstaller = false
-        if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
-             installerOptions = ['--win-menu', '--win-shortcut', '--win-dir-chooser']
+            'jdk.accessibility'
+    ].join(',')
+
+    outputs.dir(jreOutput)
+
+    doFirst {
+        // Clean previous output so jlink doesn't fail on existing directory
+        delete jreOutput
+    }
+
+    // Resolve the jlink executable from the Java 21 toolchain
+    def javaToolchainService = project.extensions.getByType(JavaToolchainService)
+    def launcher = javaToolchainService.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+
+    doFirst {
+        def javaHome = launcher.get().metadata.installationPath.asFile.absolutePath
+        def jlinkExe = org.gradle.internal.os.OperatingSystem.current().isWindows()
+                ? "${javaHome}/bin/jlink.exe"
+                : "${javaHome}/bin/jlink"
+
+        commandLine jlinkExe,
+                '--add-modules', jlinkModules,
+                '--strip-debug',
+                '--compress', '2',
+                '--no-header-files',
+                '--no-man-pages',
+                '--output', jreOutput.absolutePath
+    }
+}
+
+tasks.register('packagePortableWithJRE', Zip) {
+    group = 'distribution'
+    description = 'Create zip portable distribution with bundled JRE'
+
+    dependsOn 'fatJar', 'createCustomJre'
+
+    archiveFileName = "${project.name}-Portable-WithJRE.zip"
+    destinationDirectory = file("${buildDir}/distributions")
+
+    into("${project.name}") {
+        // Bundled custom JRE
+        from("${buildDir}/custom-jre") {
+            into('jre')
+        }
+
+        // Fat JAR
+        from(tasks.fatJar.archiveFile) {
+            rename { "${project.name}.jar" }
+        }
+
+        // Launcher scripts
+        from('launcher.bat')
+        from('launcher.sh')
+        from('launcher.properties')
+        from('LAUNCHER_README.md')
+
+        // Help documentation
+        from('help') {
+            into('help')
         }
     }
 }
