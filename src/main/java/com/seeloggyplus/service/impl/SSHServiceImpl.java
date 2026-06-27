@@ -16,6 +16,7 @@ import java.util.Vector;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -675,7 +676,7 @@ public class SSHServiceImpl implements SSHService {
                             return;
 
                         channel = (ChannelSftp) session.openChannel("sftp");
-                        channel.connect();
+                        channel.connect(30_000);
 
                         raf.seek(start);
                         InputStream is = channel.get(remotePath, null, start);
@@ -713,9 +714,23 @@ public class SSHServiceImpl implements SSHService {
                 });
             }
 
-            latch.await();
+            long timeoutSec = Math.max(60, Math.min(3600, (fileSize / 102_400) + 60));
+            boolean completed = latch.await(timeoutSec, TimeUnit.SECONDS);
+            if (!completed) {
+                hasError.set(true);
+                executor.shutdownNow();
+                executor.awaitTermination(5, TimeUnit.SECONDS);
+            }
             boolean success = !hasError.get();
             executor.shutdown();
+            if (hasError.get()) {
+                try {
+                    java.nio.file.Files.deleteIfExists(java.nio.file.Paths.get(localPath));
+                } catch (java.nio.file.NoSuchFileException ignored) {
+                } catch (IOException e2) {
+                    logger.warn("Failed to delete partial download file: {}", localPath, e2);
+                }
+            }
             return success;
         } catch (Exception e) {
             logger.error("Concurrent download failed", e);

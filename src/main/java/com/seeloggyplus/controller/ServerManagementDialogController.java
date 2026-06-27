@@ -211,6 +211,7 @@ public class ServerManagementDialogController {
             allServers.clear();
             allServers.addAll(task.getValue());
             filterServers(searchField.getText());
+            serverTable.refresh();
             logger.info("Loaded {} servers", allServers.size());
 
             // Auto-check connection status for all servers (optional)

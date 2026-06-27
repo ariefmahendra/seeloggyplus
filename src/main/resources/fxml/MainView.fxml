@@ -323,7 +323,7 @@
             
             <!-- Memory Stats (right side) -->
              <Button text="GC" onAction="#handleGC" style="-fx-font-size: 10px; -fx-padding: 2 5;">
-                <tooltip><Tooltip text="Minta Garbage Collection (System.gc())" /></tooltip>
+                <tooltip><Tooltip text="Run Garbage Collection" /></tooltip>
              </Button>
             <Separator orientation="VERTICAL" />
             <Label fx:id="memoryStatusLabel" text="Memory: ..." style="-fx-font-family: 'Segoe UI', sans-serif; -fx-font-size: 11px; -fx-text-fill: #555555;"/>
