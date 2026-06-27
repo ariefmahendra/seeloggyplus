@@ -108,4 +108,5 @@ target/
 # Database files
 ./seeloggyplus.db
 /.data
+.data/.keystore
 /logs
