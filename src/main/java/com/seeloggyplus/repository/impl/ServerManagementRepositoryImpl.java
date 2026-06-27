@@ -3,6 +3,7 @@ package com.seeloggyplus.repository.impl;
 import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.repository.ServerManagementRepository;
 import com.seeloggyplus.config.DatabaseConfig;
+import com.seeloggyplus.util.CredentialEncryptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +90,7 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
             ps.setString(3, server.getHost());
             ps.setInt(4, server.getPort());
             ps.setString(5, server.getUsername());
-            ps.setString(6, server.getPassword());
+            ps.setString(6, CredentialEncryptor.getInstance().encrypt(server.getPassword()));
             ps.setString(7, server.getDefaultPath());
             ps.setString(8, server.getCreatedAt() != null ? server.getCreatedAt().toString() : LocalDateTime.now().toString());
             ps.setString(9, server.getLastUsed() != null ? server.getLastUsed().toString() : null);
@@ -111,7 +112,7 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
             ps.setString(2, server.getHost());
             ps.setInt(3, server.getPort());
             ps.setString(4, server.getUsername());
-            ps.setString(5, server.getPassword());
+            ps.setString(5, CredentialEncryptor.getInstance().encrypt(server.getPassword()));
             ps.setString(6, server.getDefaultPath());
             ps.setBoolean(7, server.isSavePassword());
             ps.setString(8, server.getId());
@@ -235,7 +236,8 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
 
     /**
      * Map ResultSet row to SSHServer object
-     * Handles null values safely
+     * Handles null values safely.
+     * Decrypts password and auto-migrates legacy plaintext passwords.
      * 
      * @param rs ResultSet positioned at current row
      * @return SSHServer object
@@ -249,9 +251,19 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
         server.setHost(rs.getString("host"));
         server.setPort(rs.getInt("port"));
         server.setUsername(rs.getString("username"));
-        server.setPassword(rs.getString("password"));
         server.setDefaultPath(rs.getString("default_path"));
         server.setSavePassword(rs.getBoolean("save_password"));
+
+        // Decrypt password; auto-migrate legacy plaintext on next save
+        String storedPassword = rs.getString("password");
+        CredentialEncryptor encryptor = CredentialEncryptor.getInstance();
+        String decrypted = encryptor.decrypt(storedPassword);
+        server.setPassword(decrypted);
+
+        // Auto-migrate: if stored value was plaintext, re-encrypt it now
+        if (storedPassword != null && !storedPassword.isBlank() && !encryptor.isEncrypted(storedPassword)) {
+            migratePasswordInBackground(server.getId(), storedPassword);
+        }
         
         // Handle nullable timestamps
         String createdAt = rs.getString("created_at");
@@ -273,5 +285,23 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
         }
         
         return server;
+    }
+
+    /**
+     * Migrate a plaintext password to encrypted form in the database.
+     */
+    private void migratePasswordInBackground(String serverId, String plaintext) {
+        try {
+            Connection connection = DatabaseConfig.getInstance().getConnection();
+            String encrypted = CredentialEncryptor.getInstance().encrypt(plaintext);
+            try (PreparedStatement ps = connection.prepareStatement("UPDATE ssh_servers SET password = ? WHERE id = ?")) {
+                ps.setString(1, encrypted);
+                ps.setString(2, serverId);
+                ps.executeUpdate();
+                logger.info("Migrated plaintext password to encrypted for server: {}", serverId);
+            }
+        } catch (SQLException e) {
+            logger.warn("Failed to migrate password for server: {}", serverId, e);
+        }
     }
 }
