@@ -395,7 +395,24 @@ public class UnifiedFileManagerDialogController {
             }
         });
 
-        fileTable.getSortOrder().addListener((ListChangeListener<? super TableColumn<FileInfo, ?>>) c -> saveSortOrdering());
+        // ponytail: listen to both sort order changes AND sort type toggles.
+        // Sort order list changes when user clicks a new column.
+        // Sort type changes when user clicks the same column again (ASC→DESC toggle).
+        // Delay save to next pulse so JavaFX finishes its internal state updates first.
+        fileTable.getSortOrder().addListener((ListChangeListener<? super TableColumn<FileInfo, ?>>) c -> {
+            if (!suppressSortSave) Platform.runLater(() -> saveSortOrdering());
+        });
+
+        // Track sortType changes on each sortable column for ASC/DESC toggle detection
+        for (TableColumn<FileInfo, ?> col : fileTable.getColumns()) {
+            if (col.isSortable()) {
+                col.sortTypeProperty().addListener((obs, oldDir, newDir) -> {
+                    if (!suppressSortSave && fileTable.getSortOrder().contains(col)) {
+                        Platform.runLater(() -> saveSortOrdering());
+                    }
+                });
+            }
+        }
 
         fileTable.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             boolean isFileSelected = (newVal != null && newVal.isFile());
@@ -603,28 +620,16 @@ public class UnifiedFileManagerDialogController {
             Optional<TableColumn<FileInfo, ?>> col = fileTable.getColumns().stream()
                 .filter(c -> parts[0].equals(c.getId()))
                 .findFirst();
-            logger.info("restoreSortOrdering: looking for col='{}', found={}", parts[0], col.isPresent());
             if (col.isEmpty()) {
                 fileTable.getSortOrder().clear();
                 return;
             }
             TableColumn.SortType direction = TableColumn.SortType.valueOf(parts[1]);
-            // ponytail: suppress save during restore to avoid listener re-saving stale direction.
-            // Apply direction, add to sort order, then re-apply direction in runLater to survive
-            // any JavaFX internal resets during the sort-order change event processing.
             suppressSortSave = true;
             col.get().setSortType(direction);
             fileTable.getSortOrder().setAll(col.get());
             col.get().setSortType(direction);
-            fileTable.sort();
             suppressSortSave = false;
-            // Belt-and-suspenders: re-apply after current event loop in case JavaFX resets it
-            Platform.runLater(() -> {
-                suppressSortSave = true;
-                col.get().setSortType(direction);
-                fileTable.sort();
-                suppressSortSave = false;
-            });
             logger.info("restoreSortOrdering: applied col={}, dir={}", col.get().getId(), col.get().getSortType());
         } catch (Exception e) {
             logger.warn("Failed to restore sort ordering", e);
