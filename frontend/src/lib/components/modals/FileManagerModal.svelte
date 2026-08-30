@@ -341,31 +341,61 @@
 
         <!-- Quick Locations -->
         <div>
-          <div class="text-[10px] font-semibold text-muted-foreground mb-1 tracking-wider uppercase">Quick Locations</div>
+          <div class="text-[10px] font-semibold text-muted-foreground mb-1 tracking-wider uppercase">
+            {currentLocation === 'REMOTE' ? 'Remote Locations' : 'Quick Locations'}
+          </div>
           <div class="flex flex-col gap-0.5">
-            <button
-              class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isHomeActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
-              on:click={async () => { currentLocation = 'LOCAL'; selectedServerId = ''; const h = await API.getHomeDirectory(); navigate(h.data || '/'); }}
-            >
-              <Folder class="w-3.5 h-3.5 text-primary shrink-0" />
-              <span class="truncate">User Home</span>
-            </button>
+            {#if currentLocation === 'REMOTE'}
+              {@const currentServer = servers.find(x => x.id === selectedServerId)}
+              {@const serverDefPath = currentServer?.defaultPath || '/var/log'}
+              <button
+                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {currentPath === serverDefPath ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                on:click={() => navigate(serverDefPath)}
+              >
+                <Folder class="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                <span class="truncate">Default Log Dir</span>
+              </button>
 
-            <button
-              class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isAppLogsActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
-              on:click={() => { currentLocation = 'LOCAL'; selectedServerId = ''; navigate('/run/media/arief/work/desktop/javafx/seeloggyplus/logs'); }}
-            >
-              <Folder class="w-3.5 h-3.5 text-primary shrink-0" />
-              <span class="truncate">App Logs Folder</span>
-            </button>
+              <button
+                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {currentPath === '/var/log' ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                on:click={() => navigate('/var/log')}
+              >
+                <Folder class="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                <span class="truncate">/var/log</span>
+              </button>
 
-            <button
-              class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isRootActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
-              on:click={() => { currentLocation = 'LOCAL'; selectedServerId = ''; navigate('/'); }}
-            >
-              <Folder class="w-3.5 h-3.5 text-primary shrink-0" />
-              <span class="truncate">Root /</span>
-            </button>
+              <button
+                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {currentPath === '/' ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                on:click={() => navigate('/')}
+              >
+                <Folder class="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                <span class="truncate">Remote Root /</span>
+              </button>
+            {:else}
+              <button
+                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isHomeActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                on:click={async () => { const h = await API.getHomeDirectory(); navigate(h.data || '/'); }}
+              >
+                <Folder class="w-3.5 h-3.5 text-primary shrink-0" />
+                <span class="truncate">User Home</span>
+              </button>
+
+              <button
+                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isAppLogsActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                on:click={() => navigate('/run/media/arief/work/desktop/javafx/seeloggyplus/logs')}
+              >
+                <Folder class="w-3.5 h-3.5 text-primary shrink-0" />
+                <span class="truncate">App Logs Folder</span>
+              </button>
+
+              <button
+                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isRootActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                on:click={() => navigate('/')}
+              >
+                <Folder class="w-3.5 h-3.5 text-primary shrink-0" />
+                <span class="truncate">Root /</span>
+              </button>
+            {/if}
           </div>
         </div>
 
@@ -384,7 +414,13 @@
                   role="button"
                   tabindex="0"
                   class="flex items-center justify-between px-2 py-1.5 rounded-[var(--radius-sm)] text-xs cursor-pointer group transition-all {isFavActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent'}"
-                  on:click={() => navigate(f.path)}
+                  on:click={() => {
+                    if (f.sshServerId) {
+                      currentLocation = 'REMOTE';
+                      selectedServerId = f.sshServerId;
+                    }
+                    navigate(f.path);
+                  }}
                   on:keydown={(e) => e.key === 'Enter' && navigate(f.path)}
                 >
 
@@ -400,6 +436,7 @@
             </div>
           {/if}
         </div>
+
       </div>
 
 
