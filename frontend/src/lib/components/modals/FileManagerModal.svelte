@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { activeModal } from '../../stores/appState';
+  import { activeModal, sshServersStore, refreshSSHServers } from '../../stores/appState';
   import { API } from '../../api';
   import { toast } from '../../stores/toast';
   import type { SSHServerModel, FileItem, FavoriteItem } from '../../types';
@@ -39,8 +39,17 @@
   let loading: boolean = false;
   let filterText: string = '';
 
-  let servers: SSHServerModel[] = [];
+  $: servers = $sshServersStore;
   let selectedServerId: string = '';
+
+  // Auto-sync selectedServerId when servers list updates
+  $: if (currentLocation === 'REMOTE' && servers.length > 0) {
+    if (!selectedServerId || !servers.some(s => s.id === selectedServerId)) {
+      selectedServerId = servers[0].id;
+    }
+  } else if (servers.length === 0) {
+    selectedServerId = '';
+  }
 
   let favorites: FavoriteItem[] = [];
   let selectedFile: FileItem | null = null;
@@ -58,7 +67,6 @@
   let isOpen = false;
   $: isOpen = $activeModal === 'file-manager';
 
-
   function handleOpenChange(open: boolean) {
     if (!open) activeModal.set(null);
   }
@@ -67,10 +75,22 @@
     await loadInitialData();
   });
 
+  $: if (isOpen) {
+    onModalOpen();
+  }
+
+  async function onModalOpen() {
+    await refreshSSHServers();
+    if (currentLocation === 'LOCAL' && !userHomePath) {
+      const hRes = await API.getHomeDirectory();
+      if (hRes.success && hRes.data) userHomePath = hRes.data;
+    }
+    await loadFavorites();
+  }
+
   async function loadInitialData() {
     try {
-      const sRes = await API.getSSHServers();
-      if (sRes.success && sRes.data) servers = sRes.data;
+      await refreshSSHServers();
 
       const hRes = await API.getHomeDirectory();
       if (hRes.success && hRes.data) {
@@ -84,6 +104,7 @@
       console.error(e);
     }
   }
+
 
 
   async function loadFavorites() {

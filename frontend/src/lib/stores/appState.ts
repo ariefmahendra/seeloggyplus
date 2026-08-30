@@ -40,6 +40,23 @@ export const activeModal = writable<string | null>(null);
 // Centralized Recent Files Store
 export const recentFilesStore = writable<RecentFileItem[]>([]);
 
+// Centralized SSH Servers Store
+export const sshServersStore = writable<SSHServerModel[]>([]);
+
+export async function refreshSSHServers(): Promise<SSHServerModel[]> {
+  try {
+    const res = await API.getSSHServers();
+    if (res.success && res.data) {
+      sshServersStore.set(res.data);
+      return res.data;
+    }
+  } catch (e) {
+    console.error('Failed to refresh SSH servers', e);
+  }
+  return [];
+}
+
+
 export async function refreshRecentFiles() {
   try {
     const res = await API.getRecentFiles();

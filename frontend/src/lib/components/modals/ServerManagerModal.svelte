@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { activeModal } from '../../stores/appState';
+  import { activeModal, sshServersStore, refreshSSHServers } from '../../stores/appState';
   import { API } from '../../api';
   import { toast } from '../../stores/toast';
   import type { SSHServerModel } from '../../types';
@@ -17,7 +17,7 @@
   import { Badge } from '../ui/badge';
   import { Server, Plus, Trash2, CheckCircle2, XCircle, RefreshCw } from 'lucide-svelte';
 
-  let servers: SSHServerModel[] = [];
+  $: servers = $sshServersStore;
   let selectedServer: SSHServerModel | null = null;
   let isCreatingNew = false;
   let testing = false;
@@ -38,23 +38,21 @@
     if (!open) activeModal.set(null);
   }
 
-  onMount(() => {
-    loadServers();
+  onMount(async () => {
+    await loadServers();
   });
 
+  $: if (isOpen) {
+    loadServers();
+  }
+
   async function loadServers() {
-    try {
-      const res = await API.getSSHServers();
-      if (res.success && res.data) {
-        servers = res.data;
-        if (servers.length > 0 && !selectedServer && !isCreatingNew) {
-          selectServer(servers[0]);
-        }
-      }
-    } catch (e) {
-      console.error(e);
+    const list = await refreshSSHServers();
+    if (list.length > 0 && !selectedServer && !isCreatingNew) {
+      selectServer(list[0]);
     }
   }
+
 
   function selectServer(s: SSHServerModel) {
     selectedServer = s;
