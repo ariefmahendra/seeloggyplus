@@ -22,6 +22,8 @@
     FileText,
     ChevronRight,
     ArrowUp,
+    ArrowDown,
+    ArrowUpDown,
     Star,
     Plus,
     Trash2,
@@ -29,6 +31,7 @@
     Server,
     Globe
   } from 'lucide-svelte';
+
 
   export let onOpenFile: (req: { path: string; source: string; serverId?: string }) => void = () => {};
 
@@ -242,10 +245,86 @@
     activeModal.set(null);
   }
 
-  $: filteredFiles = files.filter(f => {
-    if (!filterText) return true;
-    return f.name.toLowerCase().includes(filterText.toLowerCase());
-  });
+  type SortField = 'name' | 'size' | 'modified';
+  type SortOrder = 'asc' | 'desc';
+
+  let sortField: SortField = 'name';
+  let sortOrder: SortOrder = 'asc';
+
+  function handleSort(field: SortField) {
+    if (sortField === field) {
+      sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortField = field;
+      sortOrder = field === 'modified' || field === 'size' ? 'desc' : 'asc';
+    }
+  }
+
+  function getFileTimestamp(item: FileItem): number {
+    const ts = (item as any).modifiedTime || (item as any).lastModifiedTime;
+    if (typeof ts === 'number' && ts > 0) return ts;
+    const str = (item as any).modified || (item as any).lastModified;
+    if (str && typeof str === 'string') {
+      const parsed = Date.parse(str);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 0;
+  }
+
+  function formatFileSize(bytes?: number, isDirectory?: boolean): string {
+    if (bytes === undefined || bytes === null || isNaN(bytes)) return '-';
+    if (bytes === 0) return isDirectory ? '-' : '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    const idx = Math.min(Math.max(i, 0), units.length - 1);
+    const val = bytes / Math.pow(1024, idx);
+    return `${val.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
+  }
+
+  function formatModifiedDate(item: FileItem): string {
+    const ts = (item as any).modifiedTime || (item as any).lastModifiedTime;
+    if (typeof ts === 'number' && ts > 0) {
+      const d = new Date(ts);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const mins = String(d.getMinutes()).padStart(2, '0');
+        const secs = String(d.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day} ${hours}:${mins}:${secs}`;
+      }
+    }
+    const str = (item as any).lastModified || (item as any).modified;
+    if (str && typeof str === 'string') {
+      return str.replace('T', ' ').substring(0, 19);
+    }
+    return '-';
+  }
+
+  $: filteredFiles = files
+    .filter(f => {
+      if (!filterText) return true;
+      return f.name.toLowerCase().includes(filterText.toLowerCase());
+    })
+    .sort((a, b) => {
+      const aDir = isDir(a);
+      const bDir = isDir(b);
+      // Folders always grouped first
+      if (aDir && !bDir) return -1;
+      if (!aDir && bDir) return 1;
+
+      let cmp = 0;
+      if (sortField === 'name') {
+        cmp = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      } else if (sortField === 'size') {
+        cmp = (a.size || 0) - (b.size || 0);
+      } else if (sortField === 'modified') {
+        cmp = getFileTimestamp(a) - getFileTimestamp(b);
+      }
+      return sortOrder === 'asc' ? cmp : -cmp;
+    });
+
 
   async function switchLocation(loc: 'LOCAL' | 'REMOTE') {
     currentLocation = loc;
@@ -491,11 +570,61 @@
           </Badge>
         </div>
 
-        <!-- File List View Header -->
-        <div class="px-3 py-1.5 bg-muted/30 border-b border-border text-[11px] font-medium text-muted-foreground grid grid-cols-12 gap-2 select-none shrink-0">
-          <span class="col-span-7">Name</span>
-          <span class="col-span-2 text-right">Size</span>
-          <span class="col-span-3 text-right">Modified</span>
+        <!-- File List View Header with Interactive Sorting -->
+        <div class="px-3 py-1.5 bg-muted/40 border-b border-border text-[11px] font-medium text-muted-foreground grid grid-cols-12 gap-2 select-none shrink-0">
+          <button
+            type="button"
+            class="col-span-7 flex items-center gap-1.5 hover:text-foreground text-left font-medium cursor-pointer transition-colors group"
+            on:click={() => handleSort('name')}
+            title="Sort by Name"
+          >
+            <span class="{sortField === 'name' ? 'text-foreground font-semibold' : ''}">Name</span>
+            {#if sortField === 'name'}
+              {#if sortOrder === 'asc'}
+                <ArrowUp class="w-3 h-3 text-primary shrink-0" />
+              {:else}
+                <ArrowDown class="w-3 h-3 text-primary shrink-0" />
+              {/if}
+            {:else}
+              <ArrowUpDown class="w-3 h-3 opacity-0 group-hover:opacity-60 shrink-0" />
+            {/if}
+          </button>
+
+          <button
+            type="button"
+            class="col-span-2 flex items-center justify-end gap-1.5 hover:text-foreground text-right font-medium cursor-pointer transition-colors group"
+            on:click={() => handleSort('size')}
+            title="Sort by File Size"
+          >
+            <span class="{sortField === 'size' ? 'text-foreground font-semibold' : ''}">Size</span>
+            {#if sortField === 'size'}
+              {#if sortOrder === 'asc'}
+                <ArrowUp class="w-3 h-3 text-primary shrink-0" />
+              {:else}
+                <ArrowDown class="w-3 h-3 text-primary shrink-0" />
+              {/if}
+            {:else}
+              <ArrowUpDown class="w-3 h-3 opacity-0 group-hover:opacity-60 shrink-0" />
+            {/if}
+          </button>
+
+          <button
+            type="button"
+            class="col-span-3 flex items-center justify-end gap-1.5 hover:text-foreground text-right font-medium cursor-pointer transition-colors group"
+            on:click={() => handleSort('modified')}
+            title="Sort by Modified Date"
+          >
+            <span class="{sortField === 'modified' ? 'text-foreground font-semibold' : ''}">Modified</span>
+            {#if sortField === 'modified'}
+              {#if sortOrder === 'asc'}
+                <ArrowUp class="w-3 h-3 text-primary shrink-0" />
+              {:else}
+                <ArrowDown class="w-3 h-3 text-primary shrink-0" />
+              {/if}
+            {:else}
+              <ArrowUpDown class="w-3 h-3 opacity-0 group-hover:opacity-60 shrink-0" />
+            {/if}
+          </button>
         </div>
 
         <!-- File List Content -->
@@ -583,14 +712,10 @@
                       <span class="truncate">{file.name}</span>
                     </div>
                     <div class="col-span-2 text-right font-mono text-[11px] opacity-80 truncate">
-                      {#if !isDirectory}
-                        <span>{file.formattedSize || ''}</span>
-                      {:else}
-                        <span>-</span>
-                      {/if}
+                      <span>{formatFileSize(file.size, isDirectory)}</span>
                     </div>
                     <div class="col-span-3 text-right font-mono text-[11px] opacity-80 truncate">
-                      <span>{file.lastModified || ''}</span>
+                      <span>{formatModifiedDate(file)}</span>
                     </div>
                   </div>
                 {/each}
@@ -598,6 +723,7 @@
             </div>
           {/if}
         </div>
+
 
       </div>
 
