@@ -49,6 +49,22 @@ public interface SSHService {
     boolean isConnected();
 
     /**
+     * Gets the connected host.
+     */
+    String getHost();
+
+    /**
+     * Gets the connected port.
+     */
+    int getPort();
+
+    /**
+     * Gets the connected username.
+     */
+    String getUsername();
+
+
+    /**
      * Tails a remote file in real-time.
      *
      * @param remotePath    Path to the remote file.

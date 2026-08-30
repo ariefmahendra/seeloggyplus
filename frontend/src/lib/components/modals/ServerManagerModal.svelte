@@ -170,11 +170,11 @@
           <Plus class="w-3.5 h-3.5" />
           <span>Add New Server</span>
         </Button>
-        <div class="flex-1 overflow-y-auto flex flex-col gap-1 mt-1">
+        <div class="flex-1 overflow-y-auto flex flex-col gap-0.5 mt-1">
           {#each servers as s}
             {@const isSel = selectedServer?.id === s.id && !isCreatingNew}
             <button
-              class="w-full text-left p-2 rounded-[var(--radius-sm)] border text-xs transition-all {isSel ? 'bg-primary/15 border-primary font-semibold text-foreground ring-1 ring-primary/40 shadow-xs' : 'bg-background border-border/40 hover:bg-accent hover:border-border text-foreground'}"
+              class="w-full text-left px-2.5 py-2 rounded-[var(--radius-sm)] text-xs transition-colors {isSel ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
               on:click={() => selectServer(s)}
             >
               <div class="font-medium truncate">{s.name}</div>
@@ -182,6 +182,7 @@
             </button>
           {/each}
         </div>
+
       </div>
 
 

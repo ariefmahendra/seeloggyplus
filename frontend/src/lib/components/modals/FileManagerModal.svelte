@@ -47,6 +47,8 @@
   let previewLines: string[] = [];
   let loadingPreview: boolean = false;
 
+  let errorMessage: string = '';
+
   let userHomePath: string = '';
 
   $: isHomeActive = currentLocation === 'LOCAL' && !selectedServerId && (currentPath === userHomePath || currentPath === userHomePath + '/');
@@ -105,29 +107,43 @@
     pathInput = targetPath;
     selectedFile = null;
     previewLines = [];
+    files = [];
+    errorMessage = '';
     try {
       if (currentLocation === 'LOCAL') {
         const res = await API.browseLocalDirectory(targetPath);
         if (res.success && res.data) {
           files = Array.isArray(res.data) ? res.data : (res.data as any).files || [];
+        } else {
+          files = [];
+          errorMessage = res.message || `Failed to load directory: ${targetPath}`;
+          toast.error(errorMessage);
         }
       } else {
         if (!selectedServerId) {
-          toast.error('Select an SSH server first');
+          files = [];
+          errorMessage = 'Select an SSH server first';
           loading = false;
           return;
         }
         const res = await API.browseRemoteDirectory(selectedServerId, targetPath);
         if (res.success && res.data) {
           files = Array.isArray(res.data) ? res.data : (res.data as any).files || [];
+        } else {
+          files = [];
+          errorMessage = res.message || 'Connection refused or unreachable on SSH server';
+          toast.error(errorMessage);
         }
       }
-    } catch (e) {
-      toast.error(`Failed to load directory: ${targetPath}`);
+    } catch (e: any) {
+      files = [];
+      errorMessage = e?.message || `Failed to load directory: ${targetPath}`;
+      toast.error(errorMessage);
     } finally {
       loading = false;
     }
   }
+
 
   function goUp() {
     if (!currentPath || currentPath === '/') return;
@@ -210,7 +226,30 @@
     return f.name.toLowerCase().includes(filterText.toLowerCase());
   });
 
-  $: pathBreadcrumbs = currentPath.split('/').filter(Boolean);
+  async function switchLocation(loc: 'LOCAL' | 'REMOTE') {
+    currentLocation = loc;
+    if (loc === 'REMOTE') {
+      try {
+        const sRes = await API.getSSHServers();
+        if (sRes.success && sRes.data) servers = sRes.data;
+        if (!selectedServerId && servers.length > 0) {
+          selectedServerId = servers[0].id;
+        }
+        if (selectedServerId) {
+          const s = servers.find(x => x.id === selectedServerId);
+          await navigate(s?.defaultPath || '/var/log');
+        } else {
+          files = [];
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      selectedServerId = '';
+      await navigate(userHomePath || '/');
+    }
+    await loadFavorites();
+  }
 </script>
 
 
@@ -224,10 +263,13 @@
           <span>Unified Log File Manager</span>
         </DialogTitle>
         <div class="mr-6">
-          <Tabs value={currentLocation} onValueChange={(val) => { currentLocation = val === 'REMOTE' ? 'REMOTE' : 'LOCAL'; navigate(currentLocation === 'LOCAL' ? '/' : '/var/log'); loadFavorites(); }}>
+          <Tabs value={currentLocation} onValueChange={(val) => switchLocation(val === 'REMOTE' ? 'REMOTE' : 'LOCAL')}>
             <TabsList class="h-7">
               <TabsTrigger value="LOCAL" class="text-xs px-2.5">Local Storage</TabsTrigger>
-              <TabsTrigger value="REMOTE" class="text-xs px-2.5">Remote SSH</TabsTrigger>
+              <TabsTrigger value="REMOTE" class="text-xs px-2.5 flex items-center gap-1">
+                <Server class="w-3 h-3 text-sky-500" />
+                <span>Remote SSH</span>
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -383,10 +425,38 @@
               <RefreshCw class="w-4 h-4 animate-spin mr-2" />
               <span>Scanning directory...</span>
             </div>
+          {:else if errorMessage}
+            <div class="h-full flex flex-col items-center justify-center gap-2 text-destructive text-xs p-6 text-center select-none">
+              <div class="p-2.5 rounded-full bg-destructive/10 text-destructive mb-1">
+                <Server class="w-7 h-7" />
+              </div>
+              <span class="font-semibold text-foreground text-sm">Connection Failed</span>
+              <span class="text-muted-foreground max-w-md text-xs">{errorMessage}</span>
+              <div class="flex items-center gap-2 mt-2">
+                <Button variant="outline" size="xs" class="gap-1" on:click={() => navigate(currentPath)}>
+                  <RefreshCw class="w-3.5 h-3.5" />
+                  <span>Retry</span>
+                </Button>
+                <Button variant="default" size="xs" class="gap-1" on:click={() => activeModal.set('server-manager')}>
+                  <span>Check Server Settings</span>
+                </Button>
+              </div>
+            </div>
+          {:else if currentLocation === 'REMOTE' && servers.length === 0}
+            <div class="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs p-6 text-center select-none">
+              <Server class="w-8 h-8 text-muted-foreground/50" />
+              <span class="font-semibold text-foreground">No SSH Servers Configured</span>
+              <span class="text-muted-foreground text-[11px]">Configure an SSH server to browse and tail remote server logs.</span>
+              <Button variant="default" size="xs" class="gap-1 mt-1" on:click={() => activeModal.set('server-manager')}>
+                <Plus class="w-3.5 h-3.5" />
+                <span>Configure SSH Server</span>
+              </Button>
+            </div>
           {:else if filteredFiles.length === 0}
             <div class="h-full flex items-center justify-center text-muted-foreground text-xs">
               Folder is empty or no files match search
             </div>
+
           {:else}
             <div class="grid grid-cols-1 gap-0.5">
               {#each filteredFiles as file}

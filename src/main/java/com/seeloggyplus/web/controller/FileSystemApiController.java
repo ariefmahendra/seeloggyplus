@@ -84,11 +84,19 @@ public class FileSystemApiController {
                         ? server.getDefaultPath() : "/";
             }
 
-            // Ensure connection
-            if (!sshService.isConnected()) {
+            // Ensure connection to THIS specific server
+            boolean needConnect = !sshService.isConnected()
+                    || !java.util.Objects.equals(server.getHost(), sshService.getHost())
+                    || server.getPort() != sshService.getPort()
+                    || !java.util.Objects.equals(server.getUsername(), sshService.getUsername());
+
+            if (needConnect) {
+                if (sshService.isConnected()) {
+                    sshService.disconnect();
+                }
                 boolean ok = sshService.connect(server.getHost(), server.getPort(), server.getUsername(), server.getPassword());
                 if (!ok) {
-                    ctx.json(ApiResponse.error("Failed to connect to SSH server: " + server.getHost()));
+                    ctx.json(ApiResponse.error("Failed to connect to SSH server: " + server.getHost() + " (Connection refused or unreachable)"));
                     return;
                 }
             }
@@ -157,14 +165,28 @@ public class FileSystemApiController {
             List<String> previewLines = new ArrayList<>();
 
             if ("REMOTE".equalsIgnoreCase(source)) {
-                if (serverId != null && !serverId.isBlank() && !sshService.isConnected()) {
+                if (serverId != null && !serverId.isBlank()) {
                     SSHServerModel server = serverService.getServerById(serverId);
                     if (server != null) {
-                        sshService.connect(server.getHost(), server.getPort(), server.getUsername(), server.getPassword());
+                        boolean needConnect = !sshService.isConnected()
+                                || !java.util.Objects.equals(server.getHost(), sshService.getHost())
+                                || server.getPort() != sshService.getPort()
+                                || !java.util.Objects.equals(server.getUsername(), sshService.getUsername());
+                        if (needConnect) {
+                            if (sshService.isConnected()) {
+                                sshService.disconnect();
+                            }
+                            boolean ok = sshService.connect(server.getHost(), server.getPort(), server.getUsername(), server.getPassword());
+                            if (!ok) {
+                                ctx.json(ApiResponse.error("Failed to connect to SSH server: " + server.getHost()));
+                                return;
+                            }
+                        }
                     }
                 }
                 previewLines = sshService.readFileLines(path, lines);
             } else {
+
                 File file = new File(path);
                 if (!file.exists() || !file.isFile()) {
                     ctx.json(ApiResponse.error("File not found: " + path));
