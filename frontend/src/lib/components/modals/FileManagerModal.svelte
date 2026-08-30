@@ -532,46 +532,73 @@
                 <span>Configure SSH Server</span>
               </Button>
             </div>
-          {:else if filteredFiles.length === 0}
-            <div class="h-full flex items-center justify-center text-muted-foreground text-xs">
-              Folder is empty or no files match search
-            </div>
           {:else}
             <div class="flex flex-col gap-0.5">
-              {#each filteredFiles as file}
-                {@const isSel = selectedFile?.path === file.path}
-                {@const isDirectory = isDir(file)}
+              <!-- Top Row: Parent Directory Navigation (..) -->
+              {#if currentPath && currentPath !== '/'}
                 <div
                   role="button"
                   tabindex="0"
-                  class="grid grid-cols-12 gap-2 items-center px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs cursor-pointer border transition-colors {isSel ? 'bg-primary text-primary-foreground font-semibold border-primary' : 'hover:bg-accent text-foreground border-transparent'}"
-                  on:click={() => handleFileClick(file)}
-                  on:dblclick={() => handleFileDblClick(file)}
-                  on:keydown={(e) => e.key === 'Enter' && handleFileClick(file)}
+                  class="grid grid-cols-12 gap-2 items-center px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs cursor-pointer border border-transparent hover:bg-accent text-foreground/80 hover:text-foreground transition-colors group select-none"
+                  on:click={goUp}
+                  on:dblclick={goUp}
+                  on:keydown={(e) => e.key === 'Enter' && goUp()}
                 >
-                  <div class="col-span-7 flex items-center gap-2 truncate">
-                    {#if isDirectory}
-                      <Folder class="w-4 h-4 text-amber-400 shrink-0" />
-                    {:else}
-                      <FileText class="w-4 h-4 text-sky-400 shrink-0" />
-                    {/if}
-                    <span class="truncate">{file.name}</span>
+                  <div class="col-span-7 flex items-center gap-2 truncate font-semibold">
+                    <Folder class="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>..</span>
+                    <span class="text-[10.5px] font-normal text-muted-foreground">(Parent Folder)</span>
                   </div>
-                  <div class="col-span-2 text-right font-mono text-[11px] opacity-80 truncate">
-                    {#if !isDirectory}
-                      <span>{file.formattedSize || ''}</span>
-                    {:else}
-                      <span>-</span>
-                    {/if}
+                  <div class="col-span-2 text-right font-mono text-[11px] opacity-40">
+                    <span>-</span>
                   </div>
-                  <div class="col-span-3 text-right font-mono text-[11px] opacity-80 truncate">
-                    <span>{file.lastModified || ''}</span>
+                  <div class="col-span-3 text-right font-mono text-[11px] opacity-40">
+                    <span>-</span>
                   </div>
                 </div>
-              {/each}
+              {/if}
+
+              {#if filteredFiles.length === 0}
+                <div class="py-8 flex items-center justify-center text-muted-foreground text-xs">
+                  Folder is empty or no files match search
+                </div>
+              {:else}
+                {#each filteredFiles as file}
+                  {@const isSel = selectedFile?.path === file.path}
+                  {@const isDirectory = isDir(file)}
+                  <div
+                    role="button"
+                    tabindex="0"
+                    class="grid grid-cols-12 gap-2 items-center px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs cursor-pointer border transition-colors {isSel ? 'bg-primary text-primary-foreground font-semibold border-primary' : 'hover:bg-accent text-foreground border-transparent'}"
+                    on:click={() => handleFileClick(file)}
+                    on:dblclick={() => handleFileDblClick(file)}
+                    on:keydown={(e) => e.key === 'Enter' && handleFileClick(file)}
+                  >
+                    <div class="col-span-7 flex items-center gap-2 truncate">
+                      {#if isDirectory}
+                        <Folder class="w-4 h-4 text-amber-400 shrink-0" />
+                      {:else}
+                        <FileText class="w-4 h-4 text-sky-400 shrink-0" />
+                      {/if}
+                      <span class="truncate">{file.name}</span>
+                    </div>
+                    <div class="col-span-2 text-right font-mono text-[11px] opacity-80 truncate">
+                      {#if !isDirectory}
+                        <span>{file.formattedSize || ''}</span>
+                      {:else}
+                        <span>-</span>
+                      {/if}
+                    </div>
+                    <div class="col-span-3 text-right font-mono text-[11px] opacity-80 truncate">
+                      <span>{file.lastModified || ''}</span>
+                    </div>
+                  </div>
+                {/each}
+              {/if}
             </div>
           {/if}
         </div>
+
       </div>
 
       <!-- Right Log Preview Drawer -->
