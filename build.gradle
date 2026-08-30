@@ -35,6 +35,7 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.2'
     implementation("com.github.ben-manes.caffeine:caffeine:3.2.2")
     implementation 'org.xerial:sqlite-jdbc:3.44.1.0'
     implementation 'org.dom4j:dom4j:2.2.0'
@@ -51,6 +52,9 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.0'
     implementation 'io.krakens:java-grok:0.1.9'
 
+    // Embedded Lightweight Web Server
+    implementation 'io.javalin:javalin:6.1.3'
+
     // TestFX Integration Testing
     testImplementation 'org.testfx:testfx-core:4.0.17'
     testImplementation 'org.testfx:testfx-junit5:4.0.17'
@@ -61,6 +65,16 @@ dependencies {
     testImplementation 'net.jqwik:jqwik:1.9.2'
 }
 
+// Builds Svelte + Vite Frontend into resources/web
+task buildFrontend(type: Exec) {
+    workingDir "$projectDir/frontend"
+    if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+        commandLine 'cmd', '/c', 'npm run build'
+    } else {
+        commandLine 'npm', 'run', 'build'
+    }
+}
+
 // Generates a version.properties file from the project version
 task generateVersionProperties {
     doLast {
@@ -69,9 +83,9 @@ task generateVersionProperties {
         propsFile.text = "version=${project.version}"
     }
 }
-// Ensure the properties file is generated before resources are processed
-// Ensure the properties file is generated before resources are processed
+// Ensure the properties file and frontend are generated before resources are processed
 processResources.dependsOn generateVersionProperties
+processResources.dependsOn buildFrontend
 
 test {
     useJUnitPlatform()
@@ -82,7 +96,7 @@ test {
 }
 
 application {
-    mainClass = 'com.seeloggyplus.Main'
+    mainClass = 'com.seeloggyplus.Launcher'
     applicationName = 'SeeloggyPlus'
 }
 

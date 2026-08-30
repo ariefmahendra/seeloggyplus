@@ -109,6 +109,16 @@ public class DatabaseConfig {
                 "UNIQUE(path, locationId)" +
                 ");";
 
+        String createSavedFiltersTable = "CREATE TABLE IF NOT EXISTS saved_filters (" +
+                "id TEXT PRIMARY KEY," +
+                "name TEXT NOT NULL," +
+                "search_text TEXT," +
+                "is_regex BOOLEAN NOT NULL DEFAULT 0," +
+                "is_case_sensitive BOOLEAN NOT NULL DEFAULT 0," +
+                "log_level TEXT," +
+                "created_at TEXT NOT NULL" +
+                ");";
+
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(createParsingConfigTable);
             stmt.execute(createSshServerTable);
@@ -116,6 +126,7 @@ public class DatabaseConfig {
             stmt.execute(createLogFileTable);
             stmt.execute(createRecentFiles);
             stmt.execute(createFavoriteFoldersTable);
+            stmt.execute(createSavedFiltersTable);
             logger.info("Tables created or already exist.");
             
             // Migration: Add timestamp_format column if not exists

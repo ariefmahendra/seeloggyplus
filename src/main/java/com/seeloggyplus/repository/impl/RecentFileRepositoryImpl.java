@@ -69,10 +69,17 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
 
     @Override
     public void save(RecentFile recentFile) {
-        String sql = "INSERT OR REPLACE INTO recent_files (id, file_id, last_opened) VALUES (?, ?, ?)";
+        String sql = "INSERT INTO recent_files (id, file_id, last_opened) VALUES (?, ?, ?) " +
+                     "ON CONFLICT(file_id) DO UPDATE SET last_opened = excluded.last_opened";
         Connection conn = getConnection();
         try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
-            preparedStatement.setString(1, recentFile.getId());
+            String id = recentFile.getId();
+            if (id == null || id.isBlank()) {
+                Optional<RecentFile> existing = findByFileId(recentFile.getFileId());
+                id = existing.map(RecentFile::getId).orElseGet(() -> java.util.UUID.randomUUID().toString());
+                recentFile.setId(id);
+            }
+            preparedStatement.setString(1, id);
             preparedStatement.setString(2, recentFile.getFileId());
 
             // Handle null lastOpened with current timestamp as fallback
@@ -87,6 +94,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
             logger.error("Error saving recent file: {}", recentFile.getId(), e);
         }
     }
+
 
     @Override
     public void deleteAll() {

@@ -110,3 +110,9 @@ target/
 /.data
 .data/.keystore
 /logs
+
+# Node / Frontend
+node_modules/
+**/node_modules/
+frontend/dist/
+
