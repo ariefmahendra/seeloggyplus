@@ -4,7 +4,8 @@
     activeModal,
     currentTheme,
     leftPanelVisible,
-    bottomPanelVisible
+    bottomPanelVisible,
+    isTailing
   } from '../stores/appState';
   import { toast } from '../stores/toast';
   import {
@@ -36,10 +37,12 @@
     Info,
     Moon,
     Sun,
-    Globe
+    Globe,
+    Eye
   } from 'lucide-svelte';
 
   export let onReload: () => void = () => {};
+  export let onToggleTail: () => void = () => {};
   export let onExport: (format: string) => void = () => {};
   export let onClearSession: () => void = () => {};
 
@@ -70,8 +73,12 @@
       <MenubarTrigger>File</MenubarTrigger>
       <MenubarContent>
         <MenubarItem on:click={() => activeModal.set('file-manager')}>
-          <span class="flex items-center gap-1.5"><FolderOpen class="w-3.5 h-3.5" /> Open...</span>
+          <span class="flex items-center gap-1.5"><FolderOpen class="w-3.5 h-3.5" /> Open Log File...</span>
           <MenubarShortcut>Ctrl+O</MenubarShortcut>
+        </MenubarItem>
+        <MenubarItem on:click={onToggleTail}>
+          <span class="flex items-center gap-1.5"><Eye class="w-3.5 h-3.5 {$isTailing ? 'text-emerald-500' : ''}" /> {$isTailing ? 'Pause Live Tail' : 'Start Live Tail'}</span>
+          <MenubarShortcut>Ctrl+T</MenubarShortcut>
         </MenubarItem>
         <MenubarItem on:click={onReload}>
           <span class="flex items-center gap-1.5"><RefreshCw class="w-3.5 h-3.5" /> Reload Log</span>
@@ -81,6 +88,7 @@
         <MenubarItem on:click={() => onExport('txt')}>
           <span class="flex items-center gap-1.5"><Download class="w-3.5 h-3.5" /> Export as Text (.txt)</span>
         </MenubarItem>
+
         <MenubarItem on:click={() => onExport('csv')}>
           <span class="flex items-center gap-1.5"><FileSpreadsheet class="w-3.5 h-3.5" /> Export as CSV (.csv)</span>
         </MenubarItem>

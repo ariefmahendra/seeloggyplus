@@ -199,25 +199,35 @@
   <Button
     variant={$isTailing ? 'default' : 'outline'}
     size="sm"
-    class="gap-1.5"
+    class="gap-1.5 transition-all {$isTailing ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs' : ''}"
     on:click={onToggleTail}
-    title="Toggle Live Tail Mode"
+    title="Toggle Live Tail Streaming Mode (Ctrl+T)"
   >
-    <Eye class="w-3.5 h-3.5" />
-    <span>Tail</span>
+    {#if $isTailing}
+      <span class="relative flex h-2 w-2">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-300"></span>
+      </span>
+      <Eye class="w-3.5 h-3.5" />
+      <span>Tail: ON</span>
+    {:else}
+      <Eye class="w-3.5 h-3.5 text-muted-foreground" />
+      <span>Tail: OFF</span>
+    {/if}
   </Button>
 
   <!-- Smart Follow Auto-scroll -->
   <Button
     variant={$autoScroll ? 'default' : 'outline'}
     size="sm"
-    class="gap-1.5"
+    class="gap-1.5 transition-all {$autoScroll ? 'bg-sky-600 hover:bg-sky-700 text-white font-semibold shadow-xs' : ''}"
     on:click={() => autoScroll.update(v => !v)}
-    title="Smart Follow (Auto-scroll to bottom)"
+    title="Smart Follow (Auto-scroll to newest lines)"
   >
     <ArrowDown class="w-3.5 h-3.5" />
-    <span>Smart Follow</span>
+    <span>Follow: {$autoScroll ? 'ON' : 'OFF'}</span>
   </Button>
+
 
   <Separator orientation="vertical" class="h-4 mx-0.5" />
 

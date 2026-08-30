@@ -29,8 +29,10 @@
     Trash2,
     RefreshCw,
     Server,
-    Globe
+    Globe,
+    Eye
   } from 'lucide-svelte';
+
 
 
   export let onOpenFile: (req: { path: string; source: string; serverId?: string }) => void = () => {};
@@ -231,19 +233,24 @@
   }
 
 
-  function openSelected(path?: string) {
+  let openWithTail: boolean = false;
+
+  function openSelected(path?: string, tail?: boolean) {
     const p = path || selectedFile?.path || pathInput;
     if (!p) {
       toast.warning('Please select a log file');
       return;
     }
+    const isTailMode = tail !== undefined ? tail : openWithTail;
     onOpenFile({
       path: p,
       source: currentLocation,
-      serverId: selectedServerId || undefined
-    });
+      serverId: selectedServerId || undefined,
+      tail: isTailMode
+    } as any);
     activeModal.set(null);
   }
+
 
   type SortField = 'name' | 'size' | 'modified';
   type SortOrder = 'asc' | 'desc';
@@ -763,23 +770,46 @@
 
     <!-- Footer -->
     <DialogFooter class="p-3.5 border-t border-border bg-muted/20 flex items-center justify-between shrink-0">
-      <div class="text-xs text-muted-foreground truncate max-w-lg font-mono">
-        {#if selectedFile}
-          Selected: {selectedFile.path} {selectedFile.formattedSize ? `(${selectedFile.formattedSize})` : ''}
-        {:else}
-          Tip: Double-click any log file to open immediately
-        {/if}
+      <div class="flex items-center gap-4">
+        <div class="text-xs text-muted-foreground truncate max-w-sm font-mono">
+          {#if selectedFile}
+            Selected: {selectedFile.path} {selectedFile.formattedSize ? `(${selectedFile.formattedSize})` : ''}
+          {:else}
+            Tip: Double-click any log file to open immediately
+          {/if}
+        </div>
+
+        <label class="flex items-center gap-1.5 text-xs text-foreground cursor-pointer select-none bg-background px-2.5 py-1 rounded-[var(--radius-sm)] border border-border hover:bg-accent transition-colors">
+          <input
+            type="checkbox"
+            bind:checked={openWithTail}
+            class="rounded border-border text-primary accent-primary cursor-pointer h-3.5 w-3.5"
+          />
+          <Eye class="w-3.5 h-3.5 text-emerald-500" />
+          <span class="font-medium text-[11px]">Live Tail Mode</span>
+        </label>
       </div>
+
       <div class="flex items-center gap-2">
         <Button variant="outline" size="sm" on:click={() => activeModal.set(null)}>
           Cancel
         </Button>
-        <Button variant="default" size="sm" on:click={() => openSelected()}>
-          Open Log File
+        <Button variant="outline" size="sm" on:click={() => openSelected(undefined, false)}>
+          Open Full Log
+        </Button>
+        <Button
+          variant="default"
+          size="sm"
+          class="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+          on:click={() => openSelected(undefined, true)}
+        >
+          <Eye class="w-3.5 h-3.5" />
+          <span>Open & Live Tail</span>
         </Button>
       </div>
     </DialogFooter>
   </DialogContent>
 </Dialog>
+
 
 

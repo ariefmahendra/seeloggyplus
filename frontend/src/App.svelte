@@ -73,7 +73,9 @@
         activeModal.set('goto-line');
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm') {
         e.preventDefault();
-        activeModal.set('server-manager');
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault();
+        handleToggleTail();
       } else if (e.key === 'F5') {
         e.preventDefault();
         handleReload();
@@ -90,7 +92,7 @@
     };
   });
 
-  async function handleOpenFile(req: { path: string; source: string; serverId?: string }) {
+  async function handleOpenFile(req: { path: string; source: string; serverId?: string; tail?: boolean }) {
     try {
       if (tailUnsubscribe) {
         tailUnsubscribe();
@@ -108,6 +110,13 @@
           logTableRef.resetAndReload(res.data.entries);
         }
         await refreshRecentFiles();
+
+        if (req.tail) {
+          setTimeout(() => {
+            handleToggleTail();
+            autoScroll.set(true);
+          }, 150);
+        }
       } else {
         toast.error(res.message || 'Failed to open log file');
       }
@@ -115,6 +124,7 @@
       toast.error(e.message || 'Error opening file');
     }
   }
+
 
 
   function handleSearchChange() {
@@ -215,9 +225,11 @@
   <!-- Desktop Menubar -->
   <Menubar
     onReload={handleReload}
+    onToggleTail={handleToggleTail}
     onExport={handleExport}
     onClearSession={handleClearSession}
   />
+
 
   <!-- Interactive Toolbar -->
   <Toolbar
