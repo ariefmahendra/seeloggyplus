@@ -275,7 +275,7 @@
 
 
 <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-  <DialogContent class="max-w-5xl h-[640px] flex flex-col p-0 gap-0 overflow-hidden border-border">
+  <DialogContent class="w-[92vw] max-w-[1240px] h-[82vh] min-h-[640px] max-h-[860px] flex flex-col p-0 gap-0 overflow-hidden border-border">
     <!-- Header -->
     <DialogHeader class="p-4 border-b border-border bg-muted/20 shrink-0">
       <div class="flex items-center justify-between">
@@ -284,15 +284,23 @@
           <span>Unified Log File Manager</span>
         </DialogTitle>
         <div class="mr-6">
-          <Tabs value={currentLocation} onValueChange={(val) => switchLocation(val === 'REMOTE' ? 'REMOTE' : 'LOCAL')}>
-            <TabsList class="h-7">
-              <TabsTrigger value="LOCAL" class="text-xs px-2.5">Local Storage</TabsTrigger>
-              <TabsTrigger value="REMOTE" class="text-xs px-2.5 flex items-center gap-1">
-                <Server class="w-3 h-3 text-sky-500" />
-                <span>Remote SSH</span>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div class="flex items-center bg-muted/60 p-0.5 rounded-[var(--radius-md)] border border-border">
+            <button
+              type="button"
+              class="px-3 py-1 text-xs font-medium rounded-[var(--radius-sm)] transition-all cursor-pointer {currentLocation === 'LOCAL' ? 'bg-background text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'}"
+              on:click={() => switchLocation('LOCAL')}
+            >
+              Local Storage
+            </button>
+            <button
+              type="button"
+              class="px-3 py-1 text-xs font-medium rounded-[var(--radius-sm)] transition-all flex items-center gap-1.5 cursor-pointer {currentLocation === 'REMOTE' ? 'bg-background text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'}"
+              on:click={() => switchLocation('REMOTE')}
+            >
+              <Server class="w-3.5 h-3.5 text-sky-500" />
+              <span>Remote SSH</span>
+            </button>
+          </div>
         </div>
       </div>
       <DialogDescription class="text-xs mt-1">
@@ -336,11 +344,11 @@
     <!-- Body Layout -->
     <div class="flex-1 flex overflow-hidden">
       <!-- Left Sidebar (Locations & Bookmarks) -->
-      <div class="w-52 border-r border-border p-3 flex flex-col gap-3 bg-muted/20 select-none overflow-y-auto shrink-0">
+      <div class="w-64 border-r border-border p-3.5 flex flex-col gap-3 bg-muted/20 select-none overflow-y-auto shrink-0">
         <!-- Remote Server Picker -->
         {#if currentLocation === 'REMOTE'}
           <div>
-            <div class="text-[10px] font-semibold text-muted-foreground mb-1 tracking-wider uppercase">SSH Servers</div>
+            <div class="text-[10px] font-semibold text-muted-foreground mb-1.5 tracking-wider uppercase">SSH Servers</div>
             {#if servers.length === 0}
               <div class="text-xs text-muted-foreground p-2 text-center border border-dashed border-border rounded-sm">
                 No servers configured.
@@ -348,10 +356,13 @@
             {:else}
               <select
                 bind:value={selectedServerId}
-                on:change={() => { const s = servers.find(x => x.id === selectedServerId); navigate(s?.defaultPath || '/var/log'); loadFavorites(); }}
-                class="w-full bg-background border border-border text-foreground text-xs p-1.5 rounded-[var(--radius-sm)] outline-none"
+                on:change={() => {
+                  const s = servers.find(x => x.id === selectedServerId);
+                  if (s) navigate(s.defaultPath || '/var/log');
+                  loadFavorites();
+                }}
+                class="w-full bg-background border border-border text-foreground text-xs p-1.5 rounded-[var(--radius-sm)] outline-none cursor-pointer"
               >
-                <option value="">Select SSH Server...</option>
                 {#each servers as s}
                   <option value={s.id}>{s.name} ({s.host})</option>
                 {/each}
@@ -362,7 +373,7 @@
 
         <!-- Quick Locations -->
         <div>
-          <div class="text-[10px] font-semibold text-muted-foreground mb-1 tracking-wider uppercase">
+          <div class="text-[10px] font-semibold text-muted-foreground mb-1.5 tracking-wider uppercase">
             {currentLocation === 'REMOTE' ? 'Remote Locations' : 'Quick Locations'}
           </div>
           <div class="flex flex-col gap-0.5">
@@ -370,7 +381,8 @@
               {@const currentServer = servers.find(x => x.id === selectedServerId)}
               {@const serverDefPath = currentServer?.defaultPath || '/var/log'}
               <button
-                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {currentPath === serverDefPath ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                type="button"
+                class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {currentPath === serverDefPath ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
                 on:click={() => navigate(serverDefPath)}
               >
                 <Folder class="w-3.5 h-3.5 text-sky-500 shrink-0" />
@@ -378,7 +390,8 @@
               </button>
 
               <button
-                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {currentPath === '/var/log' ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                type="button"
+                class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {currentPath === '/var/log' ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
                 on:click={() => navigate('/var/log')}
               >
                 <Folder class="w-3.5 h-3.5 text-sky-500 shrink-0" />
@@ -386,7 +399,8 @@
               </button>
 
               <button
-                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {currentPath === '/' ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                type="button"
+                class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {currentPath === '/' ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
                 on:click={() => navigate('/')}
               >
                 <Folder class="w-3.5 h-3.5 text-sky-500 shrink-0" />
@@ -394,7 +408,8 @@
               </button>
             {:else}
               <button
-                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isHomeActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                type="button"
+                class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isHomeActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
                 on:click={async () => { const h = await API.getHomeDirectory(); navigate(h.data || '/'); }}
               >
                 <Folder class="w-3.5 h-3.5 text-primary shrink-0" />
@@ -402,7 +417,8 @@
               </button>
 
               <button
-                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isAppLogsActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                type="button"
+                class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isAppLogsActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
                 on:click={() => navigate('/run/media/arief/work/desktop/javafx/seeloggyplus/logs')}
               >
                 <Folder class="w-3.5 h-3.5 text-primary shrink-0" />
@@ -410,7 +426,8 @@
               </button>
 
               <button
-                class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isRootActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
+                type="button"
+                class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs text-left cursor-pointer transition-all {isRootActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
                 on:click={() => navigate('/')}
               >
                 <Folder class="w-3.5 h-3.5 text-primary shrink-0" />
@@ -424,17 +441,17 @@
 
         <!-- Bookmarks / Favorites -->
         <div class="flex-1">
-          <div class="text-[10px] font-semibold text-muted-foreground mb-1 tracking-wider uppercase">Bookmarks</div>
+          <div class="text-[10px] font-semibold text-muted-foreground mb-1.5 tracking-wider uppercase">Bookmarks</div>
           {#if favorites.length === 0}
             <div class="text-[11px] text-muted-foreground p-2">No bookmarked folders yet</div>
           {:else}
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-0.5">
               {#each favorites as f}
                 {@const isFavActive = currentPath === f.path}
                 <div
                   role="button"
                   tabindex="0"
-                  class="flex items-center justify-between px-2 py-1.5 rounded-[var(--radius-sm)] text-xs cursor-pointer group transition-all {isFavActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent'}"
+                  class="flex items-center justify-between px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs cursor-pointer group transition-all {isFavActive ? 'bg-primary/15 font-semibold text-foreground' : 'hover:bg-accent text-foreground'}"
                   on:click={() => {
                     if (f.sshServerId) {
                       currentLocation = 'REMOTE';
@@ -444,9 +461,9 @@
                   }}
                   on:keydown={(e) => e.key === 'Enter' && navigate(f.path)}
                 >
-
-                  <span class="truncate font-medium text-foreground">{f.name}</span>
+                  <span class="truncate font-medium">{f.name}</span>
                   <button
+                    type="button"
                     class="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-0.5"
                     on:click={(e) => removeFavorite(f.id, e)}
                   >
@@ -457,55 +474,60 @@
             </div>
           {/if}
         </div>
-
       </div>
-
 
       <!-- Center File Browser -->
       <div class="flex-1 flex flex-col bg-background overflow-hidden">
-        <!-- Filter Box -->
-        <div class="p-2 border-b border-border bg-background flex items-center gap-2 shrink-0">
+        <!-- Filter & Info Bar -->
+        <div class="p-2.5 border-b border-border bg-background flex items-center gap-2 shrink-0">
           <Input
             type="text"
-            placeholder="Search files in directory..."
+            placeholder="Search files in current directory..."
             bind:value={filterText}
-            class="h-7 text-xs"
+            class="h-7 text-xs flex-1"
           />
-          <Badge variant="outline" class="font-mono text-xs px-2 h-7">
+          <Badge variant="outline" class="font-mono text-xs px-2.5 h-7">
             {filteredFiles.length} items
           </Badge>
         </div>
 
-        <!-- File List -->
-        <div class="flex-1 overflow-y-auto p-2">
+        <!-- File List View Header -->
+        <div class="px-3 py-1.5 bg-muted/30 border-b border-border text-[11px] font-medium text-muted-foreground grid grid-cols-12 gap-2 select-none shrink-0">
+          <span class="col-span-7">Name</span>
+          <span class="col-span-2 text-right">Size</span>
+          <span class="col-span-3 text-right">Modified</span>
+        </div>
+
+        <!-- File List Content -->
+        <div class="flex-1 overflow-y-auto p-1.5">
           {#if loading}
             <div class="h-full flex items-center justify-center text-muted-foreground text-xs">
               <RefreshCw class="w-4 h-4 animate-spin mr-2" />
               <span>Scanning directory...</span>
             </div>
           {:else if errorMessage}
-            <div class="h-full flex flex-col items-center justify-center gap-2 text-destructive text-xs p-6 text-center select-none">
-              <div class="p-2.5 rounded-full bg-destructive/10 text-destructive mb-1">
-                <Server class="w-7 h-7" />
+            <div class="h-full flex flex-col items-center justify-center gap-2.5 text-destructive text-xs p-6 text-center select-none">
+              <div class="p-3 rounded-full bg-destructive/10 text-destructive mb-1">
+                <Server class="w-8 h-8" />
               </div>
               <span class="font-semibold text-foreground text-sm">Connection Failed</span>
               <span class="text-muted-foreground max-w-md text-xs">{errorMessage}</span>
               <div class="flex items-center gap-2 mt-2">
-                <Button variant="outline" size="xs" class="gap-1" on:click={() => navigate(currentPath)}>
+                <Button variant="outline" size="sm" class="gap-1 text-xs" on:click={() => navigate(currentPath)}>
                   <RefreshCw class="w-3.5 h-3.5" />
                   <span>Retry</span>
                 </Button>
-                <Button variant="default" size="xs" class="gap-1" on:click={() => activeModal.set('server-manager')}>
+                <Button variant="default" size="sm" class="gap-1 text-xs" on:click={() => activeModal.set('server-manager')}>
                   <span>Check Server Settings</span>
                 </Button>
               </div>
             </div>
           {:else if currentLocation === 'REMOTE' && servers.length === 0}
-            <div class="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs p-6 text-center select-none">
-              <Server class="w-8 h-8 text-muted-foreground/50" />
-              <span class="font-semibold text-foreground">No SSH Servers Configured</span>
-              <span class="text-muted-foreground text-[11px]">Configure an SSH server to browse and tail remote server logs.</span>
-              <Button variant="default" size="xs" class="gap-1 mt-1" on:click={() => activeModal.set('server-manager')}>
+            <div class="h-full flex flex-col items-center justify-center gap-2.5 text-muted-foreground text-xs p-6 text-center select-none">
+              <Server class="w-10 h-10 text-muted-foreground/50" />
+              <span class="font-semibold text-foreground text-sm">No SSH Servers Configured</span>
+              <span class="text-muted-foreground text-xs">Configure an SSH server to browse and tail remote server logs in real-time.</span>
+              <Button variant="default" size="sm" class="gap-1 mt-2 text-xs" on:click={() => activeModal.set('server-manager')}>
                 <Plus class="w-3.5 h-3.5" />
                 <span>Configure SSH Server</span>
               </Button>
@@ -514,31 +536,35 @@
             <div class="h-full flex items-center justify-center text-muted-foreground text-xs">
               Folder is empty or no files match search
             </div>
-
           {:else}
-            <div class="grid grid-cols-1 gap-0.5">
+            <div class="flex flex-col gap-0.5">
               {#each filteredFiles as file}
                 {@const isSel = selectedFile?.path === file.path}
+                {@const isDirectory = isDir(file)}
                 <div
                   role="button"
                   tabindex="0"
-                  class="flex items-center justify-between px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs cursor-pointer border transition-colors {isSel ? 'bg-primary text-primary-foreground font-semibold border-primary' : 'hover:bg-accent text-foreground border-transparent'}"
+                  class="grid grid-cols-12 gap-2 items-center px-2.5 py-1.5 rounded-[var(--radius-sm)] text-xs cursor-pointer border transition-colors {isSel ? 'bg-primary text-primary-foreground font-semibold border-primary' : 'hover:bg-accent text-foreground border-transparent'}"
                   on:click={() => handleFileClick(file)}
                   on:dblclick={() => handleFileDblClick(file)}
                   on:keydown={(e) => e.key === 'Enter' && handleFileClick(file)}
                 >
-                  <div class="flex items-center gap-2 truncate">
-                    {#if isDir(file)}
+                  <div class="col-span-7 flex items-center gap-2 truncate">
+                    {#if isDirectory}
                       <Folder class="w-4 h-4 text-amber-400 shrink-0" />
                     {:else}
-                      <FileText class="w-4 h-4 text-blue-400 shrink-0" />
+                      <FileText class="w-4 h-4 text-sky-400 shrink-0" />
                     {/if}
                     <span class="truncate">{file.name}</span>
                   </div>
-                  <div class="flex items-center gap-3 text-[11px] opacity-80 shrink-0 font-mono">
-                    {#if !isDir(file)}
+                  <div class="col-span-2 text-right font-mono text-[11px] opacity-80 truncate">
+                    {#if !isDirectory}
                       <span>{file.formattedSize || ''}</span>
+                    {:else}
+                      <span>-</span>
                     {/if}
+                  </div>
+                  <div class="col-span-3 text-right font-mono text-[11px] opacity-80 truncate">
                     <span>{file.lastModified || ''}</span>
                   </div>
                 </div>
@@ -549,17 +575,17 @@
       </div>
 
       <!-- Right Log Preview Drawer -->
-      <div class="w-72 border-l border-border bg-muted/10 flex flex-col overflow-hidden shrink-0">
-        <div class="p-2 border-b border-border bg-muted/20 flex items-center justify-between text-muted-foreground shrink-0">
-          <span class="font-semibold text-[10.5px]">Preview (Last 50 lines)</span>
+      <div class="w-96 border-l border-border bg-muted/10 flex flex-col overflow-hidden shrink-0">
+        <div class="p-2.5 border-b border-border bg-muted/20 flex items-center justify-between text-muted-foreground shrink-0">
+          <span class="font-semibold text-xs">Preview (Last 50 lines)</span>
           {#if selectedFile && !isDir(selectedFile)}
-            <span class="font-mono text-[9.5px]">{selectedFile.formattedSize || ''}</span>
+            <span class="font-mono text-[10px] bg-background px-1.5 py-0.5 rounded border border-border">{selectedFile.formattedSize || ''}</span>
           {/if}
         </div>
-        <div class="flex-1 overflow-auto p-2 font-mono text-[10.5px] leading-tight text-foreground select-text whitespace-pre bg-background">
+        <div class="flex-1 overflow-auto p-3 font-mono text-xs leading-relaxed text-foreground select-text whitespace-pre bg-background">
           {#if loadingPreview}
             <div class="h-full flex items-center justify-center text-muted-foreground text-xs">
-              <RefreshCw class="w-3.5 h-3.5 animate-spin mr-1.5" />
+              <RefreshCw class="w-4 h-4 animate-spin mr-2" />
               <span>Loading preview...</span>
             </div>
           {:else if selectedFile && !isDir(selectedFile)}
@@ -573,22 +599,22 @@
               </div>
             {/if}
           {:else}
-            <div class="h-full flex items-center justify-center text-muted-foreground text-xs p-4 text-center">
-              Select any log file to preview contents
+            <div class="h-full flex flex-col items-center justify-center text-muted-foreground text-xs p-6 text-center gap-1.5 select-none">
+              <FileText class="w-7 h-7 text-muted-foreground/40" />
+              <span>Select any log file to preview contents</span>
             </div>
           {/if}
         </div>
       </div>
-
     </div>
 
     <!-- Footer -->
-    <DialogFooter class="p-3 border-t border-border bg-muted/20 flex items-center justify-between shrink-0">
-      <div class="text-xs text-muted-foreground truncate max-w-md font-mono">
+    <DialogFooter class="p-3.5 border-t border-border bg-muted/20 flex items-center justify-between shrink-0">
+      <div class="text-xs text-muted-foreground truncate max-w-lg font-mono">
         {#if selectedFile}
-          Selected: {selectedFile.path} ({selectedFile.formattedSize || ''})
+          Selected: {selectedFile.path} {selectedFile.formattedSize ? `(${selectedFile.formattedSize})` : ''}
         {:else}
-          Tip: Double click any log file to open immediately
+          Tip: Double-click any log file to open immediately
         {/if}
       </div>
       <div class="flex items-center gap-2">
@@ -602,4 +628,5 @@
     </DialogFooter>
   </DialogContent>
 </Dialog>
+
 
