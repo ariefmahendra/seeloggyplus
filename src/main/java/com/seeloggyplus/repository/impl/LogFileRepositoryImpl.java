@@ -146,6 +146,41 @@ public class LogFileRepositoryImpl implements LogFileRepository {
     }
 
     @Override
+    public LogFile findByPathNameAndServer(String filePath, String name, String sshServerId, boolean isRemote) throws FatalDatabaseException, NotFoundException {
+        String sqlStr = isRemote
+                ? "SELECT id, name, file_path, size, modified, is_remote, ssh_server_id, parsing_configuration_id FROM log_files WHERE file_path = ? AND name = ? AND is_remote = 1 AND ssh_server_id = ?;"
+                : "SELECT id, name, file_path, size, modified, is_remote, ssh_server_id, parsing_configuration_id FROM log_files WHERE file_path = ? AND name = ? AND (is_remote = 0 OR is_remote IS NULL);";
+        Connection conn = getConnection();
+        try (PreparedStatement preparedStatement = conn.prepareStatement(sqlStr)) {
+            preparedStatement.setString(1, filePath);
+            preparedStatement.setString(2, name);
+            if (isRemote) {
+                preparedStatement.setString(3, sshServerId);
+            }
+            var resultSet = preparedStatement.executeQuery();
+
+            if (resultSet.next()) {
+                return new LogFile(
+                        resultSet.getString("id"),
+                        resultSet.getString("name"),
+                        resultSet.getString("file_path"),
+                        resultSet.getString("size"),
+                        resultSet.getString("modified"),
+                        resultSet.getBoolean("is_remote"),
+                        resultSet.getString("ssh_server_id"),
+                        resultSet.getString("parsing_configuration_id")
+                );
+            }
+
+            throw new NotFoundException("Log file not found with path: " + filePath + ", name: " + name
+                    + ", isRemote: " + isRemote + ", sshServerId: " + sshServerId);
+        } catch (SQLException ex) {
+            logger.error("Error finding log file by path, name and server: path={}, name={}, server={}", filePath, name, sshServerId, ex);
+            throw new FatalDatabaseException("Error finding log file by path, name and server", ex);
+        }
+    }
+
+    @Override
     public void deleteAll() throws FatalDatabaseException {
         String sqlStr = "DELETE FROM log_files;";
         Connection conn = getConnection();

@@ -171,7 +171,7 @@ public class UnifiedFileManagerDialogController {
         setupFileTable();
         setupEventHandlers();
 
-        locationListView.getSelectionModel().select(0);
+        restoreLastLocation();
 
         // --- Auto-Refresh on Focus ---
         Platform.runLater(() -> {
@@ -477,6 +477,10 @@ public class UnifiedFileManagerDialogController {
         }
 
         currentLocation = location;
+        if (preferenceService != null) {
+            String locId = location.server == null ? "local" : location.server.getName();
+            preferenceService.saveOrUpdatePreferences(new Preference("file_manager_last_location", locId));
+        }
         backHistory.clear();
         forwardHistory.clear();
         directoryCache.clear(); // Clear cache when changing location
@@ -591,6 +595,77 @@ public class UnifiedFileManagerDialogController {
             : "file_manager_last_path_" + currentLocation.server.getName();
     }
 
+    private boolean isInitialFileSelectionPending = true;
+
+    private String lastFileKey() {
+        return currentLocation == null || currentLocation.server == null
+            ? "file_manager_last_file_local"
+            : "file_manager_last_file_" + currentLocation.server.getName();
+    }
+
+    private String lastFileFolderKey() {
+        return currentLocation == null || currentLocation.server == null
+            ? "file_manager_last_file_dir_local"
+            : "file_manager_last_file_dir_" + currentLocation.server.getName();
+    }
+
+    private void saveLastOpenedFile(FileInfo file) {
+        if (preferenceService != null && file != null) {
+            preferenceService.saveOrUpdatePreferences(new Preference(lastFileKey(), file.getName()));
+            if (currentPath != null) {
+                preferenceService.saveOrUpdatePreferences(new Preference(lastFileFolderKey(), currentPath));
+            }
+            if (currentLocation != null) {
+                String locId = currentLocation.server == null ? "local" : currentLocation.server.getName();
+                preferenceService.saveOrUpdatePreferences(new Preference("file_manager_last_location", locId));
+            }
+        }
+    }
+
+    private void restoreFileSelection() {
+        if (!isInitialFileSelectionPending) return;
+        isInitialFileSelectionPending = false;
+
+        if (preferenceService == null) return;
+        String savedDir = preferenceService.getPreferencesByCode(lastFileFolderKey()).orElse(null);
+        if (savedDir != null && currentPath != null) {
+            String normSaved = normalizePathString(savedDir);
+            String normCurrent = normalizePathString(currentPath);
+            if (!normSaved.equals(normCurrent)) {
+                return;
+            }
+        }
+
+        preferenceService.getPreferencesByCode(lastFileKey())
+            .filter(f -> !f.isBlank())
+            .ifPresent(lastFileName -> {
+                for (FileInfo file : fileTable.getItems()) {
+                    if (file.isFile() && file.getName().equals(lastFileName)) {
+                        fileTable.getSelectionModel().select(file);
+                        fileTable.scrollTo(file);
+                        break;
+                    }
+                }
+            });
+    }
+
+    private void restoreLastLocation() {
+        int targetIndex = 0;
+        if (preferenceService != null) {
+            String lastLoc = preferenceService.getPreferencesByCode("file_manager_last_location").orElse("local");
+            if (!"local".equalsIgnoreCase(lastLoc) && !lastLoc.isBlank()) {
+                for (int i = 0; i < locationListView.getItems().size(); i++) {
+                    LocationItem item = locationListView.getItems().get(i);
+                    if (item.server != null && item.server.getName().equalsIgnoreCase(lastLoc)) {
+                        targetIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+        locationListView.getSelectionModel().select(targetIndex);
+    }
+
     private String sortKey() {
         return currentLocation == null || currentLocation.server == null
             ? "file_manager_sort_local"
@@ -701,6 +776,7 @@ public class UnifiedFileManagerDialogController {
             allFiles.setAll(cachedEntry.getFiles());
             itemCountLabel.setText(allFiles.size() + " items");
             updateStatus("Ready (from cache)");
+            restoreFileSelection();
             return;
         }
         logger.info("Cache MISS for path: {}", path);
@@ -767,6 +843,7 @@ public class UnifiedFileManagerDialogController {
             updateNavigationButtons();
             loadFavoritesForCurrentLocation();
             fileTable.refresh();
+            restoreFileSelection();
         });
 
         loadTask.setOnFailed(e -> {
@@ -797,6 +874,7 @@ public class UnifiedFileManagerDialogController {
         selectedFileResult = fileTable.getSelectionModel().getSelectedItem();
         if (selectedFileResult != null && selectedFileResult.isFile()) {
             openAction = OpenAction.OPEN;
+            saveLastOpenedFile(selectedFileResult);
             closeDialog();
         }
     }
@@ -820,6 +898,7 @@ public class UnifiedFileManagerDialogController {
         }
 
         openAction = OpenAction.TAIL;
+        saveLastOpenedFile(selectedFileResult);
         closeDialog();
     }
 

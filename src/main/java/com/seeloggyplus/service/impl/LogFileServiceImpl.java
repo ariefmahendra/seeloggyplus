@@ -150,6 +150,31 @@ public class LogFileServiceImpl implements LogFileService {
      * {@inheritDoc}
      */
     @Override
+    public LogFile getLogFileByPathNameAndServer(String name, String filePath, String sshServerId, boolean isRemote) {
+        if (name == null || name.trim().isEmpty()) {
+            logger.error("Cannot get log file with null or empty name");
+            throw new IllegalArgumentException("LogFile name cannot be null or empty");
+        }
+        if (filePath == null || filePath.trim().isEmpty()) {
+            logger.error("Cannot get log file with null or empty file path");
+            throw new IllegalArgumentException("LogFile path cannot be null or empty");
+        }
+
+        try {
+            return logFileRepository.findByPathNameAndServer(filePath, name, sshServerId, isRemote);
+        } catch (NotFoundException ex) {
+            logger.debug("Log file not found by path: {}, name: {}, serverId: {}, isRemote: {}", filePath, name, sshServerId, isRemote);
+            return null;
+        } catch (FatalDatabaseException ex) {
+            logger.error("Database error when getting log file by path/name/server", ex);
+            throw new RuntimeException("Failed to get log file by path, name and server", ex);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void deleteAllLogFiles() {
         try {
             logFileRepository.deleteAll();

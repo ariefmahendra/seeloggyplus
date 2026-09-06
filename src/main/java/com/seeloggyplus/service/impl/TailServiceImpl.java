@@ -36,7 +36,7 @@ public class TailServiceImpl implements TailService {
     }
 
     @Override
-    public void startLocalTail(File file, Consumer<String> lineConsumer, Consumer<Exception> errorHandler,
+    public synchronized void startLocalTail(File file, Consumer<String> lineConsumer, Consumer<Exception> errorHandler,
             boolean loadContext, int contextRows) {
         stopTail(); // Ensure previous session is closed
 
@@ -88,13 +88,14 @@ public class TailServiceImpl implements TailService {
 
         // start from end = true because we already loaded context
         tailer = new Tailer(file, listener, TAIL_DELAY_MILLIS, true);
-        tailerThread = new Thread(tailer, "TailService-Thread");
-        tailerThread.setDaemon(true);
-        tailerThread.start();
+        Thread thread = new Thread(tailer, "TailService-Thread");
+        thread.setDaemon(true);
+        tailerThread = thread;
+        thread.start();
     }
 
     @Override
-    public void stopTail() {
+    public synchronized void stopTail() {
         isRunning = false;
         if (tailer != null) {
             tailer.stop();

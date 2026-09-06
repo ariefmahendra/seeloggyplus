@@ -6,13 +6,15 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 <?import javafx.scene.shape.Rectangle?>
-<BorderPane minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
+<BorderPane minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" stylesheets="@../style/components.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
     <top>
         <VBox>
             <MenuBar fx:id="menuBar">
                 <!-- File Menu -->
                 <Menu text="File">
                     <MenuItem accelerator="Ctrl+O" onAction="#handleOpen" text="Open..." />
+                    <MenuItem fx:id="closeTabMenuItem" accelerator="Ctrl+W" onAction="#handleCloseCurrentTab" text="Close Tab" />
+                    <MenuItem fx:id="closeAllTabsMenuItem" onAction="#handleCloseAllTabs" text="Close All Tabs" />
                     <SeparatorMenuItem />
                     <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit" />
                 </Menu>
@@ -61,11 +63,7 @@
                 </ToggleButton>
                 <Separator orientation="VERTICAL" />
                 <Label text="Search:" />
-                <TextField fx:id="searchField" prefWidth="250" promptText="Include (Search)...">
-                    <font>
-                        <Font size="10.0" />
-                    </font>
-                </TextField>
+                <TextField fx:id="searchField" prefWidth="250" promptText="Include (Search)..." />
 
                 <ToggleButton fx:id="regexCheckBox" text="Regex" />
                 <ToggleButton fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
@@ -169,6 +167,7 @@
                                 </Button>
                             </HBox>
 
+                            <TextField fx:id="recentFilesFilterField" promptText="Filter recent logs..." />
                             <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS" />
 
                             <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files">
@@ -203,13 +202,23 @@
 
                             <center>
                                 <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
-                                    <!-- Center Panel: Log Table -->
-                                    <VBox spacing="5">
-                                        <padding>
-                                            <Insets bottom="5" left="5" right="5" top="5" />
-                                        </padding>
+                                    <!-- Center Panel: Log Table / Tabs -->
+                                    <VBox spacing="0">
+                                        <StackPane fx:id="logContainer" VBox.vgrow="ALWAYS">
+                                            <!-- Empty State Pane -->
+                                            <VBox fx:id="emptyStatePane" alignment="CENTER" spacing="12" styleClass="empty-state-pane">
+                                                <FontAwesomeIconView glyphName="FILE_TEXT_ALT" size="48" styleClass="empty-state-icon" />
+                                                <Label text="No Log File Open" styleClass="empty-state-title" />
+                                                <Label text="Open a file via File → Open (Ctrl+O), choose from Recent Files, or drag &amp; drop a log file here." styleClass="empty-state-subtitle" />
+                                                <Button text="Open File..." onAction="#handleOpen" styleClass="empty-state-button">
+                                                    <graphic>
+                                                        <FontAwesomeIconView glyphName="FOLDER_OPEN" size="14" />
+                                                    </graphic>
+                                                </Button>
+                                            </VBox>
 
-                                        <StackPane fx:id="logContainer" VBox.vgrow="ALWAYS" />
+                                            <TabPane fx:id="logTabPane" tabClosingPolicy="ALL_TABS" tabDragPolicy="REORDER" visible="false" managed="false" />
+                                        </StackPane>
                                     </VBox>
 
                                     <!-- Bottom Panel: Log Detail -->

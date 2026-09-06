@@ -48,3 +48,54 @@
     -fx-background-color: #E3F2FD;
     /* Light Blue 50 */
 }
+
+/* JSON Syntax Highlighting */
+.json-key {
+    -fx-fill: #006699;
+    -fx-font-weight: bold;
+}
+.json-string {
+    -fx-fill: #2E7D32;
+}
+.json-number {
+    -fx-fill: #D84315;
+    -fx-font-weight: bold;
+}
+.json-boolean {
+    -fx-fill: #6A1B9A;
+    -fx-font-weight: bold;
+}
+.json-null {
+    -fx-fill: #757575;
+    -fx-font-style: italic;
+}
+.json-punctuation {
+    -fx-fill: #37474F;
+    -fx-font-weight: bold;
+}
+
+/* XML Syntax Highlighting */
+.xml-tag {
+    -fx-fill: #0D47A1;
+    -fx-font-weight: bold;
+}
+.xml-attribute {
+    -fx-fill: #D84315;
+}
+.xml-equals {
+    -fx-fill: #37474F;
+}
+.xml-value {
+    -fx-fill: #2E7D32;
+}
+.xml-comment {
+    -fx-fill: #757575;
+    -fx-font-style: italic;
+}
+.xml-declaration {
+    -fx-fill: #00695C;
+    -fx-font-weight: bold;
+}
+.xml-cdata {
+    -fx-fill: #AD1457;
+}

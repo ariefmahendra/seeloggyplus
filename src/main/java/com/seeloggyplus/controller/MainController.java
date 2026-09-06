@@ -28,13 +28,18 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
+import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.application.Platform;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -63,6 +68,10 @@ public class MainController {
     @FXML
     private MenuItem exitMenuItem;
     @FXML
+    private MenuItem closeTabMenuItem;
+    @FXML
+    private MenuItem closeAllTabsMenuItem;
+    @FXML
     private CheckMenuItem showLeftPanelMenuItem;
     @FXML
     private CheckMenuItem showBottomPanelMenuItem;
@@ -90,11 +99,17 @@ public class MainController {
     @FXML
     private Button expandLeftPanelButton;
     @FXML
+    private TextField recentFilesFilterField;
+    @FXML
     private ListView<RecentFilesDto> recentFilesListView;
     @FXML
     private Button clearRecentButton;
     @FXML
     private Button pinLeftPanelButton;
+
+    private final ObservableList<RecentFilesDto> allRecentFiles = FXCollections.observableArrayList();
+    private FilteredList<RecentFilesDto> filteredRecentFiles;
+    private Label detailPlaceholderLabel;
 
     // FXML Components - Center Panel (Log Table)
 
@@ -117,6 +132,13 @@ public class MainController {
     private ProgressIndicator loadingProgress;
     @FXML
     private StackPane logContainer;
+    @FXML
+    private TabPane logTabPane;
+    @FXML
+    private VBox emptyStatePane;
+
+    private final Map<Tab, LogSession> sessionMap = new LinkedHashMap<>();
+    private LogSession currentSession = null;
 
     // Root of the center area (clipped to avoid painting over top/bottom bars)
     @FXML
@@ -152,6 +174,7 @@ public class MainController {
     @FXML
     private StackPane detailContainer;
     private StyleClassedTextArea detailCodeArea;
+    private String currentRawLogContent;
 
     // Layout State Variables
     private double lastVerticalDividerPos = 0.7;
@@ -239,7 +262,7 @@ public class MainController {
     private Predicate<LogEntry> currentTailFilterPredicate = null;
     private Pattern currentTailSearchPattern = null; // Compiled pattern for incremental tail search
     private int tailSearchScannedUpTo = 0; // liveTailList index up to which search has been performed
-    private final boolean isSkippingFilterTrigger = false;
+    private boolean isSkippingFilterTrigger = false;
 
     private int totalEntries = 0;
     private IntArrayList filteredIndexes = null;
@@ -256,7 +279,7 @@ public class MainController {
     private SplitPane searchSplitPane;
 
     // Persistent buffer for live tailing (CanvasLogViewer reads this)
-    private final List<LogEntry> liveTailList = Collections.synchronizedList(new ArrayList<>());
+    private List<LogEntry> liveTailList = Collections.synchronizedList(new ArrayList<>());
 
     @FXML
     private ToggleButton followTailButton;
@@ -317,8 +340,10 @@ public class MainController {
     }
 
     private void updateTailButtonState() {
-        boolean isRemote = (currentLogFromDb != null && currentLogFromDb.isRemote());
-        boolean isLocal = (currentFile != null && currentFile.exists());
+        boolean isRemote = (currentLogFromDb != null && currentLogFromDb.isRemote())
+                || (currentSession != null && currentSession.getSessionType() == LogSession.SessionType.REMOTE);
+        boolean isLocal = (currentFile != null && currentFile.exists())
+                || (currentSession != null && currentSession.getSessionType() == LogSession.SessionType.LOCAL);
 
         if (isRemote || isLocal) {
             tailButton.setDisable(false);
@@ -374,6 +399,12 @@ public class MainController {
 
     private void setupMenuBar() {
         exitMenuItem.setOnAction(e -> handleExit());
+        if (closeTabMenuItem != null) {
+            closeTabMenuItem.setOnAction(e -> handleCloseCurrentTab());
+        }
+        if (closeAllTabsMenuItem != null) {
+            closeAllTabsMenuItem.setOnAction(e -> handleCloseAllTabs());
+        }
 
         showLeftPanelMenuItem.setSelected(true);
         showBottomPanelMenuItem.setSelected(true);
@@ -412,9 +443,34 @@ public class MainController {
         recentFilesListView.setCellFactory(
                 listView -> new RecentFileListCell(serverManagementService, () -> monitoringRemotePath));
         recentFilesListView.getStyleClass().add("recent-files-list");
-        recentFilesListView.setItems(FXCollections.observableArrayList(recentFileService.findAll()));
+        allRecentFiles.setAll(recentFileService.findAll());
+        filteredRecentFiles = new FilteredList<>(allRecentFiles, p -> true);
+        recentFilesListView.setItems(filteredRecentFiles);
         recentFilesListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         recentFilesListView.setContextMenu(leftPanelContextMenu);
+
+        if (recentFilesFilterField != null) {
+            recentFilesFilterField.textProperty().addListener((obs, oldVal, newVal) -> {
+                filteredRecentFiles.setPredicate(dto -> {
+                    if (newVal == null || newVal.isBlank()) return true;
+                    String filter = newVal.toLowerCase().trim();
+                    LogFile file = dto.logFile();
+                    if (file == null) return false;
+                    boolean matchesName = file.getName() != null && file.getName().toLowerCase().contains(filter);
+                    boolean matchesPath = file.getFilePath() != null && file.getFilePath().toLowerCase().contains(filter);
+                    boolean matchesServer = false;
+                    if (file.isRemote() && file.getSshServerID() != null) {
+                        try {
+                            SSHServerModel server = serverManagementService.getServerById(file.getSshServerID());
+                            if (server != null && server.getName() != null && server.getName().toLowerCase().contains(filter)) {
+                                matchesServer = true;
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                    return matchesName || matchesPath || matchesServer;
+                });
+            });
+        }
 
         recentFilesListView.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2 && event.getButton() == MouseButton.PRIMARY) {
@@ -497,56 +553,112 @@ public class MainController {
      */
     private void selectRecentFile(File file) {
         if (file == null) return;
-        selectRecentFileByPath(file.getAbsolutePath());
+        selectRecentFile(file.getAbsolutePath(), null, false);
     }
 
     /**
-     * Selects the recent file entry matching the given path (local absolute path or remote path).
+     * Selects the recent file entry matching the given path, server ID, and remote status.
      */
-    private void selectRecentFileByPath(String targetPath) {
+    private void selectRecentFile(String targetPath, String sshServerId, boolean isRemote) {
         if (targetPath == null || recentFilesListView == null) {
             return;
         }
         Platform.runLater(() -> {
             recentFilesListView.getSelectionModel().clearSelection();
             for (RecentFilesDto dto : recentFilesListView.getItems()) {
-                if (dto != null && dto.logFile() != null && targetPath.equals(dto.logFile().getFilePath())) {
-                    recentFilesListView.getSelectionModel().select(dto);
-                    recentFilesListView.scrollTo(dto);
-                    return;
+                if (dto != null && dto.logFile() != null) {
+                    LogFile lf = dto.logFile();
+                    if (targetPath.equals(lf.getFilePath()) && lf.isRemote() == isRemote) {
+                        if (!isRemote || Objects.equals(sshServerId, lf.getSshServerID())) {
+                            recentFilesListView.getSelectionModel().select(dto);
+                            recentFilesListView.scrollTo(dto);
+                            return;
+                        }
+                    }
                 }
             }
         });
+    }
+
+    private void selectRecentFileByPath(String targetPath) {
+        selectRecentFile(targetPath, null, false);
     }
 
     private static final String KEYWORDS_REGEX = "(?i)(ERROR|FATAL|EXCEPTION|WARN|INFO|DEBUG|TRACE)";
     private static final Pattern KEYWORDS_PATTERN = Pattern.compile(KEYWORDS_REGEX);
 
     private void setupCenterPanel() {
-        canvasLogViewer = new CanvasLogViewer();
-        canvasLogViewer.setTailBuffer(liveTailList);
         if (followTailButton != null) {
-            followTailButton.setSelected(canvasLogViewer.isFollowTail());
-            canvasLogViewer.setOnFollowTailChanged(
-                    isFollowing -> Platform.runLater(() -> followTailButton.setSelected(isFollowing)));
-            followTailButton.selectedProperty()
-                    .addListener((obs, oldVal, newVal) -> canvasLogViewer.setFollowTail(newVal));
+            followTailButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                if (isProgrammaticUpdate) return;
+                if (canvasLogViewer != null) {
+                    canvasLogViewer.setFollowTail(newVal);
+                }
+                if (currentSession != null) {
+                    currentSession.setFollowTail(newVal);
+                }
+            });
         }
 
-        logContainer.getChildren().add(canvasLogViewer);
-        logContainer.setMinSize(0, 0);
-        StackPane.setAlignment(canvasLogViewer, javafx.geometry.Pos.CENTER);
+        if (logTabPane != null) {
+            logTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
+                onTabSelected(oldTab, newTab);
+            });
 
-        canvasLogViewer.prefWidthProperty().bind(logContainer.widthProperty());
-        canvasLogViewer.prefHeightProperty().bind(logContainer.heightProperty());
-        canvasLogViewer.setMinSize(0, 0);
-        canvasLogViewer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+            // Intercept UP/DOWN/PAGE_UP/PAGE_DOWN/HOME/END keys so TabPane never changes tabs on arrow keys,
+            // and instead routes line scrolling/navigation directly to the log canvas viewer.
+            logTabPane.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+                KeyCode code = event.getCode();
+                if (code == KeyCode.UP || code == KeyCode.DOWN || code == KeyCode.PAGE_UP || code == KeyCode.PAGE_DOWN
+                        || ((code == KeyCode.HOME || code == KeyCode.END) && event.isControlDown())) {
+                    event.consume();
+                    if (canvasLogViewer != null) {
+                        canvasLogViewer.handleKeyNavigation(event);
+                        canvasLogViewer.requestCanvasFocus();
+                    }
+                }
+            });
+
+            logTabPane.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.MIDDLE) {
+                    javafx.scene.Node target = (javafx.scene.Node) event.getTarget();
+                    while (target != null && target != logTabPane) {
+                        if (target.getStyleClass().contains("tab")) {
+                            for (Tab t : logTabPane.getTabs()) {
+                                if (t.getGraphic() != null && isNodeRelated(target, t.getGraphic())) {
+                                    LogSession s = sessionMap.get(t);
+                                    if (s != null) closeSession(s);
+                                    event.consume();
+                                    return;
+                                }
+                            }
+                            Tab selected = logTabPane.getSelectionModel().getSelectedItem();
+                            if (selected != null) {
+                                LogSession s = sessionMap.get(selected);
+                                if (s != null) closeSession(s);
+                            }
+                            event.consume();
+                            return;
+                        }
+                        target = target.getParent();
+                    }
+                } else if (event.getButton() == MouseButton.PRIMARY) {
+                    Platform.runLater(() -> {
+                        if (canvasLogViewer != null) {
+                            canvasLogViewer.requestCanvasFocus();
+                        }
+                    });
+                }
+            });
+        }
 
         // Search Result Panel — shown to the right of the log viewer when search is active
         searchResultPanel = new com.seeloggyplus.ui.search.SearchResultPanel();
         searchResultPanel.setOnLineSelected((listIndex, globalLine, content) -> {
-            canvasLogViewer.jumpToLine(globalLine);
-            canvasLogViewer.selectLine(globalLine);
+            if (canvasLogViewer != null) {
+                canvasLogViewer.jumpToLine(globalLine);
+                canvasLogViewer.selectLine(globalLine);
+            }
             displayLogDetailFromCanvas(globalLine, content);
             // Sync navigator status with panel click
             if (filteredIndexes != null && searchNavigator != null) {
@@ -568,37 +680,8 @@ public class MainController {
         logParent.setMinHeight(0);
         this.searchSplitPane = searchSplit;
 
-        canvasLogViewer.setOnLineClick((lineNumber, lineContent) -> {
-            displayLogDetailFromCanvas(lineNumber, Objects.requireNonNullElse(lineContent, ""));
-        });
-
-        canvasLogViewer.setOnLineDoubleClick((lineNumber, content) -> {
-            logger.info("Double clicked line {}", lineNumber + 1);
-            if (filteredIndexes != null) {
-                logger.info("Clearing search and jumping to original line {}", lineNumber + 1);
-                searchField.clear();
-                filteredIndexes = null;
-                canvasLogViewer.clearFilter();
-                canvasLogViewer.clearSearchHighlight();
-                hideSearchResultPanel();
-                if (searchNavigator != null) searchNavigator.clear();
-                canvasLogViewer.jumpToLine(lineNumber);
-            }
-
-            displayLogDetailFromCanvas(lineNumber, content);
-        });
-
-        canvasLogViewer.setOnStatusUpdate((currentLine, total, percentage) -> {
-            if (statusLabel != null) {
-                String formatted;
-                if (tailModeEnabled) {
-                    formatted = String.format("Line: %,d / %,d", currentLine, total);
-                } else {
-                    formatted = String.format("Line: %,d / %,d (%.1f%%)", currentLine, total, percentage);
-                }
-                statusLabel.setText(formatted);
-            }
-        });
+        setupDragAndDrop();
+        updateEmptyState();
 
         setupDetailPanel();
 
@@ -633,13 +716,15 @@ public class MainController {
                     if (currentSearchTask != null && currentSearchTask.isRunning()) {
                         currentSearchTask.cancel(true);
                     }
-                    canvasLogViewer.clearFilter();
-                    canvasLogViewer.clearSearchHighlight();
+                    if (canvasLogViewer != null) {
+                        canvasLogViewer.clearFilter();
+                        canvasLogViewer.clearSearchHighlight();
+                        if (tailModeEnabled && !canvasLogViewer.isFollowTail()) {
+                            canvasLogViewer.setFollowTail(true);
+                        }
+                    }
                     if (searchNavigator != null) searchNavigator.clear();
                     hideSearchResultPanel();
-                    if (tailModeEnabled && !canvasLogViewer.isFollowTail()) {
-                        canvasLogViewer.setFollowTail(true);
-                    }
                 }
             }
         });
@@ -689,19 +774,30 @@ public class MainController {
             return;
         }
 
-        if (button.isSelected()) {
+        applyToggleStyle(button, button.isSelected());
+
+        button.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            applyToggleStyle(button, newVal);
+        });
+    }
+
+    private void applyToggleStyle(ToggleButton button, boolean selected) {
+        if (selected) {
             button.setStyle(TOGGLE_SELECTED_STYLE);
         } else {
             button.setStyle(TOGGLE_DESELECTED_STYLE);
         }
+        updateToggleIconColor(button, selected);
+    }
 
-        button.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal) {
-                button.setStyle(TOGGLE_SELECTED_STYLE);
-            } else {
-                button.setStyle(TOGGLE_DESELECTED_STYLE);
-            }
-        });
+    private void updateToggleIconColor(ToggleButton button, boolean selected) {
+        if (button == null) return;
+        Node graphic = button.getGraphic();
+        if (graphic instanceof FontAwesomeIconView icon) {
+            icon.setFill(selected ? Color.WHITE : Color.web("#333333"));
+        } else if (graphic instanceof javafx.scene.shape.Shape shape) {
+            shape.setFill(selected ? Color.WHITE : Color.web("#333333"));
+        }
     }
 
     private void normalizeLayoutState() {
@@ -774,13 +870,20 @@ public class MainController {
 
     private void displayLogDetailFromCanvas(long lineNumber, String content) {
         if (detailCodeArea != null && content != null) {
+            if (detailPlaceholderLabel != null) {
+                detailPlaceholderLabel.setVisible(false);
+                detailPlaceholderLabel.setManaged(false);
+            }
+            this.currentRawLogContent = content;
             detailCodeArea.clear();
             detailCodeArea.replaceText(0, 0, content);
             detailLabel.setText("Line " + (lineNumber + 1));
 
+            boolean prettified = false;
             if (autoPrettifyJson) {
-                prettifyJson();
-            } else if (autoPrettifyXml) {
+                prettified = prettifyJson();
+            }
+            if (!prettified && autoPrettifyXml) {
                 prettifyXml();
             }
         }
@@ -831,64 +934,77 @@ public class MainController {
             }
 
             filteredIndexes = new IntArrayList();
-            canvasLogViewer.setFilteredIndexes(null); // Show all lines
-            canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
+            if (canvasLogViewer != null) {
+                canvasLogViewer.setFilteredIndexes(null); // Show all lines
+                canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
 
-            // Scan FILE lines first (if a file is loaded alongside tail)
-            long tailOffset = canvasLogViewer.getFileLineCount();
-            if (mappedFileReader != null && lineOffsetIndex != null && tailOffset > 0) {
-                int fileLines = lineOffsetIndex.getLineCount();
-                for (int i = 0; i < fileLines; i++) {
-                    CharSequence line = mappedFileReader.readLine(lineOffsetIndex, i);
-                    if (line != null && matchPattern.matcher(line).find()) {
-                        filteredIndexes.add(i);
-                    }
+                // Pause follow-tail so user can navigate search results
+                if (canvasLogViewer.isFollowTail()) {
+                    canvasLogViewer.setFollowTail(false);
                 }
-                logger.info("Tail search: {} matches in file lines (0..{})", filteredIndexes.size(), fileLines);
             }
 
-            // Then scan tail buffer lines.
-            // Canvas sees tail buffer as fileLineCount + bufferIndex.
-            List<LogEntry> snapshot;
+            final long tailOffset = canvasLogViewer != null ? canvasLogViewer.getFileLineCount() : 0;
+            final MappedFileReader reader = mappedFileReader;
+            final LineOffsetIndex index = lineOffsetIndex;
+            final Pattern pattern = matchPattern;
+            final CanvasLogViewer viewer = canvasLogViewer;
+            final List<LogEntry> snapshot;
             synchronized (liveTailList) {
                 snapshot = new ArrayList<>(liveTailList);
             }
-            for (int i = 0; i < snapshot.size(); i++) {
-                LogEntry entry = snapshot.get(i);
-                String raw = entry != null ? entry.getRawLog() : "";
-                if (matchPattern.matcher(raw).find()) {
-                    filteredIndexes.add((int) (tailOffset + i));
+            final int snapshotSize = snapshot.size();
+
+            // Offload file and tail scanning to background worker to eliminate UI freeze
+            SEARCH_POOL.submit(() -> {
+                IntArrayList results = new IntArrayList();
+                if (reader != null && index != null && tailOffset > 0) {
+                    int fileLines = index.getLineCount();
+                    for (int i = 0; i < fileLines; i++) {
+                        if (Thread.currentThread().isInterrupted()) return;
+                        CharSequence line = reader.readLine(index, i);
+                        if (line != null && pattern.matcher(line).find()) {
+                            results.add(i);
+                        }
+                    }
+                    logger.info("Tail search: {} matches in file lines (0..{})", results.size(), fileLines);
                 }
-            }
 
-            // Pause follow-tail so user can navigate search results
-            if (canvasLogViewer.isFollowTail()) {
-                canvasLogViewer.setFollowTail(false);
-            }
-
-            if (searchNavigator != null) {
-                searchNavigator.setMatchCount(filteredIndexes.size());
-            }
-
-            // Show search result panel with tail-mode resolver
-            if (filteredIndexes.size() > 0) {
-                showSearchResultPanelForTail(filteredIndexes, matchPattern);
-                // Jump to first match
-                int firstLine = filteredIndexes.get(0);
-                canvasLogViewer.jumpToLine(firstLine);
-                canvasLogViewer.selectLine(firstLine);
-                currentMatchIndex = 1;
-                if (searchNavigator != null) {
-                    searchNavigator.updateStatus(1, filteredIndexes.size());
+                for (int i = 0; i < snapshot.size(); i++) {
+                    if (Thread.currentThread().isInterrupted()) return;
+                    LogEntry entry = snapshot.get(i);
+                    String raw = entry != null ? entry.getRawLog() : "";
+                    if (pattern.matcher(raw).find()) {
+                        results.add((int) (tailOffset + i));
+                    }
                 }
-            } else {
-                hideSearchResultPanel();
-                currentMatchIndex = -1;
-            }
 
-            // Store pattern for incremental tail search
-            currentTailSearchPattern = matchPattern;
-            tailSearchScannedUpTo = snapshot.size(); // mark how far we've scanned
+                Platform.runLater(() -> {
+                    this.filteredIndexes = results;
+                    this.currentTailSearchPattern = pattern;
+                    this.tailSearchScannedUpTo = snapshotSize;
+
+                    if (searchNavigator != null) {
+                        searchNavigator.setMatchCount(results.size());
+                    }
+
+                    // Show search result panel with tail-mode resolver
+                    if (results.size() > 0) {
+                        showSearchResultPanelForTail(results, pattern);
+                        // Jump to first match
+                        int firstLine = results.get(0);
+                        viewer.jumpToLine(firstLine);
+                        viewer.selectLine(firstLine);
+                        currentMatchIndex = 1;
+                        if (searchNavigator != null) {
+                            searchNavigator.updateStatus(1, results.size());
+                        }
+                    } else {
+                        hideSearchResultPanel();
+                        currentMatchIndex = -1;
+                    }
+                });
+            });
 
             // Update the predicate for completeness
             try {
@@ -1009,7 +1125,9 @@ public class MainController {
             // Store matches for navigation but do NOT filter the view —
             // all lines remain visible, matches are only highlighted.
             filteredIndexes = matches;
-            canvasLogViewer.setFilteredIndexes(null); // Show all lines
+            if (canvasLogViewer != null) {
+                canvasLogViewer.setFilteredIndexes(null); // Show all lines
+            }
 
             // Enhanced Highlight Logic for Boolean Search
             String highlightPattern = searchText;
@@ -1025,7 +1143,9 @@ public class MainController {
                 }
             }
 
-            canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
+            if (canvasLogViewer != null) {
+                canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
+            }
 
             // Compile pattern for search result panel highlight
             Pattern compiledHighlight = null;
@@ -1044,8 +1164,10 @@ public class MainController {
                 showSearchResultPanel(matches, compiledHighlight);
                 // Jump to first match
                 int firstLine = matches.get(0);
-                canvasLogViewer.jumpToLine(firstLine);
-                canvasLogViewer.selectLine(firstLine);
+                if (canvasLogViewer != null) {
+                    canvasLogViewer.jumpToLine(firstLine);
+                    canvasLogViewer.selectLine(firstLine);
+                }
                 currentMatchIndex = 1;
                 if (searchNavigator != null) {
                     searchNavigator.updateStatus(1, matches.size());
@@ -1080,8 +1202,10 @@ public class MainController {
         if (nextIdx >= total) nextIdx = 0; // wrap
 
         int globalLine = filteredIndexes.get(nextIdx);
-        canvasLogViewer.jumpToLine(globalLine);
-        canvasLogViewer.selectLine(globalLine);
+        if (canvasLogViewer != null) {
+            canvasLogViewer.jumpToLine(globalLine);
+            canvasLogViewer.selectLine(globalLine);
+        }
         currentMatchIndex = nextIdx + 1; // advance for next call
         if (searchNavigator != null) {
             searchNavigator.updateStatus(nextIdx + 1, total);
@@ -1100,8 +1224,10 @@ public class MainController {
         if (prevIdx < 0) prevIdx = total - 1; // wrap
 
         int globalLine = filteredIndexes.get(prevIdx);
-        canvasLogViewer.jumpToLine(globalLine);
-        canvasLogViewer.selectLine(globalLine);
+        if (canvasLogViewer != null) {
+            canvasLogViewer.jumpToLine(globalLine);
+            canvasLogViewer.selectLine(globalLine);
+        }
         currentMatchIndex = prevIdx + 1;
         if (searchNavigator != null) {
             searchNavigator.updateStatus(prevIdx + 1, total);
@@ -1122,16 +1248,18 @@ public class MainController {
         if (currentSearchTask != null && currentSearchTask.isRunning()) {
             currentSearchTask.cancel(true);
         }
-        canvasLogViewer.clearFilter();
-        canvasLogViewer.clearSearchHighlight();
+        if (canvasLogViewer != null) {
+            canvasLogViewer.clearFilter();
+            canvasLogViewer.clearSearchHighlight();
+            // Restore follow-tail when clearing search in tail mode
+            if (tailModeEnabled && !canvasLogViewer.isFollowTail()) {
+                canvasLogViewer.setFollowTail(true);
+            }
+        }
         if (searchNavigator != null) {
             searchNavigator.clear();
         }
         hideSearchResultPanel();
-        // Restore follow-tail when clearing search in tail mode
-        if (tailModeEnabled && !canvasLogViewer.isFollowTail()) {
-            canvasLogViewer.setFollowTail(true);
-        }
     }
 
     private void showSearchResultPanel(IntArrayList matches, Pattern highlightPattern) {
@@ -1163,7 +1291,7 @@ public class MainController {
     private void showSearchResultPanelForTail(IntArrayList matches, Pattern highlightPattern) {
         if (searchResultPanel == null || searchSplitPane == null) return;
         // Resolver: idx can be a file line (< tailOffset) or tail buffer line (>= tailOffset).
-        long tailOffset = canvasLogViewer.getFileLineCount();
+        long tailOffset = canvasLogViewer != null ? canvasLogViewer.getFileLineCount() : 0;
         searchResultPanel.setLineContentResolver(idx -> {
             if (idx < tailOffset) {
                 // File line
@@ -1201,8 +1329,10 @@ public class MainController {
         lineOffsetIndex = null;
         filteredIndexes = null;
         totalEntries = 0;
-        canvasLogViewer.clearFilter();
-        canvasLogViewer.clearSearchHighlight();
+        if (canvasLogViewer != null) {
+            canvasLogViewer.clearFilter();
+            canvasLogViewer.clearSearchHighlight();
+        }
         logger.info("File resources cleaned up");
     }
 
@@ -1216,6 +1346,13 @@ public class MainController {
     }
 
     private void loadFileWithParallelParsing(File file, LogFile logFile, boolean updateRecentFilesList,
+            boolean jumpToEnd, boolean selectInRecent) {
+        if (currentSession != null) {
+            loadFileWithParallelParsing(currentSession, file, logFile, updateRecentFilesList, jumpToEnd, selectInRecent);
+        }
+    }
+
+    private void loadFileWithParallelParsing(LogSession session, File file, LogFile logFile, boolean updateRecentFilesList,
             boolean jumpToEnd, boolean selectInRecent) {
         showLoading("Indexing file: " + file.getName() + " (scanning for lines...)");
         Task<Void> task = new Task<>() {
@@ -1233,26 +1370,48 @@ public class MainController {
 
                 raf.close();
                 logger.info("Indexing complete! {} lines indexed in {}", index.getLineCount(), file.getName());
+                MappedFileReader oldReader = session.getReader();
                 MappedFileReader reader = new com.seeloggyplus.util.MappedFileReader(file);
-                lineOffsetIndex = index;
-                mappedFileReader = reader;
-                totalEntries = index.getLineCount();
+                session.setIndex(index);
+                session.setReader(reader);
+                session.setTotalEntries(index.getLineCount());
+                if (oldReader != null) {
+                    oldReader.close();
+                }
                 return null;
             }
         };
 
         task.setOnSucceeded(e -> {
-            logger.info("Index complete! {} entries available", totalEntries);
+            logger.info("Index complete! {} entries available", session.getTotalEntries());
 
             Platform.runLater(() -> {
-                canvasLogViewer.loadFile(mappedFileReader, lineOffsetIndex);
-                if (jumpToEnd && totalEntries > 0) {
-                    canvasLogViewer.jumpToLine(totalEntries - 1);
-                } else {
-                    canvasLogViewer.jumpToLine(0);
+                if (session.isClosed()) {
+                    if (session.getReader() != null) {
+                        session.getReader().close();
+                    }
+                    return;
                 }
-                canvasLogViewer.requestCanvasFocus();
-                logger.info("Canvas viewer initialized");
+                session.getLiveTailList().clear();
+                if (session.getCanvasLogViewer() != null) {
+                    session.getCanvasLogViewer().loadFile(session.getReader(), session.getIndex());
+                    if (jumpToEnd && session.getTotalEntries() > 0) {
+                        session.getCanvasLogViewer().jumpToLine(session.getTotalEntries() - 1);
+                    } else {
+                        session.getCanvasLogViewer().jumpToLine(0);
+                    }
+                }
+
+                if (session == currentSession) {
+                    mappedFileReader = session.getReader();
+                    lineOffsetIndex = session.getIndex();
+                    totalEntries = session.getTotalEntries();
+                    if (session.getCanvasLogViewer() != null) {
+                        session.getCanvasLogViewer().requestCanvasFocus();
+                    }
+                    updateTailButtonState();
+                }
+                logger.info("Canvas viewer initialized for session: {}", session.getTitle());
             });
 
             if (updateRecentFilesList) {
@@ -1295,6 +1454,34 @@ public class MainController {
     private void handleReload() {
         logger.info("Reload triggered by user.");
 
+        if (currentSession != null) {
+            if (currentSession.getSessionType() == LogSession.SessionType.LOCAL && currentSession.getLocalFile() != null) {
+                logger.info("Reloading local file in current tab '{}'.", currentSession.getLocalFile().getName());
+                showLoading("Reloading file...");
+                loadFileWithParallelParsing(currentSession, currentSession.getLocalFile(), currentSession.getLogFileRecord(), false, false, false);
+                return;
+            } else if (currentSession.getSessionType() == LogSession.SessionType.REMOTE) {
+                if (currentSession.getSshService() != null && currentSession.getRemotePath() != null) {
+                    final LogSession targetSession = currentSession;
+                    logger.info("Reloading remote tail for session '{}'", targetSession.getTitle());
+                    disableTail(targetSession, true);
+                    targetSession.getLiveTailList().clear();
+                    if (targetSession.getCanvasLogViewer() != null) {
+                        targetSession.getCanvasLogViewer().refreshTail();
+                    }
+                    targetSession.setTailModeEnabled(true);
+                    targetSession.getSshService().tailFile(targetSession.getRemotePath(), tailWindowSize,
+                            line -> handleTailLineBackground(targetSession, line),
+                            error -> Platform.runLater(() -> {
+                                showError("Remote Tail Error", error);
+                                disableTail(targetSession, false);
+                            }));
+                    updateTabBadge(targetSession);
+                    return;
+                }
+            }
+        }
+
         // 1. Active remote tail — just restart it
         if (tailModeEnabled && monitoringRemotePath != null && activeTailSshService != null) {
             reloadActiveRemoteTail();
@@ -1333,9 +1520,15 @@ public class MainController {
             return;
         }
         SSHServerModel server = serverManagementService.getServerById(currentLogFromDb.getSshServerID());
-        if (server == null || currentParsingConfig == null) {
-            showError("Reload Error", "Missing server or parsing configuration.");
+        if (server == null) {
+            showError("Reload Error", "Missing server configuration.");
             return;
+        }
+        if (currentParsingConfig == null && currentSession != null) {
+            currentParsingConfig = currentSession.getParsingConfig();
+        }
+        if (currentParsingConfig == null) {
+            currentParsingConfig = parsingConfigService.findDefault().orElseGet(ParsingConfig::createRawConfig);
         }
         showLoading("Reloading remote tail...");
         try {
@@ -1411,6 +1604,7 @@ public class MainController {
         currentLogFromDb = null;
         currentParsingConfig = null;
         clearSearch();
+        clearDetail();
         updateTailButtonState();
         recentFilesListView.getSelectionModel().clearSelection();
         if (followTailButton != null) {
@@ -1429,6 +1623,7 @@ public class MainController {
                 applyAutoPrettify();
             } else {
                 prettifyJsonButton.setStyle("");
+                restoreRawDetailIfNotPrettified();
             }
         });
 
@@ -1440,6 +1635,7 @@ public class MainController {
                 applyAutoPrettify();
             } else {
                 prettifyXmlButton.setStyle("");
+                restoreRawDetailIfNotPrettified();
             }
         });
         copyButton.setOnAction(e -> copyDetailToClipboard());
@@ -1461,15 +1657,39 @@ public class MainController {
     }
 
     private void applyAutoPrettify() {
-        if (detailCodeArea.getText() == null || detailCodeArea.getText().isEmpty()) {
+        if (currentRawLogContent == null && detailCodeArea != null) {
+            currentRawLogContent = detailCodeArea.getText();
+        }
+        if (currentRawLogContent == null || currentRawLogContent.isEmpty()) {
             return;
         }
 
+        boolean prettified = false;
         if (autoPrettifyJson) {
-            prettifyJson();
+            prettified = prettifyJson();
         }
-        if (autoPrettifyXml) {
+        if (!prettified && autoPrettifyXml) {
             prettifyXml();
+        }
+    }
+
+    private void restoreRawDetailIfNotPrettified() {
+        if (currentRawLogContent != null && detailCodeArea != null) {
+            boolean prettified = false;
+            if (autoPrettifyJson) {
+                prettified = prettifyJson();
+            }
+            if (!prettified && autoPrettifyXml) {
+                prettifyXml();
+            }
+            if (!prettified) {
+                detailCodeArea.replaceText(currentRawLogContent);
+                try {
+                    detailCodeArea.setStyleSpans(0, computeHighlightingSpans(currentRawLogContent));
+                } catch (Exception e) {
+                    logger.warn("CSS load fail in restore raw detail");
+                }
+            }
         }
     }
 
@@ -1554,6 +1774,24 @@ public class MainController {
                 this::navigateNextMatch);
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F3, KeyCombination.SHIFT_DOWN),
                 this::navigatePreviousMatch);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.W, KeyCombination.CONTROL_DOWN),
+                this::handleCloseCurrentTab);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.TAB, KeyCombination.CONTROL_DOWN),
+                this::selectNextTab);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.TAB, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
+                this::selectPreviousTab);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN), () -> {
+            Node focusOwner = scene.getFocusOwner();
+            if (focusOwner instanceof TextInputControl) {
+                return;
+            }
+            if (focusOwner != null && focusOwner.getClass().getName().toLowerCase().contains("richtext")) {
+                return;
+            }
+            if (canvasLogViewer != null && canvasLogViewer.hasSelection()) {
+                canvasLogViewer.copySelectedLines();
+            }
+        });
     }
 
     @FXML
@@ -1571,6 +1809,8 @@ public class MainController {
             dialog.initModality(Modality.WINDOW_MODAL);
             dialog.initOwner(mainStage);
             dialog.setScene(new Scene(root));
+            dialog.setMaximized(true);
+            dialog.setOnShown(e -> dialog.setMaximized(true));
 
             dialog.showAndWait();
 
@@ -1589,12 +1829,15 @@ public class MainController {
 
             if (selectedFile.getSourceType() == FileInfo.SourceType.LOCAL) {
                 openLocalLogFile(new File(selectedFile.getPath()), true);
+                if (action == UnifiedFileManagerDialogController.OpenAction.TAIL) {
+                    enableTail();
+                }
                 if (sshService != null) {
                     sshService.disconnect();
                 }
             } else {
                 if (action == UnifiedFileManagerDialogController.OpenAction.OPEN) {
-                    openRemoteLogFile(selectedFile.getPath(), selectedFile.getName(), sshService);
+                    openRemoteLogFile(selectedFile.getPath(), selectedFile.getName(), sshService, sshServer);
                 } else if (action == UnifiedFileManagerDialogController.OpenAction.TAIL) {
                     startRemoteTail(selectedFile.getPath(), sshService, sshServer);
                 }
@@ -1605,7 +1848,7 @@ public class MainController {
         }
     }
 
-    private void openRemoteLogFile(String remotePath, String remoteFileName, SSHServiceImpl sshService) {
+    private void openRemoteLogFile(String remotePath, String remoteFileName, SSHServiceImpl sshService, SSHServerModel sshServer) {
         if (sshService == null || !sshService.isConnected()) {
             showError("Connection Error", "SSH connection is not active. Please re-select the file.");
             return;
@@ -1658,7 +1901,7 @@ public class MainController {
         downloadTask.setOnSucceeded(e -> {
             File localFile = downloadTask.getValue();
             hideLoading();
-            openLocalLogFile(localFile, true); // Removed parsingConfig
+            openLocalLogFile(localFile, remoteFileName, sshServer, true);
             sshService.disconnect();
         });
 
@@ -1696,63 +1939,105 @@ public class MainController {
     }
 
     private void openLocalLogFile(File file, boolean updateRecentFilesList) {
+        openLocalLogFile(file, null, null, updateRecentFilesList);
+    }
+
+    private void openLocalLogFile(File file, String customDisplayName, SSHServerModel remoteServer, boolean updateRecentFilesList) {
         if (file == null || !file.exists()) {
             logger.error("File does not exist: {}", file);
             showError("File Error", "The selected file does not exist or cannot be accessed.");
             return;
         }
 
-        ParsingConfig parsingConfig = ParsingConfig.createRawConfig(); // Created internally
+        // Check if file is already open in an existing tab
+        for (Map.Entry<Tab, LogSession> entry : sessionMap.entrySet()) {
+            LogSession s = entry.getValue();
+            if (s.getSessionType() == LogSession.SessionType.LOCAL && s.getLocalFile() != null) {
+                try {
+                    if (s.getLocalFile().getCanonicalPath().equalsIgnoreCase(file.getCanonicalPath())) {
+                        if (logTabPane != null) {
+                            logTabPane.getSelectionModel().select(entry.getKey());
+                        }
+                        return;
+                    }
+                } catch (IOException ignored) {
+                    if (s.getLocalFile().getAbsolutePath().equalsIgnoreCase(file.getAbsolutePath())) {
+                        if (logTabPane != null) {
+                            logTabPane.getSelectionModel().select(entry.getKey());
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        ParsingConfig parsingConfig = ParsingConfig.createRawConfig();
         logger.info("Using default RAW configuration for local file: {}", file.getAbsolutePath());
 
-        clearSearch();
-
-        cancelCurrentLoadingTask();
-        if (tailModeEnabled) {
-            disableTail(true); // skipReindex: we're about to load a different file
-        }
-        if (followTailButton != null) {
-            followTailButton.setSelected(false);
+        String cleanName = customDisplayName;
+        if (cleanName == null) {
+            cleanName = file.getName();
+            if (cleanName.matches("^seeloggyplus-\\d+-(.+)$")) {
+                cleanName = cleanName.replaceFirst("^seeloggyplus-\\d+-", "");
+            }
         }
 
-        // Always clear tail buffers when loading a new file to prevent stale tail data from appearing
-        synchronized (tailBuffer) {
-            tailBuffer.clear();
-        }
-        liveTailList.clear();
-        tailFlushScheduled.set(false);
-
-        // Make sure UI layout state is consistent before starting a new load.
-        normalizeLayoutState();
-
-        currentFile = file;
-        lastSession = LastSession.local(file);
-        currentParsingConfig = parsingConfig;
-
-        LogFile logFile = getOrCreateLogFile(file);
-
+        LogFile logFile = getOrCreateLogFile(file, cleanName, remoteServer);
         if (logFile == null) {
             logger.error("Failed to get or create log file record for: {}", file.getAbsolutePath());
             showError("Database Error", "Failed to save log file information to database.");
             return;
         }
 
-        this.currentLogFromDb = logFile;
-        this.currentFile = file;
+        String tabTitle = cleanName;
+        if (remoteServer != null && remoteServer.getName() != null && !remoteServer.getName().isBlank()) {
+            tabTitle = cleanName + " (" + remoteServer.getName() + ")";
+        }
+
+        LogSession session = new LogSession(tabTitle, LogSession.SessionType.LOCAL);
+        session.setLocalFile(file);
+        if (remoteServer != null) {
+            session.setSshServer(remoteServer);
+        }
+        session.setLogFileRecord(logFile);
+        session.setParsingConfig(parsingConfig);
+        session.setTailService(new TailServiceImpl());
+
+        Tab tab = createTabForSession(session);
+        sessionMap.put(tab, session);
+        if (logTabPane != null) {
+            logTabPane.getTabs().add(tab);
+            logTabPane.getSelectionModel().select(tab);
+        }
 
         long fileSizeInBytes = file.length();
-        logger.info("Starting to load file: {} ({}) - Notepad++ Style (RAM-based)", file.getName(),
+        logger.info("Starting to load file: {} ({}) into new tab", tabTitle,
                 FileUtils.formatFileSize(fileSizeInBytes));
-        loadFileWithParallelParsing(file, logFile, updateRecentFilesList);
+        loadFileWithParallelParsing(session, file, logFile, updateRecentFilesList, false, true);
     }
 
     private LogFile getOrCreateLogFile(File file) {
+        String cleanName = file.getName();
+        if (cleanName.matches("^seeloggyplus-\\d+-(.+)$")) {
+            cleanName = cleanName.replaceFirst("^seeloggyplus-\\d+-", "");
+        }
+        return getOrCreateLogFile(file, cleanName, null);
+    }
+
+    private LogFile getOrCreateLogFile(File file, String displayName, SSHServerModel remoteServer) {
         try {
             ParsingConfig parsingConfig = ParsingConfig.createRawConfig(); // Internal default
-            LogFile existingLogFile = logFileService.getLogFileByPathAndName(file.getName(), file.getAbsolutePath());
+            String serverId = remoteServer != null ? remoteServer.getId() : null;
+            boolean isRemote = remoteServer != null;
+
+            LogFile existingLogFile = logFileService.getLogFileByPathNameAndServer(displayName, file.getAbsolutePath(), serverId, isRemote);
+            if (existingLogFile == null) {
+                existingLogFile = logFileService.getLogFileByPathNameAndServer(file.getName(), file.getAbsolutePath(), serverId, isRemote);
+            }
 
             if (existingLogFile != null) {
                 logger.info("LogFile found in database, updating metadata for: {}", file.getAbsolutePath());
+                existingLogFile.setName(displayName);
                 existingLogFile.setSize(com.seeloggyplus.util.FileUtils.formatFileSize(file.length()));
                 existingLogFile.setModified(String.valueOf(file.lastModified()));
                 existingLogFile.setParsingConfigurationID(parsingConfig.getId());
@@ -1768,10 +2053,10 @@ public class MainController {
             } else {
                 logger.info("LogFile not found in database, creating new entry for: {}", file.getAbsolutePath());
                 LogFile newLogFile = new LogFile();
-                newLogFile.setName(file.getName());
+                newLogFile.setName(displayName);
                 newLogFile.setFilePath(file.getAbsolutePath());
-                newLogFile.setRemote(false);
-                newLogFile.setSshServerID(null);
+                newLogFile.setRemote(isRemote);
+                newLogFile.setSshServerID(serverId);
                 newLogFile.setParsingConfigurationID(parsingConfig.getId());
                 newLogFile.setModified(String.valueOf(file.lastModified()));
                 newLogFile.setSize(com.seeloggyplus.util.FileUtils.formatFileSize(file.length()));
@@ -1905,14 +2190,27 @@ public class MainController {
     }
 
     private void handleRecentFileSelected(RecentFilesDto recentFile) {
-        hideLoading();
-        cancelCurrentLoadingTask();
-        if (tailModeEnabled) {
-            disableTail(true); // skipReindex: a new file/tail is about to be loaded
-        }
+        if (recentFile == null || recentFile.logFile() == null) return;
         LogFile logFile = recentFile.logFile();
 
         if (logFile.isRemote()) {
+            // Check if already open in a tab
+            for (Map.Entry<Tab, LogSession> entry : sessionMap.entrySet()) {
+                LogSession s = entry.getValue();
+                if (s.getSessionType() == LogSession.SessionType.REMOTE
+                        && logFile.getFilePath().equals(s.getRemotePath())
+                        && s.getSshServer() != null
+                        && s.getSshServer().getId().equals(logFile.getSshServerID())) {
+                    if (logTabPane != null) {
+                        logTabPane.getSelectionModel().select(entry.getKey());
+                    }
+                    return;
+                }
+            }
+
+            hideLoading();
+            cancelCurrentLoadingTask();
+
             Task<SSHServiceImpl> connectTask = new Task<>() {
                 @Override
                 protected SSHServiceImpl call() throws Exception {
@@ -1996,6 +2294,28 @@ public class MainController {
                 return;
             }
 
+            // Check if already open in a tab
+            for (Map.Entry<Tab, LogSession> entry : sessionMap.entrySet()) {
+                LogSession s = entry.getValue();
+                if (s.getSessionType() == LogSession.SessionType.LOCAL && s.getLocalFile() != null) {
+                    try {
+                        if (s.getLocalFile().getCanonicalPath().equalsIgnoreCase(file.getCanonicalPath())) {
+                            if (logTabPane != null) {
+                                logTabPane.getSelectionModel().select(entry.getKey());
+                            }
+                            return;
+                        }
+                    } catch (IOException ignored) {
+                        if (s.getLocalFile().getAbsolutePath().equalsIgnoreCase(file.getAbsolutePath())) {
+                            if (logTabPane != null) {
+                                logTabPane.getSelectionModel().select(entry.getKey());
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+
             logger.info("Opening recent file: {} with RAW config", file.getName());
             resetFilters();
             openLocalLogFile(file, false);
@@ -2027,106 +2347,113 @@ public class MainController {
             logger.warn("CSS load fail");
         }
         VirtualizedScrollPane<StyleClassedTextArea> vsp = new VirtualizedScrollPane<>(detailCodeArea);
-        detailContainer.getChildren().add(vsp);
+
+        detailPlaceholderLabel = new Label("Select a log line from the table above to view formatted details, JSON/XML, or stack trace");
+        detailPlaceholderLabel.setStyle("-fx-text-fill: #888888; -fx-font-size: 12px; -fx-font-style: italic;");
+        detailPlaceholderLabel.setWrapText(true);
+        detailPlaceholderLabel.setAlignment(Pos.CENTER);
+
+        detailContainer.getChildren().addAll(vsp, detailPlaceholderLabel);
     }
 
     private StyleSpans<Collection<String>> computeHighlightingSpans(String text) {
-        Matcher matcher = KEYWORDS_PATTERN.matcher(text);
-        int lastKwEnd = 0;
-        StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
-        while (matcher.find()) {
-            String styleClass = switch (matcher.group().toUpperCase()) {
-                case "ERROR", "FATAL", "EXCEPTION" -> "error";
-                case "WARN" -> "warn";
-                case "INFO" -> "info";
-                case "DEBUG" -> "debug";
-                case "TRACE" -> "trace";
-                default -> "default";
-            };
-            spansBuilder.add(Collections.emptyList(), matcher.start() - lastKwEnd);
-            spansBuilder.add(Collections.singleton(styleClass), matcher.end() - matcher.start());
-            lastKwEnd = matcher.end();
-        }
-        spansBuilder.add(Collections.emptyList(), text.length() - lastKwEnd);
-        return spansBuilder.create();
+        return SyntaxHighlighter.computeLogHighlighting(text);
     }
 
-    private void prettifyJson() {
-        String fullText = detailCodeArea.getText();
-        if (fullText == null || fullText.isEmpty()) {
-            return;
+    private boolean prettifyJson() {
+        String sourceText = currentRawLogContent != null ? currentRawLogContent : detailCodeArea.getText();
+        if (sourceText == null || sourceText.isEmpty()) {
+            return false;
         }
 
-        StringBuilder newTextBuilder = new StringBuilder(fullText);
-        int offset = 0;
-
-        while (true) {
-            String remainingText = newTextBuilder.substring(offset);
-            String extractedJson = JsonPrettify.extractJson(remainingText);
-
-            if (extractedJson == null) {
-                break;
-            }
-
-            String prettifiedJson = JsonPrettify.prettify(extractedJson);
-
-            int start = newTextBuilder.indexOf(extractedJson, offset);
-            if (start == -1) {
-                break;
-            }
-            int end = start + extractedJson.length();
-
-            newTextBuilder.replace(start, end, prettifiedJson);
-            offset = start + prettifiedJson.length();
+        if (sourceText.length() > 4096) {
+            CompletableFuture.supplyAsync(() -> {
+                String prettified = JsonPrettify.prettifyFromLog(sourceText);
+                if (prettified != null && !prettified.equals(sourceText)) {
+                    StyleSpans<Collection<String>> spans = null;
+                    try {
+                        spans = SyntaxHighlighter.computeJsonHighlighting(prettified);
+                    } catch (Exception ignored) {}
+                    return new Object[] { prettified, spans };
+                }
+                return null;
+            }).thenAccept(result -> {
+                if (result != null && sourceText.equals(currentRawLogContent)) {
+                    Platform.runLater(() -> {
+                        String prettified = (String) result[0];
+                        @SuppressWarnings("unchecked")
+                        StyleSpans<Collection<String>> spans = (StyleSpans<Collection<String>>) result[1];
+                        detailCodeArea.replaceText(prettified);
+                        if (spans != null) {
+                            try {
+                                detailCodeArea.setStyleSpans(0, spans);
+                            } catch (Exception ignored) {}
+                        }
+                    });
+                }
+            });
+            return true;
         }
 
-        if (!newTextBuilder.toString().equals(fullText)) {
-            detailCodeArea.replaceText(newTextBuilder.toString());
+        String prettified = JsonPrettify.prettifyFromLog(sourceText);
+        if (prettified != null && !prettified.equals(sourceText)) {
+            detailCodeArea.replaceText(prettified);
             try {
-                detailCodeArea.setStyleSpans(0, computeHighlightingSpans(newTextBuilder.toString()));
+                detailCodeArea.setStyleSpans(0, SyntaxHighlighter.computeJsonHighlighting(prettified));
             } catch (Exception e) {
-                logger.warn("CSS load fail in pretty json");
+                logger.warn("CSS load fail in pretty json", e);
             }
+            return true;
         }
+        return false;
     }
 
-    private void prettifyXml() {
-        String fullText = detailCodeArea.getText();
-        if (fullText == null || fullText.isEmpty()) {
-            return;
+    private boolean prettifyXml() {
+        String sourceText = currentRawLogContent != null ? currentRawLogContent : detailCodeArea.getText();
+        if (sourceText == null || sourceText.isEmpty()) {
+            return false;
         }
 
-        StringBuilder newTextBuilder = new StringBuilder(fullText);
-        int offset = 0;
-
-        while (true) {
-            String remainingText = newTextBuilder.substring(offset);
-            String extractedXml = XmlPrettify.extractXml(remainingText);
-
-            if (extractedXml == null) {
-                break;
-            }
-
-            String prettifiedXml = XmlPrettify.prettify(extractedXml);
-
-            int start = newTextBuilder.indexOf(extractedXml, offset);
-            if (start == -1) {
-                break;
-            }
-            int end = start + extractedXml.length();
-
-            newTextBuilder.replace(start, end, prettifiedXml);
-            offset = start + prettifiedXml.length();
+        if (sourceText.length() > 4096) {
+            CompletableFuture.supplyAsync(() -> {
+                String prettified = XmlPrettify.prettifyFromLog(sourceText);
+                if (prettified != null && !prettified.equals(sourceText)) {
+                    StyleSpans<Collection<String>> spans = null;
+                    try {
+                        spans = SyntaxHighlighter.computeXmlHighlighting(prettified);
+                    } catch (Exception ignored) {}
+                    return new Object[] { prettified, spans };
+                }
+                return null;
+            }).thenAccept(result -> {
+                if (result != null && sourceText.equals(currentRawLogContent)) {
+                    Platform.runLater(() -> {
+                        String prettified = (String) result[0];
+                        @SuppressWarnings("unchecked")
+                        StyleSpans<Collection<String>> spans = (StyleSpans<Collection<String>>) result[1];
+                        detailCodeArea.replaceText(prettified);
+                        if (spans != null) {
+                            try {
+                                detailCodeArea.setStyleSpans(0, spans);
+                            } catch (Exception ignored) {}
+                        }
+                    });
+                }
+            });
+            return true;
         }
 
-        if (!newTextBuilder.toString().equals(fullText)) {
-            detailCodeArea.replaceText(newTextBuilder.toString());
+        String prettified = XmlPrettify.prettifyFromLog(sourceText);
+        if (prettified != null && !prettified.equals(sourceText)) {
+            detailCodeArea.replaceText(prettified);
             try {
-                detailCodeArea.setStyleSpans(0, computeHighlightingSpans(newTextBuilder.toString()));
+                detailCodeArea.setStyleSpans(0, SyntaxHighlighter.computeXmlHighlighting(prettified));
             } catch (Exception e) {
-                logger.warn("CSS load fail in pretty xml");
+                logger.warn("CSS load fail in pretty xml", e);
             }
+            return true;
         }
+        return false;
     }
 
     private void copyDetailToClipboard() {
@@ -2138,8 +2465,24 @@ public class MainController {
     }
 
     private void clearDetail() {
-        detailCodeArea.clear();
-        detailLabel.setText("Log Detail");
+        Runnable r = () -> {
+            if (detailCodeArea != null) {
+                detailCodeArea.clear();
+            }
+            currentRawLogContent = null;
+            if (detailLabel != null) {
+                detailLabel.setText("Log Detail");
+            }
+            if (detailPlaceholderLabel != null) {
+                detailPlaceholderLabel.setVisible(true);
+                detailPlaceholderLabel.setManaged(true);
+            }
+        };
+        if (Platform.isFxApplicationThread()) {
+            r.run();
+        } else {
+            Platform.runLater(r);
+        }
     }
 
     private void toggleLeftPanel() {
@@ -2222,7 +2565,7 @@ public class MainController {
     }
 
     private void refreshRecentFilesList() {
-        recentFilesListView.setItems(FXCollections.observableArrayList(recentFileService.findAll()));
+        allRecentFiles.setAll(recentFileService.findAll());
     }
 
     private void handleAbout() {
@@ -2271,24 +2614,38 @@ public class MainController {
     }
 
     private void handleExit() {
+        for (LogSession session : new ArrayList<>(sessionMap.values())) {
+            try {
+                session.close();
+            } catch (Exception e) {
+                logger.warn("Error closing session {}: {}", session.getTitle(), e.getMessage());
+            }
+        }
+        sessionMap.clear();
         stopLocalTail();
         if (activeTailSshService != null) {
             stopRemoteTail();
         }
-        logger.info("Application exiting, stopped tailers.");
+        logger.info("Application exiting, stopped tailers and closed all sessions.");
         Platform.exit();
     }
 
     @FXML
     private void enableTail() {
-        boolean isRemote = (currentLogFromDb != null && currentLogFromDb.isRemote());
-        boolean isLocal = (currentFile != null && currentFile.exists());
+        boolean isRemote = (currentSession != null && currentSession.getSessionType() == LogSession.SessionType.REMOTE)
+                || (currentLogFromDb != null && currentLogFromDb.isRemote());
+        boolean isLocal = (currentSession != null && currentSession.getSessionType() == LogSession.SessionType.LOCAL)
+                || (currentFile != null && currentFile.exists());
 
         if (!isRemote && !isLocal) {
             showInfo("Tail Mode", "No active file to tail.");
             if (tailButton.isSelected())
                 tailButton.setSelected(false);
             return;
+        }
+
+        if (currentParsingConfig == null && currentSession != null) {
+            currentParsingConfig = currentSession.getParsingConfig();
         }
 
         if (currentParsingConfig == null) {
@@ -2299,27 +2656,47 @@ public class MainController {
         }
 
         if (currentParsingConfig == null) {
-            showError("Tail Error", "No parsing configuration available. Please select one.");
-            if (tailButton.isSelected())
-                tailButton.setSelected(false);
-            return;
+            currentParsingConfig = parsingConfigService.findDefault()
+                    .orElseGet(ParsingConfig::createRawConfig);
+        }
+
+        if (currentSession != null && currentSession.getParsingConfig() == null) {
+            currentSession.setParsingConfig(currentParsingConfig);
         }
 
         tailModeEnabled = true;
+        if (currentSession != null) {
+            currentSession.setTailModeEnabled(true);
+        }
         if (!tailButton.isSelected()) {
-            tailButton.setSelected(true);
+            isProgrammaticUpdate = true;
+            try {
+                tailButton.setSelected(true);
+            } finally {
+                isProgrammaticUpdate = false;
+            }
         }
         // Style handled by listener
 
-        // Clear live buffer for new session
-        liveTailList.clear();
-        canvasLogViewer.refreshTail(); // Updates view to show cleared state
-
-        remoteTailLineCounter = 0;
+        if (currentSession != null) {
+            if (currentSession.getCanvasLogViewer() != null) {
+                currentSession.getCanvasLogViewer().setTailBuffer(currentSession.getLiveTailList());
+                currentSession.getCanvasLogViewer().refreshTail();
+            }
+            updateTabBadge(currentSession);
+        } else {
+            if (canvasLogViewer != null) {
+                canvasLogViewer.setTailBuffer(liveTailList);
+                canvasLogViewer.refreshTail();
+            }
+        }
 
         try {
             currentTailFilterPredicate = buildSearchPredicate(searchField.getText(), regexCheckBox.isSelected(),
                     caseSensitiveCheckBox.isSelected());
+            if (currentSession != null) {
+                currentSession.setCurrentTailFilterPredicate(currentTailFilterPredicate);
+            }
         } catch (Exception e) {
             logger.warn("Tail filter error", e);
         }
@@ -2327,12 +2704,111 @@ public class MainController {
         if (isRemote) {
             startRemoteTailInternal();
         } else {
-            startLocalTail(currentFile);
+            if (currentSession != null) {
+                File fileToTail = currentSession.getLocalFile() != null ? currentSession.getLocalFile() : currentFile;
+                startLocalTail(currentSession, fileToTail);
+            } else {
+                startLocalTail(currentFile);
+            }
         }
     }
 
     private void startRemoteTailInternal() {
-        String sshServerId = currentLogFromDb.getSshServerID();
+        if (currentSession != null && currentSession.getSessionType() == LogSession.SessionType.REMOTE) {
+            final LogSession targetSession = currentSession;
+            targetSession.setTailModeEnabled(true);
+            if (targetSession.getCanvasLogViewer() != null) {
+                targetSession.getCanvasLogViewer().setTailBuffer(targetSession.getLiveTailList());
+                targetSession.getCanvasLogViewer().refreshTail();
+            }
+
+            SSHServiceImpl existingSsh = targetSession.getSshService();
+            if (existingSsh != null && existingSsh.isConnected()) {
+                logger.info("Resuming remote tail on existing session: {}", targetSession.getTitle());
+                existingSsh.tailFile(targetSession.getRemotePath(), tailWindowSize,
+                        line -> handleTailLineBackground(targetSession, line),
+                        error -> Platform.runLater(() -> {
+                            logger.error("Remote tail error for {}: {}", targetSession.getTitle(), error);
+                            showError("Remote Tail Error", error);
+                            disableTail(targetSession, false);
+                        }));
+                updateTabBadge(targetSession);
+                return;
+            }
+
+            SSHServerModel server = targetSession.getSshServer();
+            if (server == null && currentLogFromDb != null && currentLogFromDb.getSshServerID() != null) {
+                server = serverManagementService.getServerById(currentLogFromDb.getSshServerID());
+                targetSession.setSshServer(server);
+            }
+            if (server == null) {
+                showError("Error", "SSH server configuration not found.");
+                disableTail(targetSession, false);
+                return;
+            }
+
+            final SSHServerModel finalServer = server;
+            String password = server.getPassword();
+            if (password == null || password.isBlank()) {
+                com.seeloggyplus.util.PasswordPromptDialog prompt = new com.seeloggyplus.util.PasswordPromptDialog(
+                        server.getHost(), server.getUsername());
+                Optional<String> result = prompt.showAndWait();
+                if (result.isPresent() && !result.get().isBlank()) {
+                    password = result.get();
+                } else {
+                    disableTail(targetSession, false);
+                    return;
+                }
+            }
+            final String finalPassword = password;
+            showLoading("Connecting to " + server.getHost() + "...");
+
+            Task<Boolean> connectTask = new Task<>() {
+                private final SSHServiceImpl newSsh = new SSHServiceImpl();
+
+                @Override
+                protected Boolean call() throws Exception {
+                    return newSsh.connect(finalServer.getHost(), finalServer.getPort(), finalServer.getUsername(), finalPassword);
+                }
+
+                @Override
+                protected void succeeded() {
+                    hideLoading();
+                    if (getValue()) {
+                        targetSession.setSshService(newSsh);
+                        newSsh.tailFile(targetSession.getRemotePath(), tailWindowSize,
+                                line -> handleTailLineBackground(targetSession, line),
+                                error -> Platform.runLater(() -> {
+                                    logger.error("Remote tail error for {}: {}", targetSession.getTitle(), error);
+                                    showError("Remote Tail Error", error);
+                                    disableTail(targetSession, false);
+                                }));
+                        updateTabBadge(targetSession);
+                    } else {
+                        showError("Connection Failed", "Could not connect to " + finalServer.getHost());
+                        disableTail(targetSession, false);
+                    }
+                }
+
+                @Override
+                protected void failed() {
+                    hideLoading();
+                    Throwable ex = getException();
+                    logger.error("SSH connection failed", ex);
+                    showError("Connection Failed", ex != null ? ex.getMessage() : "Unknown error");
+                    disableTail(targetSession, false);
+                }
+            };
+            Thread.ofVirtual().start(connectTask);
+            return;
+        }
+
+        String sshServerId = (currentLogFromDb != null) ? currentLogFromDb.getSshServerID() : null;
+        if (sshServerId == null) {
+            showError("Error", "Server not found");
+            disableTail();
+            return;
+        }
         SSHServerModel server = serverManagementService.getServerById(sshServerId);
         if (server == null) {
             showError("Error", "Server not found");
@@ -2374,8 +2850,8 @@ public class MainController {
 
             @Override
             protected void succeeded() {
+                hideLoading();
                 if (getValue()) {
-                    hideLoading();
                     // Assuming we have parsing config setup
                     startRemoteTail(remotePath, sshService, server); // Removed currentParsingConfig
                 } else {
@@ -2388,12 +2864,11 @@ public class MainController {
             @Override
             protected void failed() {
                 hideLoading();
-                showError("Connection Error", getException().getMessage());
+                showError("Connection Error", getException() != null ? getException().getMessage() : "Failed to connect");
                 disableTail();
             }
         };
-
-        new Thread(connectTask).start();
+        Thread.ofVirtual().start(connectTask);
     }
 
     private void disableTail() {
@@ -2406,100 +2881,117 @@ public class MainController {
      * after, avoiding a race between two async loadFileWithParallelParsing tasks).
      */
     private void disableTail(boolean skipReindex) {
-        tailModeEnabled = false;
-        if (tailButton.isSelected()) {
-            isProgrammaticUpdate = true;
-            tailButton.setSelected(false);
-            isProgrammaticUpdate = false;
+        if (currentSession != null) {
+            disableTail(currentSession, skipReindex);
+        } else {
+            tailModeEnabled = false;
+            if (tailButton != null && tailButton.isSelected()) {
+                isProgrammaticUpdate = true;
+                tailButton.setSelected(false);
+                isProgrammaticUpdate = false;
+            }
         }
-        tailButton.setStyle("");
-        stopRemoteTail();
-        stopLocalTail();
+    }
 
-        // Clear both tail buffers to prevent stale data from bleeding into the next file load
-        synchronized (tailBuffer) {
-            tailBuffer.clear();
+    private void disableTail(LogSession session, boolean skipReindex) {
+        if (session == null) return;
+        session.setTailModeEnabled(false);
+
+        if (session.getTailService() != null) {
+            session.getTailService().stopTail();
         }
-        liveTailList.clear();
-        tailFlushScheduled.set(false);
-        currentTailSearchPattern = null;
-        tailSearchScannedUpTo = 0;
+        if (session.getSshService() != null) {
+            session.getSshService().stopTailing();
+        }
 
-        // Atomically transition the viewer out of tail mode
-        canvasLogViewer.exitTailMode();
+        synchronized (session.getTailBuffer()) {
+            session.getTailBuffer().clear();
+        }
+        // Do NOT clear liveTailList here so that logs remain visible and navigable!
+        session.getTailFlushScheduled().set(false);
+        session.setCurrentTailSearchPattern(null);
+        session.setTailSearchScannedUpTo(0);
 
-        // For local files: re-index so new lines appended during tail are visible,
-        // but only when we're staying on the same file (not switching to a different one).
-        if (!skipReindex && currentFile != null && currentFile.exists()) {
-            logger.info("Re-indexing local file after tail: {}", currentFile.getName());
-            LogFile logFile = currentLogFromDb != null ? currentLogFromDb : getOrCreateLogFile(currentFile);
-            if (logFile != null) {
-                loadFileWithParallelParsing(currentFile, logFile, false, true, false);
+        if (session.getCanvasLogViewer() != null) {
+            session.getCanvasLogViewer().exitTailMode();
+        }
+        updateTabBadge(session);
+
+        if (session == currentSession) {
+            tailModeEnabled = false;
+            if (tailButton != null && tailButton.isSelected()) {
+                isProgrammaticUpdate = true;
+                tailButton.setSelected(false);
+                isProgrammaticUpdate = false;
+            }
+            if (tailButton != null) {
+                applyToggleStyle(tailButton, false);
             }
         }
 
-        logger.info("Tail mode DISABLED");
+        // For local files: re-index so new lines appended during tail are visible
+        if (!skipReindex && session.getSessionType() == LogSession.SessionType.LOCAL
+                && session.getLocalFile() != null && session.getLocalFile().exists()) {
+            logger.info("Re-indexing local file after tail: {}", session.getLocalFile().getName());
+            LogFile logFile = session.getLogFileRecord() != null ? session.getLogFileRecord() : getOrCreateLogFile(session.getLocalFile());
+            if (logFile != null) {
+                loadFileWithParallelParsing(session, session.getLocalFile(), logFile, false, true, false);
+            }
+        }
+
+        logger.info("Tail mode DISABLED for session: {}", session.getTitle());
     }
 
     private void startRemoteTail(String remotePath, SSHServiceImpl sshService, SSHServerModel server) {
-        stopRemoteTail();
-        clearSearch(); // Reset search/filters when starting new tail
+        // Check if this remote tail session is already open in an existing tab
+        for (Map.Entry<Tab, LogSession> entry : sessionMap.entrySet()) {
+            LogSession s = entry.getValue();
+            if (s.getSessionType() == LogSession.SessionType.REMOTE &&
+                    remotePath.equals(s.getRemotePath()) &&
+                    s.getSshServer() != null && server != null &&
+                    s.getSshServer().getId().equals(server.getId())) {
+                if (logTabPane != null) {
+                    logTabPane.getSelectionModel().select(entry.getKey());
+                }
+                return;
+            }
+        }
 
         saveRemoteTailToRecent(remotePath, server);
 
-        // The parsing config is now created and set within saveRemoteTailToRecent
-        // and assigned to currentLogFromDb.
-        // We need to retrieve it from currentLogFromDb or re-create it here if not
-        // already set.
-        // For now, let's assume currentLogFromDb is set by saveRemoteTailToRecent
-        // and we can get the config from there.
-        ParsingConfig rawConfig = ParsingConfig.createRawConfig(); // Re-create for local use if not already set
+        ParsingConfig rawConfig = ParsingConfig.createRawConfig();
         if (currentLogFromDb != null && currentLogFromDb.getParsingConfigurationID() != null) {
             rawConfig = parsingConfigService.findById(currentLogFromDb.getParsingConfigurationID())
                     .orElse(ParsingConfig.createRawConfig());
         }
 
-        this.activeTailSshService = sshService;
-        this.remoteTailLineCounter = 0;
-        this.currentParsingConfig = rawConfig; // Used rawConfig
-        this.currentFile = null;
+        String fileName = new File(remotePath).getName();
+        String title = fileName + " (" + (server != null ? server.getName() : "Remote") + ")";
+        LogSession session = new LogSession(title, LogSession.SessionType.REMOTE);
+        session.setRemotePath(remotePath);
+        session.setSshServer(server);
+        session.setSshService(sshService);
+        session.setLogFileRecord(this.currentLogFromDb);
+        session.setParsingConfig(rawConfig);
+        session.setTailModeEnabled(true);
 
-        // Save for reload after clear
-        this.lastSession = LastSession.remote(remotePath, this.currentLogFromDb, sshService);
-
-        liveTailList.clear();
-        canvasLogViewer.setTailBuffer(liveTailList);
-        canvasLogViewer.resetView(); // Clean slate for remote tail
-        logger.info("ListView ready for config: {}", rawConfig.getName()); // Used rawConfig
-        tailFlushScheduled.set(false); // Force reset flush lock
-        tailColumnsAutoResized = false; // Force reset log flag
-        tailModeEnabled = true;
-        if (!tailButton.isSelected()) {
-            isProgrammaticUpdate = true;
-            tailButton.setSelected(true);
-            isProgrammaticUpdate = false;
+        Tab tab = createTabForSession(session);
+        sessionMap.put(tab, session);
+        if (logTabPane != null) {
+            logTabPane.getTabs().add(tab);
+            logTabPane.getSelectionModel().select(tab);
         }
 
-        try {
-            currentTailFilterPredicate = buildSearchPredicate(searchField.getText(), regexCheckBox.isSelected(),
-                    caseSensitiveCheckBox.isSelected());
-            logger.info("Tail filter initialized from current UI filters.");
-        } catch (Exception e) {
-            logger.error("Failed to build tail filter predicate", e);
-            showError("Tail Filter Error", e.getMessage());
-            currentTailFilterPredicate = null;
-        }
+        session.getCanvasLogViewer().setTailBuffer(session.getLiveTailList());
+        session.getCanvasLogViewer().resetView();
 
-        updateTailButtonState();
+        logger.info("ListView ready for config: {}", rawConfig.getName());
 
-        // Design Pattern Compliance: Use SSHService's tailFile which handles 'tail -n
-        // <lines> -F'
-        // This provides the initial lines (Pre-fetch) AND starts the real-time stream.
-        sshService.tailFile(remotePath, tailWindowSize, line -> handleTailLineBackground(line),
+        sshService.tailFile(remotePath, tailWindowSize, line -> handleTailLineBackground(session, line),
                 error -> Platform.runLater(() -> {
-                    logger.error("Remote tail error: {}", error);
+                    logger.error("Remote tail error for {}: {}", session.getTitle(), error);
                     showError("Remote Tail Error", error);
-                    disableTail();
+                    disableTail(session, false);
                 }));
     }
 
@@ -2507,28 +2999,29 @@ public class MainController {
         try {
             ParsingConfig parsingConfig = ParsingConfig.createRawConfig(); // Internal default
             String fileName = new File(remotePath).getName();
-            LogFile logFile = logFileService.getLogFileByPathAndName(fileName, remotePath);
+            String serverId = server != null ? server.getId() : null;
+            LogFile logFile = logFileService.getLogFileByPathNameAndServer(fileName, remotePath, serverId, true);
 
             if (logFile == null) {
                 logFile = new LogFile();
                 logFile.setName(fileName);
                 logFile.setFilePath(remotePath);
                 logFile.setRemote(true);
-                logFile.setSshServerID(server.getId());
+                logFile.setSshServerID(serverId);
                 logFile.setParsingConfigurationID(parsingConfig.getId());
                 logFile.setModified(String.valueOf(System.currentTimeMillis()));
                 logFile.setSize("-");
 
                 logFileService.insertLogFile(logFile);
-                logger.info("Created remote LogFile for tail: id={}, path={}", logFile.getId(), remotePath);
+                logger.info("Created remote LogFile for tail: id={}, serverId={}, path={}", logFile.getId(), serverId, remotePath);
             } else {
                 logFile.setRemote(true);
-                logFile.setSshServerID(server.getId());
+                logFile.setSshServerID(serverId);
                 logFile.setParsingConfigurationID(parsingConfig.getId());
                 logFile.setModified(String.valueOf(System.currentTimeMillis()));
                 logFile.setSize("-"); // Reset size for tail
                 logFileService.updateLogFile(logFile);
-                logger.info("Updated existing LogFile for remote tail: id={}, path={}", logFile.getId(), remotePath);
+                logger.info("Updated existing LogFile for remote tail: id={}, serverId={}, path={}", logFile.getId(), serverId, remotePath);
             }
 
             Optional<RecentFile> existingRecentOpt = recentFileService.findByFileId(logFile.getId());
@@ -2542,7 +3035,7 @@ public class MainController {
                 recentFileService.save(logFile, recent);
                 createdNewRecent = true;
 
-                logger.info("Created new RecentFile for remote tail: fileId={}", logFile.getId());
+                logger.info("Created new RecentFile for remote tail: fileId={}, serverId={}", logFile.getId(), serverId);
             } else {
                 createdNewRecent = false;
                 logger.info("Remote tail for existing recent fileId={}, NOT updating lastOpened (no re-sort)",
@@ -2552,14 +3045,13 @@ public class MainController {
             this.currentLogFromDb = logFile;
             this.monitoringRemotePath = remotePath;
 
-            final String pathToSelect = remotePath;
             Platform.runLater(() -> {
                 if (createdNewRecent) {
                     refreshRecentFilesList();
                 } else {
                     recentFilesListView.refresh();
                 }
-                selectRecentFileByPath(pathToSelect);
+                selectRecentFile(remotePath, serverId, true);
             });
         } catch (Exception e) {
             logger.error("Failed to save remote tail to recent for path {}", remotePath, e);
@@ -2567,16 +3059,23 @@ public class MainController {
     }
 
     private synchronized void handleTailLineBackground(String line) {
-        long lineNumber = ++remoteTailLineCounter;
+        if (currentSession != null) {
+            handleTailLineBackground(currentSession, line);
+        }
+    }
+
+    private void handleTailLineBackground(LogSession session, String line) {
+        if (session == null || session.isClosed()) return;
+        long lineNumber = session.incrementRemoteTailLineCounter();
         LogEntry entry = logParserService.parseLine(line, lineNumber);
-        synchronized (tailBuffer) {
-            if (tailBuffer.size() >= MAX_TAIL_BUFFER_SIZE) {
-                tailBuffer.removeFirst();
+        synchronized (session.getTailBuffer()) {
+            if (session.getTailBuffer().size() >= MAX_TAIL_BUFFER_SIZE) {
+                session.getTailBuffer().remove(0);
             }
-            tailBuffer.add(entry);
+            session.getTailBuffer().add(entry);
         }
 
-        scheduleTailFlush();
+        scheduleTailFlush(session);
     }
 
     private Predicate<LogEntry> buildSearchPredicate(String searchText, boolean isRegex, boolean caseSensitive) {
@@ -2734,102 +3233,118 @@ public class MainController {
     }
 
     private void scheduleTailFlush() {
-        if (!tailFlushScheduled.compareAndSet(false, true)) {
+        if (currentSession != null) {
+            scheduleTailFlush(currentSession);
+        }
+    }
+
+    private void scheduleTailFlush(LogSession session) {
+        if (session == null || !session.getTailFlushScheduled().compareAndSet(false, true)) {
             return;
         }
 
         Platform.runLater(() -> {
-            tailFlushScheduled.set(false);
+            session.getTailFlushScheduled().set(false);
 
             // Guard: don't flush if tail mode was disabled while this was queued
-            if (!tailModeEnabled) {
-                synchronized (tailBuffer) {
-                    tailBuffer.clear();
+            if (!session.isTailModeEnabled() || session.isClosed()) {
+                synchronized (session.getTailBuffer()) {
+                    session.getTailBuffer().clear();
                 }
                 return;
             }
 
             try {
                 List<LogEntry> toAdd;
-                synchronized (tailBuffer) {
-                    if (tailBuffer.isEmpty()) {
+                synchronized (session.getTailBuffer()) {
+                    if (session.getTailBuffer().isEmpty()) {
                         return;
                     }
-                    toAdd = new ArrayList<>(tailBuffer);
-                    tailBuffer.clear();
+                    toAdd = new ArrayList<>(session.getTailBuffer());
+                    session.getTailBuffer().clear();
                 }
 
-                int oldSize = liveTailList.size();
-                liveTailList.addAll(toAdd);
+                int oldSize = session.getLiveTailList().size();
+                session.getLiveTailList().addAll(toAdd);
 
                 // Limit Logic here
                 int trimmed = 0;
-                if (liveTailList.size() > 50000) {
-                    trimmed = liveTailList.size() - 50000;
-                    liveTailList.subList(0, trimmed).clear();
+                if (session.getLiveTailList().size() > 50000) {
+                    trimmed = session.getLiveTailList().size() - 50000;
+                    session.getLiveTailList().subList(0, trimmed).clear();
                 }
 
-                canvasLogViewer.refreshTail();
+                if (session.isActive()) {
+                    session.getCanvasLogViewer().refreshTail();
 
-                // Incremental search: scan new lines and append matches to result panel
-                if (tailModeEnabled && currentTailSearchPattern != null && filteredIndexes != null) {
-                    long tailOffset = canvasLogViewer.getFileLineCount();
+                    // Incremental search: scan new lines and append matches to result panel
+                    if (session == currentSession && currentTailSearchPattern != null && filteredIndexes != null) {
+                        long tailOffset = canvasLogViewer != null ? canvasLogViewer.getFileLineCount() : 0;
 
-                    // If buffer was trimmed, adjust existing filteredIndexes in-place
-                    if (trimmed > 0) {
-                        int removedMatchCount = 0;
-                        int writeIdx = 0;
-                        for (int i = 0; i < filteredIndexes.size(); i++) {
-                            int shifted = filteredIndexes.get(i) - trimmed;
-                            if (shifted >= (int) tailOffset) {
-                                filteredIndexes.set(writeIdx++, shifted);
-                            } else {
-                                removedMatchCount++;
+                        // If buffer was trimmed, adjust existing filteredIndexes in-place
+                        if (trimmed > 0) {
+                            int removedMatchCount = 0;
+                            int writeIdx = 0;
+                            for (int i = 0; i < filteredIndexes.size(); i++) {
+                                int shifted = filteredIndexes.get(i) - trimmed;
+                                if (shifted >= (int) tailOffset) {
+                                    filteredIndexes.set(writeIdx++, shifted);
+                                } else {
+                                    removedMatchCount++;
+                                }
+                            }
+                            // Remove trailing entries that were compacted
+                            while (filteredIndexes.size() > writeIdx) {
+                                filteredIndexes.removeLast();
+                            }
+                            tailSearchScannedUpTo = Math.max(0, tailSearchScannedUpTo - trimmed);
+                            if (removedMatchCount > 0 && searchResultPanel != null) {
+                                searchResultPanel.trimFromStart(removedMatchCount);
                             }
                         }
-                        // Remove trailing entries that were compacted
-                        while (filteredIndexes.size() > writeIdx) {
-                            filteredIndexes.removeLast();
+
+                        // Scan ONLY lines that haven't been scanned yet
+                        IntArrayList newMatches = new IntArrayList();
+                        for (int i = tailSearchScannedUpTo; i < session.getLiveTailList().size(); i++) {
+                            LogEntry entry = session.getLiveTailList().get(i);
+                            String raw = entry != null ? entry.getRawLog() : "";
+                            if (currentTailSearchPattern.matcher(raw).find()) {
+                                int globalIdx = (int) (tailOffset + i);
+                                filteredIndexes.add(globalIdx);
+                                newMatches.add(globalIdx);
+                            }
                         }
-                        tailSearchScannedUpTo = Math.max(0, tailSearchScannedUpTo - trimmed);
-                        if (removedMatchCount > 0 && searchResultPanel != null) {
-                            searchResultPanel.trimFromStart(removedMatchCount);
+                        tailSearchScannedUpTo = session.getLiveTailList().size();
+
+                        if (newMatches.size() > 0 && searchResultPanel != null) {
+                            searchResultPanel.syncItemCount();
+                        }
+                        if (searchNavigator != null) {
+                            searchNavigator.setMatchCount(filteredIndexes.size());
+                        }
+                    } else if (session == currentSession && canvasLogViewer != null && canvasLogViewer.hasSearchHighlight()) {
+                        if (searchNavigator != null) {
+                            searchNavigator.setMatchCount(canvasLogViewer.countMatches());
                         }
                     }
 
-                    // Scan ONLY lines that haven't been scanned yet
-                    IntArrayList newMatches = new IntArrayList();
-                    for (int i = tailSearchScannedUpTo; i < liveTailList.size(); i++) {
-                        LogEntry entry = liveTailList.get(i);
-                        String raw = entry != null ? entry.getRawLog() : "";
-                        if (currentTailSearchPattern.matcher(raw).find()) {
-                            int globalIdx = (int) (tailOffset + i);
-                            filteredIndexes.add(globalIdx);
-                            newMatches.add(globalIdx);
-                        }
+                    if (session == currentSession && statusLabel != null) {
+                        statusLabel.setText(String.format("Line: %,d / %,d",
+                                session.getCanvasLogViewer().getCurrentTopLine(),
+                                session.getCanvasLogViewer().getTotalLines()));
                     }
-                    tailSearchScannedUpTo = liveTailList.size();
-
-                    // Update search result panel — since panel.matchedLines is the same
-                    // reference as filteredIndexes, we only need to sync itemCount/cache.
-                    if (newMatches.size() > 0 && searchResultPanel != null) {
-                        searchResultPanel.syncItemCount();
-                    }
-                    if (searchNavigator != null) {
-                        searchNavigator.setMatchCount(filteredIndexes.size());
-                    }
-                } else if (tailModeEnabled && canvasLogViewer.hasSearchHighlight()) {
-                    if (searchNavigator != null) {
-                        searchNavigator.setMatchCount(canvasLogViewer.countMatches());
-                    }
+                } else {
+                    // DORMANT BACKGROUND TAB: Do not render canvas, just update unread badge!
+                    session.addUnreadTailLines(toAdd.size());
+                    updateTabBadge(session);
                 }
 
-                if (!tailColumnsAutoResized) {
-                    tailColumnsAutoResized = true;
-                    logger.debug("Tail batch displayed: {} lines", toAdd.size());
+                if (!session.isTailColumnsAutoResized()) {
+                    session.setTailColumnsAutoResized(true);
+                    logger.debug("Tail batch displayed for session {}: {} lines", session.getTitle(), toAdd.size());
                 }
             } catch (Throwable t) {
-                logger.error("CRITICAL ERROR in tail flush", t);
+                logger.error("CRITICAL ERROR in tail flush for session {}", session.getTitle(), t);
             }
         });
     }
@@ -2914,6 +3429,9 @@ public class MainController {
     }
 
     private <T> Optional<T> showAndWaitAndRestore(Dialog<T> dialog) {
+        if (menuBar == null || menuBar.getScene() == null || menuBar.getScene().getWindow() == null) {
+            return dialog.showAndWait();
+        }
         Stage mainStage = (Stage) menuBar.getScene().getWindow();
         boolean wasMaximized = mainStage.isMaximized();
         double oldX = mainStage.getX();
@@ -2999,33 +3517,77 @@ public class MainController {
     }
 
     private void startLocalTail(File file) {
-        stopLocalTail();
-        liveTailList.clear();
-        canvasLogViewer.refreshTail();
+        if (currentSession != null) {
+            startLocalTail(currentSession, file);
+        } else {
+            stopLocalTail();
+            liveTailList.clear();
+            if (canvasLogViewer != null) {
+                canvasLogViewer.setTailBuffer(liveTailList);
+                canvasLogViewer.refreshTail();
+            }
 
-        // If the file is already loaded in the viewer, skip initial context load
-        // to avoid duplicating lines that are already displayed from the file index.
-        boolean needsContext = (mappedFileReader == null || lineOffsetIndex == null);
+            // If the file is already loaded in the viewer, skip initial context load
+            // to avoid duplicating lines that are already displayed from the file index.
+            boolean needsContext = (mappedFileReader == null || lineOffsetIndex == null);
 
-        logger.info("Starting local tail (TailService) for: {} (loadContext={})", file.getAbsolutePath(),
-                needsContext);
-        Thread starterThread = new Thread(() -> tailService.startLocalTail(
+            logger.info("Starting local tail (TailService) for: {} (loadContext={})", file.getAbsolutePath(),
+                    needsContext);
+            Thread starterThread = new Thread(() -> tailService.startLocalTail(
+                    file,
+                    this::handleTailLineBackground,
+                    ex -> {
+                        if (ex instanceof InterruptedException) {
+                            // Normal shutdown, ignore
+                            return;
+                        }
+                        if (ex instanceof FileNotFoundException) {
+                            Platform.runLater(() -> showInfo("Tail Info", "File not found or renamed."));
+                        } else {
+                            logger.error("Tailer error", ex);
+                        }
+                    },
+                    needsContext, tailWindowSize), "TailService-Starter");
+            starterThread.setDaemon(true);
+            starterThread.start();
+        }
+    }
+
+    private void startLocalTail(LogSession session, File file) {
+        if (session == null || file == null) return;
+        if (session.getTailService() != null) {
+            session.getTailService().stopTail();
+        } else {
+            session.setTailService(new TailServiceImpl());
+        }
+        boolean needsContext = (session.getReader() == null || session.getIndex() == null);
+        if (needsContext) {
+            session.getLiveTailList().clear();
+        }
+        if (session.getCanvasLogViewer() != null) {
+            session.getCanvasLogViewer().setTailBuffer(session.getLiveTailList());
+            if (session.isActive()) {
+                session.getCanvasLogViewer().refreshTail();
+            }
+        }
+        logger.info("Starting local tail for session '{}': {} (loadContext={})", session.getTitle(),
+                file.getAbsolutePath(), needsContext);
+
+        Thread starterThread = new Thread(() -> session.getTailService().startLocalTail(
                 file,
-                this::handleTailLineBackground,
+                line -> handleTailLineBackground(session, line),
                 ex -> {
-                    if (ex instanceof InterruptedException) {
-                        // Normal shutdown, ignore
-                        return;
-                    }
+                    if (ex instanceof InterruptedException) return;
                     if (ex instanceof FileNotFoundException) {
                         Platform.runLater(() -> showInfo("Tail Info", "File not found or renamed."));
                     } else {
-                        logger.error("Tailer error", ex);
+                        logger.error("Tailer error for session " + session.getTitle(), ex);
                     }
                 },
-                needsContext, tailWindowSize), "TailService-Starter");
+                needsContext, tailWindowSize), "TailService-Starter-" + session.getId());
         starterThread.setDaemon(true);
         starterThread.start();
+        updateTabBadge(session);
     }
 
     @FXML
@@ -3050,7 +3612,7 @@ public class MainController {
             try {
                 String clean = result.replaceAll("[,.]", "").trim();
                 long line = Long.parseLong(clean);
-                if (line > 0) {
+                if (line > 0 && canvasLogViewer != null) {
                     canvasLogViewer.jumpToLine(line - 1);
                 }
                 followTailButton.setSelected(false);
@@ -3061,8 +3623,502 @@ public class MainController {
     }
 
     private void stopLocalTail() {
+        if (currentSession != null && currentSession.getTailService() != null) {
+            currentSession.getTailService().stopTail();
+        }
         if (tailService != null) {
             tailService.stopTail();
         }
+    }
+
+    // ==================== Tab Management & Lifecycle ====================
+
+    private Tab createTabForSession(LogSession session) {
+        Tab tab = new Tab();
+        String rawTitle = session.getTitle();
+        if (rawTitle != null && rawTitle.matches("^seeloggyplus-\\d+-(.+)$")) {
+            rawTitle = rawTitle.replaceFirst("^seeloggyplus-\\d+-", "");
+            session.setTitle(rawTitle);
+        }
+        tab.setText(session.getTitle());
+        session.setTab(tab);
+
+        CanvasLogViewer viewer = new CanvasLogViewer();
+        viewer.setTailBuffer(session.getLiveTailList());
+        session.setCanvasLogViewer(viewer);
+        setupViewerCallbacks(session, viewer);
+
+        tab.setContent(viewer);
+
+        HBox graphicBox = new HBox(4);
+        graphicBox.setAlignment(Pos.CENTER_LEFT);
+
+        Circle liveDot = new Circle(3.5);
+        liveDot.getStyleClass().add("tab-live-indicator");
+        liveDot.setFill(Color.web("#4CAF50"));
+        liveDot.setVisible(session.isTailModeEnabled());
+        liveDot.setManaged(session.isTailModeEnabled());
+        session.setLiveIndicatorDot(liveDot);
+
+        Label badge = new Label();
+        badge.getStyleClass().add("tab-badge-unread");
+        badge.setVisible(false);
+        badge.setManaged(false);
+        session.setUnreadBadgeLabel(badge);
+
+        graphicBox.getChildren().addAll(liveDot, badge);
+        graphicBox.setOnMouseClicked(event -> {
+            if (event.getButton() == MouseButton.MIDDLE) {
+                event.consume();
+                closeSession(session);
+            } else {
+                Platform.runLater(() -> {
+                    if (session.getCanvasLogViewer() != null) {
+                        session.getCanvasLogViewer().requestCanvasFocus();
+                    }
+                });
+            }
+        });
+        tab.setGraphic(graphicBox);
+
+        tab.setOnSelectionChanged(event -> {
+            if (tab.isSelected()) {
+                Platform.runLater(() -> {
+                    if (session.getCanvasLogViewer() != null) {
+                        session.getCanvasLogViewer().requestCanvasFocus();
+                    }
+                });
+            }
+        });
+
+        String tooltipText = session.getSessionType() == LogSession.SessionType.LOCAL
+                && session.getLocalFile() != null ? session.getLocalFile().getAbsolutePath()
+                : (session.getRemotePath() != null ? session.getRemotePath() : session.getTitle());
+        tab.setTooltip(new Tooltip(tooltipText));
+
+        tab.setContextMenu(createTabContextMenu(session));
+
+        tab.setOnCloseRequest(event -> {
+            event.consume();
+            closeSession(session);
+        });
+
+        return tab;
+    }
+
+    private ContextMenu createTabContextMenu(LogSession session) {
+        ContextMenu menu = new ContextMenu();
+
+        MenuItem closeItem = new MenuItem("Close Tab");
+        closeItem.setOnAction(e -> closeSession(session));
+
+        MenuItem closeRightItem = new MenuItem("Close Tabs to the Right");
+        closeRightItem.setOnAction(e -> handleCloseTabsToTheRight(session));
+
+        MenuItem closeOthersItem = new MenuItem("Close Other Tabs");
+        closeOthersItem.setOnAction(e -> handleCloseOtherTabs(session));
+
+        MenuItem closeAllItem = new MenuItem("Close All Tabs");
+        closeAllItem.setOnAction(e -> handleCloseAllTabs());
+
+        MenuItem reloadItem = new MenuItem("Reload");
+        reloadItem.setOnAction(e -> {
+            if (session.getSessionType() == LogSession.SessionType.LOCAL && session.getLocalFile() != null) {
+                loadFileWithParallelParsing(session, session.getLocalFile(), session.getLogFileRecord(), false, false, false);
+            }
+        });
+
+        MenuItem copyPathItem = new MenuItem("Copy File Path");
+        copyPathItem.setOnAction(e -> {
+            String path = session.getLocalFile() != null ? session.getLocalFile().getAbsolutePath()
+                    : (session.getRemotePath() != null ? session.getRemotePath() : "");
+            if (!path.isEmpty()) {
+                Clipboard clipboard = Clipboard.getSystemClipboard();
+                ClipboardContent cc = new ClipboardContent();
+                cc.putString(path);
+                clipboard.setContent(cc);
+            }
+        });
+
+        MenuItem showInExplorerItem = new MenuItem("Show in File Explorer");
+        showInExplorerItem.setOnAction(e -> {
+            if (session.getLocalFile() != null && session.getLocalFile().exists()) {
+                try {
+                    if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                        new ProcessBuilder("explorer.exe", "/select,", session.getLocalFile().getAbsolutePath()).start();
+                    } else {
+                        java.awt.Desktop.getDesktop().open(session.getLocalFile().getParentFile());
+                    }
+                } catch (Exception ex) {
+                    logger.warn("Failed to open file explorer for {}", session.getLocalFile(), ex);
+                }
+            }
+        });
+
+        menu.getItems().addAll(closeItem, closeRightItem, closeOthersItem, closeAllItem, new SeparatorMenuItem(), reloadItem, new SeparatorMenuItem(), copyPathItem, showInExplorerItem);
+        return menu;
+    }
+
+    private void setupViewerCallbacks(LogSession session, CanvasLogViewer viewer) {
+        if (session == null || viewer == null) return;
+
+        viewer.setOnLineClick((lineNumber, lineContent) -> {
+            session.setSelectedLine(lineNumber);
+            session.setSelectedLineContent(lineContent);
+            if (session == currentSession) {
+                displayLogDetailFromCanvas(lineNumber, lineContent);
+            }
+        });
+
+        viewer.setOnStatusUpdate((currentLine, totalLines, percentage) -> {
+            if (session == currentSession && statusLabel != null) {
+                statusLabel.setText(String.format("Line: %,d / %,d (%.1f%%)", currentLine, totalLines, percentage));
+            }
+        });
+
+        viewer.setOnFollowTailChanged(following -> {
+            session.setFollowTail(following);
+            if (session == currentSession && followTailButton != null && followTailButton.isSelected() != following) {
+                isProgrammaticUpdate = true;
+                followTailButton.setSelected(following);
+                isProgrammaticUpdate = false;
+            }
+        });
+    }
+
+    private void onTabSelected(Tab oldTab, Tab newTab) {
+        if (oldTab != null) {
+            LogSession oldSession = sessionMap.get(oldTab);
+            if (oldSession != null) {
+                oldSession.setActive(false);
+                oldSession.setSearchQuery(searchField != null ? searchField.getText() : "");
+                oldSession.setRegex(regexCheckBox != null && regexCheckBox.isSelected());
+                oldSession.setCaseSensitive(caseSensitiveCheckBox != null && caseSensitiveCheckBox.isSelected());
+                oldSession.setFilteredIndexes(filteredIndexes);
+                oldSession.setCurrentMatchIndex(currentMatchIndex);
+            }
+        }
+
+        if (newTab != null) {
+            LogSession newSession = sessionMap.get(newTab);
+            onActiveSessionChanged(newSession);
+        } else {
+            onActiveSessionChanged(null);
+        }
+
+        updateEmptyState();
+    }
+
+    private void onActiveSessionChanged(LogSession session) {
+        if (currentSession != null && currentSession != session) {
+            currentSession.setActive(false);
+        }
+
+        currentSession = session;
+
+        if (session != null) {
+            session.setActive(true);
+            session.resetUnreadTailLines();
+            updateTabBadge(session);
+
+            canvasLogViewer = session.getCanvasLogViewer();
+            if (canvasLogViewer != null) {
+                canvasLogViewer.setTailBuffer(session.getLiveTailList());
+            }
+            mappedFileReader = session.getReader();
+            lineOffsetIndex = session.getIndex();
+            totalEntries = session.getTotalEntries();
+            currentFile = session.getLocalFile();
+            currentLogFromDb = session.getLogFileRecord();
+            currentParsingConfig = session.getParsingConfig() != null ? session.getParsingConfig() : ParsingConfig.createRawConfig();
+            tailModeEnabled = session.isTailModeEnabled();
+            filteredIndexes = session.getFilteredIndexes();
+            currentMatchIndex = session.getCurrentMatchIndex();
+            liveTailList = session.getLiveTailList();
+
+            isSkippingFilterTrigger = true;
+            if (searchField != null) {
+                searchField.setText(session.getSearchQuery() != null ? session.getSearchQuery() : "");
+            }
+            if (regexCheckBox != null) {
+                regexCheckBox.setSelected(session.isRegex());
+            }
+            if (caseSensitiveCheckBox != null) {
+                caseSensitiveCheckBox.setSelected(session.isCaseSensitive());
+            }
+            isSkippingFilterTrigger = false;
+
+            isProgrammaticUpdate = true;
+            if (tailButton != null) {
+                tailButton.setSelected(session.isTailModeEnabled());
+                configureToggleStyle(tailButton);
+            }
+            if (followTailButton != null) {
+                followTailButton.setSelected(session.isFollowTail());
+                configureToggleStyle(followTailButton);
+            }
+            isProgrammaticUpdate = false;
+
+            if (filteredIndexes != null && filteredIndexes.size() > 0) {
+                if (searchNavigator != null) {
+                    searchNavigator.setMatchCount(filteredIndexes.size());
+                    if (currentMatchIndex > 0) {
+                        searchNavigator.updateStatus(currentMatchIndex, filteredIndexes.size());
+                    }
+                }
+                String searchText = session.getSearchQuery();
+                if (searchText != null && !searchText.isEmpty()) {
+                    Pattern compiledHighlight = null;
+                    try {
+                        int flags = session.isCaseSensitive() ? 0 : Pattern.CASE_INSENSITIVE;
+                        compiledHighlight = Pattern.compile(
+                                session.isRegex() ? searchText : Pattern.quote(searchText), flags);
+                    } catch (Exception ignored) {}
+                    showSearchResultPanel(filteredIndexes, compiledHighlight);
+                }
+            } else {
+                hideSearchResultPanel();
+                if (searchNavigator != null) {
+                    searchNavigator.clear();
+                }
+            }
+
+            if (session.getSelectedLineContent() != null) {
+                displayLogDetailFromCanvas(session.getSelectedLine(), session.getSelectedLineContent());
+            } else {
+                clearDetail();
+            }
+
+            if (session.getCanvasLogViewer() != null) {
+                if (session.isTailModeEnabled()) {
+                    session.getCanvasLogViewer().refreshTail();
+                } else {
+                    session.getCanvasLogViewer().redraw();
+                }
+                Platform.runLater(() -> {
+                    if (session.getCanvasLogViewer() != null) {
+                        session.getCanvasLogViewer().requestCanvasFocus();
+                    }
+                });
+            }
+
+            if (session.getSessionType() == LogSession.SessionType.LOCAL && session.getLocalFile() != null) {
+                selectRecentFile(session.getLocalFile().getAbsolutePath(), null, false);
+            } else if (session.getRemotePath() != null) {
+                String serverId = session.getSshServer() != null ? session.getSshServer().getId() : null;
+                selectRecentFile(session.getRemotePath(), serverId, true);
+            }
+
+            updateTailButtonState();
+        } else {
+            canvasLogViewer = null;
+            mappedFileReader = null;
+            lineOffsetIndex = null;
+            totalEntries = 0;
+            currentFile = null;
+            currentLogFromDb = null;
+            tailModeEnabled = false;
+            filteredIndexes = null;
+            currentMatchIndex = -1;
+
+            isSkippingFilterTrigger = true;
+            if (searchField != null) {
+                searchField.clear();
+            }
+            isSkippingFilterTrigger = false;
+
+            hideSearchResultPanel();
+            if (searchNavigator != null) {
+                searchNavigator.clear();
+            }
+            clearDetail();
+            updateTailButtonState();
+        }
+
+        updateEmptyState();
+    }
+
+    private void updateEmptyState() {
+        boolean hasTabs = logTabPane != null && !logTabPane.getTabs().isEmpty();
+        if (emptyStatePane != null) {
+            emptyStatePane.setVisible(!hasTabs);
+            emptyStatePane.setManaged(!hasTabs);
+        }
+        if (logTabPane != null) {
+            logTabPane.setVisible(hasTabs);
+            logTabPane.setManaged(hasTabs);
+        }
+
+        if (closeTabMenuItem != null) {
+            closeTabMenuItem.setDisable(!hasTabs);
+        }
+        if (closeAllTabsMenuItem != null) {
+            closeAllTabsMenuItem.setDisable(!hasTabs);
+        }
+        if (searchField != null) {
+            searchField.setDisable(!hasTabs);
+        }
+        if (searchButton != null) {
+            searchButton.setDisable(!hasTabs);
+        }
+        if (tailButton != null) {
+            tailButton.setDisable(!hasTabs);
+        }
+        if (followTailButton != null) {
+            followTailButton.setDisable(!hasTabs);
+        }
+    }
+
+    private void updateTabBadge(LogSession session) {
+        if (session == null) return;
+        Platform.runLater(() -> {
+            if (session.getLiveIndicatorDot() != null) {
+                boolean tailing = session.isTailModeEnabled();
+                session.getLiveIndicatorDot().setVisible(tailing);
+                session.getLiveIndicatorDot().setManaged(tailing);
+            }
+            Tab tab = session.getTab();
+            if (tab != null) {
+                int unread = session.getUnreadTailLines();
+                if (unread > 0 && !session.isActive()) {
+                    tab.setText(session.getTitle() + " (+" + (unread > 999 ? "999+" : unread) + ")");
+                } else {
+                    tab.setText(session.getTitle());
+                }
+            }
+            if (session.getUnreadBadgeLabel() != null) {
+                session.getUnreadBadgeLabel().setVisible(false);
+                session.getUnreadBadgeLabel().setManaged(false);
+            }
+        });
+    }
+
+    private void closeSession(LogSession session) {
+        if (session == null) return;
+
+        if (session.isTailModeEnabled()) {
+            disableTail(session, true);
+        }
+
+        session.close();
+
+        Tab tab = session.getTab();
+        if (tab != null && logTabPane != null) {
+            sessionMap.remove(tab);
+            logTabPane.getTabs().remove(tab);
+        }
+
+        if (currentSession == session) {
+            Tab nextSelected = logTabPane != null ? logTabPane.getSelectionModel().getSelectedItem() : null;
+            if (nextSelected != null) {
+                onActiveSessionChanged(sessionMap.get(nextSelected));
+            } else {
+                onActiveSessionChanged(null);
+            }
+        }
+
+        updateEmptyState();
+        logger.info("Closed session: {}", session.getTitle());
+    }
+
+    @FXML
+    public void handleCloseCurrentTab() {
+        if (currentSession != null) {
+            closeSession(currentSession);
+        }
+    }
+
+    @FXML
+    public void handleCloseAllTabs() {
+        List<LogSession> sessions = new ArrayList<>(sessionMap.values());
+        for (LogSession s : sessions) {
+            closeSession(s);
+        }
+    }
+
+    private void handleCloseOtherTabs(LogSession keepSession) {
+        List<LogSession> sessions = new ArrayList<>(sessionMap.values());
+        for (LogSession s : sessions) {
+            if (s != keepSession) {
+                closeSession(s);
+            }
+        }
+    }
+
+    private void handleCloseTabsToTheRight(LogSession session) {
+        if (logTabPane == null || session == null || session.getTab() == null) return;
+        int targetIdx = logTabPane.getTabs().indexOf(session.getTab());
+        if (targetIdx < 0) return;
+
+        List<Tab> tabsToClose = new ArrayList<>();
+        for (int i = targetIdx + 1; i < logTabPane.getTabs().size(); i++) {
+            tabsToClose.add(logTabPane.getTabs().get(i));
+        }
+
+        for (Tab t : tabsToClose) {
+            LogSession s = sessionMap.get(t);
+            if (s != null) {
+                closeSession(s);
+            }
+        }
+    }
+
+    private boolean isNodeRelated(javafx.scene.Node a, javafx.scene.Node b) {
+        if (a == b) return true;
+        javafx.scene.Node p = b;
+        while (p != null) {
+            if (p == a) return true;
+            p = p.getParent();
+        }
+        p = a;
+        while (p != null) {
+            if (p == b) return true;
+            p = p.getParent();
+        }
+        return false;
+    }
+
+    private void selectNextTab() {
+        if (logTabPane != null && logTabPane.getTabs().size() > 1) {
+            int current = logTabPane.getSelectionModel().getSelectedIndex();
+            int next = (current + 1) % logTabPane.getTabs().size();
+            logTabPane.getSelectionModel().select(next);
+        }
+    }
+
+    private void selectPreviousTab() {
+        if (logTabPane != null && logTabPane.getTabs().size() > 1) {
+            int current = logTabPane.getSelectionModel().getSelectedIndex();
+            int total = logTabPane.getTabs().size();
+            int prev = (current - 1 + total) % total;
+            logTabPane.getSelectionModel().select(prev);
+        }
+    }
+
+    private void setupDragAndDrop() {
+        if (logContainer == null) return;
+
+        logContainer.setOnDragOver(event -> {
+            if (event.getGestureSource() != logContainer && event.getDragboard().hasFiles()) {
+                event.acceptTransferModes(TransferMode.COPY_OR_MOVE);
+            }
+            event.consume();
+        });
+
+        logContainer.setOnDragDropped(event -> {
+            Dragboard db = event.getDragboard();
+            boolean success = false;
+            if (db.hasFiles()) {
+                List<File> files = db.getFiles();
+                for (File file : files) {
+                    if (file.isFile()) {
+                        openLocalLogFile(file, true);
+                        success = true;
+                    }
+                }
+            }
+            event.setDropCompleted(success);
+            event.consume();
+        });
     }
 }

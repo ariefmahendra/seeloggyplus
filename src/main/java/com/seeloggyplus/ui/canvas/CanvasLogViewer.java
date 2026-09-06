@@ -8,6 +8,8 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
@@ -27,8 +29,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.seeloggyplus.model.LogEntry;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Collections;
+import javafx.scene.input.KeyEvent;
 
 /**
  * High-performance Canvas-based log viewer.
@@ -448,7 +452,25 @@ public class CanvasLogViewer extends GridPane {
     // Line content cache — avoids re-reading and re-allocating strings for lines
     // that haven't changed between frames during smooth scroll
     private String[] lineCache = new String[0];
+    private Color[] lineColorCache = new Color[0];
     private long lineCacheStartLine = -1;
+
+    private Color detectLogLevelColor(String line) {
+        if (line == null || line.isEmpty()) return TEXT_COLOR;
+        CharSequence levelScanRange = line.length() > 120 ? line.subSequence(0, 120) : line;
+        Matcher levelMatcher = LEVEL_PATTERN.matcher(levelScanRange);
+        if (levelMatcher.find()) {
+            String level = levelMatcher.group(1).toUpperCase();
+            return switch (level) {
+                case "ERROR", "FATAL" -> ERROR_COLOR;
+                case "WARN", "WARNING" -> WARN_COLOR;
+                case "INFO" -> INFO_COLOR;
+                case "DEBUG", "TRACE" -> DEBUG_COLOR;
+                default -> TEXT_COLOR;
+            };
+        }
+        return TEXT_COLOR;
+    }
 
     private void render() {
         double width = canvas.getWidth();
@@ -469,6 +491,7 @@ public class CanvasLogViewer extends GridPane {
         // Populate line cache — reuse strings when currentTopLine hasn't changed
         if (lineCache.length < linesToRender) {
             lineCache = new String[linesToRender + 10]; // small over-alloc
+            lineColorCache = new Color[linesToRender + 10];
             lineCacheStartLine = -1; // force refill
         }
         if (lineCacheStartLine != currentTopLine) {
@@ -477,11 +500,14 @@ public class CanvasLogViewer extends GridPane {
                 long viewIndex = currentTopLine + i;
                 if (viewIndex >= effectiveLineCount) {
                     lineCache[i] = null;
+                    lineColorCache[i] = TEXT_COLOR;
                     continue;
                 }
                 long actualLineIndex = (filteredIndexes != null)
                         ? filteredIndexes.get((int) viewIndex) : viewIndex;
-                lineCache[i] = getLineContent(actualLineIndex);
+                String content = getLineContent(actualLineIndex);
+                lineCache[i] = content;
+                lineColorCache[i] = detectLogLevelColor(content);
             }
         }
 
@@ -507,7 +533,8 @@ public class CanvasLogViewer extends GridPane {
 
             String line = lineCache[i];
             if (line == null) line = "";
-            renderLineContent(line, leftMargin, y, actualLineIndex);
+            Color color = lineColorCache[i] != null ? lineColorCache[i] : TEXT_COLOR;
+            renderLineContent(line, color, leftMargin, y, actualLineIndex);
         }
         gc.restore();
 
@@ -536,7 +563,7 @@ public class CanvasLogViewer extends GridPane {
         }
     }
 
-    private void renderLineContent(String line, double x, double y, long globalIndex) {
+    private void renderLineContent(String line, Color baseColor, double x, double y, long globalIndex) {
         double drawX = x - currentScrollX;
         double canvasWidth = canvas.getWidth();
 
@@ -548,8 +575,6 @@ public class CanvasLogViewer extends GridPane {
         // Compute visible character range to avoid rendering thousands of off-screen glyphs
         int visStart = Math.max(0, (int) ((leftMargin - drawX) / charWidth));
         int visEnd = Math.min(line.length(), (int) ((canvasWidth - drawX) / charWidth) + 1);
-
-        Color baseColor = TEXT_COLOR;
 
         boolean isSelected = selectedLineIndexes.contains(globalIndex);
 
@@ -573,22 +598,8 @@ public class CanvasLogViewer extends GridPane {
             }
         }
 
-        // Log level detection — scan only first 120 chars (level keyword is always near the start)
-        CharSequence levelScanRange = line.length() > 120 ? line.subSequence(0, 120) : line;
-        Matcher levelMatcher = LEVEL_PATTERN.matcher(levelScanRange);
-        if (levelMatcher.find()) {
-            String level = levelMatcher.group(1).toUpperCase();
-            baseColor = switch (level) {
-                case "ERROR", "FATAL" -> ERROR_COLOR;
-                case "WARN", "WARNING" -> WARN_COLOR;
-                case "INFO" -> INFO_COLOR;
-                case "DEBUG", "TRACE" -> DEBUG_COLOR;
-                default -> TEXT_COLOR;
-            };
-        }
-
-        // Only render the visible substring
-        gc.setFill(baseColor);
+        // Only render the visible substring using pre-cached baseColor
+        gc.setFill(baseColor != null ? baseColor : TEXT_COLOR);
         if (visStart > 0 || visEnd < line.length()) {
             String visibleText = line.substring(visStart, visEnd);
             gc.fillText(visibleText, drawX + visStart * charWidth, y + 2);
@@ -687,6 +698,7 @@ public class CanvasLogViewer extends GridPane {
 
                 ContextMenu contextMenu = new ContextMenu();
                 MenuItem copyItem = new MenuItem("Copy Selection");
+                copyItem.setAccelerator(new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN));
                 copyItem.setOnAction(event -> copySelectedLines());
                 contextMenu.getItems().add(copyItem);
 
@@ -806,115 +818,170 @@ public class CanvasLogViewer extends GridPane {
     }
 
     private void setupKeyboardHandlers() {
+        setFocusTraversable(true);
         canvas.setFocusTraversable(true);
-        canvas.setOnKeyPressed(e -> {
-            if (reader == null && tailBuffer.isEmpty()) {
-                return;
-            }
 
-            if (e.getCode() == KeyCode.C && e.isControlDown()) {
-                copySelectedLines();
-                e.consume();
-                return;
-            }
+        this.setOnMousePressed(e -> canvas.requestFocus());
+        vScrollBar.setFocusTraversable(false);
+        hScrollBar.setFocusTraversable(false);
 
-            long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
-            long maxTop = Math.max(0, effectiveLines - visibleLineCount);
-
-            if (e.getCode() == KeyCode.DOWN || e.getCode() == KeyCode.UP) {
-                // Move selection by one line and scroll if needed
-                long currentSel = selectedLine >= 0 ? selectedLine : currentTopLine;
-                long newSel;
-                if (e.getCode() == KeyCode.DOWN) {
-                    newSel = Math.min(currentSel + 1, effectiveLines - 1);
-                } else {
-                    newSel = Math.max(currentSel - 1, 0);
-                }
-
-                // Update selection
-                selectedLine = newSel;
-                selectionAnchor = newSel;
-                selectedLineIndexes.clear();
-                long globalIdx = (filteredIndexes != null) ? filteredIndexes.get((int) newSel) : newSel;
-                selectedLineIndexes.add(globalIdx);
-
-                // Scroll to keep selection visible
-                if (newSel < currentTopLine) {
-                    currentTopLine = newSel;
-                } else if (newSel >= currentTopLine + visibleLineCount) {
-                    currentTopLine = newSel - visibleLineCount + 1;
-                }
-                currentTopLine = Math.max(0, Math.min(currentTopLine, maxTop));
-                smoothScrollY = currentTopLine;
-                targetScrollY = currentTopLine;
-                scrollOffsetY = 0;
-                vScrollBar.setValue(currentTopLine);
-                lineCacheStartLine = -1;
-                render();
-                fireStatusUpdate(effectiveLines);
-
-                // Fire click handler so detail panel updates
-                String content = getLineContent(globalIdx);
-                if (onLineClick != null) {
-                    onLineClick.handle(globalIdx, content);
-                }
-
-                e.consume();
-                return;
-            }
-
-            long newTop = currentTopLine;
-
-            if (e.getCode() == KeyCode.PAGE_DOWN) {
-                newTop = Math.min(currentTopLine + visibleLineCount, maxTop);
-            } else if (e.getCode() == KeyCode.PAGE_UP) {
-                newTop = Math.max(currentTopLine - visibleLineCount, 0);
-            } else if (e.getCode() == KeyCode.HOME && e.isControlDown()) {
-                newTop = 0;
-            } else if (e.getCode() == KeyCode.END && e.isControlDown()) {
-                newTop = maxTop;
-            }
-
-            if (newTop != currentTopLine) {
-                currentTopLine = Math.max(0, newTop);
-                smoothScrollY = currentTopLine;
-                targetScrollY = currentTopLine;
-                scrollOffsetY = 0;
-                vScrollBar.setValue(currentTopLine);
-                lineCacheStartLine = -1;
-                render();
-                fireStatusUpdate(effectiveLines);
-            }
-
-            e.consume();
-        });
+        javafx.event.EventHandler<KeyEvent> keyHandler = this::handleKeyNavigation;
+        canvas.setOnKeyPressed(keyHandler);
+        this.setOnKeyPressed(keyHandler);
     }
 
-    private void copySelectedLines() {
-        if (selectedLineIndexes.isEmpty()) {
+    public void handleKeyNavigation(KeyEvent e) {
+        if (e == null || e.isConsumed()) {
             return;
         }
 
-        StringBuilder sb = new StringBuilder();
+        if (reader == null && tailBuffer.isEmpty()) {
+            return;
+        }
 
-        selectedLineIndexes.stream().sorted().forEach(globalIndex -> {
-            long actualLineIndex = globalIndex;
+        if (e.getCode() == KeyCode.C && e.isControlDown()) {
+            copySelectedLines();
+            e.consume();
+            return;
+        }
 
-            if (filteredIndexes != null) {
-                if (globalIndex < filteredIndexes.size()) {
-                    actualLineIndex = filteredIndexes.get(globalIndex.intValue());
-                } else {
-                    return;
+        long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
+        if (effectiveLines <= 0) return;
+        long maxTop = Math.max(0, effectiveLines - visibleLineCount);
+
+        if (e.getCode() == KeyCode.DOWN || e.getCode() == KeyCode.UP) {
+            if (e.getCode() == KeyCode.UP && followTail) {
+                followTail = false;
+                if (onFollowTailChanged != null) {
+                    onFollowTailChanged.accept(false);
                 }
             }
 
-            String line = getLineContent(actualLineIndex);
-            sb.append(line).append(System.lineSeparator());
-        });
+            long newSel;
+            if (selectedLine < 0) {
+                newSel = Math.max(0, Math.min(currentTopLine, effectiveLines - 1));
+            } else {
+                if (e.getCode() == KeyCode.DOWN) {
+                    newSel = Math.min(selectedLine + 1, effectiveLines - 1);
+                } else {
+                    newSel = Math.max(selectedLine - 1, 0);
+                }
+            }
 
-        ClipboardContent content = new ClipboardContent();
-        content.putString(sb.toString());
-        Clipboard.getSystemClipboard().setContent(content);
+            // Update selection
+            selectedLine = newSel;
+            selectionAnchor = newSel;
+            selectedLineIndexes.clear();
+            long globalIdx = (filteredIndexes != null) ? filteredIndexes.get((int) newSel) : newSel;
+            selectedLineIndexes.add(globalIdx);
+
+            // Scroll to keep selection visible
+            if (newSel < currentTopLine) {
+                currentTopLine = newSel;
+            } else if (newSel >= currentTopLine + visibleLineCount) {
+                currentTopLine = newSel - visibleLineCount + 1;
+            }
+            currentTopLine = Math.max(0, Math.min(currentTopLine, maxTop));
+            smoothScrollY = currentTopLine;
+            targetScrollY = currentTopLine;
+            scrollOffsetY = 0;
+            vScrollBar.setValue(currentTopLine);
+            lineCacheStartLine = -1;
+            render();
+            fireStatusUpdate(effectiveLines);
+
+            // Fire click handler so detail panel updates
+            String content = getLineContent(globalIdx);
+            if (onLineClick != null) {
+                onLineClick.handle(globalIdx, content);
+            }
+
+            e.consume();
+            return;
+        }
+
+        if (e.getCode() == KeyCode.LEFT) {
+            hScrollBar.setValue(Math.max(0, hScrollBar.getValue() - 40));
+            e.consume();
+            return;
+        } else if (e.getCode() == KeyCode.RIGHT) {
+            hScrollBar.setValue(Math.min(hScrollBar.getMax(), hScrollBar.getValue() + 40));
+            e.consume();
+            return;
+        }
+
+        long newTop = currentTopLine;
+
+        if (e.getCode() == KeyCode.PAGE_DOWN) {
+            newTop = Math.min(currentTopLine + visibleLineCount, maxTop);
+        } else if (e.getCode() == KeyCode.PAGE_UP) {
+            newTop = Math.max(currentTopLine - visibleLineCount, 0);
+        } else if (e.getCode() == KeyCode.HOME && e.isControlDown()) {
+            newTop = 0;
+        } else if (e.getCode() == KeyCode.END && e.isControlDown()) {
+            newTop = maxTop;
+        }
+
+        if (newTop != currentTopLine) {
+            currentTopLine = Math.max(0, newTop);
+            smoothScrollY = currentTopLine;
+            targetScrollY = currentTopLine;
+            scrollOffsetY = 0;
+            vScrollBar.setValue(currentTopLine);
+            lineCacheStartLine = -1;
+            render();
+            fireStatusUpdate(effectiveLines);
+        }
+
+        e.consume();
+    }
+
+    public void handleArrowKey(KeyCode code) {
+        KeyEvent dummyEvent = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
+        handleKeyNavigation(dummyEvent);
+    }
+
+    public boolean hasSelection() {
+        return !selectedLineIndexes.isEmpty() || selectedLine >= 0;
+    }
+
+    public void copySelectedLines() {
+        if (!javafx.application.Platform.isFxApplicationThread()) {
+            javafx.application.Platform.runLater(this::copySelectedLines);
+            return;
+        }
+
+        if (selectedLineIndexes.isEmpty()) {
+            if (selectedLine >= 0) {
+                long idx = (filteredIndexes != null && selectedLine < filteredIndexes.size())
+                        ? filteredIndexes.get((int) selectedLine) : selectedLine;
+                selectedLineIndexes.add(idx);
+            } else {
+                return;
+            }
+        }
+
+        StringBuilder sb = new StringBuilder();
+        List<Long> sortedIndices = new ArrayList<>(selectedLineIndexes);
+        Collections.sort(sortedIndices);
+
+        for (int i = 0; i < sortedIndices.size(); i++) {
+            long globalIndex = sortedIndices.get(i);
+            String line = getLineContent(globalIndex);
+            if (line != null) {
+                sb.append(line);
+                if (i < sortedIndices.size() - 1) {
+                    sb.append(System.lineSeparator());
+                }
+            }
+        }
+
+        if (sb.length() > 0) {
+            ClipboardContent content = new ClipboardContent();
+            content.putString(sb.toString());
+            Clipboard.getSystemClipboard().setContent(content);
+            logger.info("Copied {} lines to clipboard", sortedIndices.size());
+        }
     }
 
     private void setupScrollBarListener() {
@@ -1095,6 +1162,16 @@ public class CanvasLogViewer extends GridPane {
     /** Returns the number of lines from the indexed file (excludes tail buffer). */
     public long getFileLineCount() {
         return fileLineCount;
+    }
+
+    /** Returns total lines (file indexed lines + tail buffer lines). */
+    public long getTotalLines() {
+        return totalLines;
+    }
+
+    /** Requests a redraw of the canvas. */
+    public void redraw() {
+        render();
     }
 
     /** Request focus on the canvas so keyboard navigation works. */

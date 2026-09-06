@@ -31,103 +31,179 @@
 }
 
 /* ============================================
-   ListView Log Viewer Performance Optimizations
-   Aggressive optimizations for smooth scrolling with 1M+ rows
+   Recent Files List & ListView (Uses default JavaFX theme)
    ============================================ */
 
-/* Fixed cell size for smooth virtualization */
-.list-view .list-cell {
-    -fx-cell-size: 24px;
-    -fx-padding: 0 8px;
-    -fx-font-family: 'Consolas', 'Monaco', monospace;
-    -fx-font-size: 12px;
 
-    /* Aggressive caching for maximum performance */
-    -fx-cache: true;
-    -fx-cache-hint: speed;
-
-    /* Optimize text rendering */
-    -fx-font-smoothing-type: lcd;
-
-    /* Reduce layout overhead */
-    -fx-background-insets: 0;
-    -fx-snap-to-pixel: false;
-}
-
-/* Optimize virtual flow for large datasets */
-.list-view .virtual-flow {
-    -fx-cache: true;
-    -fx-cache-hint: speed;
-    -fx-snap-to-pixel: false;
-}
-
-/* Disable smooth scrolling animation to reduce overhead */
-.list-view {
-    -fx-smooth: false;
-}
-
-/* Optimized scrollbar styling - simpler for better performance */
-.list-view .virtual-flow .scroll-bar:vertical,
-.list-view .virtual-flow .scroll-bar:horizontal {
+/* ============================================
+   SplitPane: Clean single-line divider without 3D bevels
+   ============================================ */
+.split-pane {
     -fx-background-color: transparent;
-}
-
-.list-view .virtual-flow .scroll-bar .thumb {
     -fx-background-insets: 0;
-    -fx-background-radius: 0;
-}
-
-/* Optimize scrollbar track for faster rendering */
-.list-view .virtual-flow .scroll-bar .track {
-    -fx-background-color: transparent;
-    -fx-background-radius: 0;
-}
-
-/* Remove increment/decrement button animations */
-.list-view .virtual-flow .scroll-bar .increment-button,
-.list-view .virtual-flow .scroll-bar .decrement-button {
-    -fx-background-radius: 0;
     -fx-padding: 0;
 }
 
-/* ============================================
-   Recent Files List Styling
-   ============================================ */
-.recent-files-list .list-cell {
-    -fx-padding: 8px 10px;
-    -fx-background-color: transparent;
-    -fx-border-color: transparent;
-    -fx-border-width: 0 0 1px 0;
-    /* Separator line */
-    -fx-border-color: #e0e0e0;
-}
-
-.recent-files-list .list-cell:filled:selected,
-.recent-files-list .list-cell:filled:selected:hover {
-    -fx-background-color: #2f65ca;
-    /* Professional Blue */
-    -fx-text-fill: white;
+.split-pane > .split-pane-divider {
+    -fx-background-color: #dcdcdc;
     -fx-background-insets: 0;
-    -fx-border-color: #1a4fa0;
-    /* Slightly darker border */
-    -fx-border-width: 0 0 0 4px;
-    /* Left accent border */
+    -fx-padding: 0 0.5px;
 }
 
-/* Specific Label Styling in Selected State */
-.recent-files-list .list-cell:filled:selected .name-label,
-.recent-files-list .list-cell:filled:selected .path-label,
-.recent-files-list .list-cell:filled:selected .size-label,
-.recent-files-list .list-cell:filled:selected .server-label,
-.recent-files-list .list-cell:filled:selected .config-label {
+/* ============================================
+   TabPane & Log Tab: Clean flat borders without layered insets
+   ============================================ */
+.tab-pane > .tab-header-area {
+    -fx-padding: 0;
+}
+
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: #f0f0f0;
+    -fx-border-color: #dcdcdc;
+    -fx-border-width: 0 0 1 0;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-background-color: #e4e4e4;
+    -fx-border-color: transparent #dcdcdc transparent transparent;
+    -fx-border-width: 0 1 0 0;
+    -fx-padding: 4 10;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #2196f3 #dcdcdc #ffffff #dcdcdc;
+    -fx-border-width: 2 1 0 1;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:hover {
+    -fx-background-color: #ececec;
+}
+
+/* Remove redundant box border wrapping tab contents */
+.tab-pane > .tab-content-area {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+}
+
+/* ============================================
+   ScrollBar: Flat modern scrollbar without layered bevels
+   ============================================ */
+.scroll-bar {
+    -fx-background-color: #f8f8f8;
+    -fx-background-insets: 0;
+}
+
+.scroll-bar:vertical {
+    -fx-pref-width: 16px;
+    -fx-border-color: #e8e8e8;
+    -fx-border-width: 0 0 0 1;
+}
+
+.scroll-bar:horizontal {
+    -fx-pref-height: 16px;
+    -fx-border-color: #e8e8e8;
+    -fx-border-width: 1 0 0 0;
+}
+
+.scroll-bar .track {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #b8b8b8;
+    -fx-background-insets: 1;
+    -fx-background-radius: 3;
+}
+
+.scroll-bar:vertical .thumb {
+    -fx-min-height: 36px;
+}
+
+.scroll-bar:horizontal .thumb {
+    -fx-min-width: 36px;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #949494;
+}
+
+.scroll-bar .thumb:pressed {
+    -fx-background-color: #666666;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow {
+    -fx-background-color: #888888;
+    -fx-padding: 2.5;
+}
+
+
+/* ============================================
+   Empty State Styling
+   ============================================ */
+.empty-state-pane {
+    -fx-background-color: #f8f9fa;
+    -fx-padding: 40px;
+}
+
+.empty-state-icon {
+    -fx-fill: #adb5bd;
+}
+
+.empty-state-title {
+    -fx-font-family: 'Segoe UI', system-ui, sans-serif;
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #495057;
+}
+
+.empty-state-subtitle {
+    -fx-font-family: 'Segoe UI', system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-text-fill: #6c757d;
+}
+
+.empty-state-button {
+    -fx-background-color: #2f65ca;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 8 16;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+
+.empty-state-button:hover {
+    -fx-background-color: #1a4fa0;
+}
+
+/* ============================================
+   Toggle Button Active Icon Styling
+   ============================================ */
+.toggle-button:selected {
+    -fx-background-color: #2196F3;
     -fx-text-fill: white;
 }
 
-.recent-files-list .list-cell:filled:hover {
-    -fx-background-color: #f0f4f8;
+.toggle-button:selected .glyph-icon,
+.toggle-button:selected FontAwesomeIconView {
+    -fx-fill: white;
+    fill: white;
 }
 
-.recent-files-list .list-cell:empty {
-    -fx-background-color: transparent;
-    -fx-border-width: 0;
+.toggle-button:selected > .graphic > .glyph-icon {
+    -fx-fill: white;
+    fill: white;
 }

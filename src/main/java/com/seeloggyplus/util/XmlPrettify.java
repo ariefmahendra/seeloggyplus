@@ -1,37 +1,35 @@
 package com.seeloggyplus.util;
 
+import org.dom4j.Document;
+import org.dom4j.DocumentHelper;
+import org.dom4j.io.OutputFormat;
+import org.dom4j.io.XMLWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.Document;
-import org.xml.sax.InputSource;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-import java.io.StringReader;
 import java.io.StringWriter;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Service for prettifying and formatting XML strings
- * Provides XML validation, formatting, and minification
+ * Service for prettifying and formatting XML strings using dom4j.
+ * Provides robust XML validation, formatting, extraction, and minification.
  */
 public class XmlPrettify {
 
     private static final Logger logger = LoggerFactory.getLogger(XmlPrettify.class);
 
+    private static final Pattern TAG_START_PATTERN = Pattern.compile("<([a-zA-Z_][a-zA-Z0-9._:-]*)");
+
     /**
-     * Prettify XML string with indentation
+     * Prettify XML string with default 2-space indentation.
      */
     public static String prettify(String xml) {
         return prettify(xml, 2);
     }
 
     /**
-     * Prettify XML with custom indentation
+     * Prettify XML with custom indentation.
      */
     public static String prettify(String xml, int indent) {
         if (xml == null || xml.trim().isEmpty()) {
@@ -39,31 +37,20 @@ public class XmlPrettify {
         }
 
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true);
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
-            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            factory.setXIncludeAware(false);
-            factory.setExpandEntityReferences(false);
-
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document document = builder.parse(new InputSource(new StringReader(xml)));
-
-            TransformerFactory transformerFactory = TransformerFactory.newInstance();
-            transformerFactory.setAttribute("indent-number", indent);
-
-            Transformer transformer = transformerFactory.newTransformer();
-            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-            transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
-            transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", String.valueOf(indent));
-            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+            Document document = DocumentHelper.parseText(xml.trim());
+            OutputFormat format = OutputFormat.createPrettyPrint();
+            format.setIndent(" ".repeat(Math.max(0, indent)));
+            format.setEncoding("UTF-8");
+            format.setSuppressDeclaration(!xml.trim().startsWith("<?xml"));
+            format.setNewLineAfterDeclaration(false);
 
             StringWriter writer = new StringWriter();
-            transformer.transform(new DOMSource(document), new StreamResult(writer));
+            XMLWriter xmlWriter = new XMLWriter(writer, format);
+            xmlWriter.write(document);
+            xmlWriter.flush();
+            xmlWriter.close();
 
-            return writer.toString();
+            return writer.toString().trim();
         } catch (Exception e) {
             logger.warn("Invalid XML or error formatting: {}", e.getMessage());
             return xml;
@@ -71,7 +58,7 @@ public class XmlPrettify {
     }
 
     /**
-     * Minify XML string (remove unnecessary whitespace)
+     * Minify XML string (remove unnecessary whitespace).
      */
     public static String minify(String xml) {
         if (xml == null || xml.trim().isEmpty()) {
@@ -79,28 +66,18 @@ public class XmlPrettify {
         }
 
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true);
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
-            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            factory.setXIncludeAware(false);
-            factory.setExpandEntityReferences(false);
-
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document document = builder.parse(new InputSource(new StringReader(xml)));
-
-            TransformerFactory transformerFactory = TransformerFactory.newInstance();
-            Transformer transformer = transformerFactory.newTransformer();
-            transformer.setOutputProperty(OutputKeys.INDENT, "no");
-            transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
-            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+            Document document = DocumentHelper.parseText(xml.trim());
+            OutputFormat format = OutputFormat.createCompactFormat();
+            format.setEncoding("UTF-8");
+            format.setSuppressDeclaration(!xml.trim().startsWith("<?xml"));
 
             StringWriter writer = new StringWriter();
-            transformer.transform(new DOMSource(document), new StreamResult(writer));
+            XMLWriter xmlWriter = new XMLWriter(writer, format);
+            xmlWriter.write(document);
+            xmlWriter.flush();
+            xmlWriter.close();
 
-            return writer.toString().replaceAll(">\\s+<", "><").trim();
+            return writer.toString().trim();
         } catch (Exception e) {
             logger.warn("Invalid XML or error minifying: {}", e.getMessage());
             return xml;
@@ -108,7 +85,7 @@ public class XmlPrettify {
     }
 
     /**
-     * Validate if string is valid XML
+     * Validate if string is valid XML.
      */
     public static boolean isValidXml(String xml) {
         if (xml == null || xml.trim().isEmpty()) {
@@ -116,17 +93,7 @@ public class XmlPrettify {
         }
 
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true);
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
-            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            factory.setXIncludeAware(false);
-            factory.setExpandEntityReferences(false);
-
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            builder.parse(new InputSource(new StringReader(xml)));
+            DocumentHelper.parseText(xml.trim());
             return true;
         } catch (Exception e) {
             return false;
@@ -134,157 +101,56 @@ public class XmlPrettify {
     }
 
     /**
-     * Extract XML from a log message
-     * Attempts to find and extract XML from text
+     * Extract the first valid XML block from text.
      */
     public static String extractXml(String text) {
-        if (text == null || text.trim().isEmpty()) {
-            return null;
-        }
-
-        // Look for XML declaration
-        int xmlStart = text.indexOf("<?xml");
-        if (xmlStart >= 0) {
-            int xmlEnd = findXmlEnd(text, xmlStart);
-            if (xmlEnd > xmlStart) {
-                String xmlCandidate = text.substring(xmlStart, xmlEnd);
-                if (isValidXml(xmlCandidate)) {
-                    return xmlCandidate;
-                }
-            }
-        }
-
-        // Look for root element (common XML tags)
-        String[] commonRootTags = {"<root", "<response", "<request", "<data", "<message", "<xml", "<document", "<config"};
-
-        for (String rootTag : commonRootTags) {
-            xmlStart = text.indexOf(rootTag);
-            if (xmlStart >= 0) {
-                int xmlEnd = findXmlEnd(text, xmlStart);
-                if (xmlEnd > xmlStart) {
-                    String xmlCandidate = text.substring(xmlStart, xmlEnd);
-                    if (isValidXml(xmlCandidate)) {
-                        return xmlCandidate;
-                    }
-                }
-            }
-        }
-
-        // Try to find any XML-like structure
-        xmlStart = text.indexOf('<');
-        if (xmlStart >= 0) {
-            int xmlEnd = text.lastIndexOf('>');
-            if (xmlEnd > xmlStart) {
-                String xmlCandidate = text.substring(xmlStart, xmlEnd + 1);
-                if (isValidXml(xmlCandidate)) {
-                    return xmlCandidate;
-                }
-            }
-        }
-
-        return null;
+        XmlRegion region = findFirstXmlRegion(text, 0);
+        return region != null ? region.xmlText : null;
     }
 
     /**
-     * Find the end of an XML document starting from a given position
-     */
-    private static int findXmlEnd(String text, int startPos) {
-        try {
-            // Find the root element tag name
-            int tagStart = text.indexOf('<', startPos);
-            if (tagStart < 0) return -1;
-
-            // Skip <?xml declaration if present
-            if (text.startsWith("<?xml", tagStart)) {
-                tagStart = text.indexOf('<', tagStart + 5);
-                if (tagStart < 0) return -1;
-            }
-
-            // Skip comments
-            while (text.startsWith("<!--", tagStart)) {
-                int commentEnd = text.indexOf("-->", tagStart);
-                if (commentEnd < 0) return -1;
-                tagStart = text.indexOf('<', commentEnd + 3);
-                if (tagStart < 0) return -1;
-            }
-
-            // Get root element name
-            int tagNameEnd = tagStart + 1;
-            while (tagNameEnd < text.length() &&
-                   !Character.isWhitespace(text.charAt(tagNameEnd)) &&
-                   text.charAt(tagNameEnd) != '>' &&
-                   text.charAt(tagNameEnd) != '/') {
-                tagNameEnd++;
-            }
-
-            String rootTagName = text.substring(tagStart + 1, tagNameEnd);
-            String closeTag = "</" + rootTagName + ">";
-
-            // Find closing tag
-            int depth = 0;
-            int pos = tagStart;
-
-            while (pos < text.length()) {
-                int nextOpen = text.indexOf("<" + rootTagName, pos);
-                int nextClose = text.indexOf(closeTag, pos);
-
-                // Check for self-closing tag
-                if (nextClose < 0) {
-                    int selfClose = text.indexOf("/>", tagStart);
-                    if (selfClose > tagStart && selfClose < text.length()) {
-                        return selfClose + 2;
-                    }
-                    return -1;
-                }
-
-                if (nextOpen >= 0 && nextOpen < nextClose) {
-                    // Check if it's actually an opening tag
-                    int afterTag = nextOpen + rootTagName.length() + 1;
-                    if (afterTag < text.length() &&
-                        (Character.isWhitespace(text.charAt(afterTag)) ||
-                         text.charAt(afterTag) == '>' ||
-                         text.charAt(afterTag) == '/')) {
-                        depth++;
-                        pos = nextOpen + 1;
-                    } else {
-                        pos = nextOpen + 1;
-                    }
-                } else {
-                    if (depth == 0) {
-                        return nextClose + closeTag.length();
-                    }
-                    depth--;
-                    pos = nextClose + closeTag.length();
-                }
-            }
-        } catch (Exception e) {
-            logger.debug("Error finding XML end: {}", e.getMessage());
-        }
-
-        return -1;
-    }
-
-    /**
-     * Format and prettify XML from log message
-     * Extracts XML and returns prettified version
-     */
-    public static String prettifyFromLog(String logMessage) {
-        String xml = extractXml(logMessage);
-        if (xml != null) {
-            return prettify(xml);
-        }
-        return logMessage;
-    }
-
-    /**
-     * Check if log message contains XML
+     * Check if text contains valid XML.
      */
     public static boolean containsXml(String text) {
         return extractXml(text) != null;
     }
 
     /**
-     * Get XML validation error message
+     * Format and prettify all XML blocks found within a log message,
+     * preserving surrounding log prefixes, timestamps, and suffixes.
+     */
+    public static String prettifyFromLog(String logMessage) {
+        if (logMessage == null || logMessage.trim().isEmpty()) {
+            return logMessage;
+        }
+
+        String trimmed = logMessage.trim();
+        if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
+            if (isValidXml(trimmed)) {
+                return prettify(trimmed);
+            }
+        }
+
+        StringBuilder sb = new StringBuilder();
+        int curPos = 0;
+
+        while (curPos < logMessage.length()) {
+            XmlRegion region = findFirstXmlRegion(logMessage, curPos);
+            if (region == null) {
+                sb.append(logMessage.substring(curPos));
+                break;
+            }
+
+            sb.append(logMessage, curPos, region.startIndex);
+            sb.append(prettify(region.xmlText));
+            curPos = region.endIndex;
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * Get XML validation error message, or null if valid.
      */
     public static String getValidationError(String xml) {
         if (xml == null || xml.trim().isEmpty()) {
@@ -292,20 +158,84 @@ public class XmlPrettify {
         }
 
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true);
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
-            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            factory.setXIncludeAware(false);
-            factory.setExpandEntityReferences(false);
-
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            builder.parse(new InputSource(new StringReader(xml)));
-            return null; // Valid XML
+            DocumentHelper.parseText(xml.trim());
+            return null;
         } catch (Exception e) {
             return e.getMessage();
         }
+    }
+
+    private static class XmlRegion {
+        final int startIndex;
+        final int endIndex;
+        final String xmlText;
+
+        XmlRegion(int startIndex, int endIndex, String xmlText) {
+            this.startIndex = startIndex;
+            this.endIndex = endIndex;
+            this.xmlText = xmlText;
+        }
+    }
+
+    private static XmlRegion findFirstXmlRegion(String text, int searchFrom) {
+        if (text == null || searchFrom >= text.length()) {
+            return null;
+        }
+
+        // Check if there is an XML declaration <?xml
+        int xmlDeclStart = text.indexOf("<?xml", searchFrom);
+        if (xmlDeclStart >= 0) {
+            int declEnd = text.indexOf("?>", xmlDeclStart);
+            if (declEnd > xmlDeclStart) {
+                Matcher m = TAG_START_PATTERN.matcher(text);
+                if (m.find(declEnd + 2)) {
+                    int tagStart = m.start();
+                    String tagName = m.group(1);
+                    XmlRegion region = findMatchingXmlEnd(text, tagStart, tagName, xmlDeclStart);
+                    if (region != null) {
+                        return region;
+                    }
+                }
+            }
+        }
+
+        // Search for any starting tag
+        Matcher m = TAG_START_PATTERN.matcher(text);
+        int pos = searchFrom;
+        while (m.find(pos)) {
+            int tagStart = m.start();
+            String tagName = m.group(1);
+            XmlRegion region = findMatchingXmlEnd(text, tagStart, tagName, tagStart);
+            if (region != null) {
+                return region;
+            }
+            pos = tagStart + 1;
+        }
+
+        return null;
+    }
+
+    private static XmlRegion findMatchingXmlEnd(String text, int tagStart, String tagName, int actualStart) {
+        String closeTag = "</" + tagName + ">";
+        int closeIdx = text.indexOf(closeTag, tagStart);
+        while (closeIdx >= tagStart) {
+            int endIdx = closeIdx + closeTag.length();
+            String candidate = text.substring(actualStart, endIdx);
+            if (isValidXml(candidate)) {
+                return new XmlRegion(actualStart, endIdx, candidate);
+            }
+            closeIdx = text.indexOf(closeTag, closeIdx + 1);
+        }
+
+        int selfClose = text.indexOf("/>", tagStart);
+        if (selfClose > tagStart) {
+            int endIdx = selfClose + 2;
+            String candidate = text.substring(actualStart, endIdx);
+            if (isValidXml(candidate)) {
+                return new XmlRegion(actualStart, endIdx, candidate);
+            }
+        }
+
+        return null;
     }
 }

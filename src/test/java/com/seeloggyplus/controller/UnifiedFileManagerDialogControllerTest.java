@@ -32,7 +32,13 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Optional;
 import java.util.function.Consumer;
+
+import com.seeloggyplus.model.Preference;
+import com.seeloggyplus.service.PreferenceService;
 
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Disabled;
@@ -103,6 +109,10 @@ public class UnifiedFileManagerDialogControllerTest {
         sshFactoryField.setAccessible(true);
         java.util.function.Supplier<SSHServiceImpl> factory = () -> mockSshService;
         sshFactoryField.set(controller, factory);
+
+        Field prefField = UnifiedFileManagerDialogController.class.getDeclaredField("preferenceService");
+        prefField.setAccessible(true);
+        prefField.set(controller, new InMemoryPreferenceService());
 
         // Clear cache
         Field cacheField = UnifiedFileManagerDialogController.class.getDeclaredField("directoryCache");
@@ -662,5 +672,42 @@ public class UnifiedFileManagerDialogControllerTest {
         // Close the newly opened ServerManagementDialog by typing ESCAPE
         robot.type(javafx.scene.input.KeyCode.ESCAPE);
         WaitForAsyncUtils.waitForFxEvents();
+    }
+
+    private static class InMemoryPreferenceService implements PreferenceService {
+        private final Map<String, String> store = new HashMap<>();
+
+        @Override
+        public void savePreferences(Preference preferences) {
+            if (preferences != null) {
+                store.put(preferences.getCode(), preferences.getValue());
+            }
+        }
+
+        @Override
+        public void updatePreferences(Preference preferences) {
+            if (preferences != null) {
+                store.put(preferences.getCode(), preferences.getValue());
+            }
+        }
+
+        @Override
+        public Optional<String> getPreferencesByCode(String code) {
+            return Optional.ofNullable(store.get(code));
+        }
+
+        @Override
+        public List<Preference> getListPreferences() {
+            List<Preference> list = new ArrayList<>();
+            store.forEach((k, v) -> list.add(new Preference(k, v)));
+            return list;
+        }
+
+        @Override
+        public void saveOrUpdatePreferences(Preference preferences) {
+            if (preferences != null) {
+                store.put(preferences.getCode(), preferences.getValue());
+            }
+        }
     }
 }

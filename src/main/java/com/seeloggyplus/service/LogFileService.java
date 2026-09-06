@@ -62,6 +62,17 @@ public interface LogFileService {
     LogFile getLogFileByPathAndName(String name, String filePath);
 
     /**
+     * Finds a log file by its name, file path, SSH server ID, and remote flag.
+     *
+     * @param name        The name of the log file.
+     * @param filePath    The path of the file.
+     * @param sshServerId The SSH server ID (required if remote, null if local).
+     * @param isRemote    True if the file is on a remote server.
+     * @return The LogFile object, or null if not found.
+     */
+    LogFile getLogFileByPathNameAndServer(String name, String filePath, String sshServerId, boolean isRemote);
+
+    /**
      * Deletes all log files from the database.
      * Use with caution.
      *

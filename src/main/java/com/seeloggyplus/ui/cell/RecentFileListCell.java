@@ -27,11 +27,18 @@ public class RecentFileListCell extends ListCell<RecentFilesDto> {
         if (empty || item == null) {
             setText(null);
             setGraphic(null);
+            setTooltip(null);
         } else {
             VBox vbox = new VBox(2);
+            vbox.setFillWidth(true);
             LogFile logFile = item.logFile();
 
             String displayName = logFile.getName();
+            // Clean up any temporary download prefix (e.g. seeloggyplus-1788673390465-app.log -> app.log)
+            if (displayName != null && displayName.matches("^seeloggyplus-\\d+-(.+)$")) {
+                displayName = displayName.replaceFirst("^seeloggyplus-\\d+-", "");
+            }
+
             String monitoringRemotePath = monitoringRemotePathSupplier != null ? monitoringRemotePathSupplier.get()
                     : null;
             if (logFile.isRemote()
@@ -43,8 +50,10 @@ public class RecentFileListCell extends ListCell<RecentFilesDto> {
             Label nameLabel = new Label(displayName);
             nameLabel.setStyle("-fx-font-weight: bold;");
             nameLabel.getStyleClass().add("name-label");
+            nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
 
             Label serverLabel = null;
+            String serverNameForTooltip = null;
             if (logFile.isRemote()) {
                 String serverNameText = "Server: -";
                 String serverId = logFile.getSshServerID();
@@ -53,6 +62,7 @@ public class RecentFileListCell extends ListCell<RecentFilesDto> {
                         SSHServerModel server = serverManagementService.getServerById(serverId);
                         if (server != null) {
                             serverNameText = "Server: " + server.getName();
+                            serverNameForTooltip = server.getName();
                         } else {
                             serverNameText = "Server: (not found: " + serverId + ")";
                         }
@@ -62,20 +72,42 @@ public class RecentFileListCell extends ListCell<RecentFilesDto> {
                     }
                 }
                 serverLabel = new Label(serverNameText);
-                serverLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #555;");
+                serverLabel.setStyle("-fx-font-size: 11px;");
                 serverLabel.getStyleClass().add("server-label");
+                serverLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
             }
 
             Label pathLabel = new Label(logFile.getFilePath());
             pathLabel.getStyleClass().add("path-label");
+            pathLabel.setTextOverrun(javafx.scene.control.OverrunStyle.CENTER_ELLIPSIS);
+
             Label sizeLabel = new Label(logFile.getSize());
             sizeLabel.getStyleClass().add("size-label");
+
+            // Bind max width to prevent horizontal overflow and scrollbars in ListView
+            if (getListView() != null) {
+                nameLabel.maxWidthProperty().bind(getListView().widthProperty().subtract(30));
+                pathLabel.maxWidthProperty().bind(getListView().widthProperty().subtract(30));
+                if (serverLabel != null) {
+                    serverLabel.maxWidthProperty().bind(getListView().widthProperty().subtract(30));
+                }
+            }
 
             if (serverLabel != null) {
                 vbox.getChildren().addAll(nameLabel, serverLabel, pathLabel, sizeLabel);
             } else {
                 vbox.getChildren().addAll(nameLabel, pathLabel, sizeLabel);
             }
+
+            // Informative tooltip with full path
+            StringBuilder tip = new StringBuilder();
+            tip.append("Name: ").append(displayName).append("\n");
+            if (serverNameForTooltip != null) {
+                tip.append("Server: ").append(serverNameForTooltip).append("\n");
+            }
+            tip.append("Path: ").append(logFile.getFilePath()).append("\n");
+            tip.append("Size: ").append(logFile.getSize() != null ? logFile.getSize() : "-");
+            setTooltip(new javafx.scene.control.Tooltip(tip.toString()));
 
             setGraphic(vbox);
         }
