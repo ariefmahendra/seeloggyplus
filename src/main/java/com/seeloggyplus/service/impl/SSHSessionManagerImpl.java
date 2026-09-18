@@ -79,6 +79,8 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
         Properties config = new Properties();
         config.put("StrictHostKeyChecking", "no");
         config.put("PreferredAuthentications", "password");
+        config.put("cipher.s2c", "aes128-ctr,aes192-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com");
+        config.put("cipher.c2s", "aes128-ctr,aes192-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com");
         config.put("compression.s2c", "none,zlib@openssh.com");
         config.put("compression.c2s", "none,zlib@openssh.com");
         config.put("MaxAuthTries", "3");

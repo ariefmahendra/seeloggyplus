@@ -457,6 +457,24 @@ public class BugExplorationTest {
             cacheField.setAccessible(true);
             ((Map<?, ?>) cacheField.get(controller)).clear();
 
+            Class<?> locationItemClass = Arrays.stream(controller.getClass().getDeclaredClasses())
+                    .filter(c -> c.getSimpleName().equals("LocationItem"))
+                    .findFirst()
+                    .orElseThrow();
+            java.lang.reflect.Constructor<?> ctor = locationItemClass.getConstructors()[0];
+            ctor.setAccessible(true);
+            Object localItem = ctor.newInstance("Local Drive", de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon.DESKTOP, null);
+
+            // Ensure controller starts at local drive
+            Platform.runLater(() -> {
+                try {
+                    invoke(controller, "handleLocationSelected",
+                            new Class[]{locationItemClass}, localItem);
+                } catch (Exception e) { throw new RuntimeException(e); }
+            });
+            Thread.sleep(500);
+            WaitForAsyncUtils.waitForFxEvents();
+
             // Step 1: Navigate to LAST_DIR (simulates user navigation)
             Platform.runLater(() -> {
                 try {
@@ -470,15 +488,9 @@ public class BugExplorationTest {
             // This resets the location and should restore from preference.
             Platform.runLater(() -> {
                 try {
-                    Class<?> locationItemClass = Arrays.stream(controller.getClass().getDeclaredClasses())
-                            .filter(c -> c.getSimpleName().equals("LocationItem"))
-                            .findFirst()
-                            .orElseThrow();
-                    java.lang.reflect.Constructor<?> ctor = locationItemClass.getConstructors()[0];
-                    ctor.setAccessible(true);
-                    Object localItem = ctor.newInstance("Local Drive", de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon.DESKTOP, null);
+                    Object reopenItem = ctor.newInstance("Local Drive", de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon.DESKTOP, null);
                     invoke(controller, "handleLocationSelected",
-                            new Class[]{locationItemClass}, localItem);
+                            new Class[]{locationItemClass}, reopenItem);
                 } catch (Exception e) { throw new RuntimeException(e); }
             });
             Thread.sleep(500);

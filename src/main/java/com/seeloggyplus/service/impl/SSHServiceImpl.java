@@ -276,8 +276,7 @@ public class SSHServiceImpl implements SSHService {
             sftpAvailable = true;
             return result;
         } catch (IOException e) {
-            logger.warn("SFTP listFiles failed, falling back to exec: {}", e.getMessage());
-            sftpAvailable = false;
+            logger.warn("SFTP listFiles failed for path {}, falling back to exec: {}", remotePath, e.getMessage());
             return listFilesExec(remotePath);
         }
     }
@@ -289,10 +288,11 @@ public class SSHServiceImpl implements SSHService {
             @SuppressWarnings("unchecked")
             Vector<ChannelSftp.LsEntry> entries = sftpChannel.ls(remotePath);
             List<RemoteFileInfo> files = new ArrayList<>(entries.size());
+            String prefix = remotePath.endsWith("/") ? remotePath : remotePath + "/";
             for (ChannelSftp.LsEntry entry : entries) {
                 String filename = entry.getFilename();
                 if (!filename.equals(".") && !filename.equals("..")) {
-                    files.add(mapToFileInfo(entry, remotePath));
+                    files.add(mapToFileInfo(entry, prefix));
                 }
             }
             return files;
@@ -455,6 +455,7 @@ public class SSHServiceImpl implements SSHService {
             return reusableSftpChannel;
         } catch (JSchException e) {
             reusableSftpChannel = null;
+            sftpAvailable = false;
             throw new IOException("SFTP channel unavailable: " + e.getMessage(), e);
         }
     }
@@ -750,8 +751,7 @@ public class SSHServiceImpl implements SSHService {
             sftpAvailable = true;
             return attrs.getSize();
         } catch (SftpException | IOException e) {
-            logger.warn("SFTP getFileSize failed, falling back to exec: {}", e.getMessage());
-            sftpAvailable = false;
+            logger.warn("SFTP getFileSize failed for {}, falling back to exec: {}", remotePath, e.getMessage());
             return getFileSizeExec(remotePath);
         }
     }
@@ -783,11 +783,11 @@ public class SSHServiceImpl implements SSHService {
         return "'" + arg.replace("'", "'\\''") + "'";
     }
 
-    private RemoteFileInfo mapToFileInfo(ChannelSftp.LsEntry entry, String parentPath) {
+    private RemoteFileInfo mapToFileInfo(ChannelSftp.LsEntry entry, String parentPrefix) {
         SftpATTRS attrs = entry.getAttrs();
         RemoteFileInfo info = new RemoteFileInfo();
         info.setName(entry.getFilename());
-        info.setPath((parentPath.endsWith("/") ? parentPath : parentPath + "/") + entry.getFilename());
+        info.setPath(parentPrefix + entry.getFilename());
         info.setSize(attrs.getSize());
         info.setDirectory(attrs.isDir());
         info.setModifiedTime(attrs.getMTime() * 1000L);

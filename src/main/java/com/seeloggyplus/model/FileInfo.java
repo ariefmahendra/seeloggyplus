@@ -56,6 +56,7 @@ public class FileInfo implements Comparable<FileInfo> {
 
     public void setSize(long size) {
         this.size = size;
+        this.formattedSize = null;
     }
 
     public boolean isDirectory() {
@@ -64,6 +65,7 @@ public class FileInfo implements Comparable<FileInfo> {
 
     public void setDirectory(boolean directory) {
         isDirectory = directory;
+        this.formattedSize = null;
     }
 
     public long getModifiedTime() {
@@ -72,6 +74,7 @@ public class FileInfo implements Comparable<FileInfo> {
 
     public void setModifiedTime(long modifiedTime) {
         this.modifiedTime = modifiedTime;
+        this.formattedModified = null;
     }
 
     public String getPermissions() {
@@ -143,19 +146,41 @@ public class FileInfo implements Comparable<FileInfo> {
         return "";
     }
 
+    private static final java.time.format.DateTimeFormatter MODIFIED_FORMATTER =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                    .withZone(java.time.ZoneId.systemDefault());
+
+    private transient String formattedModified;
+    private transient String formattedSize;
+
+    public String getFormattedModified() {
+        if (formattedModified != null) {
+            return formattedModified;
+        }
+        if (modifiedTime > 0) {
+            formattedModified = MODIFIED_FORMATTER.format(java.time.Instant.ofEpochMilli(modifiedTime));
+            return formattedModified;
+        }
+        formattedModified = "-";
+        return formattedModified;
+    }
+
     public String getFormattedSize() {
+        if (formattedSize != null) {
+            return formattedSize;
+        }
         if (isDirectory) {
-            return "-";
-        }
-        if (size < 1024) {
-            return size + " B";
+            formattedSize = "-";
+        } else if (size < 1024) {
+            formattedSize = size + " B";
         } else if (size < 1024 * 1024) {
-            return String.format("%.1f KB", size / 1024.0);
+            formattedSize = String.format(java.util.Locale.US, "%.1f KB", size / 1024.0);
         } else if (size < 1024 * 1024 * 1024) {
-            return String.format("%.1f MB", size / (1024.0 * 1024.0));
+            formattedSize = String.format(java.util.Locale.US, "%.1f MB", size / (1024.0 * 1024.0));
         } else {
-            return String.format("%.1f GB", size / (1024.0 * 1024.0 * 1024.0));
+            formattedSize = String.format(java.util.Locale.US, "%.1f GB", size / (1024.0 * 1024.0 * 1024.0));
         }
+        return formattedSize;
     }
 
     @Override

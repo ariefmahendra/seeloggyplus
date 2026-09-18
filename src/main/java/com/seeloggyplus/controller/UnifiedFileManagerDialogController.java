@@ -324,27 +324,31 @@ public class UnifiedFileManagerDialogController {
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+                TableRow<?> row = getTableRow();
+                if (empty || row == null || row.getItem() == null) {
                     setGraphic(null);
+                    if (row != null && row.getStyle() != null && !row.getStyle().isEmpty()) {
+                        row.setStyle("");
+                    }
                 } else {
-                    FileInfo file = getTableRow().getItem();
+                    FileInfo file = (FileInfo) row.getItem();
+                    String targetStyle = "";
                     if (file.isDirectory()) {
                         icon.setIcon(FontAwesomeIcon.FOLDER);
                         icon.setFill(Color.DARKGOLDENROD);
                         boolean isFavorite = favoritePathsCache.contains(file.getPath());
                         if (isFavorite) {
-                            getTableRow().setStyle("-fx-font-weight: bold;");
-                        } else {
-                            getTableRow().setStyle("");
+                            targetStyle = "-fx-font-weight: bold;";
                         }
                     } else if (file.isLogFile()) {
                         icon.setIcon(FontAwesomeIcon.FILE_TEXT_ALT);
                         icon.setFill(Color.STEELBLUE);
-                        getTableRow().setStyle("");
                     } else {
                         icon.setIcon(FontAwesomeIcon.FILE_ALT);
                         icon.setFill(Color.DARKGRAY);
-                        getTableRow().setStyle("");
+                    }
+                    if (!java.util.Objects.equals(row.getStyle(), targetStyle)) {
+                        row.setStyle(targetStyle);
                     }
                     setGraphic(icon);
                 }
@@ -362,22 +366,21 @@ public class UnifiedFileManagerDialogController {
         permissionsColumn
                 .setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getPermissions()));
         ownerColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getOwner()));
-        modifiedColumn.setCellValueFactory(cellData -> {
-            if (cellData.getValue().getModified() != null) {
-                return new SimpleStringProperty(cellData.getValue().getModified().format(DATE_FORMATTER));
-            }
-            return new SimpleStringProperty("-");
+        modifiedColumn.setCellValueFactory(cellData ->
+                new SimpleStringProperty(cellData.getValue().getFormattedModified()));
+        modifiedColumn.setComparator((m1, m2) -> {
+            if (m1 == null || "-".equals(m1)) return (m2 == null || "-".equals(m2)) ? 0 : -1;
+            if (m2 == null || "-".equals(m2)) return 1;
+            return m1.compareTo(m2);
         });
 
         SortedList<FileInfo> sortedData = new SortedList<>(filteredFiles);
         // ponytail: fallback comparator — directories first, then modified desc, tie-break name asc
-        // When user clicks a column header, fileTable.comparatorProperty() becomes non-null and overrides this.
-        // getSortOrder().clear() in loadFiles() resets back to this default after each load.
+        // Optimized to use primitive long comparison and String.CASE_INSENSITIVE_ORDER to avoid object churn
         Comparator<FileInfo> defaultSort = Comparator
-            .comparing((FileInfo f) -> f.getName().equals("..") ? 0 : (f.isDirectory() ? 1 : 2))
-            .thenComparing(f -> f.getModified() != null ? f.getModified() : java.time.LocalDateTime.MIN,
-                           Comparator.reverseOrder())
-            .thenComparing(f -> f.getName().toLowerCase());
+            .<FileInfo>comparingInt(f -> f.getName().equals("..") ? 0 : (f.isDirectory() ? 1 : 2))
+            .thenComparing((f1, f2) -> Long.compare(f2.getModifiedTime(), f1.getModifiedTime()))
+            .thenComparing(FileInfo::getName, String.CASE_INSENSITIVE_ORDER);
         sortedData.comparatorProperty().bind(
             fileTable.comparatorProperty().map(c -> c != null ? c : defaultSort)
         );
@@ -438,10 +441,11 @@ public class UnifiedFileManagerDialogController {
         pathField.setOnAction(e -> navigateTo(pathField.getText()));
 
         searchField.textProperty().addListener((obs, oldVal, newVal) -> {
+            String query = (newVal == null) ? "" : newVal.trim().toLowerCase();
             filteredFiles.setPredicate(file -> {
-                if (newVal == null || newVal.isEmpty())
+                if (query.isEmpty())
                     return true;
-                return file.getName().toLowerCase().contains(newVal.toLowerCase());
+                return file.getName().toLowerCase().contains(query);
             });
             itemCountLabel.setText(filteredFiles.size() + " items");
         });
@@ -734,6 +738,10 @@ public class UnifiedFileManagerDialogController {
                 return;
             }
             TableColumn.SortType direction = TableColumn.SortType.valueOf(parts[1]);
+            var currentOrder = fileTable.getSortOrder();
+            if (currentOrder.size() == 1 && currentOrder.get(0) == col.get() && col.get().getSortType() == direction) {
+                return;
+            }
             suppressSortSave = true;
             col.get().setSortType(direction);
             fileTable.getSortOrder().setAll(col.get());
@@ -796,6 +804,7 @@ public class UnifiedFileManagerDialogController {
         CacheEntry cachedEntry = directoryCache.get(cacheKey);
         if (cachedEntry != null && !cachedEntry.isExpired()) {
             logger.info("Cache HIT for path: {}", path);
+            fileTable.setOpacity(1.0);
             allFiles.setAll(cachedEntry.getFiles());
             restoreSortOrdering();
             itemCountLabel.setText(allFiles.size() + " items");
@@ -808,6 +817,7 @@ public class UnifiedFileManagerDialogController {
 
         updateStatus("Loading " + path + "...");
         progressIndicator.setVisible(true);
+        fileTable.setOpacity(0.65);
 
         if (currentLoadTask != null && currentLoadTask.isRunning()) {
             currentLoadTask.cancel(true);
@@ -866,6 +876,7 @@ public class UnifiedFileManagerDialogController {
             restoreSortOrdering(); // restores saved sort or falls back to defaultSort
             itemCountLabel.setText(allFiles.size() + " items");
             progressIndicator.setVisible(false);
+            fileTable.setOpacity(1.0);
             updateStatus("Ready");
             updateNavigationButtons();
             loadFavoritesForCurrentLocation();
@@ -875,6 +886,7 @@ public class UnifiedFileManagerDialogController {
         loadTask.setOnFailed(e -> {
             if (loadTask != currentLoadTask) return;
             progressIndicator.setVisible(false);
+            fileTable.setOpacity(1.0);
             updateStatus("Error loading files");
             Throwable ex = loadTask.getException();
             logger.error("Error loading files for path: {}", path, ex);

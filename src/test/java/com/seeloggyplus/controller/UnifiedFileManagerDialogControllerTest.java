@@ -119,6 +119,19 @@ public class UnifiedFileManagerDialogControllerTest {
         cacheField.setAccessible(true);
         java.util.Map<?, ?> cache = (java.util.Map<?, ?>) cacheField.get(controller);
         cache.clear();
+
+        // Ensure location is reset to Local Drive for test isolation
+        Platform.runLater(() -> {
+            try {
+                ListView<?> locationListView = getField("locationListView");
+                if (locationListView != null && locationListView.getSelectionModel().getSelectedIndex() != 0) {
+                    locationListView.getSelectionModel().select(0);
+                }
+            } catch (Exception ignored) {}
+        });
+        Thread.sleep(500);
+        WaitForAsyncUtils.waitForFxEvents();
+        localFileService.callCount = 0;
     }
 
     private void forceRefreshLocation() {
@@ -328,6 +341,7 @@ public class UnifiedFileManagerDialogControllerTest {
                 m.invoke(controller, "C:\\CacheDir");
             } catch (Exception e) {}
         });
+        Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
 
         assertEquals(1, localFileService.callCount); // First call
@@ -339,6 +353,7 @@ public class UnifiedFileManagerDialogControllerTest {
                 m.invoke(controller, "C:\\CacheDir");
             } catch (Exception e) {}
         });
+        Thread.sleep(200);
         WaitForAsyncUtils.waitForFxEvents();
 
         assertEquals(1, localFileService.callCount); // Should be cached!
