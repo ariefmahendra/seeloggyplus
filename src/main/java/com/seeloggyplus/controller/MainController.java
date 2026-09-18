@@ -267,6 +267,9 @@ public class MainController {
     private PauseTransition searchDebounce;
     private Task<?> currentSearchTask;
     private volatile long searchGeneration = 0;
+    private String lastAppliedSearchQuery = null;
+    private boolean lastAppliedRegex = false;
+    private boolean lastAppliedCaseSensitive = false;
     private com.seeloggyplus.ui.search.SearchResultPanel searchResultPanel;
     private SplitPane searchSplitPane;
 
@@ -661,9 +664,11 @@ public class MainController {
         setupDetailPanel();
 
         searchField.setOnAction(e -> {
-            if (searchNavigator != null && searchNavigator.isVisible()
-                    && searchField.getText() != null && !searchField.getText().isEmpty()) {
-                // Results already showing — Enter navigates to next match
+            boolean querySame = java.util.Objects.equals(searchField.getText(), lastAppliedSearchQuery)
+                    && (regexCheckBox != null && regexCheckBox.isSelected() == lastAppliedRegex)
+                    && (caseSensitiveCheckBox != null && caseSensitiveCheckBox.isSelected() == lastAppliedCaseSensitive);
+            if (querySame && filteredIndexes != null && !filteredIndexes.isEmpty()) {
+                // Results already showing for this exact query — Enter navigates to next match
                 navigateNextMatch();
             } else {
                 performSearch();
@@ -672,6 +677,9 @@ public class MainController {
         searchField.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ESCAPE) {
                 clearSearch();
+            } else if (event.getCode() == KeyCode.ENTER && event.isShiftDown()) {
+                navigatePreviousMatch();
+                event.consume();
             }
         });
 
@@ -679,27 +687,16 @@ public class MainController {
         searchDebounce = new PauseTransition(Duration.millis(300));
         searchDebounce.setOnFinished(evt -> performSearch());
         searchField.textProperty().addListener((obs, oldText, newText) -> {
+            if (isSkippingFilterTrigger) {
+                return;
+            }
             if (newText != null && !newText.isEmpty()) {
                 searchDebounce.playFromStart();
             } else {
                 searchDebounce.stop();
                 // Only clear if there was actually a previous search
                 if (oldText != null && !oldText.isEmpty()) {
-                    filteredIndexes = null;
-                    currentMatchIndex = -1;
-                    searchGeneration++;
-                    if (currentSearchTask != null && currentSearchTask.isRunning()) {
-                        currentSearchTask.cancel(true);
-                    }
-                    if (canvasLogViewer != null) {
-                        canvasLogViewer.clearFilter();
-                        canvasLogViewer.clearSearchHighlight();
-                        if (tailModeEnabled && !canvasLogViewer.isFollowTail()) {
-                            canvasLogViewer.setFollowTail(true);
-                        }
-                    }
-                    if (searchNavigator != null) searchNavigator.clear();
-                    hideSearchResultPanel();
+                    clearSearch();
                 }
             }
         });
@@ -815,6 +812,10 @@ public class MainController {
         logger.info("Search - Include: '{}', Regex: {}, CaseSensitive: {}",
                 searchText, isRegex, caseSensitive);
 
+        lastAppliedSearchQuery = searchText;
+        lastAppliedRegex = isRegex;
+        lastAppliedCaseSensitive = caseSensitive;
+
         if ((mappedFileReader == null || lineOffsetIndex == null) && !tailModeEnabled) {
             logger.warn("No file loaded for search");
             return;
@@ -826,7 +827,7 @@ public class MainController {
         }
 
         if (tailModeEnabled) {
-            // TAIL MODE: Highlight + Search Result Panel (same UX as local file mode)
+            // TAIL MODE: Filtered lines + Highlight
             String highlightPattern = searchText;
             boolean highlightIsRegex = isRegex;
 
@@ -840,22 +841,22 @@ public class MainController {
                 }
             }
 
+            final String finalHighlightPattern = highlightPattern;
+            final boolean finalHighlightIsRegex = highlightIsRegex;
+
             // Compile the search pattern for matching against tail buffer lines
             final Pattern matchPattern;
             try {
                 int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
                 matchPattern = Pattern.compile(
-                        highlightIsRegex ? highlightPattern : Pattern.quote(highlightPattern), flags);
+                        finalHighlightIsRegex ? finalHighlightPattern : Pattern.quote(finalHighlightPattern), flags);
             } catch (Exception ex) {
                 logger.warn("Invalid search pattern for tail mode", ex);
                 return;
             }
 
-            filteredIndexes = new IntArrayList();
             if (canvasLogViewer != null) {
-                canvasLogViewer.setFilteredIndexes(null); // Show all lines
-                canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
-
+                canvasLogViewer.setSearchHighlight(finalHighlightPattern, finalHighlightIsRegex, caseSensitive);
                 // Pause follow-tail so user can navigate search results
                 if (canvasLogViewer.isFollowTail()) {
                     canvasLogViewer.setFollowTail(false);
@@ -902,24 +903,46 @@ public class MainController {
                     this.currentTailSearchPattern = pattern;
                     this.tailSearchScannedUpTo = snapshotSize;
 
+                    if (currentSession != null) {
+                        currentSession.setFilteredIndexes(results);
+                        currentSession.setSearchQuery(searchText);
+                        currentSession.setRegex(isRegex);
+                        currentSession.setCaseSensitive(caseSensitive);
+                        currentSession.setCurrentTailSearchPattern(pattern);
+                        currentSession.setTailSearchScannedUpTo(snapshotSize);
+                    }
+
+                    if (viewer != null) {
+                        viewer.setFilteredIndexes(results);
+                        viewer.setSearchHighlight(finalHighlightPattern, finalHighlightIsRegex, caseSensitive);
+                    }
+
                     if (searchNavigator != null) {
                         searchNavigator.setMatchCount(results.size());
                     }
 
-                    // Show search result panel with tail-mode resolver
+                    hideSearchResultPanel();
+
                     if (results.size() > 0) {
-                        showSearchResultPanelForTail(results, pattern);
-                        // Jump to first match
-                        int firstLine = results.get(0);
-                        viewer.jumpToLine(firstLine);
-                        viewer.selectLine(firstLine);
+                        if (viewer != null) {
+                            viewer.jumpToLine(0);
+                            viewer.selectLine(0);
+                        }
                         currentMatchIndex = 1;
+                        if (currentSession != null) {
+                            currentSession.setCurrentMatchIndex(1);
+                        }
                         if (searchNavigator != null) {
                             searchNavigator.updateStatus(1, results.size());
                         }
+                        long firstLine = results.get(0);
+                        String content = getLineContentForGlobal(firstLine);
+                        displayLogDetailFromCanvas(firstLine, content);
                     } else {
-                        hideSearchResultPanel();
                         currentMatchIndex = -1;
+                        if (currentSession != null) {
+                            currentSession.setCurrentMatchIndex(-1);
+                        }
                     }
                 });
             });
@@ -1040,11 +1063,15 @@ public class MainController {
             IntArrayList matches = task.getValue();
             logger.info("Search complete: {} matches found", matches.size());
 
-            // Store matches for navigation but do NOT filter the view —
-            // all lines remain visible, matches are only highlighted.
             filteredIndexes = matches;
             if (canvasLogViewer != null) {
-                canvasLogViewer.setFilteredIndexes(null); // Show all lines
+                canvasLogViewer.setFilteredIndexes(matches);
+            }
+            if (currentSession != null) {
+                currentSession.setFilteredIndexes(matches);
+                currentSession.setSearchQuery(searchText);
+                currentSession.setRegex(isRegex);
+                currentSession.setCaseSensitive(caseSensitive);
             }
 
             // Enhanced Highlight Logic for Boolean Search
@@ -1065,34 +1092,35 @@ public class MainController {
                 canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, caseSensitive);
             }
 
-            // Compile pattern for search result panel highlight
-            Pattern compiledHighlight = null;
-            try {
-                int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
-                compiledHighlight = Pattern.compile(
-                        highlightIsRegex ? highlightPattern : Pattern.quote(highlightPattern), flags);
-            } catch (Exception ignored) {}
-
             if (searchNavigator != null) {
                 searchNavigator.setMatchCount(matches.size());
             }
 
-            // Show search result panel with clickable list of matched lines
+            hideSearchResultPanel();
+
             if (matches.size() > 0) {
-                showSearchResultPanel(matches, compiledHighlight);
                 // Jump to first match
-                int firstLine = matches.get(0);
                 if (canvasLogViewer != null) {
-                    canvasLogViewer.jumpToLine(firstLine);
-                    canvasLogViewer.selectLine(firstLine);
+                    canvasLogViewer.jumpToLine(0);
+                    canvasLogViewer.selectLine(0);
                 }
                 currentMatchIndex = 1;
+                if (currentSession != null) {
+                    currentSession.setCurrentMatchIndex(1);
+                }
                 if (searchNavigator != null) {
                     searchNavigator.updateStatus(1, matches.size());
                 }
+                if (mappedFileReader != null && lineOffsetIndex != null) {
+                    int firstLine = matches.get(0);
+                    String content = mappedFileReader.readLine(lineOffsetIndex, firstLine);
+                    displayLogDetailFromCanvas(firstLine, content);
+                }
             } else {
-                hideSearchResultPanel();
                 currentMatchIndex = -1;
+                if (currentSession != null) {
+                    currentSession.setCurrentMatchIndex(-1);
+                }
             }
 
             hideLoading();
@@ -1121,16 +1149,21 @@ public class MainController {
 
         int globalLine = filteredIndexes.get(nextIdx);
         if (canvasLogViewer != null) {
-            canvasLogViewer.jumpToLine(globalLine);
-            canvasLogViewer.selectLine(globalLine);
+            canvasLogViewer.jumpToLine(nextIdx);
+            canvasLogViewer.selectLine(nextIdx);
         }
         currentMatchIndex = nextIdx + 1; // advance for next call
+        if (currentSession != null) {
+            currentSession.setCurrentMatchIndex(currentMatchIndex);
+        }
         if (searchNavigator != null) {
             searchNavigator.updateStatus(nextIdx + 1, total);
         }
         if (searchResultPanel != null) {
             searchResultPanel.selectIndex(nextIdx);
         }
+        String content = getLineContentForGlobal(globalLine);
+        displayLogDetailFromCanvas(globalLine, content);
     }
 
     private void navigatePreviousMatch() {
@@ -1143,16 +1176,21 @@ public class MainController {
 
         int globalLine = filteredIndexes.get(prevIdx);
         if (canvasLogViewer != null) {
-            canvasLogViewer.jumpToLine(globalLine);
-            canvasLogViewer.selectLine(globalLine);
+            canvasLogViewer.jumpToLine(prevIdx);
+            canvasLogViewer.selectLine(prevIdx);
         }
         currentMatchIndex = prevIdx + 1;
+        if (currentSession != null) {
+            currentSession.setCurrentMatchIndex(currentMatchIndex);
+        }
         if (searchNavigator != null) {
             searchNavigator.updateStatus(prevIdx + 1, total);
         }
         if (searchResultPanel != null) {
             searchResultPanel.selectIndex(prevIdx);
         }
+        String content = getLineContentForGlobal(globalLine);
+        displayLogDetailFromCanvas(globalLine, content);
     }
 
     private void clearSearch() {
@@ -1161,10 +1199,18 @@ public class MainController {
         currentMatchIndex = -1;
         currentTailSearchPattern = null;
         tailSearchScannedUpTo = 0;
+        lastAppliedSearchQuery = null;
         // Invalidate any in-flight search tasks
         searchGeneration++;
         if (currentSearchTask != null && currentSearchTask.isRunning()) {
             currentSearchTask.cancel(true);
+        }
+        if (currentSession != null) {
+            currentSession.setFilteredIndexes(null);
+            currentSession.setSearchQuery("");
+            currentSession.setCurrentMatchIndex(-1);
+            currentSession.setCurrentTailSearchPattern(null);
+            currentSession.setTailSearchScannedUpTo(0);
         }
         if (canvasLogViewer != null) {
             canvasLogViewer.clearFilter();
@@ -1178,6 +1224,31 @@ public class MainController {
             searchNavigator.clear();
         }
         hideSearchResultPanel();
+    }
+
+    private String getLineContentForGlobal(long globalLine) {
+        if (tailModeEnabled) {
+            long fileLineCount = canvasLogViewer != null ? canvasLogViewer.getFileLineCount() : 0;
+            if (globalLine < fileLineCount) {
+                if (mappedFileReader != null && lineOffsetIndex != null && globalLine < lineOffsetIndex.getLineCount()) {
+                    return mappedFileReader.readLine(lineOffsetIndex, (int) globalLine);
+                }
+            } else {
+                int tailIdx = (int) (globalLine - fileLineCount);
+                synchronized (liveTailList) {
+                    if (tailIdx >= 0 && tailIdx < liveTailList.size()) {
+                        LogEntry entry = liveTailList.get(tailIdx);
+                        return entry != null ? entry.getRawLog() : "";
+                    }
+                }
+            }
+            return "";
+        } else {
+            if (mappedFileReader != null && lineOffsetIndex != null && globalLine < lineOffsetIndex.getLineCount()) {
+                return mappedFileReader.readLine(lineOffsetIndex, (int) globalLine);
+            }
+            return "";
+        }
     }
 
     private void showSearchResultPanel(IntArrayList matches, Pattern highlightPattern) {
@@ -3211,9 +3282,13 @@ public class MainController {
                                 int globalIdx = (int) (tailOffset + i);
                                 filteredIndexes.add(globalIdx);
                                 newMatches.add(globalIdx);
+                                if (session.getCanvasLogViewer() != null) {
+                                    session.getCanvasLogViewer().appendToFilter(globalIdx);
+                                }
                             }
                         }
                         tailSearchScannedUpTo = session.getLiveTailList().size();
+                        session.setTailSearchScannedUpTo(tailSearchScannedUpTo);
 
                         if (newMatches.size() > 0 && searchResultPanel != null) {
                             searchResultPanel.syncItemCount();
@@ -3695,6 +3770,8 @@ public class MainController {
                 oldSession.setCaseSensitive(caseSensitiveCheckBox != null && caseSensitiveCheckBox.isSelected());
                 oldSession.setFilteredIndexes(filteredIndexes);
                 oldSession.setCurrentMatchIndex(currentMatchIndex);
+                oldSession.setCurrentTailSearchPattern(currentTailSearchPattern);
+                oldSession.setTailSearchScannedUpTo(tailSearchScannedUpTo);
             }
         }
 
@@ -3734,6 +3811,11 @@ public class MainController {
             filteredIndexes = session.getFilteredIndexes();
             currentMatchIndex = session.getCurrentMatchIndex();
             liveTailList = session.getLiveTailList();
+            currentTailSearchPattern = session.getCurrentTailSearchPattern();
+            tailSearchScannedUpTo = session.getTailSearchScannedUpTo();
+            lastAppliedSearchQuery = session.getSearchQuery();
+            lastAppliedRegex = session.isRegex();
+            lastAppliedCaseSensitive = session.isCaseSensitive();
 
             isSkippingFilterTrigger = true;
             if (searchField != null) {
@@ -3758,6 +3840,30 @@ public class MainController {
             }
             isProgrammaticUpdate = false;
 
+            if (canvasLogViewer != null) {
+                if (filteredIndexes != null) {
+                    canvasLogViewer.setFilteredIndexes(filteredIndexes);
+                    String searchText = session.getSearchQuery();
+                    if (searchText != null && !searchText.isEmpty()) {
+                        String highlightPattern = searchText;
+                        boolean highlightIsRegex = session.isRegex();
+                        if (!session.isRegex()) {
+                            List<String> terms = extractSearchTerms(searchText);
+                            if (!terms.isEmpty()) {
+                                highlightPattern = terms.stream()
+                                        .map(java.util.regex.Pattern::quote)
+                                        .collect(java.util.stream.Collectors.joining("|"));
+                                highlightIsRegex = true;
+                            }
+                        }
+                        canvasLogViewer.setSearchHighlight(highlightPattern, highlightIsRegex, session.isCaseSensitive());
+                    }
+                } else {
+                    canvasLogViewer.clearFilter();
+                    canvasLogViewer.clearSearchHighlight();
+                }
+            }
+
             if (filteredIndexes != null && filteredIndexes.size() > 0) {
                 if (searchNavigator != null) {
                     searchNavigator.setMatchCount(filteredIndexes.size());
@@ -3765,22 +3871,12 @@ public class MainController {
                         searchNavigator.updateStatus(currentMatchIndex, filteredIndexes.size());
                     }
                 }
-                String searchText = session.getSearchQuery();
-                if (searchText != null && !searchText.isEmpty()) {
-                    Pattern compiledHighlight = null;
-                    try {
-                        int flags = session.isCaseSensitive() ? 0 : Pattern.CASE_INSENSITIVE;
-                        compiledHighlight = Pattern.compile(
-                                session.isRegex() ? searchText : Pattern.quote(searchText), flags);
-                    } catch (Exception ignored) {}
-                    showSearchResultPanel(filteredIndexes, compiledHighlight);
-                }
             } else {
-                hideSearchResultPanel();
                 if (searchNavigator != null) {
                     searchNavigator.clear();
                 }
             }
+            hideSearchResultPanel();
 
             if (session.getSelectedLineContent() != null) {
                 displayLogDetailFromCanvas(session.getSelectedLine(), session.getSelectedLineContent());

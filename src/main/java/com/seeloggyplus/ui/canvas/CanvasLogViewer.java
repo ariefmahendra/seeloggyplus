@@ -253,6 +253,7 @@ public class CanvasLogViewer extends GridPane {
         this.scrollOffsetY = 0;
         this.selectedLine = -1;
         this.selectedLineIndexes.clear();
+        this.lineCacheStartLine = -1;
 
         updateScrollBar();
         render();
@@ -265,6 +266,10 @@ public class CanvasLogViewer extends GridPane {
      */
     public void clearFilter() {
         setFilteredIndexes(null);
+    }
+
+    public com.seeloggyplus.util.IntArrayList getFilteredIndexes() {
+        return filteredIndexes;
     }
 
     /**
@@ -432,20 +437,48 @@ public class CanvasLogViewer extends GridPane {
 
     /**
      * Jump to specific line number (0-based).
+     * If filtered, accepts either a view index (0 <= line < filteredCount) or a global line index.
      */
     public void jumpToLine(long line) {
         if (followTail) {
             setFollowTail(false);
         }
-        currentTopLine = Math.max(0, Math.min(line, totalLines - visibleLineCount));
-        selectedLine = line;
+        long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
+        if (effectiveLines <= 0) {
+            return;
+        }
+
+        long targetViewIndex = line;
+        long targetGlobalLine = line;
+
+        if (filteredIndexes != null) {
+            if (line >= 0 && line < filteredCount) {
+                targetViewIndex = line;
+                targetGlobalLine = filteredIndexes.get((int) line);
+            } else {
+                int foundIdx = filteredIndexes.indexOf((int) line);
+                if (foundIdx >= 0) {
+                    targetViewIndex = foundIdx;
+                    targetGlobalLine = line;
+                } else {
+                    targetViewIndex = 0;
+                    targetGlobalLine = filteredIndexes.isEmpty() ? 0 : filteredIndexes.get(0);
+                }
+            }
+        }
+
+        long maxTop = Math.max(0, effectiveLines - visibleLineCount);
+        currentTopLine = Math.max(0, Math.min(targetViewIndex, maxTop));
+        selectedLine = targetViewIndex;
+        selectedLineIndexes.clear();
+        selectedLineIndexes.add(targetGlobalLine);
         smoothScrollY = currentTopLine;
         targetScrollY = currentTopLine;
         scrollOffsetY = 0;
+        lineCacheStartLine = -1;
 
         vScrollBar.setValue(currentTopLine);
         render();
-        long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
         fireStatusUpdate(effectiveLines);
     }
 
@@ -1191,19 +1224,33 @@ public class CanvasLogViewer extends GridPane {
     }
 
     public void selectLine(long line) {
-        if (line >= 0 && line < getItemCount()) {
-            selectedLine = line;
-            selectedLineIndexes.clear();
+        long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
+        if (effectiveLines <= 0) {
+            return;
+        }
 
-            // Map view index to global index for selection set
-            long globalIndex;
-            if (filteredIndexes != null) {
-                globalIndex = filteredIndexes.get((int) line);
+        long targetViewIndex = line;
+        long targetGlobalLine = line;
+
+        if (filteredIndexes != null) {
+            if (line >= 0 && line < filteredCount) {
+                targetViewIndex = line;
+                targetGlobalLine = filteredIndexes.get((int) line);
             } else {
-                globalIndex = line;
+                int foundIdx = filteredIndexes.indexOf((int) line);
+                if (foundIdx >= 0) {
+                    targetViewIndex = foundIdx;
+                    targetGlobalLine = line;
+                } else {
+                    return;
+                }
             }
-            selectedLineIndexes.add(globalIndex);
+        }
 
+        if (targetViewIndex >= 0 && targetViewIndex < effectiveLines) {
+            selectedLine = targetViewIndex;
+            selectedLineIndexes.clear();
+            selectedLineIndexes.add(targetGlobalLine);
             render();
         }
     }
