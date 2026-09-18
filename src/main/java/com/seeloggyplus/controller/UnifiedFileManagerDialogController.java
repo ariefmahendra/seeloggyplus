@@ -505,6 +505,7 @@ public class UnifiedFileManagerDialogController {
 
             if (result.isPresent() && !result.get().isBlank()) {
                 password = result.get();
+                server.setPassword(password);
             } else {
                 logger.info("User cancelled password prompt. Aborting connection.");
                 updateStatus("Connection cancelled.");
@@ -561,6 +562,30 @@ public class UnifiedFileManagerDialogController {
         });
 
         new Thread(connectTask).start();
+    }
+
+    private synchronized void ensureSshConnected() throws IOException {
+        if (currentLocation == null || currentLocation.server == null) {
+            return;
+        }
+        if (activeSshService != null && activeSshService.isConnected()) {
+            return;
+        }
+        logger.info("SSH session not active. Attempting transparent reconnection to {}...",
+                currentLocation.server.getHost());
+        if (activeSshService == null) {
+            activeSshService = sshServiceFactory.get();
+        }
+        SSHServerModel server = currentLocation.server;
+        String password = server.getPassword();
+        if (password == null || password.isBlank()) {
+            throw new IOException("SSH session is not active and no password is saved for server: " + server.getName());
+        }
+        boolean ok = activeSshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
+        if (!ok || !activeSshService.isConnected()) {
+            throw new IOException("Failed to establish SSH connection to " + server.getHost());
+        }
+        logger.info("Successfully established SSH connection to {}", server.getHost());
     }
 
     private String normalizePathString(String path) {
@@ -796,7 +821,7 @@ public class UnifiedFileManagerDialogController {
                     files = new java.util.ArrayList<>(localFileService.listFiles(path));
                 } else {
                     if (activeSshService == null || !activeSshService.isConnected()) {
-                        throw new IOException("SSH session is not active.");
+                        ensureSshConnected();
                     }
                     List<RemoteFileInfo> remoteFiles = activeSshService.listFiles(path);
                     files = new java.util.ArrayList<>(remoteFiles.size() + 1);
@@ -894,8 +919,12 @@ public class UnifiedFileManagerDialogController {
         }
 
         if (activeSshService == null || !activeSshService.isConnected()) {
-            showError("Tail Error", "Koneksi SSH tidak aktif.");
-            return;
+            try {
+                ensureSshConnected();
+            } catch (IOException e) {
+                showError("Tail Error", "Koneksi SSH tidak aktif: " + e.getMessage());
+                return;
+            }
         }
 
         openAction = OpenAction.TAIL;

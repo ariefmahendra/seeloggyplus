@@ -297,6 +297,7 @@ public class SSHServiceImpl implements SSHService {
             }
             return files;
         } catch (SftpException e) {
+            closeSftpChannel();
             throw new IOException(e);
         }
     }
