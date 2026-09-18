@@ -95,10 +95,6 @@ public class MainController {
     @FXML
     private VBox leftPanel;
     @FXML
-    private VBox collapsedLeftPanel;
-    @FXML
-    private Button expandLeftPanelButton;
-    @FXML
     private TextField recentFilesFilterField;
     @FXML
     private ListView<RecentFilesDto> recentFilesListView;
@@ -155,10 +151,6 @@ public class MainController {
     // FXML Components - Bottom Panel (Log Detail)
     @FXML
     private VBox bottomPanel;
-    @FXML
-    private HBox collapsedBottomPanel;
-    @FXML
-    private Button expandBottomPanelButton;
     @FXML
     private Button pinBottomPanelButton;
 
@@ -483,37 +475,28 @@ public class MainController {
 
         clearRecentButton.setOnAction(e -> handleClearRecentFiles());
         pinLeftPanelButton.setOnAction(e -> handleToggleLeftPanelPin());
-        expandLeftPanelButton.setOnAction(e -> handleToggleLeftPanelPin());
         updateLeftPanelDisplay();
     }
 
     private void handleToggleLeftPanelPin() {
-        isLeftPanelPinned = !isLeftPanelPinned;
-        updateLeftPanelDisplay();
+        toggleLeftPanel();
     }
 
     private void updateLeftPanelDisplay() {
-        FontAwesomeIconView pinIcon = (FontAwesomeIconView) pinLeftPanelButton.getGraphic();
-        FontAwesomeIconView expandIcon = (FontAwesomeIconView) expandLeftPanelButton.getGraphic();
-
-        if (horizontalSplitPane == null) {
+        if (horizontalSplitPane == null || leftPanel == null) {
             return;
         }
 
         if (isLeftPanelPinned) {
-            pinIcon.setGlyphName("ANGLE_DOUBLE_LEFT");
-
+            if (!horizontalSplitPane.getItems().contains(leftPanel)) {
+                horizontalSplitPane.getItems().add(0, leftPanel);
+            }
             leftPanel.setVisible(true);
             leftPanel.setManaged(true);
-            collapsedLeftPanel.setVisible(false);
-            collapsedLeftPanel.setManaged(false);
 
-            Platform.runLater(() -> {
-                horizontalSplitPane.applyCss();
-                horizontalSplitPane.layout();
-                double pos = lastHorizontalDividerPos > 0 ? lastHorizontalDividerPos : 0.2;
-                horizontalSplitPane.setDividerPositions(clampDivider(pos));
-            });
+            double pos = lastHorizontalDividerPos > 0 ? lastHorizontalDividerPos : 0.2;
+            horizontalSplitPane.setDividerPositions(clampDivider(pos));
+            Platform.runLater(() -> horizontalSplitPane.setDividerPositions(clampDivider(pos)));
 
             if (toggleLeftPanelButton != null) {
                 toggleLeftPanelButton.setSelected(true);
@@ -523,27 +506,18 @@ public class MainController {
                 lastHorizontalDividerPos = horizontalSplitPane.getDividerPositions()[0];
             }
 
-            expandIcon.setGlyphName("ANGLE_DOUBLE_RIGHT");
-
-            // Keep SplitPane items intact; just hide the left pane and move divider fully
-            // left.
+            // Pure native JavaFX: panel is completely closed
+            horizontalSplitPane.getItems().remove(leftPanel);
             leftPanel.setVisible(false);
             leftPanel.setManaged(false);
 
-            collapsedLeftPanel.setVisible(true);
-            collapsedLeftPanel.setManaged(false);
-
-            Platform.runLater(() -> {
-                horizontalSplitPane.applyCss();
-                horizontalSplitPane.layout();
-                // push divider to extreme left so right area takes all the space
-                horizontalSplitPane.setDividerPositions(0.0);
-            });
+            if (toggleLeftPanelButton != null) {
+                toggleLeftPanelButton.setSelected(false);
+            }
         }
 
-        showLeftPanelMenuItem.setSelected(isLeftPanelPinned);
-        if (toggleLeftPanelButton != null) {
-            toggleLeftPanelButton.setSelected(isLeftPanelPinned);
+        if (showLeftPanelMenuItem != null) {
+            showLeftPanelMenuItem.setSelected(isLeftPanelPinned);
         }
     }
 
@@ -601,6 +575,7 @@ public class MainController {
         }
 
         if (logTabPane != null) {
+            logTabPane.setStyle("-fx-open-tab-animation: NONE; -fx-close-tab-animation: NONE;");
             logTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
                 onTabSelected(oldTab, newTab);
             });
@@ -803,65 +778,8 @@ public class MainController {
     private void normalizeLayoutState() {
         Platform.runLater(() -> {
             try {
-                // Left panel state
-                if (horizontalSplitPane != null) {
-                    if (isLeftPanelPinned) {
-                        if (leftPanel != null) {
-                            leftPanel.setVisible(true);
-                            leftPanel.setManaged(true);
-                        }
-                        if (collapsedLeftPanel != null) {
-                            collapsedLeftPanel.setVisible(false);
-                            collapsedLeftPanel.setManaged(false);
-                        }
-                        horizontalSplitPane.applyCss();
-                        horizontalSplitPane.layout();
-                        double pos = lastHorizontalDividerPos > 0 ? lastHorizontalDividerPos : 0.2;
-                        horizontalSplitPane.setDividerPositions(clampDivider(pos));
-                    } else {
-                        if (leftPanel != null) {
-                            leftPanel.setVisible(false);
-                            leftPanel.setManaged(false);
-                        }
-                        if (collapsedLeftPanel != null) {
-                            collapsedLeftPanel.setVisible(true);
-                            collapsedLeftPanel.setManaged(false);
-                        }
-                        horizontalSplitPane.applyCss();
-                        horizontalSplitPane.layout();
-                        horizontalSplitPane.setDividerPositions(0.0);
-                    }
-                }
-
-                // Bottom panel state
-                if (verticalSplitPane != null) {
-                    if (isBottomPanelPinned) {
-                        if (bottomPanel != null) {
-                            bottomPanel.setVisible(true);
-                            bottomPanel.setManaged(true);
-                        }
-                        if (collapsedBottomPanel != null) {
-                            collapsedBottomPanel.setVisible(false);
-                            collapsedBottomPanel.setManaged(false);
-                        }
-                        verticalSplitPane.applyCss();
-                        verticalSplitPane.layout();
-                        double pos = lastVerticalDividerPos > 0 ? lastVerticalDividerPos : 0.7;
-                        verticalSplitPane.setDividerPositions(clampDivider(pos));
-                    } else {
-                        if (bottomPanel != null) {
-                            bottomPanel.setVisible(false);
-                            bottomPanel.setManaged(false);
-                        }
-                        if (collapsedBottomPanel != null) {
-                            collapsedBottomPanel.setVisible(true);
-                            collapsedBottomPanel.setManaged(false);
-                        }
-                        verticalSplitPane.applyCss();
-                        verticalSplitPane.layout();
-                        verticalSplitPane.setDividerPositions(1.0);
-                    }
-                }
+                updateLeftPanelDisplay();
+                updateBottomPanelDisplay();
             } catch (Exception ex) {
                 logger.warn("normalizeLayoutState failed", ex);
             }
@@ -1641,7 +1559,6 @@ public class MainController {
         copyButton.setOnAction(e -> copyDetailToClipboard());
         clearDetailButton.setOnAction(e -> clearDetail());
         pinBottomPanelButton.setOnAction(e -> handleToggleBottomPanelPin());
-        expandBottomPanelButton.setOnAction(e -> handleToggleBottomPanelPin());
 
         if (statusLabel != null) {
             statusLabel.setCursor(Cursor.HAND);
@@ -1694,32 +1611,24 @@ public class MainController {
     }
 
     private void handleToggleBottomPanelPin() {
-        isBottomPanelPinned = !isBottomPanelPinned;
-        updateBottomPanelDisplay();
+        toggleBottomPanel();
     }
 
     private void updateBottomPanelDisplay() {
-        FontAwesomeIconView pinIcon = (FontAwesomeIconView) pinBottomPanelButton.getGraphic();
-        FontAwesomeIconView expandIcon = (FontAwesomeIconView) expandBottomPanelButton.getGraphic();
-
-        if (verticalSplitPane == null) {
+        if (verticalSplitPane == null || bottomPanel == null) {
             return;
         }
 
         if (isBottomPanelPinned) {
-            pinIcon.setGlyphName("ANGLE_DOUBLE_DOWN");
-
+            if (!verticalSplitPane.getItems().contains(bottomPanel)) {
+                verticalSplitPane.getItems().add(bottomPanel);
+            }
             bottomPanel.setVisible(true);
             bottomPanel.setManaged(true);
-            collapsedBottomPanel.setVisible(false);
-            collapsedBottomPanel.setManaged(false);
 
-            Platform.runLater(() -> {
-                verticalSplitPane.applyCss();
-                verticalSplitPane.layout();
-                double pos = lastVerticalDividerPos > 0 ? lastVerticalDividerPos : 0.7;
-                verticalSplitPane.setDividerPositions(clampDivider(pos));
-            });
+            double pos = lastVerticalDividerPos > 0 ? lastVerticalDividerPos : 0.7;
+            verticalSplitPane.setDividerPositions(clampDivider(pos));
+            Platform.runLater(() -> verticalSplitPane.setDividerPositions(clampDivider(pos)));
 
             if (toggleBottomPanelButton != null) {
                 toggleBottomPanelButton.setSelected(true);
@@ -1729,28 +1638,18 @@ public class MainController {
                 lastVerticalDividerPos = verticalSplitPane.getDividerPositions()[0];
             }
 
-            expandIcon.setGlyphName("ANGLE_DOUBLE_LEFT");
-            expandIcon.setRotate(90);
-
-            // Keep SplitPane items intact; just hide the bottom pane and move divider fully
-            // down.
+            // Pure native JavaFX: panel is completely closed
+            verticalSplitPane.getItems().remove(bottomPanel);
             bottomPanel.setVisible(false);
             bottomPanel.setManaged(false);
 
-            collapsedBottomPanel.setVisible(true);
-            collapsedBottomPanel.setManaged(false);
-
-            Platform.runLater(() -> {
-                verticalSplitPane.applyCss();
-                verticalSplitPane.layout();
-                // push divider to extreme bottom so top area takes all the space
-                verticalSplitPane.setDividerPositions(1.0);
-            });
+            if (toggleBottomPanelButton != null) {
+                toggleBottomPanelButton.setSelected(false);
+            }
         }
 
-        showBottomPanelMenuItem.setSelected(isBottomPanelPinned);
-        if (toggleBottomPanelButton != null) {
-            toggleBottomPanelButton.setSelected(isBottomPanelPinned);
+        if (showBottomPanelMenuItem != null) {
+            showBottomPanelMenuItem.setSelected(isBottomPanelPinned);
         }
     }
 

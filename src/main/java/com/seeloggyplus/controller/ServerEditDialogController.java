@@ -43,6 +43,8 @@ public class ServerEditDialogController {
     private SSHServerModel sshServer;
     @Getter
     private boolean saved = false;
+    @Getter
+    private SSHServerModel savedServer;
     private boolean passwordVisible = false;
     private TextField passwordTextField;
 
@@ -104,6 +106,20 @@ public class ServerEditDialogController {
         passwordField.setText(server.getPassword() != null ? server.getPassword() : "");
         defaultPathField.setText(server.getDefaultPath() != null ? server.getDefaultPath() : "/");
         savePasswordCheckBox.setSelected(server.isSavePassword());
+    }
+
+    public void setCloneServer(SSHServerModel original) {
+        this.sshServer = null; // null ensures handleSave() creates a brand new server record
+        String baseName = (original.getName() != null && !original.getName().isBlank())
+                ? original.getName()
+                : (original.getHost() != null && !original.getHost().isBlank() ? original.getHost() : "Server");
+        nameField.setText(baseName + " (Copy)");
+        hostField.setText(original.getHost() != null ? original.getHost() : "");
+        portField.setText(String.valueOf(original.getPort() > 0 ? original.getPort() : 22));
+        usernameField.setText(original.getUsername() != null ? original.getUsername() : "");
+        passwordField.setText(original.getPassword() != null ? original.getPassword() : "");
+        defaultPathField.setText(original.getDefaultPath() != null ? original.getDefaultPath() : "/");
+        savePasswordCheckBox.setSelected(original.isSavePassword());
     }
 
     private void handleTest() {
@@ -173,7 +189,7 @@ public class ServerEditDialogController {
         }
 
         serverService.saveServer(server);
-
+        savedServer = server;
         saved = true;
         closeDialog();
     }

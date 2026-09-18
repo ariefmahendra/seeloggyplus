@@ -79,6 +79,9 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
         Properties config = new Properties();
         config.put("StrictHostKeyChecking", "no");
         config.put("PreferredAuthentications", "password");
+        config.put("compression.s2c", "none,zlib@openssh.com");
+        config.put("compression.c2s", "none,zlib@openssh.com");
+        config.put("MaxAuthTries", "3");
 
         session.setServerAliveInterval(60 * 1000); // 60 seconds
         session.setServerAliveCountMax(3);

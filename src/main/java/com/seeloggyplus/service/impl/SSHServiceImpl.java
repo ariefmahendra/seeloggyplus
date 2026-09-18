@@ -81,9 +81,9 @@ public class SSHServiceImpl implements SSHService {
         stopTailing();
         closeSftpChannel();
         sftpAvailable = null; // Reset for next connection
-        if (host != null) {
-            SSHSessionManagerImpl.getInstance().closeSession(host, port, username);
-        }
+        // Do not force-close the underlying SSH session in SSHSessionManager.
+        // The session is pooled and managed with TTL by SSHSessionManagerImpl,
+        // allowing instant reconnection when browsing or reopening dialogs.
         this.currentSession = null;
     }
 
@@ -288,7 +288,7 @@ public class SSHServiceImpl implements SSHService {
 
             @SuppressWarnings("unchecked")
             Vector<ChannelSftp.LsEntry> entries = sftpChannel.ls(remotePath);
-            List<RemoteFileInfo> files = new ArrayList<>();
+            List<RemoteFileInfo> files = new ArrayList<>(entries.size());
             for (ChannelSftp.LsEntry entry : entries) {
                 String filename = entry.getFilename();
                 if (!filename.equals(".") && !filename.equals("..")) {
@@ -445,10 +445,10 @@ public class SSHServiceImpl implements SSHService {
             return reusableSftpChannel;
         }
         Session session = getSessionOrThrow();
-        // Single attempt with short timeout — if SFTP subsystem is unavailable, fail fast
+        // Attempt with reasonable timeout (5s) — avoid false negatives on busy servers
         try {
             ChannelSftp ch = (ChannelSftp) session.openChannel("sftp");
-            ch.connect(3000);
+            ch.connect(5000);
             reusableSftpChannel = ch;
             logger.info("SFTP channel opened for {}@{}:{}", username, host, port);
             return reusableSftpChannel;

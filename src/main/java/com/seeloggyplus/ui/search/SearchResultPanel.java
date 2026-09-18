@@ -328,7 +328,9 @@ public class SearchResultPanel extends VBox {
     private void updateScrollBar() {
         long max = Math.max(0, itemCount - visibleLineCount);
         vScrollBar.setMax(max);
-        vScrollBar.setVisibleAmount(visibleLineCount);
+        double minVisibleProportion = 0.12;
+        double safeVisibleAmount = Math.max(visibleLineCount, itemCount * minVisibleProportion);
+        vScrollBar.setVisibleAmount(safeVisibleAmount);
         vScrollBar.setBlockIncrement(Math.max(1, visibleLineCount - 1));
 
         // Horizontal scrollbar — estimate max content width

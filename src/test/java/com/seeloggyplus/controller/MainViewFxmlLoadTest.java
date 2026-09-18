@@ -5,6 +5,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.ToggleButton;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -239,6 +240,12 @@ public class MainViewFxmlLoadTest {
         assertNotNull(tailButton);
         assertTrue(tailButton.getGraphic() instanceof de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView);
         de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView icon = (de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView) tailButton.getGraphic();
+
+        java.lang.reflect.Field fileField = MainController.class.getDeclaredField("currentFile");
+        fileField.setAccessible(true);
+        java.io.File tempFile = java.io.File.createTempFile("test-tail", ".log");
+        tempFile.deleteOnExit();
+        fileField.set(controller, tempFile);
 
         javafx.application.Platform.runLater(() -> {
             tailButton.setSelected(true);

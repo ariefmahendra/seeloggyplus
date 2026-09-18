@@ -10,4 +10,10 @@ public interface ServerManagementService {
     void updateServerLastUsed(String id);
     List<SSHServerModel> getAllServers();
     SSHServerModel getServerById(String id);
+    default SSHServerModel cloneServer(String id) {
+        return null;
+    }
+    default SSHServerModel createCloneModel(SSHServerModel source) {
+        return null;
+    }
 }

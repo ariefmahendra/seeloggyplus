@@ -135,8 +135,8 @@ public class CanvasLogViewer extends GridPane {
         vScrollBar.setVisibleAmount(50);
         vScrollBar.setUnitIncrement(1); // Arrow button clicks scroll 1 line
         // Stabilize scrollbar thickness so layout math doesn't oscillate
-        vScrollBar.setPrefWidth(16);
-        vScrollBar.setMinWidth(16);
+        vScrollBar.setPrefWidth(18);
+        vScrollBar.setMinWidth(18);
 
         hScrollBar = new ScrollBar();
         hScrollBar.setOrientation(javafx.geometry.Orientation.HORIZONTAL);
@@ -1124,8 +1124,11 @@ public class CanvasLogViewer extends GridPane {
         long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
         long max = Math.max(0, effectiveLines - visibleLineCount);
         vScrollBar.setMax(max);
-        vScrollBar.setVisibleAmount(visibleLineCount);
-        vScrollBar.setBlockIncrement(visibleLineCount - 1);
+        // Ensure visibleAmount provides a comfortable, draggable thumb proportion (minimum 12%)
+        double minVisibleProportion = 0.12;
+        double safeVisibleAmount = Math.max(visibleLineCount, effectiveLines * minVisibleProportion);
+        vScrollBar.setVisibleAmount(safeVisibleAmount);
+        vScrollBar.setBlockIncrement(Math.max(1, visibleLineCount - 1));
         double visibleWidth = canvas.getWidth() - leftMargin;
         double maxLineWidth = 30000;
         double maxScroll = Math.max(0, maxLineWidth - visibleWidth);

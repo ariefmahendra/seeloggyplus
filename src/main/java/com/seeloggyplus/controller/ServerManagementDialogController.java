@@ -1,13 +1,8 @@
 package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.SSHServerModel;
-import com.seeloggyplus.service.SSHService;
-import com.seeloggyplus.service.SSHSessionManager;
 import com.seeloggyplus.service.ServerManagementService;
-import com.seeloggyplus.service.impl.SSHServiceImpl;
-import com.seeloggyplus.service.impl.SSHSessionManagerImpl;
 import com.seeloggyplus.service.impl.ServerManagementServiceImpl;
-import com.seeloggyplus.util.PasswordPromptDialog;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
@@ -20,7 +15,6 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
@@ -30,7 +24,6 @@ import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * High-performance Server Management Dialog Controller
@@ -43,8 +36,6 @@ public class ServerManagementDialogController {
 
     @FXML
     private TableView<SSHServerModel> serverTable;
-    @FXML
-    private TableColumn<SSHServerModel, String> statusColumn;
     @FXML
     private TableColumn<SSHServerModel, String> nameColumn;
     @FXML
@@ -65,9 +56,9 @@ public class ServerManagementDialogController {
     @FXML
     private Button editServerButton;
     @FXML
-    private Button deleteServerButton;
+    private Button cloneServerButton;
     @FXML
-    private Button testConnectionButton;
+    private Button deleteServerButton;
     @FXML
     private Button refreshButton;
     @FXML
@@ -91,7 +82,6 @@ public class ServerManagementDialogController {
     private Label detailLastUsedLabel;
 
     private ServerManagementService serverService;
-    private SSHService sshService;
     private ObservableList<SSHServerModel> allServers;
     private ObservableList<SSHServerModel> filteredServers;
     private SSHServerModel selectedForConnection;
@@ -101,7 +91,6 @@ public class ServerManagementDialogController {
         logger.info("Initializing ServerManagementDialogController");
 
         serverService = new ServerManagementServiceImpl();
-        sshService = new SSHServiceImpl();
         allServers = FXCollections.observableArrayList();
         filteredServers = FXCollections.observableArrayList();
 
@@ -115,42 +104,6 @@ public class ServerManagementDialogController {
      * Setup table columns with optimized cell factories
      */
     private void setupTableColumns() {
-        // Status column with real-time connection indicators
-        statusColumn.setCellValueFactory(cellData -> new SimpleStringProperty(""));
-        statusColumn.setCellFactory(col -> new TableCell<>() {
-            private final FontAwesomeIconView icon = new FontAwesomeIconView();
-
-            {
-                icon.setSize("16");
-            }
-
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
-                    setGraphic(null);
-                    setTooltip(null);
-                } else {
-                    SSHSessionManager sessionManager = SSHSessionManagerImpl.getInstance();
-                    Set<String> activeSessionKeys = sessionManager.getActiveSessionKeys();
-                    SSHServerModel server = getTableRow().getItem();
-                    String sessionKey = server.getUsername() + "@" + server.getHost() + ":" + server.getPort();
-
-                    if (activeSessionKeys.contains(sessionKey)) {
-                        icon.setIcon(FontAwesomeIcon.CHECK_CIRCLE);
-                        icon.setFill(Color.web("#2ecc71")); // Green
-                        setTooltip(new Tooltip("Session is active"));
-                    } else {
-                        icon.setIcon(FontAwesomeIcon.TIMES_CIRCLE);
-                        icon.setFill(Color.web("#e74c3c")); // Red
-                        setTooltip(new Tooltip("No active session"));
-                    }
-                    setGraphic(icon);
-                    setAlignment(javafx.geometry.Pos.CENTER);
-                }
-            }
-        });
-
         nameColumn.setCellValueFactory(cellData -> new SimpleStringProperty(
                 cellData.getValue().getName() != null ? cellData.getValue().getName() : "-"));
 
@@ -178,6 +131,53 @@ public class ServerManagementDialogController {
             updateDetailsPanel(newVal);
             updateButtonStates();
         });
+
+        // Row factory for double click to edit
+        serverTable.setRowFactory(tv -> {
+            TableRow<SSHServerModel> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !row.isEmpty()) {
+                    handleEditServer();
+                }
+            });
+            return row;
+        });
+
+        // Context Menu for table operations
+        ContextMenu contextMenu = new ContextMenu();
+
+        MenuItem addMenuItem = new MenuItem("Add Server...");
+        addMenuItem.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.PLUS));
+        addMenuItem.setOnAction(e -> handleAddServer());
+
+        MenuItem editMenuItem = new MenuItem("Edit...");
+        editMenuItem.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.EDIT));
+        editMenuItem.setOnAction(e -> handleEditServer());
+
+        MenuItem cloneMenuItem = new MenuItem("Clone...");
+        cloneMenuItem.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.COPY));
+        cloneMenuItem.setOnAction(e -> handleCloneServer());
+
+        MenuItem deleteMenuItem = new MenuItem("Delete");
+        deleteMenuItem.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.TRASH));
+        deleteMenuItem.setOnAction(e -> handleDeleteServer());
+
+        contextMenu.getItems().addAll(
+                addMenuItem,
+                new SeparatorMenuItem(),
+                editMenuItem,
+                cloneMenuItem,
+                deleteMenuItem
+        );
+
+        contextMenu.setOnShowing(e -> {
+            boolean hasRow = serverTable.getSelectionModel().getSelectedItem() != null;
+            editMenuItem.setDisable(!hasRow);
+            cloneMenuItem.setDisable(!hasRow);
+            deleteMenuItem.setDisable(!hasRow);
+        });
+
+        serverTable.setContextMenu(contextMenu);
     }
 
     /**
@@ -186,8 +186,10 @@ public class ServerManagementDialogController {
     private void setupEventHandlers() {
         addServerButton.setOnAction(e -> handleAddServer());
         editServerButton.setOnAction(e -> handleEditServer());
+        if (cloneServerButton != null) {
+            cloneServerButton.setOnAction(e -> handleCloneServer());
+        }
         deleteServerButton.setOnAction(e -> handleDeleteServer());
-        testConnectionButton.setOnAction(e -> handleTestConnection());
         refreshButton.setOnAction(e -> loadServers());
         closeButton.setOnAction(e -> handleClose());
 
@@ -200,6 +202,13 @@ public class ServerManagementDialogController {
      * Load servers from database and check connection status
      */
     private void loadServers() {
+        loadServers(null);
+    }
+
+    /**
+     * Load servers from database and optionally select a specific server by ID
+     */
+    private void loadServers(String selectServerId) {
         Task<List<SSHServerModel>> task = new Task<>() {
             @Override
             protected List<SSHServerModel> call() {
@@ -214,63 +223,20 @@ public class ServerManagementDialogController {
             serverTable.refresh();
             logger.info("Loaded {} servers", allServers.size());
 
-            // Auto-check connection status for all servers (optional)
-            // checkAllConnectionStatus();
+            if (selectServerId != null) {
+                for (SSHServerModel s : filteredServers) {
+                    if (selectServerId.equals(s.getId())) {
+                        serverTable.getSelectionModel().select(s);
+                        serverTable.scrollTo(s);
+                        break;
+                    }
+                }
+            }
         });
 
         task.setOnFailed(e -> {
             logger.error("Failed to load servers", task.getException());
             showError("Load Error", "Failed to load servers: " + task.getException().getMessage());
-        });
-
-        new Thread(task).start();
-    }
-
-    /**
-     * Check connection status for all servers in background
-     * This is optional and can be triggered by user action
-     */
-    private void checkAllConnectionStatus() {
-        for (SSHServerModel server : allServers) {
-            if (server.isValid()) {
-                checkConnectionStatus(server);
-            }
-        }
-    }
-
-    /**
-     * Check connection status for a single server
-     */
-    private void checkConnectionStatus(SSHServerModel server) {
-        // Set status to TESTING
-        server.setConnectionStatus(SSHServerModel.ConnectionStatus.TESTING);
-        serverTable.refresh();
-
-        Task<Boolean> task = new Task<>() {
-            @Override
-            protected Boolean call() {
-                try {
-                    return sshService.connect(server.getHost(), server.getPort(), server.getUsername(),
-                            server.getPassword());
-                } catch (Exception e) {
-                    logger.debug("Connection test failed for {}: {}", server.getHost(), e.getMessage());
-                    return false;
-                }
-            }
-        };
-
-        task.setOnSucceeded(e -> {
-            boolean connected = task.getValue();
-            server.setConnectionStatus(connected ? SSHServerModel.ConnectionStatus.CONNECTED
-                    : SSHServerModel.ConnectionStatus.DISCONNECTED);
-            serverTable.refresh();
-            logger.debug("Server {} status: {}", server.getHost(), server.getConnectionStatus());
-        });
-
-        task.setOnFailed(e -> {
-            server.setConnectionStatus(SSHServerModel.ConnectionStatus.DISCONNECTED);
-            serverTable.refresh();
-            logger.error("Connection check failed for {}", server.getHost(), task.getException());
         });
 
         new Thread(task).start();
@@ -325,7 +291,8 @@ public class ServerManagementDialogController {
             showAndWaitAndRestore(dialog);
 
             if (controller.isSaved()) {
-                loadServers();
+                SSHServerModel saved = controller.getSavedServer();
+                loadServers(saved != null ? saved.getId() : null);
             }
         } catch (IOException e) {
             logger.error("Failed to open add server dialog", e);
@@ -359,10 +326,47 @@ public class ServerManagementDialogController {
             showAndWaitAndRestore(dialog);
 
             if (controller.isSaved()) {
-                loadServers();
+                SSHServerModel saved = controller.getSavedServer();
+                loadServers(saved != null ? saved.getId() : (selected != null ? selected.getId() : null));
             }
         } catch (IOException e) {
             logger.error("Failed to open edit server dialog", e);
+            showError("Dialog Error", "Failed to open server editor: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Handle clone server action
+     */
+    private void handleCloneServer() {
+        SSHServerModel selected = serverTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            return;
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ServerEditDialog.fxml"));
+            Parent root = loader.load();
+
+            ServerEditDialogController controller = loader.getController();
+            controller.setServerService(serverService);
+            controller.setCloneServer(selected);
+
+            Stage dialog = new Stage();
+            dialog.setTitle("Clone SSH Server");
+            dialog.initModality(Modality.APPLICATION_MODAL);
+            dialog.initOwner(cloneServerButton.getScene().getWindow());
+            dialog.setScene(new Scene(root));
+
+            showAndWaitAndRestore(dialog);
+
+            if (controller.isSaved()) {
+                SSHServerModel saved = controller.getSavedServer();
+                loadServers(saved != null ? saved.getId() : null);
+                logger.info("Cloned server successfully from: {}", selected.getDisplayString());
+            }
+        } catch (IOException e) {
+            logger.error("Failed to open clone server dialog", e);
             showError("Dialog Error", "Failed to open server editor: " + e.getMessage());
         }
     }
@@ -388,83 +392,6 @@ public class ServerManagementDialogController {
             loadServers();
             logger.info("Deleted server: {}", selected.getDisplayString());
         }
-    }
-
-    /**
-     * Handle test connection action with real-time status update
-     */
-    private void handleTestConnection() {
-        SSHServerModel selected = serverTable.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            return;
-        }
-
-        if (!selected.isValid()) {
-            showError("Invalid Configuration", selected.getValidationError());
-            return;
-        }
-
-        // Prompt for password if it's not saved
-        String password = selected.getPassword();
-        if (password == null || password.isBlank()) {
-            PasswordPromptDialog prompt = new PasswordPromptDialog(selected.getHost(), selected.getUsername());
-            Optional<String> result = showAndWaitAndRestore(prompt);
-            if (result.isPresent()) {
-                password = result.get();
-            } else {
-                logger.info("User cancelled password prompt for test connection.");
-                return; // Abort test
-            }
-        }
-        final String finalPassword = password;
-
-        // Set status to TESTING
-        selected.setConnectionStatus(SSHServerModel.ConnectionStatus.TESTING);
-        serverTable.refresh();
-
-        Task<Boolean> task = new Task<>() {
-            @Override
-            protected Boolean call() {
-                try {
-                    return sshService.connect(selected.getHost(), selected.getPort(), selected.getUsername(),
-                            finalPassword);
-                } catch (Exception e) {
-                    logger.error("Connection test failed", e);
-                    return false;
-                }
-            }
-        };
-
-        task.setOnSucceeded(e -> {
-            boolean success = task.getValue();
-
-            // Update status
-            selected.setConnectionStatus(
-                    success ? SSHServerModel.ConnectionStatus.CONNECTED : SSHServerModel.ConnectionStatus.DISCONNECTED);
-
-            if (success) {
-                serverService.updateServerLastUsed(selected.getId());
-                loadServers(); // Refresh to show updated last used time
-            } else {
-                serverTable.refresh();
-            }
-
-            // Show result dialog
-            Alert resultDialog = new Alert(success ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR);
-            resultDialog.setTitle("Connection Test");
-            resultDialog.setHeaderText(success ? "Connection Successful" : "Connection Failed");
-            resultDialog.setContentText(success ? "Successfully connected to " + selected.getDisplayString()
-                    : "Failed to connect. Please check your credentials and network connection.");
-            showAndWaitAndRestore(resultDialog);
-        });
-
-        task.setOnFailed(e -> {
-            selected.setConnectionStatus(SSHServerModel.ConnectionStatus.DISCONNECTED);
-            serverTable.refresh();
-            showError("Test Failed", "Connection test failed: " + task.getException().getMessage());
-        });
-
-        new Thread(task).start();
     }
 
     /**
@@ -498,8 +425,10 @@ public class ServerManagementDialogController {
     private void updateButtonStates() {
         boolean hasSelection = serverTable.getSelectionModel().getSelectedItem() != null;
         editServerButton.setDisable(!hasSelection);
+        if (cloneServerButton != null) {
+            cloneServerButton.setDisable(!hasSelection);
+        }
         deleteServerButton.setDisable(!hasSelection);
-        testConnectionButton.setDisable(!hasSelection);
     }
 
     /**

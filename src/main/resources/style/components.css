@@ -34,60 +34,12 @@
    Recent Files List & ListView (Uses default JavaFX theme)
    ============================================ */
 
-
 /* ============================================
-   SplitPane: Clean single-line divider without 3D bevels
+   TabPane: Disable open/close sliding animation
    ============================================ */
-.split-pane {
-    -fx-background-color: transparent;
-    -fx-background-insets: 0;
-    -fx-padding: 0;
-}
-
-.split-pane > .split-pane-divider {
-    -fx-background-color: #dcdcdc;
-    -fx-background-insets: 0;
-    -fx-padding: 0 0.5px;
-}
-
-/* ============================================
-   TabPane & Log Tab: Clean flat borders without layered insets
-   ============================================ */
-.tab-pane > .tab-header-area {
-    -fx-padding: 0;
-}
-
-.tab-pane > .tab-header-area > .tab-header-background {
-    -fx-background-color: #f0f0f0;
-    -fx-border-color: #dcdcdc;
-    -fx-border-width: 0 0 1 0;
-}
-
-.tab-pane > .tab-header-area > .headers-region > .tab {
-    -fx-background-insets: 0;
-    -fx-background-radius: 0;
-    -fx-background-color: #e4e4e4;
-    -fx-border-color: transparent #dcdcdc transparent transparent;
-    -fx-border-width: 0 1 0 0;
-    -fx-padding: 4 10;
-}
-
-.tab-pane > .tab-header-area > .headers-region > .tab:selected {
-    -fx-background-color: #ffffff;
-    -fx-border-color: #2196f3 #dcdcdc #ffffff #dcdcdc;
-    -fx-border-width: 2 1 0 1;
-}
-
-.tab-pane > .tab-header-area > .headers-region > .tab:hover {
-    -fx-background-color: #ececec;
-}
-
-/* Remove redundant box border wrapping tab contents */
-.tab-pane > .tab-content-area {
-    -fx-background-color: transparent;
-    -fx-background-insets: 0;
-    -fx-padding: 0;
-    -fx-border-width: 0;
+.tab-pane {
+    -fx-open-tab-animation: NONE;
+    -fx-close-tab-animation: NONE;
 }
 
 /* ============================================
@@ -99,13 +51,15 @@
 }
 
 .scroll-bar:vertical {
-    -fx-pref-width: 16px;
+    -fx-pref-width: 18px;
+    -fx-min-width: 18px;
     -fx-border-color: #e8e8e8;
     -fx-border-width: 0 0 0 1;
 }
 
 .scroll-bar:horizontal {
-    -fx-pref-height: 16px;
+    -fx-pref-height: 18px;
+    -fx-min-height: 18px;
     -fx-border-color: #e8e8e8;
     -fx-border-width: 1 0 0 0;
 }
@@ -116,25 +70,17 @@
 }
 
 .scroll-bar .thumb {
-    -fx-background-color: #b8b8b8;
+    -fx-background-color: #b0b0b0;
     -fx-background-insets: 1;
-    -fx-background-radius: 3;
-}
-
-.scroll-bar:vertical .thumb {
-    -fx-min-height: 36px;
-}
-
-.scroll-bar:horizontal .thumb {
-    -fx-min-width: 36px;
+    -fx-background-radius: 4;
 }
 
 .scroll-bar .thumb:hover {
-    -fx-background-color: #949494;
+    -fx-background-color: #787878;
 }
 
 .scroll-bar .thumb:pressed {
-    -fx-background-color: #666666;
+    -fx-background-color: #404040;
 }
 
 .scroll-bar .increment-button,
@@ -187,6 +133,13 @@
 
 .empty-state-button:hover {
     -fx-background-color: #1a4fa0;
+}
+
+.empty-state-button .glyph-icon,
+.empty-state-button FontAwesomeIconView,
+.empty-state-button > .graphic > .glyph-icon {
+    -fx-fill: white;
+    fill: white;
 }
 
 /* ============================================

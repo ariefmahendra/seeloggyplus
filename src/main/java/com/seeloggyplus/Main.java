@@ -86,6 +86,9 @@ public class Main extends Application {
             primaryStage.show();
             logger.info("SeeLoggyPlus application started successfully");
 
+            // Initialize Dev Hot Reloader for live CSS & layout reloading
+            com.seeloggyplus.util.DevHotReloader.init(primaryStage, scene);
+
         } catch (IOException e) {
             logger.error("Failed to load main view", e);
             showErrorAndExit("Failed to start application: " + e.getMessage());
@@ -180,6 +183,7 @@ public class Main extends Application {
      */
     private void cleanup() {
         logger.info("Cleaning up application resources");
+        com.seeloggyplus.util.DevHotReloader.shutdown();
         // Add any cleanup tasks here
     }
 

@@ -66,6 +66,14 @@ public class SortPersistenceIntegrationTest {
         // Clear directory cache
         Map<?, ?> cache = getField("directoryCache");
         cache.clear();
+
+        runOnFxAndWait(() -> {
+            try {
+                setField(controller, "suppressSortSave", true);
+                fileTable.getSortOrder().clear();
+                setField(controller, "suppressSortSave", false);
+            } catch (Exception ignored) {}
+        });
     }
 
     // -------------------------------------------------------------------------

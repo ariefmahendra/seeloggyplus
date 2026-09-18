@@ -125,172 +125,125 @@
     <!-- Center: Main Content -->
     <center>
         <StackPane fx:id="centerRoot">
-            <BorderPane xmlns="http://javafx.com/javafx">
-                <left>
-                    <VBox fx:id="collapsedLeftPanel" alignment="TOP_CENTER" managed="false" prefWidth="20" spacing="10" visible="false">
+            <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
+                <VBox fx:id="leftPanel" minWidth="200" prefWidth="250" spacing="5">
+                    <padding>
+                        <Insets bottom="5" left="5" right="5" top="5" />
+                    </padding>
+
+                    <HBox spacing="5">
+                        <Label prefHeight="18.0" prefWidth="294.0" text="Recent Log Files" HBox.hgrow="ALWAYS">
+                            <font>
+                                <Font name="System Bold" size="12.0" />
+                            </font>
+                        </Label>
+                        <Separator prefWidth="200.0" HBox.hgrow="ALWAYS" />
+                        <Button fx:id="pinLeftPanelButton">
+                            <graphic>
+                                <FontAwesomeIconView glyphName="TIMES" size="12" />
+                            </graphic>
+                            <tooltip>
+                                <Tooltip text="Close Panel (Ctrl+B)" />
+                            </tooltip>
+                        </Button>
+                    </HBox>
+
+                    <TextField fx:id="recentFilesFilterField" promptText="Filter recent logs..." />
+                    <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS" />
+
+                    <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
+                        </graphic>
+                    </Button>
+                </VBox>
+
+                <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
+                    <!-- Center Panel: Log Table / Tabs -->
+                    <VBox spacing="0">
+                        <StackPane fx:id="logContainer" VBox.vgrow="ALWAYS">
+                            <!-- Empty State Pane -->
+                            <VBox fx:id="emptyStatePane" alignment="CENTER" spacing="12" styleClass="empty-state-pane">
+                                <FontAwesomeIconView glyphName="FILE_TEXT_ALT" size="48" styleClass="empty-state-icon" />
+                                <Label text="No Log File Open" styleClass="empty-state-title" />
+                                <Label text="Open a file via File → Open (Ctrl+O), choose from Recent Files, or drag &amp; drop a log file here." styleClass="empty-state-subtitle" />
+                                <Button text="Open File..." onAction="#handleOpen" styleClass="empty-state-button">
+                                    <graphic>
+                                        <FontAwesomeIconView glyphName="FOLDER_OPEN" size="14" fill="white" />
+                                    </graphic>
+                                </Button>
+                            </VBox>
+
+                            <TabPane fx:id="logTabPane" style="-fx-open-tab-animation: NONE; -fx-close-tab-animation: NONE;" tabClosingPolicy="ALL_TABS" tabDragPolicy="REORDER" visible="false" managed="false" />
+                        </StackPane>
+                    </VBox>
+
+                    <!-- Bottom Panel: Log Detail -->
+                    <VBox fx:id="bottomPanel" minHeight="80" prefHeight="180" spacing="5">
                         <padding>
                             <Insets bottom="5" left="5" right="5" top="5" />
                         </padding>
 
-                        <Button fx:id="expandLeftPanelButton" rotate="90">
-                            <graphic>
-                                <FontAwesomeIconView glyphName="ANGLE_DOUBLE_RIGHT" size="12" />
-                            </graphic>
-                            <tooltip>
-                                <Tooltip text="Expand Recent Files" />
-                            </tooltip>
-                        </Button>
-                    </VBox>
-                </left>
+                        <HBox alignment="CENTER_LEFT" spacing="10">
+                            <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS">
+                                <font>
+                                    <Font name="System Bold" size="12.0" />
+                                </font>
+                            </Label>
 
-                <center>
-                    <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
-                        <VBox fx:id="leftPanel" minWidth="200" prefWidth="250" spacing="5">
-                            <padding>
-                                <Insets bottom="5" left="5" right="5" top="5" />
-                            </padding>
-
-                            <HBox spacing="5">
-                                <Label prefHeight="18.0" prefWidth="294.0" text="Recent Log Files" HBox.hgrow="ALWAYS">
-                                    <font>
-                                        <Font name="System Bold" size="12.0" />
-                                    </font>
-                                </Label>
-                                <Separator prefWidth="200.0" HBox.hgrow="ALWAYS" />
-                                <Button fx:id="pinLeftPanelButton">
+                            <HBox alignment="CENTER_LEFT" spacing="5">
+                                <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
                                     <graphic>
-                                        <FontAwesomeIconView glyphName="ANGLE_DOUBLE_LEFT" size="12" />
+                                        <FontAwesomeIconView glyphName="INDENT" size="12" />
                                     </graphic>
                                     <tooltip>
-                                        <Tooltip text="Collapse Recent Files Panel" />
+                                        <Tooltip text="Auto-Prettify JSON" />
+                                    </tooltip>
+                                </ToggleButton>
+                                <ToggleButton fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
+                                    <graphic>
+                                        <FontAwesomeIconView glyphName="CODE" size="12" />
+                                    </graphic>
+                                    <tooltip>
+                                        <Tooltip text="Auto-Prettify XML" />
+                                    </tooltip>
+                                </ToggleButton>
+                                <Button fx:id="copyButton">
+                                    <graphic>
+                                        <FontAwesomeIconView glyphName="COPY" size="12" />
+                                    </graphic>
+                                    <tooltip>
+                                        <Tooltip text="Copy" />
+                                    </tooltip>
+                                </Button>
+                                <Button fx:id="clearDetailButton">
+                                    <graphic>
+                                        <FontAwesomeIconView glyphName="CLOSE" size="12" />
+                                    </graphic>
+                                    <tooltip>
+                                        <Tooltip text="Clear" />
+                                    </tooltip>
+                                </Button>
+                                <Separator orientation="VERTICAL" />
+                                <Button fx:id="pinBottomPanelButton">
+                                    <graphic>
+                                        <FontAwesomeIconView glyphName="TIMES" size="12" />
+                                    </graphic>
+                                    <tooltip>
+                                        <Tooltip text="Close Detail Panel (Ctrl+J)" />
                                     </tooltip>
                                 </Button>
                             </HBox>
-
-                            <TextField fx:id="recentFilesFilterField" promptText="Filter recent logs..." />
-                            <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS" />
-
-                            <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files">
-                                <graphic>
-                                    <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
-                                </graphic>
-                            </Button>
-                        </VBox>
-
-                        <BorderPane>
-                            <bottom>
-                                <HBox fx:id="collapsedBottomPanel" alignment="CENTER_LEFT" prefHeight="20" spacing="10" visible="false">
-                                    <padding>
-                                        <Insets bottom="5" left="5" right="5" top="5" />
-                                    </padding>
-
-                                    <Button fx:id="expandBottomPanelButton">
-                                        <graphic>
-                                            <FontAwesomeIconView glyphName="ANGLE_DOUBLE_LEFT" size="12" rotate="90" />
-                                        </graphic>
-                                        <tooltip>
-                                            <Tooltip text="Expand Detail Panel" />
-                                        </tooltip>
-                                    </Button>
-                                    <Label text="Log Detail (Collapsed)">
-                                        <font>
-                                            <Font name="System Bold" size="10.0" />
-                                        </font>
-                                    </Label>
-                                </HBox>
-                            </bottom>
-
-                            <center>
-                                <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
-                                    <!-- Center Panel: Log Table / Tabs -->
-                                    <VBox spacing="0">
-                                        <StackPane fx:id="logContainer" VBox.vgrow="ALWAYS">
-                                            <!-- Empty State Pane -->
-                                            <VBox fx:id="emptyStatePane" alignment="CENTER" spacing="12" styleClass="empty-state-pane">
-                                                <FontAwesomeIconView glyphName="FILE_TEXT_ALT" size="48" styleClass="empty-state-icon" />
-                                                <Label text="No Log File Open" styleClass="empty-state-title" />
-                                                <Label text="Open a file via File → Open (Ctrl+O), choose from Recent Files, or drag &amp; drop a log file here." styleClass="empty-state-subtitle" />
-                                                <Button text="Open File..." onAction="#handleOpen" styleClass="empty-state-button">
-                                                    <graphic>
-                                                        <FontAwesomeIconView glyphName="FOLDER_OPEN" size="14" />
-                                                    </graphic>
-                                                </Button>
-                                            </VBox>
-
-                                            <TabPane fx:id="logTabPane" tabClosingPolicy="ALL_TABS" tabDragPolicy="REORDER" visible="false" managed="false" />
-                                        </StackPane>
-                                    </VBox>
-
-                                    <!-- Bottom Panel: Log Detail -->
-                                    <VBox fx:id="bottomPanel" minHeight="80" prefHeight="180" spacing="5">
-                                        <padding>
-                                            <Insets bottom="5" left="5" right="5" top="5" />
-                                        </padding>
-
-                                        <HBox alignment="CENTER_LEFT" spacing="10">
-                                            <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS">
-                                                <font>
-                                                    <Font name="System Bold" size="12.0" />
-                                                </font>
-                                            </Label>
-
-                                            <HBox alignment="CENTER_LEFT" spacing="5">
-                                                <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
-                                                    <graphic>
-                                                        <FontAwesomeIconView glyphName="INDENT" size="12" />
-                                                    </graphic>
-                                                    <tooltip>
-                                                        <Tooltip text="Auto-Prettify JSON" />
-                                                    </tooltip>
-                                                </ToggleButton>
-                                                <ToggleButton fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
-                                                    <graphic>
-                                                        <FontAwesomeIconView glyphName="CODE" size="12" />
-                                                    </graphic>
-                                                    <tooltip>
-                                                        <Tooltip text="Auto-Prettify XML" />
-                                                    </tooltip>
-                                                </ToggleButton>
-                                                <Button fx:id="copyButton">
-                                                    <graphic>
-                                                        <FontAwesomeIconView glyphName="COPY" size="12" />
-                                                    </graphic>
-                                                    <tooltip>
-                                                        <Tooltip text="Copy" />
-                                                    </tooltip>
-                                                </Button>
-                                                <Button fx:id="clearDetailButton">
-                                                    <graphic>
-                                                        <FontAwesomeIconView glyphName="CLOSE" size="12" />
-                                                    </graphic>
-                                                    <tooltip>
-                                                        <Tooltip text="Clear" />
-                                                    </tooltip>
-                                                </Button>
-                                                <Separator orientation="VERTICAL" />
-                                                <Button fx:id="pinBottomPanelButton">
-                                                    <graphic>
-                                                        <FontAwesomeIconView glyphName="ANGLE_DOUBLE_DOWN" size="12" />
-                                                    </graphic>
-                                                    <tooltip>
-                                                        <Tooltip text="Pin/Unpin Detail Panel" />
-                                                    </tooltip>
-                                                </Button>
-                                            </HBox>
-                                        </HBox>
-                                        
-                                        <StackPane fx:id="detailContainer" VBox.vgrow="ALWAYS" style="-fx-border-color: #cccccc; -fx-border-width: 1;">
-                                             <padding>
-                                                 <Insets/>
-                                             </padding>
-                                        </StackPane>
-                                    </VBox>
-                                </SplitPane>
-                            </center>
-                        </BorderPane>
-                    </SplitPane>
-                </center>
-            </BorderPane>
+                        </HBox>
+                        
+                        <StackPane fx:id="detailContainer" VBox.vgrow="ALWAYS" style="-fx-border-color: #cccccc; -fx-border-width: 1;">
+                             <padding>
+                                 <Insets/>
+                             </padding>
+                        </StackPane>
+                    </VBox>
+                </SplitPane>
+            </SplitPane>
 
             <!-- Loading Overlay -->
             <VBox fx:id="loadingOverlay" alignment="CENTER" visible="false" style="-fx-background-color: rgba(0, 0, 0, 0.4);">

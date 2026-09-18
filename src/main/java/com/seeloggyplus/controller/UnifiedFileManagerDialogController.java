@@ -1,5 +1,6 @@
 package com.seeloggyplus.controller;
 
+import com.seeloggyplus.dto.RemoteFileInfo;
 import com.seeloggyplus.model.FavoriteFolder;
 import com.seeloggyplus.model.FileInfo;
 import com.seeloggyplus.model.Preference;
@@ -148,10 +149,14 @@ public class UnifiedFileManagerDialogController {
     // --- Performance Enhancements ---
     private final java.util.Map<String, CacheEntry> directoryCache = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Set<String> favoritePathsCache = new java.util.HashSet<>();
-    private static final long CACHE_DURATION_MS = 60 * 1000; // 60 seconds
+    private static final long CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
     private boolean suppressAutoRefresh = false;
     private boolean suppressSortSave = false;
     private String cachedFavoritesLocationId = null; // Track which location favorites are cached for
+
+    private String getCacheKey(String path) {
+        return getLocationIdForCurrent() + ":" + path;
+    }
 
     @FXML
     public void initialize() {
@@ -173,15 +178,8 @@ public class UnifiedFileManagerDialogController {
 
         restoreLastLocation();
 
-        // --- Auto-Refresh on Focus ---
+        // Keyboard shortcuts
         Platform.runLater(() -> {
-            Stage stage = (Stage) pathField.getScene().getWindow();
-            stage.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
-                if (isNowFocused) {
-                    handleWindowGainedFocus();
-                }
-            });
-
             // Add Ctrl+R shortcut for refreshing
             pathField.getScene().getAccelerators().put(
                     new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN),
@@ -194,12 +192,8 @@ public class UnifiedFileManagerDialogController {
             suppressAutoRefresh = false;
             return;
         }
-
-        // Only refresh if we are in a remote location and have a path
-        if (currentLocation != null && currentLocation.server != null && currentPath != null) {
-            logger.info("Window gained focus, auto-refreshing remote path: {}", currentPath);
-            refreshCurrentPath();
-        }
+        // WinSCP-style: do not automatically clear cache or re-download on focus.
+        // Manual refresh is available via the refresh button or Ctrl+R.
     }
 
     private void setupLocationList() {
@@ -483,7 +477,6 @@ public class UnifiedFileManagerDialogController {
         }
         backHistory.clear();
         forwardHistory.clear();
-        directoryCache.clear(); // Clear cache when changing location
         cachedFavoritesLocationId = null; // Force favorites reload for new location
         updateNavigationButtons();
         loadFavoritesForCurrentLocation();
@@ -623,30 +616,34 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void restoreFileSelection() {
-        if (!isInitialFileSelectionPending) return;
-        isInitialFileSelectionPending = false;
+        try {
+            if (!isInitialFileSelectionPending) return;
+            isInitialFileSelectionPending = false;
 
-        if (preferenceService == null) return;
-        String savedDir = preferenceService.getPreferencesByCode(lastFileFolderKey()).orElse(null);
-        if (savedDir != null && currentPath != null) {
-            String normSaved = normalizePathString(savedDir);
-            String normCurrent = normalizePathString(currentPath);
-            if (!normSaved.equals(normCurrent)) {
-                return;
-            }
-        }
-
-        preferenceService.getPreferencesByCode(lastFileKey())
-            .filter(f -> !f.isBlank())
-            .ifPresent(lastFileName -> {
-                for (FileInfo file : fileTable.getItems()) {
-                    if (file.isFile() && file.getName().equals(lastFileName)) {
-                        fileTable.getSelectionModel().select(file);
-                        fileTable.scrollTo(file);
-                        break;
-                    }
+            if (preferenceService == null) return;
+            String savedDir = preferenceService.getPreferencesByCode(lastFileFolderKey()).orElse(null);
+            if (savedDir != null && currentPath != null) {
+                String normSaved = normalizePathString(savedDir);
+                String normCurrent = normalizePathString(currentPath);
+                if (!normSaved.equals(normCurrent)) {
+                    return;
                 }
-            });
+            }
+
+            preferenceService.getPreferencesByCode(lastFileKey())
+                .filter(f -> !f.isBlank())
+                .ifPresent(lastFileName -> {
+                    for (FileInfo file : fileTable.getItems()) {
+                        if (file.isFile() && file.getName().equals(lastFileName)) {
+                            fileTable.getSelectionModel().select(file);
+                            fileTable.scrollTo(file);
+                            break;
+                        }
+                    }
+                });
+        } catch (Exception e) {
+            logger.warn("Failed to restore file selection", e);
+        }
     }
 
     private void restoreLastLocation() {
@@ -770,12 +767,15 @@ public class UnifiedFileManagerDialogController {
 
     private void loadFiles(String path) {
         // --- Caching Layer ---
-        CacheEntry cachedEntry = directoryCache.get(path);
+        String cacheKey = getCacheKey(path);
+        CacheEntry cachedEntry = directoryCache.get(cacheKey);
         if (cachedEntry != null && !cachedEntry.isExpired()) {
             logger.info("Cache HIT for path: {}", path);
             allFiles.setAll(cachedEntry.getFiles());
+            restoreSortOrdering();
             itemCountLabel.setText(allFiles.size() + " items");
             updateStatus("Ready (from cache)");
+            updateNavigationButtons();
             restoreFileSelection();
             return;
         }
@@ -798,7 +798,9 @@ public class UnifiedFileManagerDialogController {
                     if (activeSshService == null || !activeSshService.isConnected()) {
                         throw new IOException("SSH session is not active.");
                     }
-                    files = activeSshService.listFiles(path).stream().map(r -> {
+                    List<RemoteFileInfo> remoteFiles = activeSshService.listFiles(path);
+                    files = new java.util.ArrayList<>(remoteFiles.size() + 1);
+                    for (RemoteFileInfo r : remoteFiles) {
                         FileInfo f = new FileInfo();
                         f.setName(r.getName());
                         f.setPath(r.getPath());
@@ -808,8 +810,8 @@ public class UnifiedFileManagerDialogController {
                         f.setPermissions(r.getPermissions());
                         f.setOwner("-");
                         f.setSourceType(FileInfo.SourceType.REMOTE);
-                        return f;
-                    }).collect(Collectors.toList());
+                        files.add(f);
+                    }
                 }
 
                 // Add ".." entry for parent directory navigation
@@ -834,7 +836,7 @@ public class UnifiedFileManagerDialogController {
         loadTask.setOnSucceeded(e -> {
             if (loadTask != currentLoadTask) return;
             List<FileInfo> loadedFiles = loadTask.getValue();
-            directoryCache.put(path, new CacheEntry(loadedFiles)); // Update cache
+            directoryCache.put(cacheKey, new CacheEntry(loadedFiles)); // Update cache
             allFiles.setAll(loadedFiles);
             restoreSortOrdering(); // restores saved sort or falls back to defaultSort
             itemCountLabel.setText(allFiles.size() + " items");
@@ -842,7 +844,6 @@ public class UnifiedFileManagerDialogController {
             updateStatus("Ready");
             updateNavigationButtons();
             loadFavoritesForCurrentLocation();
-            fileTable.refresh();
             restoreFileSelection();
         });
 
@@ -1029,7 +1030,7 @@ public class UnifiedFileManagerDialogController {
 
     private void refreshCurrentPath() {
         if (currentPath != null) {
-            directoryCache.remove(currentPath); // Invalidate cache for this path
+            directoryCache.remove(getCacheKey(currentPath)); // Invalidate cache for this path
             logger.info("Cache invalidated for path: {}", currentPath);
             loadFiles(currentPath);
         }

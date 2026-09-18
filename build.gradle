@@ -86,6 +86,14 @@ application {
     applicationName = 'SeeloggyPlus'
 }
 
+tasks.register('runDev', JavaExec) {
+    group = 'application'
+    description = 'Runs the SeeLoggyPlus JavaFX Desktop app in Development mode with Hot Reload enabled'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.seeloggyplus.Launcher'
+    systemProperty 'seeloggyplus.dev', 'true'
+}
+
 tasks.register('fatJar', Jar) {
     dependsOn processResources
     archiveClassifier = 'all'

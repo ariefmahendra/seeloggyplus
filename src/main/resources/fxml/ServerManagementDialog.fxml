@@ -25,17 +25,15 @@
                     </graphic>
                 </Button>
                 
-                <Button fx:id="deleteServerButton" text="Delete">
+                <Button fx:id="cloneServerButton" text="Clone">
                     <graphic>
-                        <FontAwesomeIconView glyphName="TRASH" size="14"/>
+                        <FontAwesomeIconView glyphName="COPY" size="14"/>
                     </graphic>
                 </Button>
                 
-                <Separator orientation="VERTICAL"/>
-                
-                <Button fx:id="testConnectionButton" text="Test Connection">
+                <Button fx:id="deleteServerButton" text="Delete">
                     <graphic>
-                        <FontAwesomeIconView glyphName="CHECK_CIRCLE" size="14"/>
+                        <FontAwesomeIconView glyphName="TRASH" size="14"/>
                     </graphic>
                 </Button>
                 
@@ -67,7 +65,6 @@
     <center>
         <TableView fx:id="serverTable" VBox.vgrow="ALWAYS">
             <columns>
-                <TableColumn fx:id="statusColumn" text="Status" prefWidth="60" minWidth="60" maxWidth="60" sortable="false"/>
                 <TableColumn fx:id="nameColumn" text="Name" prefWidth="150" minWidth="100"/>
                 <TableColumn fx:id="hostColumn" text="Host" prefWidth="200" minWidth="150"/>
                 <TableColumn fx:id="portColumn" text="Port" prefWidth="70" minWidth="60" maxWidth="80"/>

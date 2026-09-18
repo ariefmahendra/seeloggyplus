@@ -151,4 +151,49 @@ import java.util.UUID;
             throw new RuntimeException("Failed to retrieve server: " + e.getMessage(), e);
         }
     }
+
+    @Override
+    public SSHServerModel createCloneModel(SSHServerModel source) {
+        if (source == null) {
+            logger.error("Attempted to clone null server");
+            throw new IllegalArgumentException("Source server cannot be null");
+        }
+
+        SSHServerModel clone = new SSHServerModel();
+        clone.setId(UUID.randomUUID().toString());
+        String baseName = (source.getName() != null && !source.getName().isBlank())
+                ? source.getName()
+                : (source.getHost() != null && !source.getHost().isBlank() ? source.getHost() : "Server");
+        clone.setName(baseName + " (Copy)");
+        clone.setHost(source.getHost());
+        clone.setPort(source.getPort() > 0 ? source.getPort() : 22);
+        clone.setUsername(source.getUsername());
+        clone.setPassword(source.getPassword());
+        clone.setDefaultPath(source.getDefaultPath() != null ? source.getDefaultPath() : "/");
+        clone.setSavePassword(source.isSavePassword());
+        clone.setCreatedAt(LocalDateTime.now());
+        clone.setLastUsed(null);
+        clone.setConnectionStatus(SSHServerModel.ConnectionStatus.UNKNOWN);
+        return clone;
+    }
+
+    @Override
+    public SSHServerModel cloneServer(String id) {
+        if (id == null || id.trim().isEmpty()) {
+            logger.error("Attempted to clone server with null/empty ID");
+            throw new IllegalArgumentException("Server ID cannot be null or empty");
+        }
+
+        SSHServerModel source = getServerById(id);
+        if (source == null) {
+            logger.error("Cannot clone non-existent server: {}", id);
+            throw new IllegalArgumentException("Server with ID " + id + " does not exist");
+        }
+
+        SSHServerModel clone = createCloneModel(source);
+        saveServer(clone);
+        logger.info("Cloned server '{}' ({}) to new server '{}' ({})",
+                source.getName(), source.getId(), clone.getName(), clone.getId());
+        return clone;
+    }
 }
