@@ -27,12 +27,14 @@ import javafx.collections.transformation.SortedList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Modality;
@@ -77,6 +79,8 @@ public class UnifiedFileManagerDialogController {
     private TextField searchField;
     @FXML
     private Button tailButton;
+    @FXML
+    private Button findInFilesButton;
 
     @FXML
     private ListView<LocationItem> locationListView;
@@ -140,6 +144,9 @@ public class UnifiedFileManagerDialogController {
     private String currentPath;
     private LocationItem currentLocation;
     private FileInfo selectedFileResult;
+    private int pendingJumpLine;
+    private int pendingTailWindowLines;
+    private int pendingTailJumpIndex = -1;
     private com.seeloggyplus.service.impl.SSHServiceImpl activeSshService;
     private Task<Boolean> currentConnectTask;
     private Task<List<FileInfo>> currentLoadTask;
@@ -154,8 +161,35 @@ public class UnifiedFileManagerDialogController {
     private boolean suppressSortSave = false;
     private String cachedFavoritesLocationId = null; // Track which location favorites are cached for
 
+    private final java.util.concurrent.ExecutorService fileIoExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "FileManager-IO");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private final java.util.concurrent.ExecutorService prefetchExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "FileManager-Prefetch");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private java.util.concurrent.Future<?> currentPrefetchFuture = null;
+    private final java.util.concurrent.atomic.AtomicInteger prefetchGeneration = new java.util.concurrent.atomic.AtomicInteger(0);
+    private javafx.animation.PauseTransition prefetchDebounce = null;
+
+    private static final Comparator<FileInfo> BACKGROUND_PRE_SORT = Comparator
+        .<FileInfo>comparingInt(f -> f.getName().equals("..") ? 0 : (f.isDirectory() ? 1 : 2))
+        .thenComparing((f1, f2) -> Long.compare(f2.getModifiedTime(), f1.getModifiedTime()))
+        .thenComparing(FileInfo::getName, String.CASE_INSENSITIVE_ORDER);
+
     private String getCacheKey(String path) {
-        return getLocationIdForCurrent() + ":" + path;
+        String norm = normalizePathString(path);
+        return getLocationIdForCurrent() + ":" + (norm != null ? norm : path);
+    }
+
+    private String getLocationIdFor(LocationItem loc) {
+        if (loc == null) return "";
+        return loc.server == null ? "local" : loc.server.getName();
     }
 
     @FXML
@@ -178,12 +212,22 @@ public class UnifiedFileManagerDialogController {
 
         restoreLastLocation();
 
-        // Keyboard shortcuts
+        // WinSCP-style keyboard shortcuts
         Platform.runLater(() -> {
-            // Add Ctrl+R shortcut for refreshing
-            pathField.getScene().getAccelerators().put(
-                    new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN),
-                    this::refreshCurrentPath);
+            if (pathField != null && pathField.getScene() != null) {
+                pathField.getScene().getAccelerators().put(
+                        new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN),
+                        this::refreshCurrentPath);
+                pathField.getScene().getAccelerators().put(
+                        new KeyCodeCombination(KeyCode.F5),
+                        this::refreshCurrentPath);
+                pathField.getScene().getAccelerators().put(
+                        new KeyCodeCombination(KeyCode.L, KeyCombination.CONTROL_DOWN),
+                        () -> {
+                            pathField.requestFocus();
+                            pathField.selectAll();
+                        });
+            }
         });
     }
 
@@ -270,7 +314,7 @@ public class UnifiedFileManagerDialogController {
         });
 
         favoritesListView.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2) {
+            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() % 2 == 0) {
                 FavoriteFolder selectedFavorite = favoritesListView.getSelectionModel().getSelectedItem();
                 if (selectedFavorite != null) {
                     navigateTo(selectedFavorite.getPath());
@@ -387,8 +431,25 @@ public class UnifiedFileManagerDialogController {
         fileTable.setItems(sortedData);
 
         fileTable.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2) {
+            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() % 2 == 0) {
+                if (event.getTarget() instanceof Node target) {
+                    TableRow<?> row = findParentTableRow(target);
+                    if (row != null && !row.isEmpty()) {
+                        handleFileDoubleClick();
+                    }
+                } else {
+                    handleFileDoubleClick();
+                }
+            }
+        });
+
+        fileTable.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
                 handleFileDoubleClick();
+                event.consume();
+            } else if (event.getCode() == KeyCode.BACK_SPACE) {
+                navigateUp();
+                event.consume();
             }
         });
 
@@ -451,6 +512,9 @@ public class UnifiedFileManagerDialogController {
         });
 
         manageServersButton.setOnAction(e -> handleManageServers());
+        if (findInFilesButton != null) {
+            findInFilesButton.setOnAction(e -> handleFindInFiles());
+        }
         previewButton.setOnAction(e -> handlePreview());
         cancelButton.setOnAction(e -> closeDialog());
         openButton.setOnAction(e -> handleOpen());
@@ -465,8 +529,12 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void handleLocationSelected(LocationItem location) {
-        if (currentLocation == location)
-            return;
+        if (currentPrefetchFuture != null && !currentPrefetchFuture.isDone()) {
+            currentPrefetchFuture.cancel(true);
+        }
+        if (currentLoadTask != null && currentLoadTask.isRunning()) {
+            currentLoadTask.cancel(true);
+        }
 
         // Disconnect from the previous session if there was one
         if (activeSshService != null) {
@@ -475,6 +543,7 @@ public class UnifiedFileManagerDialogController {
         }
 
         currentLocation = location;
+        updateFindInFilesState();
         if (preferenceService != null) {
             String locId = location.server == null ? "local" : location.server.getName();
             preferenceService.saveOrUpdatePreferences(new Preference("file_manager_last_location", locId));
@@ -521,6 +590,7 @@ public class UnifiedFileManagerDialogController {
         final String finalPassword = password;
         updateStatus("Connecting to " + server.getHost() + "...");
         progressIndicator.setVisible(true);
+        fileTable.setCursor(javafx.scene.Cursor.WAIT);
         allFiles.clear();
 
         if (currentConnectTask != null && currentConnectTask.isRunning()) {
@@ -549,6 +619,7 @@ public class UnifiedFileManagerDialogController {
             } else {
                 updateStatus("Connection failed");
                 progressIndicator.setVisible(false);
+                fileTable.setCursor(javafx.scene.Cursor.DEFAULT);
                 showError("Connection Error",
                         "Could not connect to " + server.getHost() + ". Please check credentials.");
                 locationListView.getSelectionModel().select(0); // Go back to local on failure
@@ -559,6 +630,7 @@ public class UnifiedFileManagerDialogController {
             if (connectTask != currentConnectTask) return;
             updateStatus("Connection failed");
             progressIndicator.setVisible(false);
+            fileTable.setCursor(javafx.scene.Cursor.DEFAULT);
             Throwable ex = connectTask.getException();
             logger.error("SSH Connection task failed", ex);
             showError("Connection Error", "Could not connect to " + server.getHost() + ": " + ex.getMessage());
@@ -759,8 +831,19 @@ public class UnifiedFileManagerDialogController {
         if (path == null || path.isEmpty())
             return;
 
+        if (prefetchDebounce != null) {
+            prefetchDebounce.stop();
+        }
+        prefetchGeneration.incrementAndGet();
+
         String normalizedNewPath = normalizePathString(path);
         String normalizedCurrentPath = normalizePathString(currentPath);
+
+        // If user repeatedly double-clicks while actively loading this exact path, ignore duplicate trigger
+        if (normalizedNewPath != null && normalizedNewPath.equals(normalizedCurrentPath)
+                && currentLoadTask != null && currentLoadTask.isRunning()) {
+            return;
+        }
 
         if (normalizedCurrentPath != null && !normalizedCurrentPath.equals(normalizedNewPath)) {
             backHistory.push(currentPath); // Push the original, un-normalized path for display
@@ -799,30 +882,48 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void loadFiles(String path) {
-        // --- Caching Layer ---
+        if (currentPrefetchFuture != null && !currentPrefetchFuture.isDone()) {
+            currentPrefetchFuture.cancel(false);
+        }
+
+        // --- Caching Layer (Stale-While-Revalidate) ---
         String cacheKey = getCacheKey(path);
         CacheEntry cachedEntry = directoryCache.get(cacheKey);
-        if (cachedEntry != null && !cachedEntry.isExpired()) {
-            logger.info("Cache HIT for path: {}", path);
-            fileTable.setOpacity(1.0);
+
+        boolean isShowingStale = false;
+        if (cachedEntry != null) {
             allFiles.setAll(cachedEntry.getFiles());
             restoreSortOrdering();
             itemCountLabel.setText(allFiles.size() + " items");
-            updateStatus("Ready (from cache)");
             updateNavigationButtons();
             restoreFileSelection();
-            return;
-        }
-        logger.info("Cache MISS for path: {}", path);
 
-        updateStatus("Loading " + path + "...");
-        progressIndicator.setVisible(true);
-        fileTable.setOpacity(0.65);
+            if (!cachedEntry.isExpired()) {
+                logger.info("Cache HIT for path: {}", path);
+                updateStatus("Ready (from cache)");
+                progressIndicator.setVisible(false);
+                fileTable.setCursor(javafx.scene.Cursor.DEFAULT);
+                scheduleSpeculativePrefetch(path, cachedEntry.getFiles());
+                return;
+            }
+
+            logger.info("Cache STALE for path: {}, displaying cached while revalidating in background", path);
+            updateStatus("Updating " + path + "...");
+            isShowingStale = true;
+        } else {
+            logger.info("Cache MISS for path: {}", path);
+            allFiles.clear();
+            itemCountLabel.setText("0 items");
+            updateStatus("Reading " + path + "...");
+            progressIndicator.setVisible(true);
+            fileTable.setCursor(javafx.scene.Cursor.WAIT);
+        }
 
         if (currentLoadTask != null && currentLoadTask.isRunning()) {
-            currentLoadTask.cancel(true);
+            currentLoadTask.cancel(false);
         }
 
+        final boolean wasShowingStale = isShowingStale;
         Task<List<FileInfo>> loadTask = new Task<>() {
             @Override
             protected List<FileInfo> call() throws Exception {
@@ -843,7 +944,7 @@ public class UnifiedFileManagerDialogController {
                         f.setDirectory(r.isDirectory());
                         f.setModifiedTime(r.getModifiedTime());
                         f.setPermissions(r.getPermissions());
-                        f.setOwner("-");
+                        f.setOwner(r.getOwner() != null && !r.getOwner().isBlank() ? r.getOwner() : "-");
                         f.setSourceType(FileInfo.SourceType.REMOTE);
                         files.add(f);
                     }
@@ -863,6 +964,7 @@ public class UnifiedFileManagerDialogController {
                     files.add(0, upDir);
                 }
 
+                files.sort(BACKGROUND_PRE_SORT);
                 return files;
             }
         };
@@ -872,28 +974,144 @@ public class UnifiedFileManagerDialogController {
             if (loadTask != currentLoadTask) return;
             List<FileInfo> loadedFiles = loadTask.getValue();
             directoryCache.put(cacheKey, new CacheEntry(loadedFiles)); // Update cache
-            allFiles.setAll(loadedFiles);
-            restoreSortOrdering(); // restores saved sort or falls back to defaultSort
-            itemCountLabel.setText(allFiles.size() + " items");
+
+            if (!wasShowingStale || !isSameFileList(allFiles, loadedFiles)) {
+                allFiles.setAll(loadedFiles);
+                restoreSortOrdering(); // restores saved sort or falls back to defaultSort
+                itemCountLabel.setText(allFiles.size() + " items");
+                restoreFileSelection();
+            }
+
             progressIndicator.setVisible(false);
-            fileTable.setOpacity(1.0);
+            fileTable.setCursor(javafx.scene.Cursor.DEFAULT);
             updateStatus("Ready");
             updateNavigationButtons();
             loadFavoritesForCurrentLocation();
-            restoreFileSelection();
+
+            scheduleSpeculativePrefetch(path, loadedFiles);
         });
 
         loadTask.setOnFailed(e -> {
             if (loadTask != currentLoadTask) return;
             progressIndicator.setVisible(false);
-            fileTable.setOpacity(1.0);
-            updateStatus("Error loading files");
+            fileTable.setCursor(javafx.scene.Cursor.DEFAULT);
             Throwable ex = loadTask.getException();
             logger.error("Error loading files for path: {}", path, ex);
-            showError("Error", "Failed to load files: " + ex.getMessage());
+
+            if (wasShowingStale) {
+                updateStatus("Ready (showing cached)");
+            } else {
+                updateStatus("Error loading files");
+                showError("Error", "Failed to load files: " + ex.getMessage());
+            }
         });
 
-        new Thread(loadTask).start();
+        fileIoExecutor.submit(loadTask);
+    }
+
+    private boolean isSameFileList(List<FileInfo> a, List<FileInfo> b) {
+        if (a == null || b == null || a.size() != b.size()) return false;
+        for (int i = 0; i < a.size(); i++) {
+            FileInfo fa = a.get(i);
+            FileInfo fb = b.get(i);
+            if (!java.util.Objects.equals(fa.getName(), fb.getName())
+                    || fa.getSize() != fb.getSize()
+                    || fa.getModifiedTime() != fb.getModifiedTime()
+                    || fa.isDirectory() != fb.isDirectory()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void scheduleSpeculativePrefetch(String parentPath, List<FileInfo> files) {
+        if (prefetchDebounce != null) {
+            prefetchDebounce.stop();
+        }
+        prefetchDebounce = new javafx.animation.PauseTransition(javafx.util.Duration.millis(800));
+        final List<FileInfo> filesCopy = new java.util.ArrayList<>(files);
+        prefetchDebounce.setOnFinished(e -> triggerSpeculativePrefetch(parentPath, filesCopy));
+        prefetchDebounce.play();
+    }
+
+    private void triggerSpeculativePrefetch(String parentPath, List<FileInfo> files) {
+        if (currentLocation == null || currentLocation.server == null) {
+            return;
+        }
+        if (activeSshService == null || !activeSshService.isConnected()) {
+            return;
+        }
+
+        final int generation = prefetchGeneration.incrementAndGet();
+        if (currentPrefetchFuture != null && !currentPrefetchFuture.isDone()) {
+            currentPrefetchFuture.cancel(false);
+        }
+
+        List<String> subDirPaths = new java.util.ArrayList<>();
+        for (FileInfo f : files) {
+            if (f != null && f.isDirectory() && !"..".equals(f.getName())) {
+                String subPath = f.getPath();
+                String key = getCacheKey(subPath);
+                CacheEntry entry = directoryCache.get(key);
+                if (entry == null || entry.isExpired()) {
+                    subDirPaths.add(subPath);
+                    if (subDirPaths.size() >= 5) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (subDirPaths.isEmpty()) {
+            return;
+        }
+
+        final com.seeloggyplus.service.impl.SSHServiceImpl ssh = activeSshService;
+        final LocationItem loc = currentLocation;
+
+        currentPrefetchFuture = prefetchExecutor.submit(() -> {
+            for (String subPath : subDirPaths) {
+                if (generation != prefetchGeneration.get() || ssh != activeSshService || !ssh.isConnected()) {
+                    break;
+                }
+                try {
+                    String key = getLocationIdFor(loc) + ":" + normalizePathString(subPath);
+                    if (directoryCache.containsKey(key) && !directoryCache.get(key).isExpired()) {
+                        continue;
+                    }
+                    List<RemoteFileInfo> remoteFiles = ssh.listFiles(subPath);
+                    if (remoteFiles != null) {
+                        List<FileInfo> subFiles = new java.util.ArrayList<>(remoteFiles.size() + 1);
+                        for (RemoteFileInfo r : remoteFiles) {
+                            FileInfo f = new FileInfo();
+                            f.setName(r.getName());
+                            f.setPath(r.getPath());
+                            f.setSize(r.getSize());
+                            f.setDirectory(r.isDirectory());
+                            f.setModifiedTime(r.getModifiedTime());
+                            f.setPermissions(r.getPermissions());
+                            f.setOwner(r.getOwner() != null && !r.getOwner().isBlank() ? r.getOwner() : "-");
+                            f.setSourceType(FileInfo.SourceType.REMOTE);
+                            subFiles.add(f);
+                        }
+
+                        // Add ".." entry
+                        FileInfo upDir = new FileInfo();
+                        upDir.setName("..");
+                        upDir.setDirectory(true);
+                        upDir.setPath(parentPath);
+                        upDir.setSourceType(FileInfo.SourceType.REMOTE);
+                        subFiles.add(0, upDir);
+
+                        subFiles.sort(BACKGROUND_PRE_SORT);
+                        directoryCache.put(key, new CacheEntry(subFiles));
+                        logger.debug("Speculative prefetch cached: {}", subPath);
+                    }
+                } catch (Exception ex) {
+                    logger.debug("Prefetch skipped for {}: {}", subPath, ex.getMessage());
+                }
+            }
+        });
     }
 
     private void handleFileDoubleClick() {
@@ -908,6 +1126,14 @@ public class UnifiedFileManagerDialogController {
         }
     }
 
+    private TableRow<?> findParentTableRow(Node node) {
+        while (node != null && !(node instanceof TableRow)) {
+            if (node instanceof TableView) return null;
+            node = node.getParent();
+        }
+        return (TableRow<?>) node;
+    }
+
     private void handleOpen() {
         selectedFileResult = fileTable.getSelectionModel().getSelectedItem();
         if (selectedFileResult != null && selectedFileResult.isFile()) {
@@ -919,7 +1145,9 @@ public class UnifiedFileManagerDialogController {
 
     @FXML
     private void handleTail() {
-        selectedFileResult = fileTable.getSelectionModel().getSelectedItem();
+        if (fileTable != null && fileTable.getSelectionModel() != null) {
+            selectedFileResult = fileTable.getSelectionModel().getSelectedItem();
+        }
         if (selectedFileResult == null || !selectedFileResult.isFile()) {
             return;
         }
@@ -942,6 +1170,70 @@ public class UnifiedFileManagerDialogController {
         openAction = OpenAction.TAIL;
         saveLastOpenedFile(selectedFileResult);
         closeDialog();
+    }
+
+    private int readTailWindowSize() {
+        try {
+            if (preferenceService != null) {
+                return Integer.parseInt(
+                        preferenceService.getPreferencesByCode("main_tail_window_size").orElse("20000"));
+            }
+        } catch (Exception ignored) {
+            // fall through to default
+        }
+        return 20000;
+    }
+
+    void updateFindInFilesState() {
+        if (findInFilesButton != null) {
+            findInFilesButton.setDisable(currentLocation == null || currentLocation.server == null);
+        }
+    }
+
+    private void handleFindInFiles() {
+        if (currentLocation == null || currentLocation.server == null) {
+            showError("Find in Files", "Select a remote server location first.");
+            return;
+        }
+        try {
+            ensureSshConnected();
+        } catch (IOException e) {
+            showError("Find in Files", "SSH connection is not active: " + e.getMessage());
+            return;
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RemoteLogSearchDialog.fxml"));
+            Parent root = loader.load();
+            RemoteLogSearchDialogController searchController = loader.getController();
+            searchController.setContext(activeSshService, currentLocation.server, currentPath);
+            searchController.setMaxTailWindow(readTailWindowSize());
+
+            Stage dialog = new Stage();
+            dialog.setTitle("Find in Files");
+            addAppIcon(dialog);
+            dialog.initModality(Modality.WINDOW_MODAL);
+            if (cancelButton != null && cancelButton.getScene() != null) {
+                dialog.initOwner(cancelButton.getScene().getWindow());
+            }
+            dialog.setScene(new Scene(root));
+            dialog.showAndWait();
+
+            FileInfo chosen = searchController.getChosenFile();
+            if (chosen != null) {
+                selectedFileResult = chosen;
+                pendingJumpLine = searchController.getTargetLine();
+                pendingTailWindowLines = searchController.getTailWindowLines();
+                pendingTailJumpIndex = searchController.getTailJumpIndex();
+                boolean tail = searchController.isTailAction() && !searchController.isOpenInstead();
+                openAction = tail ? OpenAction.TAIL : OpenAction.OPEN;
+                saveLastOpenedFile(selectedFileResult);
+                closeDialog();
+            }
+        } catch (IOException e) {
+            logger.error("Failed to open Find in Files dialog", e);
+            showError("Find in Files", "Could not open dialog: " + e.getMessage());
+        }
     }
 
     private void handleAddToFavorites() {
@@ -1001,6 +1293,15 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void closeDialog() {
+        if (prefetchDebounce != null) {
+            prefetchDebounce.stop();
+        }
+        if (currentPrefetchFuture != null && !currentPrefetchFuture.isDone()) {
+            currentPrefetchFuture.cancel(false);
+        }
+        fileIoExecutor.shutdown();
+        prefetchExecutor.shutdown();
+
         // Ensure any active connection is terminated when the dialog closes, unless we
         // selected a file to open
         if (activeSshService != null && selectedFileResult == null) {
@@ -1009,8 +1310,10 @@ public class UnifiedFileManagerDialogController {
             logger.info("Keeping SSH connection alive for caller to use with file: {}", selectedFileResult.getName());
         }
 
-        Stage stage = (Stage) cancelButton.getScene().getWindow();
-        stage.close();
+        if (cancelButton != null && cancelButton.getScene() != null && cancelButton.getScene().getWindow() != null) {
+            Stage stage = (Stage) cancelButton.getScene().getWindow();
+            stage.close();
+        }
     }
 
     private void navigateBack() {
@@ -1080,7 +1383,7 @@ public class UnifiedFileManagerDialogController {
     private void updateNavigationButtons() {
         backButton.setDisable(backHistory.isEmpty());
         forwardButton.setDisable(forwardHistory.isEmpty());
-        upButton.setDisable(currentPath == null || currentPath.equals("/")
+        upButton.setDisable(currentLocation == null || currentPath == null || currentPath.equals("/")
                 || (currentLocation.server == null && new java.io.File(currentPath).getParent() == null));
     }
 
@@ -1201,6 +1504,21 @@ public class UnifiedFileManagerDialogController {
 
     public FileInfo getSelectedFile() {
         return selectedFileResult;
+    }
+
+    /** 1-based line to jump to when the file was chosen from Find in Files, or 0. */
+    public int getPendingJumpLine() {
+        return pendingJumpLine;
+    }
+
+    /** Tail window (last N lines) requested by Find in Files, or 0 for the default. */
+    public int getPendingTailWindowLines() {
+        return pendingTailWindowLines;
+    }
+
+    /** 0-based index within the tail buffer to jump to, or -1. */
+    public int getPendingTailJumpIndex() {
+        return pendingTailJumpIndex;
     }
 
     public com.seeloggyplus.service.impl.SSHServiceImpl getSshService() {

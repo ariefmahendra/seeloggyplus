@@ -69,6 +69,17 @@
                 <Separator orientation="VERTICAL"/>
                 
                 <TextField fx:id="searchField" promptText="Search files..." prefWidth="200"/>
+
+                <Separator orientation="VERTICAL"/>
+
+                <Button fx:id="findInFilesButton" text="Find in Files" disable="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="SEARCH"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Search text inside all remote files under the current folder"/>
+                    </tooltip>
+                </Button>
             </ToolBar>
         </VBox>
     </top>

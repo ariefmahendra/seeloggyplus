@@ -13,6 +13,7 @@ public class RemoteFileInfo implements Comparable<RemoteFileInfo> {
     private boolean isDirectory;
     private long modifiedTime;
     private String permissions;
+    private String owner;
 
     @Override
     public int compareTo(RemoteFileInfo o) {

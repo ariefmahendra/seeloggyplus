@@ -130,10 +130,15 @@ public class CanvasSearchFilteringTest {
             try {
                 CanvasLogViewer viewer = session.getCanvasLogViewer();
                 assertNotNull(viewer, "CanvasLogViewer should be present");
-                assertNotNull(viewer.getFilteredIndexes(), "CanvasLogViewer should have filtered indexes set");
-                assertEquals(2, viewer.getItemCount(), "Canvas should only show 2 matching lines for ERROR");
-                assertEquals(2, viewer.getFilteredIndexes().size());
+                assertEquals(4, viewer.getItemCount(), "Canvas should display all 4 lines");
                 assertEquals(4, viewer.getTotalLines(), "Total lines in session should remain 4");
+                assertTrue(viewer.hasSearchHighlight(), "Search highlight should be active");
+
+                Field srpField = MainController.class.getDeclaredField("searchResultPanel");
+                srpField.setAccessible(true);
+                com.seeloggyplus.ui.search.SearchResultPanel panel = (com.seeloggyplus.ui.search.SearchResultPanel) srpField.get(controller);
+                assertNotNull(panel);
+                assertEquals(2, panel.getItemCount(), "Panel should contain 2 matches");
 
                 // Clear search
                 Method clearSearchMethod = MainController.class.getDeclaredMethod("clearSearch");
@@ -201,28 +206,119 @@ public class CanvasSearchFilteringTest {
 
         Platform.runLater(() -> {
             try {
-                // Session 1 should have 1 line filtered
-                assertEquals(1, session1.getCanvasLogViewer().getItemCount());
+                // Session 1 should display all 3 lines in canvas and have highlight
+                assertEquals(3, session1.getCanvasLogViewer().getItemCount());
                 assertEquals(3, session1.getCanvasLogViewer().getTotalLines());
-                assertNotNull(session1.getCanvasLogViewer().getFilteredIndexes());
+                assertTrue(session1.getCanvasLogViewer().hasSearchHighlight());
 
                 // Switch to session 2
                 Method onActiveSessionChangedMethod = MainController.class.getDeclaredMethod("onActiveSessionChanged", LogSession.class);
                 onActiveSessionChangedMethod.setAccessible(true);
                 onActiveSessionChangedMethod.invoke(controller, session2);
 
-                // Session 2 should have all 2 lines and no filtered indexes
+                // Session 2 should have all 2 lines and no highlight
                 assertEquals(2, session2.getCanvasLogViewer().getItemCount());
                 assertEquals(2, session2.getCanvasLogViewer().getTotalLines());
-                assertNull(session2.getCanvasLogViewer().getFilteredIndexes());
+                assertFalse(session2.getCanvasLogViewer().hasSearchHighlight());
 
                 // Switch back to session 1
                 onActiveSessionChangedMethod.invoke(controller, session1);
 
-                // Session 1 should restore filtered indexes and show 1 line
-                assertEquals(1, session1.getCanvasLogViewer().getItemCount());
+                // Session 1 should preserve all 3 lines and restore highlight
+                assertEquals(3, session1.getCanvasLogViewer().getItemCount());
                 assertEquals(3, session1.getCanvasLogViewer().getTotalLines());
-                assertNotNull(session1.getCanvasLogViewer().getFilteredIndexes());
+                assertTrue(session1.getCanvasLogViewer().hasSearchHighlight());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        WaitForAsyncUtils.waitForFxEvents();
+    }
+
+    @Test
+    public void testLocalFileSearchFiltersCanvas() throws Exception {
+        java.io.File tempLog = java.io.File.createTempFile("test-local-search", ".log");
+        tempLog.deleteOnExit();
+        java.nio.file.Files.writeString(tempLog.toPath(),
+                "2026-09-01 [INFO] Started application\n" +
+                "2026-09-01 [WARN] Slow database query\n" +
+                "2026-09-01 [ERROR] Failed to connect to payment gateway\n" +
+                "2026-09-01 [INFO] Ping OK\n" +
+                "2026-09-01 [ERROR] Out of memory\n");
+
+        LogSession session = new LogSession("local-file.log", LogSession.SessionType.LOCAL);
+        session.setLocalFile(tempLog);
+
+        Platform.runLater(() -> {
+            try {
+                Method createTabMethod = MainController.class.getDeclaredMethod("createTabForSession", LogSession.class);
+                createTabMethod.setAccessible(true);
+                Tab tab = (Tab) createTabMethod.invoke(controller, session);
+                assertNotNull(tab);
+
+                Method onActiveSessionChangedMethod = MainController.class.getDeclaredMethod("onActiveSessionChanged", LogSession.class);
+                onActiveSessionChangedMethod.setAccessible(true);
+                onActiveSessionChangedMethod.invoke(controller, session);
+
+                Method loadFileMethod = MainController.class.getDeclaredMethod(
+                        "loadFileWithParallelParsing", LogSession.class, java.io.File.class, com.seeloggyplus.model.LogFile.class, boolean.class, boolean.class, boolean.class);
+                loadFileMethod.setAccessible(true);
+                loadFileMethod.invoke(controller, session, tempLog, null, false, false, false);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        // Wait for file indexing
+        WaitForAsyncUtils.sleep(1000, TimeUnit.MILLISECONDS);
+        WaitForAsyncUtils.waitForFxEvents();
+
+        Platform.runLater(() -> {
+            try {
+                CanvasLogViewer viewer = session.getCanvasLogViewer();
+                assertNotNull(viewer);
+                assertEquals(5, viewer.getTotalLines(), "Indexed file should have 5 lines");
+                assertEquals(5, viewer.getItemCount());
+
+                // Set search field to "ERROR" and perform search
+                Field searchFieldRef = MainController.class.getDeclaredField("searchField");
+                searchFieldRef.setAccessible(true);
+                TextField searchField = (TextField) searchFieldRef.get(controller);
+                searchField.setText("ERROR");
+
+                Method performSearchMethod = MainController.class.getDeclaredMethod("performSearch");
+                performSearchMethod.setAccessible(true);
+                performSearchMethod.invoke(controller);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        // Wait for parallel search task to complete
+        WaitForAsyncUtils.sleep(1000, TimeUnit.MILLISECONDS);
+        WaitForAsyncUtils.waitForFxEvents();
+
+        Platform.runLater(() -> {
+            try {
+                CanvasLogViewer viewer = session.getCanvasLogViewer();
+                assertEquals(5, viewer.getItemCount(), "All 5 lines should remain displayed in canvas");
+                assertEquals(5, viewer.getTotalLines(), "Underlying file lines remain 5");
+                assertTrue(viewer.hasSearchHighlight());
+
+                Field srpField = MainController.class.getDeclaredField("searchResultPanel");
+                srpField.setAccessible(true);
+                com.seeloggyplus.ui.search.SearchResultPanel panel = (com.seeloggyplus.ui.search.SearchResultPanel) srpField.get(controller);
+                assertNotNull(panel);
+                assertEquals(2, panel.getItemCount(), "Panel shows 2 matches");
+
+                // Clear search
+                Method clearSearchMethod = MainController.class.getDeclaredMethod("clearSearch");
+                clearSearchMethod.setAccessible(true);
+                clearSearchMethod.invoke(controller);
+
+                assertNull(viewer.getFilteredIndexes(), "Filter indexes cleared");
+                assertEquals(5, viewer.getItemCount(), "All 5 lines restored");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

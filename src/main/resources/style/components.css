@@ -43,44 +43,46 @@
 }
 
 /* ============================================
-   ScrollBar: Flat modern scrollbar without layered bevels
+   ScrollBar: Sleek modern scrollbar (clean & professional)
    ============================================ */
 .scroll-bar {
-    -fx-background-color: #f8f8f8;
-    -fx-background-insets: 0;
-}
-
-.scroll-bar:vertical {
-    -fx-pref-width: 18px;
-    -fx-min-width: 18px;
-    -fx-border-color: #e8e8e8;
-    -fx-border-width: 0 0 0 1;
-}
-
-.scroll-bar:horizontal {
-    -fx-pref-height: 18px;
-    -fx-min-height: 18px;
-    -fx-border-color: #e8e8e8;
-    -fx-border-width: 1 0 0 0;
-}
-
-.scroll-bar .track {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
 }
 
+.scroll-bar:vertical {
+    -fx-pref-width: 10px;
+    -fx-min-width: 10px;
+    -fx-max-width: 10px;
+    -fx-border-color: #ededed;
+    -fx-border-width: 0 0 0 1;
+}
+
+.scroll-bar:horizontal {
+    -fx-pref-height: 10px;
+    -fx-min-height: 10px;
+    -fx-max-height: 10px;
+    -fx-border-color: #ededed;
+    -fx-border-width: 1 0 0 0;
+}
+
+.scroll-bar .track {
+    -fx-background-color: #fafafa;
+    -fx-background-insets: 0;
+}
+
 .scroll-bar .thumb {
-    -fx-background-color: #b0b0b0;
+    -fx-background-color: #c4c4c4;
     -fx-background-insets: 1;
-    -fx-background-radius: 4;
+    -fx-background-radius: 5px;
 }
 
 .scroll-bar .thumb:hover {
-    -fx-background-color: #787878;
+    -fx-background-color: #8e8e8e;
 }
 
 .scroll-bar .thumb:pressed {
-    -fx-background-color: #404040;
+    -fx-background-color: #555555;
 }
 
 .scroll-bar .increment-button,
@@ -88,12 +90,30 @@
     -fx-background-color: transparent;
     -fx-background-insets: 0;
     -fx-padding: 0;
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+    -fx-min-width: 0;
+    -fx-min-height: 0;
+    -fx-max-width: 0;
+    -fx-max-height: 0;
 }
 
 .scroll-bar .increment-arrow,
 .scroll-bar .decrement-arrow {
-    -fx-background-color: #888888;
-    -fx-padding: 2.5;
+    -fx-shape: " ";
+    -fx-padding: 0;
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+    -fx-min-width: 0;
+    -fx-min-height: 0;
+    -fx-max-width: 0;
+    -fx-max-height: 0;
+}
+
+.scroll-bar .corner,
+.scroll-pane .corner {
+    -fx-background-color: #fafafa;
+    -fx-background-insets: 0;
 }
 
 
@@ -159,4 +179,53 @@
 .toggle-button:selected > .graphic > .glyph-icon {
     -fx-fill: white;
     fill: white;
+}
+
+/* ============================================
+   Remote Log Search: keyword highlight
+   ============================================ */
+.match-highlight {
+    -fx-background-color: yellow;
+    -fx-text-fill: black;
+    -fx-padding: 0 1 0 1;
+}
+
+.preview-line-number {
+    -fx-fill: #6c757d;
+}
+
+.preview-target-line {
+    -fx-background-color: #d6e9ff;
+}
+
+/* ============================================
+   Remote Log Search: easier-to-grab scrollbars & divider
+   ============================================ */
+.remote-log-search-dialog .scroll-bar:vertical {
+    -fx-pref-width: 14px;
+    -fx-min-width: 14px;
+    -fx-max-width: 14px;
+}
+
+.remote-log-search-dialog .scroll-bar:horizontal {
+    -fx-pref-height: 14px;
+    -fx-min-height: 14px;
+    -fx-max-height: 14px;
+}
+
+.remote-log-search-dialog .scroll-bar .thumb {
+    -fx-background-insets: 2;
+    -fx-background-radius: 6px;
+    -fx-min-height: 32px;
+    -fx-min-width: 32px;
+}
+
+.remote-log-search-dialog .split-pane-divider {
+    -fx-padding: 0 3 0 3;
+    -fx-background-color: #dee2e6;
+    -fx-background-insets: 0;
+}
+
+.remote-log-search-dialog .split-pane-divider:hover {
+    -fx-background-color: #adb5bd;
 }

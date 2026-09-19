@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
+
+<BorderPane fx:id="rootPane"
+            xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.seeloggyplus.controller.RemoteLogSearchDialogController"
+            stylesheets="@../style/components.css"
+            prefWidth="960" prefHeight="640">
+
+    <!-- Top: Search Form -->
+    <top>
+        <VBox spacing="8">
+            <padding>
+                <Insets top="12" right="12" bottom="8" left="12"/>
+            </padding>
+            <GridPane hgap="8" vgap="6">
+                <columnConstraints>
+                    <ColumnConstraints minWidth="80"/>
+                    <ColumnConstraints hgrow="ALWAYS"/>
+                    <ColumnConstraints minWidth="110"/>
+                    <ColumnConstraints hgrow="ALWAYS"/>
+                </columnConstraints>
+                <Label text="Folder:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                <TextField fx:id="rootPathField" promptText="/var/log" GridPane.rowIndex="0" GridPane.columnIndex="1" GridPane.columnSpan="3"/>
+                <Label text="Keyword:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                <TextField fx:id="keywordField" promptText="keyword to find inside log files" GridPane.rowIndex="1" GridPane.columnIndex="1" GridPane.columnSpan="3"/>
+                <CheckBox fx:id="regexCheckBox" text="Regex" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                <CheckBox fx:id="caseSensitiveCheckBox" text="Case sensitive" GridPane.rowIndex="2" GridPane.columnIndex="3"/>
+            </GridPane>
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Button fx:id="searchButton" text="Search" onAction="#handleSearch">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="SEARCH"/>
+                    </graphic>
+                </Button>
+                <Button fx:id="cancelSearchButton" text="Stop" onAction="#handleCancelSearch" disable="true"/>
+                <ProgressIndicator fx:id="progressIndicator" visible="false" prefWidth="18" prefHeight="18"/>
+                <Label fx:id="statusLabel" text="Searches every file under the folder"/>
+            </HBox>
+        </VBox>
+    </top>
+
+    <!-- Center: Results + Preview -->
+    <center>
+        <SplitPane orientation="VERTICAL" dividerPositions="0.55">
+            <TableView fx:id="resultTable">
+                <columns>
+                    <TableColumn fx:id="fileColumn" text="File" prefWidth="360" minWidth="200"/>
+                    <TableColumn fx:id="lineColumn" text="Line" prefWidth="90" minWidth="70"/>
+                    <TableColumn fx:id="contentColumn" text="Content" prefWidth="480" minWidth="200"/>
+                </columns>
+                <placeholder>
+                    <VBox alignment="CENTER" spacing="10">
+                        <FontAwesomeIconView glyphName="SEARCH" size="40" fill="gray"/>
+                        <Label text="No matching lines yet" textFill="gray"/>
+                    </VBox>
+                </placeholder>
+            </TableView>
+
+            <VBox spacing="6">
+                <padding>
+                    <Insets top="6" right="4" bottom="4" left="4"/>
+                </padding>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <Label fx:id="previewLabel" text="Preview"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Label text="Context:"/>
+                    <ComboBox fx:id="contextSelector" prefWidth="80"/>
+                </HBox>
+                <ListView fx:id="previewList" VBox.vgrow="ALWAYS"/>
+            </VBox>
+        </SplitPane>
+    </center>
+
+    <!-- Bottom: Actions -->
+    <bottom>
+        <VBox>
+            <Separator/>
+            <HBox spacing="10" alignment="CENTER_RIGHT">
+                <padding>
+                    <Insets top="10" right="12" bottom="10" left="12"/>
+                </padding>
+                <Button fx:id="closeButton" text="Close" onAction="#handleClose"/>
+                <Button fx:id="copyPathButton" text="Copy Path" onAction="#handleCopyPath" disable="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="CLIPBOARD"/>
+                    </graphic>
+                </Button>
+                <Button fx:id="copyLineButton" text="Copy Line" onAction="#handleCopyLine" disable="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="CLIPBOARD"/>
+                    </graphic>
+                </Button>
+                <Button fx:id="tailButton" text="Tail" onAction="#handleTail" disable="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="TERMINAL"/>
+                    </graphic>
+                </Button>
+                <Button fx:id="openButton" text="Open &amp; Jump" onAction="#handleOpen" disable="true" defaultButton="true">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="CHECK"/>
+                    </graphic>
+                </Button>
+            </HBox>
+        </VBox>
+    </bottom>
+
+</BorderPane>

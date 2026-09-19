@@ -56,6 +56,8 @@ public class SortPersistenceIntegrationTest {
 
     @BeforeEach
     public void setup() throws Exception {
+        drainPendingLoadTaskBeforeStateSetup();
+
         mockPrefs = new InMemoryPreferenceService();
         setField(controller, "preferenceService", mockPrefs);
         setField(controller, "localFileService", new StubLocalFileService());
@@ -300,6 +302,26 @@ public class SortPersistenceIntegrationTest {
         return fileTable.getColumns().stream()
             .filter(c -> fxId.equals(c.getId()))
             .findFirst().orElse(null);
+    }
+
+    /**
+     * The @Start FXML load triggers an async directory load that may complete after
+     * this test replaces services, clearing the sort order and overwriting the
+     * preference store mid-test. Cancel and drain it first for deterministic state.
+     */
+    private void drainPendingLoadTaskBeforeStateSetup() throws Exception {
+        Field taskField = UnifiedFileManagerDialogController.class.getDeclaredField("currentLoadTask");
+        taskField.setAccessible(true);
+        javafx.concurrent.Task<?> task = (javafx.concurrent.Task<?>) taskField.get(controller);
+        if (task == null) return;
+        WaitForAsyncUtils.asyncFx(() -> task.cancel(true)).get();
+        long deadline = System.currentTimeMillis() + 3000;
+        while (Boolean.TRUE.equals(WaitForAsyncUtils.asyncFx(task::isRunning).get())
+                && System.currentTimeMillis() < deadline) {
+            WaitForAsyncUtils.waitForFxEvents();
+            Thread.sleep(25);
+        }
+        WaitForAsyncUtils.waitForFxEvents();
     }
 
     private void setLocalLocation() throws Exception {

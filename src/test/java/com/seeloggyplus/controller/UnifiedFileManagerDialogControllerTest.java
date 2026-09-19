@@ -360,6 +360,60 @@ public class UnifiedFileManagerDialogControllerTest {
     }
 
     @Test
+    public void testStaleWhileRevalidateRendersImmediately(FxRobot robot) throws Exception {
+        // Prepare expired cache entry
+        Field cacheField = UnifiedFileManagerDialogController.class.getDeclaredField("directoryCache");
+        cacheField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cache = (Map<String, Object>) cacheField.get(controller);
+
+        List<FileInfo> staleFiles = new ArrayList<>();
+        FileInfo f = new FileInfo();
+        f.setName("stale-file.log");
+        f.setSize(1234L);
+        staleFiles.add(f);
+
+        // Access inner CacheEntry via reflection or construct
+        Class<?> cacheEntryClass = Class.forName("com.seeloggyplus.controller.UnifiedFileManagerDialogController$CacheEntry");
+        java.lang.reflect.Constructor<?> ctor = cacheEntryClass.getDeclaredConstructor(List.class);
+        ctor.setAccessible(true);
+        Object staleEntry = ctor.newInstance(staleFiles);
+
+        // Set timestamp back by 10 minutes so it is expired
+        Field tsField = cacheEntryClass.getDeclaredField("timestamp");
+        tsField.setAccessible(true);
+        tsField.set(staleEntry, System.currentTimeMillis() - (10 * 60 * 1000));
+
+        cache.put("local:C:\\StaleDir", staleEntry);
+
+        localFileService.simulateDelay = true; // Service takes 500ms
+        int initialCalls = localFileService.callCount;
+
+        Platform.runLater(() -> {
+            try {
+                java.lang.reflect.Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("navigateTo", String.class);
+                m.setAccessible(true);
+                m.invoke(controller, "C:\\StaleDir");
+            } catch (Exception e) {}
+        });
+
+        // Check IMMEDIATELY (well before 500ms delay of service)
+        Thread.sleep(50);
+        WaitForAsyncUtils.waitForFxEvents();
+
+        // Stale files should already be displayed immediately (0ms perceived latency!)
+        assertEquals(1.0, fileTable.getOpacity(), "Table must remain full opacity (not dimmed) when showing stale cache");
+        assertFalse(fileTable.getItems().isEmpty(), "Stale files must be displayed immediately without waiting for network");
+        assertEquals("stale-file.log", fileTable.getItems().get(0).getName());
+
+        // Wait for background revalidation to finish
+        Thread.sleep(800);
+        WaitForAsyncUtils.waitForFxEvents();
+
+        assertTrue(localFileService.callCount > initialCalls, "Background revalidation must have run");
+    }
+
+    @Test
     public void testSortingBySize(FxRobot robot) {
         robot.clickOn("#homeButton");
         WaitForAsyncUtils.waitForFxEvents();
@@ -419,7 +473,7 @@ public class UnifiedFileManagerDialogControllerTest {
             } catch (Exception e) {}
         });
         WaitForAsyncUtils.waitForFxEvents();
-        // openAction should still be OPEN, not TAIL because it rejected it
+        // openAction should still be OPEN, not TAIL because it rejected local files
         assertEquals(UnifiedFileManagerDialogController.OpenAction.OPEN, controller.getOpenAction());
     }
 
@@ -497,6 +551,40 @@ public class UnifiedFileManagerDialogControllerTest {
         assertEquals(UnifiedFileManagerDialogController.OpenAction.TAIL, controller.getOpenAction());
     }
 
+    @Test
+    public void testOwnerColumnDisplay(FxRobot robot) throws Exception {
+        invokeControllerMethod("navigateHome");
+        Thread.sleep(1500);
+        WaitForAsyncUtils.waitForFxEvents();
+
+        TableColumn<FileInfo, String> ownerCol = getField("ownerColumn");
+        assertNotNull(ownerCol, "Owner column should exist");
+
+        ObservableList<FileInfo> localItems = fileTable.getItems();
+        assertNotNull(localItems);
+        FileInfo file1 = localItems.stream().filter(f -> "file1.txt".equals(f.getName())).findFirst().orElse(null);
+        assertNotNull(file1, "file1.txt should be present");
+        assertEquals("localuser", file1.getOwner());
+        assertEquals("localuser", ownerCol.getCellObservableValue(file1).getValue());
+
+        // Now switch to remote server and verify remote owner mapping
+        Platform.runLater(() -> {
+            try {
+                ListView<?> locationListView = getField("locationListView");
+                locationListView.getSelectionModel().select(1); // Server 1
+            } catch (Exception ignored) {}
+        });
+        Thread.sleep(1500);
+        WaitForAsyncUtils.waitForFxEvents();
+
+        ObservableList<FileInfo> remoteItems = fileTable.getItems();
+        assertNotNull(remoteItems);
+        FileInfo remoteFile = remoteItems.stream().filter(f -> "remoteFile.log".equals(f.getName())).findFirst().orElse(null);
+        assertNotNull(remoteFile, "remoteFile.log should be present");
+        assertEquals("remoteuser", remoteFile.getOwner());
+        assertEquals("remoteuser", ownerCol.getCellObservableValue(remoteFile).getValue());
+    }
+
     // --- Mock Classes ---
 
     class MockLocalFileService implements LocalFileService {
@@ -522,9 +610,9 @@ public class UnifiedFileManagerDialogControllerTest {
                 }
             }
             List<FileInfo> list = new ArrayList<>();
-            FileInfo d1 = new FileInfo(); d1.setName("folder1"); d1.setDirectory(true); d1.setPath(directoryPath + "\\folder1");
-            FileInfo f1 = new FileInfo(); f1.setName("file1.txt"); f1.setDirectory(false); f1.setPath(directoryPath + "\\file1.txt"); f1.setSize(1024L);
-            FileInfo f2 = new FileInfo(); f2.setName("file2.log"); f2.setDirectory(false); f2.setPath(directoryPath + "\\file2.log"); f2.setSize(5000000L);
+            FileInfo d1 = new FileInfo(); d1.setName("folder1"); d1.setDirectory(true); d1.setPath(directoryPath + "\\folder1"); d1.setOwner("localuser");
+            FileInfo f1 = new FileInfo(); f1.setName("file1.txt"); f1.setDirectory(false); f1.setPath(directoryPath + "\\file1.txt"); f1.setSize(1024L); f1.setOwner("localuser");
+            FileInfo f2 = new FileInfo(); f2.setName("file2.log"); f2.setDirectory(false); f2.setPath(directoryPath + "\\file2.log"); f2.setSize(5000000L); f2.setOwner("localuser");
             list.add(d1);
             list.add(f1);
             list.add(f2);
@@ -578,6 +666,7 @@ public class UnifiedFileManagerDialogControllerTest {
             f1.setSize(1024L);
             f1.setModifiedTime(System.currentTimeMillis());
             f1.setPermissions("rw-r--r--");
+            f1.setOwner("remoteuser");
             list.add(f1);
             return list;
         }

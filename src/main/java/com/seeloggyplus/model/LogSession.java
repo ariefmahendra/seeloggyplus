@@ -62,6 +62,7 @@ public class LogSession implements AutoCloseable {
     private final List<LogEntry> tailBuffer = new ArrayList<>();
     private long remoteTailLineCounter = 0;
     private final AtomicBoolean tailFlushScheduled = new AtomicBoolean(false);
+    private int pendingTailJumpIndex = -1;
     private boolean tailColumnsAutoResized = false;
     private int unreadTailLines = 0;
     private volatile boolean active = false;
@@ -211,6 +212,14 @@ public class LogSession implements AutoCloseable {
 
     public void setTotalEntries(int totalEntries) {
         this.totalEntries = totalEntries;
+    }
+
+    public int getPendingTailJumpIndex() {
+        return pendingTailJumpIndex;
+    }
+
+    public void setPendingTailJumpIndex(int pendingTailJumpIndex) {
+        this.pendingTailJumpIndex = pendingTailJumpIndex;
     }
 
     public boolean isTailModeEnabled() {

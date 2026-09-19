@@ -39,14 +39,6 @@ public class RecentFileListCell extends ListCell<RecentFilesDto> {
                 displayName = displayName.replaceFirst("^seeloggyplus-\\d+-", "");
             }
 
-            String monitoringRemotePath = monitoringRemotePathSupplier != null ? monitoringRemotePathSupplier.get()
-                    : null;
-            if (logFile.isRemote()
-                    && monitoringRemotePath != null
-                    && monitoringRemotePath.equals(logFile.getFilePath())) {
-                displayName = displayName + " (Monitoring)";
-            }
-
             Label nameLabel = new Label(displayName);
             nameLabel.setStyle("-fx-font-weight: bold;");
             nameLabel.getStyleClass().add("name-label");

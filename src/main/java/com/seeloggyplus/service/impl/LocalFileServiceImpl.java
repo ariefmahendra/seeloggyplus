@@ -80,14 +80,28 @@ public class LocalFileServiceImpl implements LocalFileService {
         fileInfo.setSourceType(FileInfo.SourceType.LOCAL);
 
         try {
-            BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class,
-                    LinkOption.NOFOLLOW_LINKS);
-            fileInfo.setDirectory(attrs.isDirectory());
-            fileInfo.setSize(attrs.isDirectory() ? 0 : attrs.size());
-            fileInfo.setModifiedTime(attrs.lastModifiedTime().toMillis());
-            // Skip owner and permissions for speed — set lightweight defaults
-            fileInfo.setOwner("-");
-            fileInfo.setPermissions(IS_POSIX ? getPermissionsStringFast(path) : "-");
+            if (IS_POSIX) {
+                PosixFileAttributes posix = Files.readAttributes(path, PosixFileAttributes.class,
+                        LinkOption.NOFOLLOW_LINKS);
+                fileInfo.setDirectory(posix.isDirectory());
+                fileInfo.setSize(posix.isDirectory() ? 0 : posix.size());
+                fileInfo.setModifiedTime(posix.lastModifiedTime().toMillis());
+                fileInfo.setPermissions(PosixFilePermissions.toString(posix.permissions()));
+                fileInfo.setOwner(posix.owner() != null ? posix.owner().getName() : "-");
+            } else {
+                BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class,
+                        LinkOption.NOFOLLOW_LINKS);
+                fileInfo.setDirectory(attrs.isDirectory());
+                fileInfo.setSize(attrs.isDirectory() ? 0 : attrs.size());
+                fileInfo.setModifiedTime(attrs.lastModifiedTime().toMillis());
+                fileInfo.setPermissions("-");
+                try {
+                    UserPrincipal owner = Files.getOwner(path, LinkOption.NOFOLLOW_LINKS);
+                    fileInfo.setOwner(owner != null ? owner.getName() : "-");
+                } catch (Exception e) {
+                    fileInfo.setOwner("-");
+                }
+            }
         } catch (IOException e) {
             logger.warn("Failed to read attributes for file: {}", path, e);
             fileInfo.setDirectory(Files.isDirectory(path));

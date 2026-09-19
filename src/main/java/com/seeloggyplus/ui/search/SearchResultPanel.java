@@ -85,6 +85,9 @@ public class SearchResultPanel extends VBox {
         vScrollBar = new ScrollBar();
         vScrollBar.setOrientation(javafx.geometry.Orientation.VERTICAL);
         vScrollBar.setMin(0);
+        vScrollBar.setPrefWidth(10);
+        vScrollBar.setMinWidth(10);
+        vScrollBar.setMaxWidth(10);
         vScrollBar.valueProperty().addListener((obs, o, n) -> {
             long newTop = Math.round(n.doubleValue());
             if (newTop != currentTopLine) {
@@ -96,6 +99,9 @@ public class SearchResultPanel extends VBox {
         hScrollBar = new ScrollBar();
         hScrollBar.setOrientation(javafx.geometry.Orientation.HORIZONTAL);
         hScrollBar.setMin(0);
+        hScrollBar.setPrefHeight(10);
+        hScrollBar.setMinHeight(10);
+        hScrollBar.setMaxHeight(10);
         hScrollBar.valueProperty().addListener((obs, o, n) -> {
             double newX = n.doubleValue();
             if (newX != currentScrollX) {
@@ -325,6 +331,10 @@ public class SearchResultPanel extends VBox {
         }
     }
 
+    public int getItemCount() {
+        return itemCount;
+    }
+
     private void updateScrollBar() {
         long max = Math.max(0, itemCount - visibleLineCount);
         vScrollBar.setMax(max);
@@ -447,6 +457,17 @@ public class SearchResultPanel extends VBox {
         }
     }
 
+    public void selectAndTriggerLine(int index) {
+        if (index >= 0 && index < itemCount && matchedLines != null) {
+            selectIndex(index);
+            long globalLine = matchedLines.get(index);
+            String content = getLineContent(index);
+            if (onLineSelected != null) {
+                onLineSelected.onSelected(index, globalLine, content);
+            }
+        }
+    }
+
     private void setupMouseHandlers() {
         canvas.setOnScroll(e -> {
             if (itemCount == 0) return;
@@ -494,14 +515,8 @@ public class SearchResultPanel extends VBox {
         canvas.setOnMouseClicked(e -> {
             if (e.getButton() != MouseButton.PRIMARY) return;
             int idx = getIndexAtY(e.getY());
-            if (idx >= 0 && idx < itemCount && matchedLines != null) {
-                selectedIndex = idx;
-                render();
-                long globalLine = matchedLines.get(idx);
-                String content = getLineContent(idx);
-                if (onLineSelected != null) {
-                    onLineSelected.onSelected(idx, globalLine, content);
-                }
+            if (idx >= 0 && idx < itemCount) {
+                selectAndTriggerLine(idx);
             }
         });
     }

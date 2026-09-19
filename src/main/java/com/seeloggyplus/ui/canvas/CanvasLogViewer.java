@@ -135,8 +135,9 @@ public class CanvasLogViewer extends GridPane {
         vScrollBar.setVisibleAmount(50);
         vScrollBar.setUnitIncrement(1); // Arrow button clicks scroll 1 line
         // Stabilize scrollbar thickness so layout math doesn't oscillate
-        vScrollBar.setPrefWidth(18);
-        vScrollBar.setMinWidth(18);
+        vScrollBar.setPrefWidth(10);
+        vScrollBar.setMinWidth(10);
+        vScrollBar.setMaxWidth(10);
 
         hScrollBar = new ScrollBar();
         hScrollBar.setOrientation(javafx.geometry.Orientation.HORIZONTAL);
@@ -145,8 +146,9 @@ public class CanvasLogViewer extends GridPane {
         hScrollBar.setVisibleAmount(800);
         hScrollBar.setUnitIncrement(20); // Arrow button clicks scroll 20px horizontally
         // Stabilize scrollbar thickness
-        hScrollBar.setPrefHeight(16);
-        hScrollBar.setMinHeight(16);
+        hScrollBar.setPrefHeight(10);
+        hScrollBar.setMinHeight(10);
+        hScrollBar.setMaxHeight(10);
 
         // Simple layout: Canvas | ScrollBar
         ColumnConstraints col1 = new ColumnConstraints();
@@ -191,7 +193,8 @@ public class CanvasLogViewer extends GridPane {
         this.reader = null;
         this.index = null;
         this.fileLineCount = 0;
-        this.totalLines = tailBuffer.size();
+        this.tailBuffer = Collections.emptyList();
+        this.totalLines = 0;
         this.currentTopLine = 0;
         this.smoothScrollY = 0;
         this.targetScrollY = 0;
@@ -209,7 +212,12 @@ public class CanvasLogViewer extends GridPane {
 
         leftMargin = 80; // Reset to default
         updateScrollBar();
+        suppressScrollBarSync = true;
+        vScrollBar.setValue(0);
+        hScrollBar.setValue(0);
+        suppressScrollBarSync = false;
         render();
+        fireStatusUpdate(getEffectiveLineCount());
         logger.info("CanvasLogViewer reset.");
     }
 
@@ -234,8 +242,18 @@ public class CanvasLogViewer extends GridPane {
         int maxDigits = String.valueOf(totalLines).length();
         leftMargin = (int) ((maxDigits + 1) * charWidth + 10); // +1 for padding, +10 for spacing
 
+        this.followTail = false;
+        if (onFollowTailChanged != null) {
+            onFollowTailChanged.accept(false);
+        }
+
         updateScrollBar();
+        suppressScrollBarSync = true;
+        vScrollBar.setValue(0);
+        hScrollBar.setValue(0);
+        suppressScrollBarSync = false;
         render();
+        fireStatusUpdate(getEffectiveLineCount());
 
         logger.info("Loaded file with {} lines, leftMargin={}px", totalLines, leftMargin);
     }
@@ -300,6 +318,9 @@ public class CanvasLogViewer extends GridPane {
 
     public void setFollowTail(boolean followTail) {
         this.followTail = followTail;
+        if (onFollowTailChanged != null) {
+            onFollowTailChanged.accept(followTail);
+        }
         if (followTail) {
             scrollToBottom();
         }
@@ -385,8 +406,10 @@ public class CanvasLogViewer extends GridPane {
         this.selectedLineIndexes.clear();
 
         // Sync scrollbar and render
-        vScrollBar.setValue(currentTopLine);
         updateScrollBar();
+        suppressScrollBarSync = true;
+        vScrollBar.setValue(currentTopLine);
+        suppressScrollBarSync = false;
         render();
         fireStatusUpdate(effectiveLines);
 
@@ -401,7 +424,10 @@ public class CanvasLogViewer extends GridPane {
         smoothScrollY = max;
         targetScrollY = max;
         scrollOffsetY = 0;
+        updateScrollBar();
+        suppressScrollBarSync = true;
         vScrollBar.setValue(max);
+        suppressScrollBarSync = false;
         render();
         fireStatusUpdate(effectiveLines);
     }
@@ -477,7 +503,10 @@ public class CanvasLogViewer extends GridPane {
         scrollOffsetY = 0;
         lineCacheStartLine = -1;
 
+        updateScrollBar();
+        suppressScrollBarSync = true;
         vScrollBar.setValue(currentTopLine);
+        suppressScrollBarSync = false;
         render();
         fireStatusUpdate(effectiveLines);
     }
@@ -1021,6 +1050,11 @@ public class CanvasLogViewer extends GridPane {
         vScrollBar.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (suppressScrollBarSync) return;
             long newTop = newVal.longValue();
+            long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
+            long maxTop = Math.max(0, effectiveLines - visibleLineCount);
+            if (newTop < maxTop && followTail) {
+                setFollowTail(false);
+            }
             if (newTop != currentTopLine) {
                 currentTopLine = newTop;
                 // Sync smooth scroll state when scrollbar is dragged directly
@@ -1029,12 +1063,12 @@ public class CanvasLogViewer extends GridPane {
                 scrollOffsetY = 0;
                 render();
                 // Update status bar
-                long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
                 fireStatusUpdate(effectiveLines);
             }
         });
 
         hScrollBar.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (suppressScrollBarSync) return;
             double newLeft = newVal.doubleValue();
             if (newLeft != currentScrollX) {
                 currentScrollX = newLeft;
@@ -1162,7 +1196,26 @@ public class CanvasLogViewer extends GridPane {
         double safeVisibleAmount = Math.max(visibleLineCount, effectiveLines * minVisibleProportion);
         vScrollBar.setVisibleAmount(safeVisibleAmount);
         vScrollBar.setBlockIncrement(Math.max(1, visibleLineCount - 1));
-        double visibleWidth = canvas.getWidth() - leftMargin;
+
+        if (followTail) {
+            currentTopLine = max;
+            smoothScrollY = max;
+            targetScrollY = max;
+            scrollOffsetY = 0;
+            suppressScrollBarSync = true;
+            vScrollBar.setValue(max);
+            suppressScrollBarSync = false;
+        } else if (currentTopLine > max) {
+            currentTopLine = max;
+            smoothScrollY = max;
+            targetScrollY = max;
+            scrollOffsetY = 0;
+            suppressScrollBarSync = true;
+            vScrollBar.setValue(max);
+            suppressScrollBarSync = false;
+        }
+
+        double visibleWidth = Math.max(1, canvas.getWidth() - leftMargin);
         double maxLineWidth = 30000;
         double maxScroll = Math.max(0, maxLineWidth - visibleWidth);
         hScrollBar.setMax(maxScroll);
@@ -1173,10 +1226,26 @@ public class CanvasLogViewer extends GridPane {
         fireStatusUpdate(effectiveLines);
     }
 
+    public ScrollBar getVScrollBar() {
+        return vScrollBar;
+    }
+
+    public ScrollBar getHScrollBar() {
+        return hScrollBar;
+    }
+
+    public long getEffectiveLineCount() {
+        return (filteredIndexes != null) ? filteredCount : totalLines;
+    }
+
     private void fireStatusUpdate(long effectiveLines) {
-        if (onStatusUpdate == null || effectiveLines <= 0)
+        if (onStatusUpdate == null)
             return;
-        long currentLine = currentTopLine + 1; // 1-indexed for display
+        if (effectiveLines <= 0) {
+            onStatusUpdate.onStatusUpdate(0, 0, 0.0);
+            return;
+        }
+        long currentLine = Math.min(currentTopLine + 1, effectiveLines); // 1-indexed for display
         double percentage = currentTopLine * 100.0 / effectiveLines;
         onStatusUpdate.onStatusUpdate(currentLine, effectiveLines, percentage);
     }

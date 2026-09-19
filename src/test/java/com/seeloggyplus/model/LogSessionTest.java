@@ -26,6 +26,20 @@ class LogSessionTest {
     }
 
     @Test
+    @DisplayName("Should default pending tail jump to -1 and store a target index")
+    void testPendingTailJumpIndex() {
+        LogSession session = new LogSession("app.log", LogSession.SessionType.REMOTE);
+
+        assertEquals(-1, session.getPendingTailJumpIndex(), "No pending jump by default");
+
+        session.setPendingTailJumpIndex(42);
+        assertEquals(42, session.getPendingTailJumpIndex());
+
+        session.setPendingTailJumpIndex(-1);
+        assertEquals(-1, session.getPendingTailJumpIndex());
+    }
+
+    @Test
     @DisplayName("Should track unread tail lines and reset when session becomes active")
     void testUnreadCounterLogic() {
         LogSession session = new LogSession("server.log", LogSession.SessionType.REMOTE);

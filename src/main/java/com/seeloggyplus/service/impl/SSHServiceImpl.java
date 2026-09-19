@@ -10,6 +10,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
@@ -17,6 +20,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -32,6 +36,7 @@ public class SSHServiceImpl implements SSHService {
     private static final Logger logger = LoggerFactory.getLogger(SSHServiceImpl.class);
     private static final int DEFAULT_PORT = 22;
     private static final long DEFAULT_TTL = 10 * 60 * 1000;
+    private static final Semaphore DOWNLOAD_SLOTS = new Semaphore(2, true);
 
     @Getter
     private String host;
@@ -43,9 +48,12 @@ public class SSHServiceImpl implements SSHService {
 
     private Session currentSession;
     private ChannelSftp reusableSftpChannel;
+    private final Object sftpLock = new Object();
     private volatile Boolean sftpAvailable = null; // null = not tested, true/false = tested
     private ChannelExec activeTailChannel;
     private final AtomicBoolean isTailing = new AtomicBoolean(false);
+    private final AtomicBoolean downloadCancelled = new AtomicBoolean(false);
+    private volatile ChannelExec activeCommandChannel;
     private final ExecutorService tailExecutor = Executors.newSingleThreadExecutor();
 
     /**
@@ -78,6 +86,7 @@ public class SSHServiceImpl implements SSHService {
 
     @Override
     public void disconnect() {
+        downloadCancelled.set(true);
         stopTailing();
         closeSftpChannel();
         sftpAvailable = null; // Reset for next connection
@@ -105,6 +114,7 @@ public class SSHServiceImpl implements SSHService {
             InputStream in = channel.getInputStream();
             InputStream err = channel.getErrStream();
 
+            activeCommandChannel = channel;
             channel.connect();
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
@@ -131,6 +141,20 @@ public class SSHServiceImpl implements SSHService {
             if (channel != null) {
                 channel.disconnect();
             }
+            if (activeCommandChannel == channel) {
+                activeCommandChannel = null;
+            }
+        }
+    }
+
+    /**
+     * Cancels the currently running {@link #executeCommand(String)} by disconnecting its channel.
+     * Safe to call when no command is running.
+     */
+    public void cancelActiveCommand() {
+        ChannelExec channel = activeCommandChannel;
+        if (channel != null) {
+            channel.disconnect();
         }
     }
 
@@ -151,6 +175,23 @@ public class SSHServiceImpl implements SSHService {
 
     @Override
     public void tailFile(String remotePath, int lines, Consumer<String> logConsumer, Consumer<String> errorConsumer) {
+        if (remotePath == null || remotePath.isBlank()) {
+            if (errorConsumer != null) {
+                errorConsumer.accept("Remote path cannot be empty");
+            }
+            return;
+        }
+
+        // Edge case: Windows local path mistakenly passed to remote SSH server
+        if (remotePath.matches("^[A-Za-z]:[\\\\/].*") || remotePath.contains("\\")) {
+            String err = "Invalid remote path: Windows local path cannot be tailed on remote SSH server: " + remotePath;
+            logger.error(err);
+            if (errorConsumer != null) {
+                errorConsumer.accept(err);
+            }
+            return;
+        }
+
         try {
             Session session = getSessionOrThrow();
             stopTailing();
@@ -158,6 +199,7 @@ public class SSHServiceImpl implements SSHService {
             tailExecutor.submit(() -> {
                 isTailing.set(true);
                 ChannelExec channel = null;
+                boolean errorReported = false;
                 try {
                     channel = (ChannelExec) session.openChannel("exec");
                     activeTailChannel = channel;
@@ -189,7 +231,15 @@ public class SSHServiceImpl implements SSHService {
                             if (b == '\n') {
                                 // Flush line
                                 String l = lineBuffer.toString(StandardCharsets.UTF_8);
-                                logConsumer.accept(l);
+                                if (isTailFatalError(l)) {
+                                    logger.error("SSH Tail fatal error detected: {}", l);
+                                    if (errorConsumer != null) {
+                                        errorConsumer.accept(l);
+                                        errorReported = true;
+                                    }
+                                } else {
+                                    logConsumer.accept(l);
+                                }
                                 lineBuffer.reset();
                             } else if (b != '\r') {
                                 lineBuffer.write(b);
@@ -198,17 +248,34 @@ public class SSHServiceImpl implements SSHService {
                     }
 
                     if (lineBuffer.size() > 0) {
-                        logger.info("SSH Tail: Flushing remaining buffer.");
-                        logConsumer.accept(lineBuffer.toString(StandardCharsets.UTF_8));
+                        String l = lineBuffer.toString(StandardCharsets.UTF_8);
+                        if (isTailFatalError(l)) {
+                            logger.error("SSH Tail fatal error in remaining buffer: {}", l);
+                            if (errorConsumer != null) {
+                                errorConsumer.accept(l);
+                                errorReported = true;
+                            }
+                        } else {
+                            logger.info("SSH Tail: Flushing remaining buffer.");
+                            logConsumer.accept(l);
+                        }
                     }
 
                     int exit = channel.getExitStatus();
                     logger.info("Tail channel closed, exit status={}", exit);
+                    if (exit > 0 && !errorReported && isTailing.get()) {
+                        if (errorConsumer != null) {
+                            errorConsumer.accept("Remote tail exited with error status " + exit);
+                            errorReported = true;
+                        }
+                    }
 
                 } catch (Exception e) {
                     if (isTailing.get()) {
                         logger.error("Tail error", e);
-                        errorConsumer.accept("Connection Error: " + e.getMessage());
+                        if (errorConsumer != null) {
+                            errorConsumer.accept("Connection Error: " + e.getMessage());
+                        }
                     }
                 } finally {
                     isTailing.set(false);
@@ -217,8 +284,19 @@ public class SSHServiceImpl implements SSHService {
             });
 
         } catch (IOException e) {
-            errorConsumer.accept("Init Error: " + e.getMessage());
+            if (errorConsumer != null) {
+                errorConsumer.accept("Init Error: " + e.getMessage());
+            }
         }
+    }
+
+    public static boolean isTailFatalError(String line) {
+        if (line == null) return false;
+        String trimmed = line.trim();
+        return (trimmed.startsWith("tail: cannot open")
+                || trimmed.startsWith("tail: cannot watch")
+                || (trimmed.startsWith("tail: ") && trimmed.contains("No such file or directory"))
+                || (trimmed.startsWith("tail: ") && trimmed.contains("Permission denied")));
     }
 
     @Override
@@ -275,18 +353,40 @@ public class SSHServiceImpl implements SSHService {
             List<RemoteFileInfo> result = listFilesSftp(remotePath);
             sftpAvailable = true;
             return result;
-        } catch (IOException e) {
-            logger.warn("SFTP listFiles failed for path {}, falling back to exec: {}", remotePath, e.getMessage());
+        } catch (Exception e) {
+            logger.warn("SFTP listFiles failed for {}, falling back to exec: {}", remotePath, e.getMessage());
             return listFilesExec(remotePath);
         }
     }
 
     private List<RemoteFileInfo> listFilesSftp(String remotePath) throws IOException {
-        try {
+        synchronized (sftpLock) {
             ChannelSftp sftpChannel = getSftpChannel();
+            Vector<ChannelSftp.LsEntry> entries;
+            try {
+                @SuppressWarnings("unchecked")
+                Vector<ChannelSftp.LsEntry> res = sftpChannel.ls(remotePath);
+                entries = res;
+            } catch (SftpException e) {
+                // If path doesn't end with slash, retry with slash (common for symlinks / directories in SFTP)
+                if (!remotePath.endsWith("/")) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Vector<ChannelSftp.LsEntry> res = sftpChannel.ls(remotePath + "/");
+                        entries = res;
+                    } catch (SftpException e2) {
+                        closeSftpChannel();
+                        throw new IOException("SFTP ls failed for " + remotePath + ": " + e2.getMessage(), e2);
+                    }
+                } else {
+                    closeSftpChannel();
+                    throw new IOException("SFTP ls failed for " + remotePath + ": " + e.getMessage(), e);
+                }
+            } catch (Exception e) {
+                closeSftpChannel();
+                throw new IOException("SFTP ls failed for " + remotePath + ": " + e.getMessage(), e);
+            }
 
-            @SuppressWarnings("unchecked")
-            Vector<ChannelSftp.LsEntry> entries = sftpChannel.ls(remotePath);
             List<RemoteFileInfo> files = new ArrayList<>(entries.size());
             String prefix = remotePath.endsWith("/") ? remotePath : remotePath + "/";
             for (ChannelSftp.LsEntry entry : entries) {
@@ -296,9 +396,6 @@ public class SSHServiceImpl implements SSHService {
                 }
             }
             return files;
-        } catch (SftpException e) {
-            closeSftpChannel();
-            throw new IOException(e);
         }
     }
 
@@ -338,7 +435,7 @@ public class SSHServiceImpl implements SSHService {
 
 
 
-    private RemoteFileInfo parseLsLine(String line, String parentPath) {
+    RemoteFileInfo parseLsLine(String line, String parentPath) {
         // Skip total line and empty lines
         if (line.startsWith("total ") || line.isBlank()) return null;
 
@@ -416,6 +513,7 @@ public class SSHServiceImpl implements SSHService {
             info.setSize(0);
         }
         info.setPermissions(permissions);
+        info.setOwner(parts[2]);
         info.setModifiedTime(modifiedTime);
         return info;
     }
@@ -441,32 +539,36 @@ public class SSHServiceImpl implements SSHService {
         throw new IOException("Failed to reconnect SSH session");
     }
 
-    private synchronized ChannelSftp getSftpChannel() throws IOException {
-        if (reusableSftpChannel != null && reusableSftpChannel.isConnected()) {
-            return reusableSftpChannel;
-        }
-        Session session = getSessionOrThrow();
-        // Attempt with reasonable timeout (5s) — avoid false negatives on busy servers
-        try {
-            ChannelSftp ch = (ChannelSftp) session.openChannel("sftp");
-            ch.connect(5000);
-            reusableSftpChannel = ch;
-            logger.info("SFTP channel opened for {}@{}:{}", username, host, port);
-            return reusableSftpChannel;
-        } catch (JSchException e) {
-            reusableSftpChannel = null;
-            sftpAvailable = false;
-            throw new IOException("SFTP channel unavailable: " + e.getMessage(), e);
+    private ChannelSftp getSftpChannel() throws IOException {
+        synchronized (sftpLock) {
+            if (reusableSftpChannel != null && reusableSftpChannel.isConnected()) {
+                return reusableSftpChannel;
+            }
+            Session session = getSessionOrThrow();
+            // Attempt with reasonable timeout (5s) — avoid false negatives on busy servers
+            try {
+                ChannelSftp ch = (ChannelSftp) session.openChannel("sftp");
+                ch.connect(5000);
+                reusableSftpChannel = ch;
+                logger.info("SFTP channel opened for {}@{}:{}", username, host, port);
+                return reusableSftpChannel;
+            } catch (JSchException e) {
+                reusableSftpChannel = null;
+                sftpAvailable = false;
+                throw new IOException("SFTP channel unavailable: " + e.getMessage(), e);
+            }
         }
     }
 
-    private synchronized void closeSftpChannel() {
-        if (reusableSftpChannel != null) {
-            try {
-                reusableSftpChannel.disconnect();
-            } catch (Exception ignored) {
+    private void closeSftpChannel() {
+        synchronized (sftpLock) {
+            if (reusableSftpChannel != null) {
+                try {
+                    reusableSftpChannel.disconnect();
+                } catch (Exception ignored) {
+                }
+                reusableSftpChannel = null;
             }
-            reusableSftpChannel = null;
         }
     }
 
@@ -616,19 +718,62 @@ public class SSHServiceImpl implements SSHService {
         }
     }
 
+    private boolean downloadFileResumable(String remotePath, String localPath, long fileSize,
+            LogParser.ProgressCallback progressCallback) {
+        return ResumableDownload.download(new ResumableDownload.Source() {
+            @Override
+            public long size() {
+                return fileSize;
+            }
+
+            @Override
+            public boolean cancelled() {
+                return downloadCancelled.get();
+            }
+
+            @Override
+            public InputStream open(long offset) throws IOException {
+                try {
+                    Session session = getSessionOrThrow();
+                    ChannelSftp channel = (ChannelSftp) session.openChannel("sftp");
+                    channel.connect(30_000);
+                    return new FilterInputStream(channel.get(remotePath, null, offset)) {
+                        @Override
+                        public void close() throws IOException {
+                            try {
+                                super.close();
+                            } finally {
+                                channel.disconnect();
+                            }
+                        }
+                    };
+                } catch (JSchException | SftpException e) {
+                    throw new IOException("Unable to open SFTP stream", e);
+                }
+            }
+        }, Path.of(localPath), progressCallback == null ? null
+                : (transferred, total) -> progressCallback.onProgress((double) transferred / total, transferred, total), 3);
+    }
+
     @Override
     public boolean downloadFileConcurrent(String remotePath, String localPath, int threadCount,
             LogParser.ProgressCallback progressCallback) {
+        downloadCancelled.set(false);
+        boolean acquired = false;
         try {
+            DOWNLOAD_SLOTS.acquire();
+            acquired = true;
             long fileSize = getFileSize(remotePath);
             if (fileSize <= 0)
                 return false;
-
-            // Always try simple download first if small
             if (fileSize < 5 * 1024 * 1024) {
                 return downloadFile(remotePath, localPath);
             }
 
+            // WinSCP-style transfer: one resumable SFTP stream, then atomic publish.
+            return downloadFileResumable(remotePath, localPath, fileSize, progressCallback);
+
+            /*
             Session session;
             try {
                 session = getSessionOrThrow();
@@ -651,92 +796,90 @@ public class SSHServiceImpl implements SSHService {
                 return downloadFile(remotePath, localPath);
             }
 
-            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            int workers = Math.max(1, Math.min(32, threadCount));
+            workers = (int) Math.min(workers, fileSize);
+            Path target = Path.of(localPath);
+            Path partial = target.resolveSibling(target.getFileName() + ".partial");
+            ExecutorService executor = Executors.newFixedThreadPool(workers);
 
-            try (RandomAccessFile raf = new RandomAccessFile(localPath, "rw")) {
-                raf.setLength(fileSize);
-            }
+            try {
+                try (RandomAccessFile raf = new RandomAccessFile(partial.toFile(), "rw")) {
+                    raf.setLength(fileSize);
+                }
 
-            long chunkSize = fileSize / threadCount;
-            CountDownLatch latch = new CountDownLatch(threadCount);
-            AtomicLong totalBytesDownloaded = new AtomicLong(0);
-            AtomicBoolean hasError = new AtomicBoolean(false);
+                long chunkSize = fileSize / workers;
+                CountDownLatch latch = new CountDownLatch(workers);
+                AtomicLong totalBytesDownloaded = new AtomicLong(0);
+                AtomicBoolean hasError = new AtomicBoolean(false);
 
-            logger.info("Starting concurrent download: {} threads, Total Size: {}", threadCount, fileSize);
-
-            for (int i = 0; i < threadCount; i++) {
-                final long start = i * chunkSize;
-                final long end = (i == threadCount - 1) ? fileSize : (start + chunkSize);
-                final long length = end - start;
-                final int threadId = i;
-
-                executor.submit(() -> {
-                    ChannelSftp channel = null;
-
-                    try (RandomAccessFile raf = new RandomAccessFile(localPath, "rw")) {
-                        if (hasError.get())
-                            return;
-
-                        channel = (ChannelSftp) session.openChannel("sftp");
-                        channel.connect(30_000);
-
-                        raf.seek(start);
-                        InputStream is = channel.get(remotePath, null, start);
-                        byte[] buffer = new byte[32 * 1024];
-                        long bytesReadThisThread = 0;
-                        int read;
-
-                        while (bytesReadThisThread < length && (read = is.read(buffer)) != -1) {
-                            if (hasError.get())
-                                break;
-
-                            long remaining = length - bytesReadThisThread;
-                            int toWrite = (int) Math.min(read, remaining);
-
-                            raf.write(buffer, 0, toWrite);
-                            bytesReadThisThread += toWrite;
-
-                            long total = totalBytesDownloaded.addAndGet(toWrite);
-                            if (progressCallback != null) {
-                                progressCallback.onProgress((double) total / fileSize, total, fileSize);
+                logger.info("Starting concurrent download: {} threads, Total Size: {}", workers, fileSize);
+                for (int i = 0; i < workers; i++) {
+                    final long start = i * chunkSize;
+                    final long end = (i == workers - 1) ? fileSize : start + chunkSize;
+                    final long length = end - start;
+                    final int threadId = i;
+                    executor.submit(() -> {
+                        ChannelSftp channel = null;
+                        try (RandomAccessFile raf = new RandomAccessFile(partial.toFile(), "rw")) {
+                            if (hasError.get()) return;
+                            channel = (ChannelSftp) session.openChannel("sftp");
+                            channel.connect(30_000);
+                            raf.seek(start);
+                            try (InputStream is = channel.get(remotePath, null, start)) {
+                                byte[] buffer = new byte[32 * 1024];
+                                long downloaded = 0;
+                                int read;
+                                while (downloaded < length && (read = is.read(buffer)) != -1 && !hasError.get()) {
+                                    int toWrite = (int) Math.min(read, length - downloaded);
+                                    raf.write(buffer, 0, toWrite);
+                                    downloaded += toWrite;
+                                    long total = totalBytesDownloaded.addAndGet(toWrite);
+                                    if (progressCallback != null) progressCallback.onProgress((double) total / fileSize, total, fileSize);
+                                }
+                                if (downloaded != length) throw new EOFException("Incomplete chunk " + threadId);
                             }
+                        } catch (Exception e) {
+                            logger.error("Error in download thread {}: {}", threadId, e.getMessage());
+                            hasError.set(true);
+                        } finally {
+                            if (channel != null) channel.disconnect();
+                            latch.countDown();
                         }
+                    });
+                }
 
-                        is.close();
-                        logger.debug("Thread {} finished downloading {} bytes", threadId, bytesReadThisThread);
-
-                    } catch (Exception e) {
-                        logger.error("Error in download thread {}: {}", threadId, e.getMessage());
-                        hasError.set(true);
-                    } finally {
-                        if (channel != null)
-                            channel.disconnect();
-                        latch.countDown();
-                    }
-                });
-            }
-
-            long timeoutSec = Math.max(60, Math.min(3600, (fileSize / 102_400) + 60));
-            boolean completed = latch.await(timeoutSec, TimeUnit.SECONDS);
-            if (!completed) {
-                hasError.set(true);
-                executor.shutdownNow();
-                executor.awaitTermination(5, TimeUnit.SECONDS);
-            }
-            boolean success = !hasError.get();
-            executor.shutdown();
-            if (hasError.get()) {
+                long timeoutSec = Math.max(60, Math.min(3600, (fileSize / 102_400) + 60));
+                if (!latch.await(timeoutSec, TimeUnit.SECONDS)) hasError.set(true);
+                if (hasError.get() || totalBytesDownloaded.get() != fileSize) return false;
                 try {
-                    java.nio.file.Files.deleteIfExists(java.nio.file.Paths.get(localPath));
-                } catch (java.nio.file.NoSuchFileException ignored) {
-                } catch (IOException e2) {
-                    logger.warn("Failed to delete partial download file: {}", localPath, e2);
+                    Files.move(partial, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(partial, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+                return true;
+            } finally {
+                executor.shutdownNow();
+                try {
+                    executor.awaitTermination(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                try {
+                    Files.deleteIfExists(partial);
+                } catch (IOException e) {
+                    logger.warn("Failed to delete partial download file: {}", partial, e);
                 }
             }
-            return success;
-        } catch (Exception e) {
-            logger.error("Concurrent download failed", e);
+            */
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.info("Download cancelled before acquiring transfer slot");
             return false;
+        } catch (Exception e) {
+            logger.error("Download failed", e);
+            return false;
+        } finally {
+            if (acquired) DOWNLOAD_SLOTS.release();
         }
     }
 
@@ -746,11 +889,14 @@ public class SSHServiceImpl implements SSHService {
             return getFileSizeExec(remotePath);
         }
         try {
-            ChannelSftp sftpChannel = getSftpChannel();
-            SftpATTRS attrs = sftpChannel.lstat(remotePath);
-            sftpAvailable = true;
-            return attrs.getSize();
+            synchronized (sftpLock) {
+                ChannelSftp sftpChannel = getSftpChannel();
+                SftpATTRS attrs = sftpChannel.lstat(remotePath);
+                sftpAvailable = true;
+                return attrs.getSize();
+            }
         } catch (SftpException | IOException e) {
+            closeSftpChannel();
             logger.warn("SFTP getFileSize failed for {}, falling back to exec: {}", remotePath, e.getMessage());
             return getFileSizeExec(remotePath);
         }
@@ -792,6 +938,17 @@ public class SSHServiceImpl implements SSHService {
         info.setDirectory(attrs.isDir());
         info.setModifiedTime(attrs.getMTime() * 1000L);
         info.setPermissions(attrs.getPermissionsString());
+        info.setOwner(extractOwner(entry.getLongname(), attrs.getUId()));
         return info;
+    }
+
+    String extractOwner(String longname, int uid) {
+        if (longname != null && !longname.isBlank()) {
+            String[] parts = longname.trim().split("\\s+");
+            if (parts.length >= 3) {
+                return parts[2];
+            }
+        }
+        return uid >= 0 ? String.valueOf(uid) : "-";
     }
 }

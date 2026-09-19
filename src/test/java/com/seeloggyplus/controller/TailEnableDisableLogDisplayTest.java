@@ -109,13 +109,13 @@ public class TailEnableDisableLogDisplayTest {
                 assertEquals(3, session.getLiveTailList().size(), "Remote logs must NOT be wiped when disabling tail");
                 assertEquals(3, viewer.getTotalLines(), "Canvas viewer total lines must remain intact after disabling tail");
 
-                // Re-enable tail: should not wipe liveTailList
+                // Re-enable tail in stream mode: per requirement 8.1, clear previous stream logs and run tail afresh
                 Method enableTailMethod = MainController.class.getDeclaredMethod("enableTail");
                 enableTailMethod.setAccessible(true);
                 assertDoesNotThrow(() -> enableTailMethod.invoke(controller));
 
-                assertEquals(3, session.getLiveTailList().size(), "Remote logs must still be preserved after re-enabling tail");
-                assertEquals(3, viewer.getTotalLines());
+                assertEquals(0, session.getLiveTailList().size(), "Stream logs must be cleared when enabling tail from non-tail mode");
+                assertEquals(0, viewer.getTotalLines(), "Canvas viewer must reset to 0 lines ready for fresh tail");
 
                 // Cleanup
                 disableTailMethod.invoke(controller, session, true);
