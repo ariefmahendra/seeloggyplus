@@ -31,11 +31,15 @@ jobs:
         if: runner.os != 'Windows'
         run: chmod +x gradlew
 
-      - name: Ensure virtual display (Linux)
+      - name: Check virtual display (Linux)
         if: runner.os == 'Linux'
+        shell: bash
         run: |
           if ! command -v xvfb-run >/dev/null 2>&1; then
-            sudo apt-get update && sudo apt-get install -y xvfb
+            echo "ERROR: xvfb-run is not installed on this runner."
+            echo "Install it once on the runner machine (as admin), then re-run:"
+            echo "  sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0"
+            exit 1
           fi
 
       - name: Run tests (Linux)
