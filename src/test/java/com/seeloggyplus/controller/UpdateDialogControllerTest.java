@@ -192,8 +192,8 @@ public class UpdateDialogControllerTest {
         try {
             byte[] zip = zipWithJar();
             UpdateCoordinator coordinator = new UpdateCoordinator(new UpdateLayout(root), staging,
-                    new UpdateDownloader((url, offset) ->
-                            new ByteArrayInputStream(zip, (int) offset, zip.length - (int) offset)),
+                    new UpdateDownloader((url, offset) -> new UpdateDownloader.Opened(
+                            new ByteArrayInputStream(zip, (int) offset, zip.length - (int) offset), offset)),
                     new UpdateInstaller());
             String json = "{\"latest\":\"9.9.9\",\"assets\":{\"portable-nojre\":{"
                     + "\"url\":\"https://example.com/app.zip\",\"size\":" + zip.length

@@ -25,9 +25,16 @@ public class UpdateDownloader {
         void onProgress(long downloaded, long total);
     }
 
+    /**
+     * A stream plus the offset it actually starts at. {@code startOffset} is 0 when the
+     * server ignored the requested range (HTTP 200) so the caller must not append.
+     */
+    public record Opened(InputStream stream, long startOffset) {
+    }
+
     @FunctionalInterface
     public interface StreamOpener {
-        InputStream open(String url, long offset) throws IOException;
+        Opened open(String url, long offset) throws IOException;
     }
 
     private static final int BUFFER_SIZE = 256 * 1024;
@@ -57,14 +64,20 @@ public class UpdateDownloader {
         Files.createDirectories(targetDir);
         Path target = targetDir.resolve(fileName(asset.url()));
         Path partial = target.resolveSibling(target.getFileName() + ".partial");
-        long offset = Files.exists(partial) ? Files.size(partial) : 0;
+        long resumeOffset = Files.exists(partial) ? Files.size(partial) : 0;
         long total = asset.size() > 0 ? asset.size() : -1;
 
-        try (InputStream input = opener.open(asset.url(), offset);
+        Opened opened = opener.open(asset.url(), resumeOffset);
+        try (InputStream input = opened.stream();
              RandomAccessFile output = new RandomAccessFile(partial.toFile(), "rw")) {
-            output.seek(offset);
+            long start = opened.startOffset();
+            if (start == 0 && resumeOffset > 0) {
+                // Server ignored the Range header and sent the whole file: restart cleanly.
+                output.setLength(0);
+            }
+            output.seek(start);
             byte[] buffer = new byte[BUFFER_SIZE];
-            long downloaded = offset;
+            long downloaded = start;
             int read;
             while ((read = input.read(buffer)) != -1) {
                 if (cancelled != null && cancelled.getAsBoolean()) {
@@ -77,7 +90,8 @@ public class UpdateDownloader {
                 }
             }
             if (total > 0 && downloaded != total) {
-                throw new IOException("Incomplete download (" + downloaded + "/" + total + " bytes)");
+                String reason = downloaded > total ? "Size mismatch" : "Incomplete download";
+                throw new IOException(reason + " (" + downloaded + "/" + total + " bytes)");
             }
         } catch (CancellationException | IOException e) {
             deleteQuietly(partial);
@@ -127,7 +141,7 @@ public class UpdateDownloader {
         }
     }
 
-    private static InputStream httpOpen(String url, long offset) throws IOException {
+    private static Opened httpOpen(String url, long offset) throws IOException {
         try {
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(10))
@@ -146,7 +160,9 @@ public class UpdateDownloader {
                 response.body().close();
                 throw new IOException("HTTP " + code + " for " + url);
             }
-            return response.body();
+            // 206 means the server honored the requested range; anything else starts at 0.
+            long startOffset = (code == 206) ? offset : 0L;
+            return new Opened(response.body(), startOffset);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Download interrupted", e);

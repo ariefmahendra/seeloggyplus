@@ -185,19 +185,21 @@ public class UpdateDialogController {
         laterButton.setDisable(true);
         releaseNotesButton.setDisable(true);
         closeButton.setDisable(true);
-        progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
+        progressBar.setProgress(0);
         setVisible(progressBar, true);
-        statusLabel.setText("Downloading...");
+        statusLabel.setText("Downloading... 0%");
 
         UpdateCoordinator activeCoordinator = activeCoordinator();
         Thread.ofVirtual().start(() -> {
             UpdateCoordinator.InstallResult installResult = activeCoordinator.install(asset, version,
                     (stage, done, total) -> Platform.runLater(() -> {
-                        statusLabel.setText(stage + "...");
-                        if (total > 0) {
-                            progressBar.setProgress((double) done / total);
+                        if ("Downloading".equals(stage) && total > 0) {
+                            double progress = Math.min(1.0, (double) done / total);
+                            progressBar.setProgress(progress);
+                            statusLabel.setText(String.format("Downloading... %.0f%%", progress * 100));
                         } else {
                             progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
+                            statusLabel.setText(stage + "...");
                         }
                     }),
                     cancelRequested::get);

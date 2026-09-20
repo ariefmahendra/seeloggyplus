@@ -45,8 +45,8 @@ class UpdateCoordinatorTest {
     }
 
     static UpdateDownloader offlineDownloader(byte[] zip) {
-        return new UpdateDownloader((url, offset) ->
-                new ByteArrayInputStream(zip, (int) offset, zip.length - (int) offset));
+        return new UpdateDownloader((url, offset) -> new UpdateDownloader.Opened(
+                new ByteArrayInputStream(zip, (int) offset, zip.length - (int) offset), offset));
     }
 
     @Test
