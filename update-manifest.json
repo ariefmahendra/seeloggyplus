@@ -2,12 +2,12 @@
   "channel": "stable",
   "latest": "0.2.0",
   "releaseNotesUrl": "https://github.com/ariefmahendra/seeloggyplus/releases/tag/0.2.0",
-  "publishedAt": "2026-09-20T09:33:09+03:00",
+  "publishedAt": "2026-09-20T09:36:50+03:00",
   "assets": {
     "portable-nojre": {
       "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.2.0/seeloggyplus-Portable.zip",
-      "size": 75552655,
-      "sha256": "f0d50fcea7a7b7a9a7ed481224efd400413073255e22b13ee2383eaa3391fd7c"
+      "size": 75552677,
+      "sha256": "8a1702e15e7b3b7b11161cbbb938a2d10267ca7e2040070d214ce372750624c8"
     }
   }
 }
