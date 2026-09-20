@@ -27,8 +27,13 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      - name: Install virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 || sudo apt-get install -y xvfb libgtk-3-0t64
+
       - name: Run tests
-        run: ./gradlew test
+        run: xvfb-run -a --server-args="-screen 0 1440x900x24" ./gradlew test
 
       - name: Build update artifacts
         run: |
