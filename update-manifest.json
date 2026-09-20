@@ -1,13 +1,27 @@
 {
   "channel": "stable",
-  "latest": "0.2.0",
-  "releaseNotesUrl": "https://github.com/ariefmahendra/seeloggyplus/releases/tag/0.2.0",
-  "publishedAt": "2026-09-20T10:20:02+03:00",
+  "latest": "0.3.0",
+  "releaseNotesUrl": "https://github.com/ariefmahendra/seeloggyplus/releases/tag/0.3.0",
   "assets": {
-    "portable-nojre": {
-      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.2.0/seeloggyplus-Portable.zip",
-      "size": 75554292,
-      "sha256": "a5a7c0c81f0410df33705a742adcd8d3f2064b09c7f2ad9bb2d90452401f9868"
+    "windows-nojre": {
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.3.0/seeloggyplus-Portable-win.zip",
+      "size": 68130712,
+      "sha256": "bec3fb76e95b72c130562bf03d010e2dbbb3facd24b9241b9a8e31228e117225"
+    },
+    "windows-jre": {
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.3.0/seeloggyplus-Portable-win-jre.zip",
+      "size": 103472751,
+      "sha256": "9137c75b9de97118c1af96ca8c3ac982a70672038b5e338a8f2fe3772a453a80"
+    },
+    "linux-nojre": {
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.3.0/seeloggyplus-Portable-linux.zip",
+      "size": 75560087,
+      "sha256": "0991ec075167af676c3bbd3726329bd9c6955d7a3e441cc0bc28e1fbc781824a"
+    },
+    "linux-jre": {
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.3.0/seeloggyplus-Portable-linux-jre.zip",
+      "size": 114205928,
+      "sha256": "ecfbe6cb303736db6ddbaeed72e74c06703c3f09e7a67bb24f162fdfe98653ff"
     }
   }
 }
