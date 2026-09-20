@@ -75,6 +75,32 @@ class UpdateInstallerTest {
     }
 
     @Test
+    void acceptsExplicitDirectoryEntriesAndWrapperFolder() throws Exception {
+        Path work = Files.createTempDirectory("seeloggy-stage");
+        try {
+            Path zip = work.resolve("with-dirs.zip");
+            try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
+                out.putNextEntry(new ZipEntry("SeeloggyPlus/"));
+                out.closeEntry();
+                out.putNextEntry(new ZipEntry("SeeloggyPlus/help/"));
+                out.closeEntry();
+                out.putNextEntry(new ZipEntry("SeeloggyPlus/seeloggyplus.jar"));
+                out.write("jar-bytes".getBytes());
+                out.closeEntry();
+            }
+            Path versions = work.resolve("versions");
+
+            UpdateInstaller.StagedUpdate staged = new UpdateInstaller()
+                    .stage(zip, versions, "0.3.0", null);
+
+            assertTrue(Files.exists(staged.jar()));
+            assertTrue(Files.exists(versions.resolve("0.3.0/help")));
+        } finally {
+            deleteRecursively(work);
+        }
+    }
+
+    @Test
     void verifiesStagedJarChecksum() throws Exception {
         Path work = Files.createTempDirectory("seeloggy-stage");
         try {

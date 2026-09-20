@@ -98,12 +98,14 @@ public class UpdateInstaller {
                 if (normalizedRelative.isBlank()) {
                     continue;
                 }
-                if (!isAllowed(normalizedRelative)) {
-                    throw new UpdateException("Update package contains a disallowed entry: " + relative);
-                }
+                // Directories (including the single wrapper folder) are always allowed;
+                // only files are subject to the content whitelist.
                 if (entry.isDirectory()) {
                     Files.createDirectories(out);
                     continue;
+                }
+                if (!isAllowed(normalizedRelative)) {
+                    throw new UpdateException("Update package contains a disallowed entry: " + relative);
                 }
                 Files.createDirectories(out.getParent());
                 totalBytes += copyEntry(zip, out);
