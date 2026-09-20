@@ -4,13 +4,15 @@ on:
   push:
     tags:
       - '[0-9]*'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    # Self-hosted runner PICONOS. Adjust labels if your runner uses different ones.
+    runs-on: [self-hosted, PICONOS]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,17 +27,46 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Make gradlew executable
+        if: runner.os != 'Windows'
         run: chmod +x gradlew
 
-      - name: Install virtual display
+      - name: Ensure virtual display (Linux)
+        if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgtk-3-0 || sudo apt-get install -y xvfb libgtk-3-0t64
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y xvfb
+          fi
 
-      - name: Run tests
-        run: xvfb-run -a --server-args="-screen 0 1440x900x24" ./gradlew test
+      - name: Run tests (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a --server-args="-screen 0 1440x900x24" ./gradlew test --stacktrace
+
+      - name: Run tests (non-Linux)
+        if: runner.os != 'Linux'
+        run: ./gradlew test --stacktrace
+
+      - name: Show failing tests
+        if: failure()
+        shell: bash
+        run: |
+          for f in build/test-results/test/*.xml; do
+            if grep -q "<failure" "$f"; then
+              echo "===== $f ====="
+              grep -B 2 -A 40 "<failure" "$f" | head -n 120
+            fi
+          done
+
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: |
+            build/reports/tests/test
+            build/test-results/test
 
       - name: Build update artifacts
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           ./gradlew buildUpdateArtifacts \
             -PupdateAssetUrl="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/seeloggyplus-Portable.zip" \
@@ -43,6 +74,7 @@ jobs:
             -PreleaseNotesUrl="https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -51,11 +83,14 @@ jobs:
           generate_release_notes: true
 
       - name: Stage manifest for GitHub Pages
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
         run: |
           mkdir -p public
           cp build/distributions/update-manifest.json public/
 
       - name: Publish manifest to gh-pages
+        if: startsWith(github.ref, 'refs/tags/')
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
