@@ -144,7 +144,7 @@ public class UpdateDownloader {
             int code = response.statusCode();
             if (code != 200 && code != 206) {
                 response.body().close();
-                throw new IOException("HTTP " + code);
+                throw new IOException("HTTP " + code + " for " + url);
             }
             return response.body();
         } catch (InterruptedException e) {
