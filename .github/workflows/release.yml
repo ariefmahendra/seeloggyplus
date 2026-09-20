@@ -38,7 +38,9 @@ jobs:
           if ! command -v xvfb-run >/dev/null 2>&1; then
             echo "ERROR: xvfb-run is not installed on this runner."
             echo "Install it once on the runner machine (as admin), then re-run:"
-            echo "  sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0"
+            echo "  Debian/Ubuntu : sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0"
+            echo "  CentOS/RHEL   : sudo yum install -y xorg-x11-server-Xvfb gtk3 libXtst mesa-libGL dejavu-sans-fonts"
+            echo "                  (or 'sudo dnf install -y ...' on CentOS 8/Stream)"
             exit 1
           fi
 
