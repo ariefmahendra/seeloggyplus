@@ -570,18 +570,33 @@ public class UnifiedFileManagerDialogControllerTest {
         assertEquals(UnifiedFileManagerDialogController.OpenAction.TAIL, controller.getOpenAction());
     }
 
+    /** Waits until an item with the given name appears in the table (polling, no fixed sleep). */
+    private FileInfo waitForTableItem(String name, long timeoutMs) throws Exception {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            WaitForAsyncUtils.waitForFxEvents();
+            FileInfo found = fileTable.getItems().stream()
+                    .filter(f -> name.equals(f.getName()))
+                    .findFirst()
+                    .orElse(null);
+            if (found != null) {
+                return found;
+            }
+            Thread.sleep(50);
+        }
+        return null;
+    }
+
     @Test
     public void testOwnerColumnDisplay(FxRobot robot) throws Exception {
         invokeControllerMethod("navigateHome");
-        Thread.sleep(1500);
+        Thread.sleep(300);
         WaitForAsyncUtils.waitForFxEvents();
 
         TableColumn<FileInfo, String> ownerCol = getField("ownerColumn");
         assertNotNull(ownerCol, "Owner column should exist");
 
-        ObservableList<FileInfo> localItems = fileTable.getItems();
-        assertNotNull(localItems);
-        FileInfo file1 = localItems.stream().filter(f -> "file1.txt".equals(f.getName())).findFirst().orElse(null);
+        FileInfo file1 = waitForTableItem("file1.txt", 5000);
         assertNotNull(file1, "file1.txt should be present");
         assertEquals("localuser", file1.getOwner());
         assertEquals("localuser", ownerCol.getCellObservableValue(file1).getValue());
@@ -593,12 +608,8 @@ public class UnifiedFileManagerDialogControllerTest {
                 locationListView.getSelectionModel().select(1); // Server 1
             } catch (Exception ignored) {}
         });
-        Thread.sleep(1500);
-        WaitForAsyncUtils.waitForFxEvents();
 
-        ObservableList<FileInfo> remoteItems = fileTable.getItems();
-        assertNotNull(remoteItems);
-        FileInfo remoteFile = remoteItems.stream().filter(f -> "remoteFile.log".equals(f.getName())).findFirst().orElse(null);
+        FileInfo remoteFile = waitForTableItem("remoteFile.log", 8000);
         assertNotNull(remoteFile, "remoteFile.log should be present");
         assertEquals("remoteuser", remoteFile.getOwner());
         assertEquals("remoteuser", ownerCol.getCellObservableValue(remoteFile).getValue());
