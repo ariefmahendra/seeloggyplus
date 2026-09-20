@@ -14,6 +14,7 @@ import javafx.util.Duration;
 import com.seeloggyplus.dto.RecentFilesDto;
 import com.seeloggyplus.model.*;
 import com.seeloggyplus.service.*;
+import com.seeloggyplus.update.*;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -328,6 +329,9 @@ public class MainController {
 
         updateTailButtonState();
         startMemoryMonitor();
+        applyPendingRollback();
+        scheduleAutoUpdateCheck();
+        markVersionHealthy();
 
         if (centerRoot != null && centerClip != null) {
             centerClip.widthProperty().bind(centerRoot.widthProperty());
@@ -2884,6 +2888,160 @@ public class MainController {
         } catch (IOException e) {
             logger.error("Failed to open About dialog", e);
             showError("Error", "Could not open About dialog: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    public void handleCheckForUpdates() {
+        runUpdateCheck(true, currentUpdateChannel());
+    }
+
+    private String currentUpdateChannel() {
+        try {
+            return preferenceService.getPreferencesByCode(UpdatePreferences.CHANNEL)
+                    .filter(channel -> !channel.isBlank())
+                    .orElse(UpdatePreferences.DEFAULT_CHANNEL);
+        } catch (Exception e) {
+            return UpdatePreferences.DEFAULT_CHANNEL;
+        }
+    }
+
+    private String updateManifestUrl() {
+        try {
+            return preferenceService.getPreferencesByCode(UpdatePreferences.MANIFEST_URL)
+                    .filter(url -> !url.isBlank())
+                    .orElse(UpdateServiceImpl.DEFAULT_MANIFEST_URL);
+        } catch (Exception e) {
+            return UpdateServiceImpl.DEFAULT_MANIFEST_URL;
+        }
+    }
+
+    /** Reverts to the previous version when the active one never reported a healthy start. */
+    private void applyPendingRollback() {
+        if (Boolean.getBoolean("seeloggyplus.disableUpdateCheck")) {
+            return;
+        }
+        try {
+            UpdateBootstrapper bootstrapper = new UpdateBootstrapper(
+                    new UpdateLayout(UpdateLayout.installationRoot()));
+            if (bootstrapper.shouldRollback()) {
+                bootstrapper.rollback().ifPresent(version -> logger.warn(
+                        "Update failed to start; rolled back to version {}", version));
+            }
+        } catch (Exception e) {
+            logger.debug("Update rollback check skipped: {}", e.getMessage());
+        }
+    }
+
+    /** Marks the running version as healthy so it will not be rolled back. */
+    private void markVersionHealthy() {
+        if (Boolean.getBoolean("seeloggyplus.disableUpdateCheck")) {
+            return;
+        }
+        try {
+            UpdateLayout layout = new UpdateLayout(UpdateLayout.installationRoot());
+            String version = AppVersion.current();
+            if (layout.isStaged(version)) {
+                new UpdateBootstrapper(layout).markHealthy(version);
+            }
+        } catch (Exception e) {
+            logger.debug("Update health marker skipped: {}", e.getMessage());
+        }
+    }
+
+    private void scheduleAutoUpdateCheck() {
+        if (Boolean.getBoolean("seeloggyplus.disableUpdateCheck")) {
+            return;
+        }
+        Platform.runLater(() -> {
+            try {
+                boolean auto = !"false".equalsIgnoreCase(
+                        preferenceService.getPreferencesByCode(UpdatePreferences.AUTO_CHECK).orElse("true"));
+                if (!auto || "DEV".equalsIgnoreCase(AppVersion.current())) {
+                    return;
+                }
+                long now = System.currentTimeMillis();
+                long last = 0;
+                try {
+                    last = Long.parseLong(
+                            preferenceService.getPreferencesByCode(UpdatePreferences.LAST_CHECK).orElse("0"));
+                } catch (NumberFormatException ignored) {
+                    // treat as never checked
+                }
+                if (now - last < 24L * 60 * 60 * 1000) {
+                    return;
+                }
+                runUpdateCheck(false, currentUpdateChannel());
+            } catch (Exception e) {
+                logger.debug("Auto update check skipped: {}", e.getMessage());
+            }
+        });
+    }
+
+    private void runUpdateCheck(boolean interactive, String channel) {
+        Thread.ofVirtual().start(() -> {
+            UpdateCheckResult result;
+            try {
+                result = new UpdateServiceImpl(updateManifestUrl()).check(channel);
+            } catch (Exception e) {
+                result = UpdateCheckResult.error(AppVersion.current(),
+                        e.getMessage() == null ? "Update check failed" : e.getMessage());
+            }
+            final UpdateCheckResult checkResult = result;
+            if (checkResult.status() != UpdateCheckResult.Status.ERROR) {
+                try {
+                    preferenceService.saveOrUpdatePreferences(
+                            new Preference(UpdatePreferences.LAST_CHECK, String.valueOf(System.currentTimeMillis())));
+                } catch (Exception ignored) {
+                    // preference update is best-effort
+                }
+            }
+            Platform.runLater(() -> {
+                if (interactive) {
+                    showUpdateDialog(checkResult, channel);
+                } else if (checkResult.hasUpdate()) {
+                    String skip = null;
+                    try {
+                        skip = preferenceService.getPreferencesByCode(UpdatePreferences.skipKey(channel)).orElse(null);
+                    } catch (Exception ignored) {
+                        // ignore
+                    }
+                    if (checkResult.manifest() != null && !checkResult.manifest().latest().equals(skip)) {
+                        showUpdateDialog(checkResult, channel);
+                    }
+                }
+            });
+        });
+    }
+
+    private void showUpdateDialog(UpdateCheckResult result, String channel) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UpdateDialog.fxml"));
+            Parent root = loader.load();
+            UpdateDialogController updateController = loader.getController();
+            updateController.setResult(result);
+
+            Stage dialog = new Stage();
+            dialog.setTitle("Software Update");
+            addAppIcon(dialog);
+            dialog.initModality(Modality.WINDOW_MODAL);
+            if (menuBar != null && menuBar.getScene() != null) {
+                dialog.initOwner(menuBar.getScene().getWindow());
+            }
+            dialog.setScene(new Scene(root));
+            dialog.showAndWait();
+
+            if (updateController.isSkipped() && result.manifest() != null) {
+                try {
+                    preferenceService.saveOrUpdatePreferences(
+                            new Preference(UpdatePreferences.skipKey(channel), result.manifest().latest()));
+                } catch (Exception ignored) {
+                    // ignore
+                }
+            }
+        } catch (IOException e) {
+            logger.error("Failed to open update dialog", e);
+            showError("Update", "Could not open update dialog: " + e.getMessage());
         }
     }
 

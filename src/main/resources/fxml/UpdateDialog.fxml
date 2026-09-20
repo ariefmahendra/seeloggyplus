@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.seeloggyplus.controller.UpdateDialogController"
+            stylesheets="@../style/components.css"
+            prefWidth="560" prefHeight="360">
+
+    <top>
+        <VBox spacing="6">
+            <padding>
+                <Insets top="16" right="16" bottom="8" left="16"/>
+            </padding>
+            <Label fx:id="titleLabel" text="Update Available" style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
+            <Label fx:id="versionLabel" text=""/>
+        </VBox>
+    </top>
+
+    <center>
+        <VBox spacing="8">
+            <padding>
+                <Insets top="4" right="16" bottom="8" left="16"/>
+            </padding>
+            <Label text="Release notes:"/>
+            <TextArea fx:id="notesArea" editable="false" wrapText="true" VBox.vgrow="ALWAYS"
+                      promptText="No release notes provided."/>
+            <Label fx:id="statusLabel" text="" wrapText="true"/>
+            <ProgressBar fx:id="progressBar" prefWidth="520" visible="false" managed="false"/>
+        </VBox>
+    </center>
+
+    <bottom>
+        <VBox>
+            <Separator/>
+            <HBox spacing="10" alignment="CENTER_RIGHT">
+                <padding>
+                    <Insets top="10" right="16" bottom="12" left="16"/>
+                </padding>
+                <Button fx:id="closeButton" text="Close" onAction="#handleClose"/>
+                <Button fx:id="skipButton" text="Skip this version" onAction="#handleSkip"/>
+                <Button fx:id="laterButton" text="Later" onAction="#handleLater"/>
+                <Button fx:id="releaseNotesButton" text="Release Notes" onAction="#handleReleaseNotes"/>
+                <Button fx:id="downloadButton" text="Download" onAction="#handleDownload" defaultButton="true"/>
+            </HBox>
+        </VBox>
+    </bottom>
+
+</BorderPane>

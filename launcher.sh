@@ -50,7 +50,23 @@ else
     echo "Using Java from PATH"
 fi
 
+# Apply a staged update if requested (blue/green layout)
+if [ "$1" = "--apply-update" ] && [ -n "$2" ]; then
+    printf '%s' "$2" > "$SCRIPT_DIR/current"
+    echo "Applied update version $2"
+    shift 2
+fi
+
+# Resolve the application jar (blue/green layout aware)
+APP_JAR="$SCRIPT_DIR/seeloggyplus.jar"
+if [ -f "$SCRIPT_DIR/current" ]; then
+    CURRENT_VER="$(cat "$SCRIPT_DIR/current")"
+    if [ -f "$SCRIPT_DIR/versions/$CURRENT_VER/seeloggyplus.jar" ]; then
+        APP_JAR="$SCRIPT_DIR/versions/$CURRENT_VER/seeloggyplus.jar"
+    fi
+fi
+
 echo "Starting SeeLoggy+ with ${MAX_MEM}GB max memory..."
 
 # Launch application (JavaFX modules are already bundled in fat JAR)
-"$JAVA_CMD" -Xmx${MAX_MEM}g -jar seeloggyplus.jar
+"$JAVA_CMD" -Xmx${MAX_MEM}g -jar "$APP_JAR" "$@"

@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Run tests
+        run: ./gradlew test
+
+      - name: Build update artifacts
+        run: |
+          ./gradlew buildUpdateArtifacts \
+            -PupdateAssetUrl="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/seeloggyplus-Portable.zip" \
+            -PminSupported="${{ vars.MIN_SUPPORTED }}" \
+            -PreleaseNotesUrl="https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/distributions/seeloggyplus-Portable.zip
+            build/distributions/update-manifest.json
+          generate_release_notes: true
+
+      - name: Stage manifest for GitHub Pages
+        run: |
+          mkdir -p public
+          cp build/distributions/update-manifest.json public/
+
+      - name: Publish manifest to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: public
+          publish_branch: gh-pages
+          keep_files: true

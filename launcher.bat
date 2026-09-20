@@ -48,9 +48,24 @@ if not "!CUSTOM_JAVA_HOME!"=="" (
     echo Using Java from PATH
 )
 
+REM Apply a staged update if requested (blue/green layout)
+if "%~1"=="--apply-update" if not "%~2"=="" (
+    > "%SCRIPT_DIR%current" echo %~2
+    echo Applied update version %~2
+)
+
+REM Resolve the application jar (blue/green layout aware)
+set APP_JAR=%SCRIPT_DIR%seeloggyplus.jar
+if exist "%SCRIPT_DIR%current" (
+    set /p CURRENT_VER=<"%SCRIPT_DIR%current"
+    if exist "%SCRIPT_DIR%versions\!CURRENT_VER!\seeloggyplus.jar" (
+        set APP_JAR=%SCRIPT_DIR%versions\!CURRENT_VER!\seeloggyplus.jar
+    )
+)
+
 echo Starting SeeLoggy+ with %MAX_MEM%GB max memory...
 
 REM Launch application (JavaFX modules are already bundled in fat JAR)
-"!JAVA_CMD!" -Xmx%MAX_MEM%g -jar seeloggyplus.jar
+"!JAVA_CMD!" -Xmx%MAX_MEM%g -jar "!APP_JAR!"
 
 endlocal

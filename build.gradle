@@ -75,6 +75,8 @@ processResources.dependsOn generateVersionProperties
 
 test {
     useJUnitPlatform()
+    // Keep tests hermetic: never hit the real update endpoint.
+    systemProperty 'seeloggyplus.disableUpdateCheck', 'true'
     testLogging {
         events "passed", "skipped", "failed"
         exceptionFormat "full"
@@ -127,6 +129,46 @@ tasks.register('packagePortableWithoutJRE', Zip) {
             into('help')
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Update artifacts: portable zip + update-manifest.json (hash + size)
+// ---------------------------------------------------------------------------
+tasks.register('generateUpdateManifest', JavaExec) {
+    group = 'distribution'
+    description = 'Generate update-manifest.json (sha256 + size) from the portable zip'
+
+    dependsOn 'packagePortableWithoutJRE'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.seeloggyplus.update.ManifestGeneratorCli'
+
+    doFirst {
+        def zipFile = tasks.packagePortableWithoutJRE.archiveFile.get().asFile
+        def outFile = file("${buildDir}/distributions/update-manifest.json")
+        def assetUrl = (project.findProperty('updateAssetUrl')
+                ?: "https://github.com/ariefmahendra/seeloggyplus/releases/download/${project.version}/${project.name}-Portable.zip").toString()
+        def channel = (project.findProperty('updateChannel') ?: 'stable').toString()
+        def minSupported = (project.findProperty('minSupported') ?: '').toString()
+        def notesUrl = (project.findProperty('releaseNotesUrl') ?: '').toString()
+
+        def cliArgs = ['--zip', zipFile.absolutePath,
+                       '--version', project.version.toString(),
+                       '--channel', channel,
+                       '--notes', notesUrl,
+                       '--url', assetUrl,
+                       '--asset-key', 'portable-nojre',
+                       '--out', outFile.absolutePath]
+        if (minSupported) {
+            cliArgs.addAll(['--min', minSupported])
+        }
+        args = cliArgs
+    }
+}
+
+tasks.register('buildUpdateArtifacts') {
+    group = 'distribution'
+    description = 'Build the portable zip together with its update manifest'
+    dependsOn 'packagePortableWithoutJRE', 'generateUpdateManifest'
 }
 
 // ---------------------------------------------------------------------------
