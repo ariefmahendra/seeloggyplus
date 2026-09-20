@@ -22,6 +22,15 @@ class LauncherScriptsTest {
     }
 
     @Test
+    void bundledJreIncludesHttpClientModule() throws Exception {
+        Path buildFile = Path.of("build.gradle");
+        assumeTrue(Files.exists(buildFile), "build.gradle not present in working dir");
+        String content = Files.readString(buildFile);
+        assertTrue(content.contains("java.net.http"),
+                "jlink module list must include java.net.http so the updater works with the bundled JRE");
+    }
+
+    @Test
     void unixLauncherIsVersionAware() throws Exception {
         Path script = Path.of("launcher.sh");
         assumeTrue(Files.exists(script), "launcher.sh not present in working dir");

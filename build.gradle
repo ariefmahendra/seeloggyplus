@@ -196,6 +196,7 @@ tasks.register('createCustomJre', Exec) {
     def jreOutput = file("${buildDir}/custom-jre")
     def jlinkModules = [
             'java.desktop', 'java.logging', 'java.naming', 'java.sql', 'java.xml',
+            'java.net.http',
             'jdk.unsupported', 'java.scripting', 'java.management',
             'jdk.crypto.ec', 'jdk.crypto.cryptoki',
             'jdk.accessibility'
