@@ -4,48 +4,50 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+<BorderPane fx:id="rootPane"
+            xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.controller.UpdateDialogController"
             stylesheets="@../style/components.css"
-            prefWidth="560" prefHeight="360">
+            styleClass="update-dialog"
+            prefWidth="600" prefHeight="440">
 
     <top>
-        <VBox spacing="6">
-            <padding>
-                <Insets top="16" right="16" bottom="8" left="16"/>
-            </padding>
-            <Label fx:id="titleLabel" text="Update Available" style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
-            <Label fx:id="versionLabel" text=""/>
+        <VBox styleClass="update-dialog-header">
+            <Label fx:id="titleLabel" text="Update Available" styleClass="update-dialog-title"/>
+            <Label fx:id="versionLabel" text="" styleClass="update-dialog-version"/>
         </VBox>
     </top>
 
     <center>
-        <VBox spacing="8">
-            <padding>
-                <Insets top="4" right="16" bottom="8" left="16"/>
-            </padding>
-            <Label text="Release notes:"/>
+        <VBox spacing="12" styleClass="update-dialog-body">
+            <HBox spacing="8" alignment="CENTER_LEFT" styleClass="update-dialog-meta">
+                <Label text="Package:" styleClass="update-dialog-field"/>
+                <Label fx:id="assetLabel" text="-" styleClass="update-dialog-value"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="sizeLabel" text="" styleClass="update-dialog-value"/>
+            </HBox>
+
+            <Label text="Release notes" styleClass="update-dialog-section"/>
             <TextArea fx:id="notesArea" editable="false" wrapText="true" VBox.vgrow="ALWAYS"
+                      styleClass="update-dialog-notes"
                       promptText="No release notes provided."/>
-            <Label fx:id="statusLabel" text="" wrapText="true"/>
-            <ProgressBar fx:id="progressBar" prefWidth="520" visible="false" managed="false"/>
+
+            <ProgressBar fx:id="progressBar" prefWidth="Infinity" visible="false" managed="false"
+                         styleClass="update-dialog-progress"/>
+
+            <Label fx:id="statusLabel" text="" wrapText="true" styleClass="update-dialog-status"/>
         </VBox>
     </center>
 
     <bottom>
-        <VBox>
-            <Separator/>
-            <HBox spacing="10" alignment="CENTER_RIGHT">
-                <padding>
-                    <Insets top="10" right="16" bottom="12" left="16"/>
-                </padding>
-                <Button fx:id="closeButton" text="Close" onAction="#handleClose"/>
-                <Button fx:id="skipButton" text="Skip this version" onAction="#handleSkip"/>
-                <Button fx:id="laterButton" text="Later" onAction="#handleLater"/>
-                <Button fx:id="releaseNotesButton" text="Release Notes" onAction="#handleReleaseNotes"/>
-                <Button fx:id="downloadButton" text="Download" onAction="#handleDownload" defaultButton="true"/>
-            </HBox>
-        </VBox>
+        <HBox spacing="10" alignment="CENTER_RIGHT" styleClass="update-dialog-actions">
+            <Button fx:id="closeButton" text="Close" onAction="#handleClose"/>
+            <Button fx:id="skipButton" text="Skip this version" onAction="#handleSkip"/>
+            <Button fx:id="laterButton" text="Later" onAction="#handleLater"/>
+            <Button fx:id="releaseNotesButton" text="Release Notes" onAction="#handleReleaseNotes"/>
+            <Button fx:id="downloadButton" text="Download" onAction="#handleDownload"
+                    defaultButton="true" styleClass="primary-button"/>
+        </HBox>
     </bottom>
 
 </BorderPane>

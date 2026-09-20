@@ -132,21 +132,28 @@ tasks.register('fatJar', Jar) {
     with jar
 }
 
-tasks.register('packagePortableWithoutJRE', Zip) {
+def detectedPlatform = {
+    def os = org.gradle.internal.os.OperatingSystem.current()
+    if (os.isWindows()) return 'win'
+    if (os.isMacOsX()) return 'mac'
+    return 'linux'
+}
+def buildPlatform = (project.findProperty('platform') ?: detectedPlatform()).toString()
+def assetPlatform = buildPlatform == 'win' ? 'windows' : (buildPlatform == 'linux' ? 'linux' : buildPlatform)
+
+tasks.register('packagePortableNoJre', Zip) {
     group = 'distribution'
-    description = 'create zip portable distribution without bundled JRE'
+    description = 'Create platform portable zip without bundled JRE'
 
     dependsOn 'fatJar'
 
-    archiveFileName = "${project.name}-Portable.zip"
+    archiveFileName = "seeloggyplus-Portable-${buildPlatform}.zip"
     destinationDirectory = file("${buildDir}/distributions")
 
     into("${project.name}") {
         from(tasks.fatJar.archiveFile) {
             rename { "${project.name}.jar" }
         }
-
-        // Add launcher scripts for custom memory configuration
         from('launcher.bat')
         from('launcher.sh')
         from('launcher.properties')
@@ -157,44 +164,97 @@ tasks.register('packagePortableWithoutJRE', Zip) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Update artifacts: portable zip + update-manifest.json (hash + size)
-// ---------------------------------------------------------------------------
-tasks.register('generateUpdateManifest', JavaExec) {
+tasks.register('packagePortableWithJre', Zip) {
     group = 'distribution'
-    description = 'Generate update-manifest.json (sha256 + size) from the portable zip'
+    description = 'Create platform portable zip with bundled JRE (must run on the target OS)'
 
-    dependsOn 'packagePortableWithoutJRE'
+    dependsOn 'fatJar', 'createCustomJre'
+
+    archiveFileName = "seeloggyplus-Portable-${buildPlatform}-jre.zip"
+    destinationDirectory = file("${buildDir}/distributions")
+
+    into("${project.name}") {
+        from("${buildDir}/custom-jre") {
+            into('jre')
+        }
+        from(tasks.fatJar.archiveFile) {
+            rename { "${project.name}.jar" }
+        }
+        from('launcher.bat')
+        from('launcher.sh')
+        from('launcher.properties')
+        from('LAUNCHER_README.md')
+        from('help') {
+            into('help')
+        }
+    }
+}
+
+tasks.register('packagePlatform') {
+    group = 'distribution'
+    description = 'Build both portable zips (with and without JRE) for the current platform'
+    dependsOn 'packagePortableNoJre', 'packagePortableWithJre'
+}
+
+// ---------------------------------------------------------------------------
+// Update artifacts: per-platform manifest (merged later across platforms)
+// ---------------------------------------------------------------------------
+tasks.register('generatePlatformManifest', JavaExec) {
+    group = 'distribution'
+    description = 'Generate update-manifest-<platform>.json listing both platform assets'
+
+    dependsOn 'packagePlatform'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'com.seeloggyplus.update.ManifestGeneratorCli'
 
     doFirst {
-        def zipFile = tasks.packagePortableWithoutJRE.archiveFile.get().asFile
-        def outFile = file("${buildDir}/distributions/update-manifest.json")
-        def assetUrl = (project.findProperty('updateAssetUrl')
-                ?: "https://github.com/ariefmahendra/seeloggyplus/releases/download/${project.version}/${project.name}-Portable.zip").toString()
+        def noJre = file("${buildDir}/distributions/seeloggyplus-Portable-${buildPlatform}.zip")
+        def withJre = file("${buildDir}/distributions/seeloggyplus-Portable-${buildPlatform}-jre.zip")
+        def baseUrl = (project.findProperty('updateBaseUrl')
+                ?: "https://github.com/ariefmahendra/seeloggyplus/releases/download/${project.version}").toString()
         def channel = (project.findProperty('updateChannel') ?: 'stable').toString()
         def minSupported = (project.findProperty('minSupported') ?: '').toString()
         def notesUrl = (project.findProperty('releaseNotesUrl') ?: '').toString()
+        def out = file("${buildDir}/distributions/update-manifest-${assetPlatform}.json")
 
-        def cliArgs = ['--zip', zipFile.absolutePath,
-                       '--version', project.version.toString(),
+        def cliArgs = ['--version', project.version.toString(),
                        '--channel', channel,
-                       '--notes', notesUrl,
-                       '--url', assetUrl,
-                       '--asset-key', 'portable-nojre',
-                       '--out', outFile.absolutePath]
+                       '--base-url', baseUrl,
+                       '--asset', "${assetPlatform}-nojre=${noJre.absolutePath}",
+                       '--asset', "${assetPlatform}-jre=${withJre.absolutePath}",
+                       '--out', out.absolutePath]
         if (minSupported) {
             cliArgs.addAll(['--min', minSupported])
         }
+        if (notesUrl) {
+            cliArgs.addAll(['--notes', notesUrl])
+        }
+        args = cliArgs
+    }
+}
+
+tasks.register('mergeManifests', JavaExec) {
+    group = 'distribution'
+    description = 'Merge per-platform manifests into a single update-manifest.json'
+
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.seeloggyplus.update.ManifestMergeCli'
+
+    doFirst {
+        def inputs = fileTree("${buildDir}/distributions") {
+            include 'update-manifest-*.json'
+        }.files
+        def out = file("${buildDir}/distributions/update-manifest.json")
+        def cliArgs = ['--out', out.absolutePath]
+        inputs.each { cliArgs.addAll(['--in', it.absolutePath]) }
         args = cliArgs
     }
 }
 
 tasks.register('buildUpdateArtifacts') {
     group = 'distribution'
-    description = 'Build the portable zip together with its update manifest'
-    dependsOn 'packagePortableWithoutJRE', 'generateUpdateManifest'
+    description = 'Build platform zips and the per-platform update manifest'
+    dependsOn 'generatePlatformManifest'
 }
 
 // ---------------------------------------------------------------------------
@@ -239,39 +299,6 @@ tasks.register('createCustomJre', Exec) {
                 '--no-header-files',
                 '--no-man-pages',
                 '--output', jreOutput.absolutePath
-    }
-}
-
-tasks.register('packagePortableWithJRE', Zip) {
-    group = 'distribution'
-    description = 'Create zip portable distribution with bundled JRE'
-
-    dependsOn 'fatJar', 'createCustomJre'
-
-    archiveFileName = "${project.name}-Portable-WithJRE.zip"
-    destinationDirectory = file("${buildDir}/distributions")
-
-    into("${project.name}") {
-        // Bundled custom JRE
-        from("${buildDir}/custom-jre") {
-            into('jre')
-        }
-
-        // Fat JAR
-        from(tasks.fatJar.archiveFile) {
-            rename { "${project.name}.jar" }
-        }
-
-        // Launcher scripts
-        from('launcher.bat')
-        from('launcher.sh')
-        from('launcher.properties')
-        from('LAUNCHER_README.md')
-
-        // Help documentation
-        from('help') {
-            into('help')
-        }
     }
 }
 

@@ -4,17 +4,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
- * CLI used by the Gradle {@code generateUpdateManifest} task.
+ * Generates a per-platform manifest. Assets are passed as {@code --asset key=file}
+ * and their URL is derived from {@code --base-url}.
  *
- * Usage:
  * <pre>
- * --zip &lt;portable.zip&gt; --version &lt;x.y.z&gt; --url &lt;downloadUrl&gt; --out &lt;manifest.json&gt;
- * [--channel stable] [--min &lt;minSupported&gt;] [--notes &lt;releaseNotesUrl&gt;] [--asset-key portable-nojre]
+ * --version 0.2.0 --base-url https://.../download/0.2.0 --out partial.json
+ * --asset windows-nojre=build/distributions/app-win.zip
+ * --asset windows-jre=build/distributions/app-win-jre.zip
+ * [--channel stable] [--min 0.1.0] [--notes https://...]
  * </pre>
  */
 public final class ManifestGeneratorCli {
@@ -23,47 +24,40 @@ public final class ManifestGeneratorCli {
     }
 
     public static void main(String[] args) throws Exception {
-        Map<String, String> options = parse(args);
-        Path zip = Path.of(require(options, "zip"));
-        Path out = Path.of(require(options, "out"));
-        String version = require(options, "version");
-        String url = require(options, "url");
-        String channel = options.getOrDefault("channel", "stable");
-        String minSupported = options.getOrDefault("min", "");
-        String notes = options.getOrDefault("notes", "");
-        String assetKey = options.getOrDefault("asset-key", "portable-nojre");
+        CliOptions options = CliOptions.parse(args);
+        Path out = Path.of(options.require("out"));
+        String version = options.require("version");
+        String channel = options.get("channel", "stable");
+        String minSupported = options.get("min", "");
+        String notes = options.get("notes", "");
+        String baseUrl = options.require("base-url");
 
-        long size = Files.size(zip);
-        String sha256 = Hashing.sha256(zip);
+        List<UpdateManifestWriter.AssetInfo> assets = new ArrayList<>();
+        for (String spec : options.all("asset")) {
+            int separator = spec.indexOf('=');
+            if (separator <= 0 || separator == spec.length() - 1) {
+                throw new IllegalArgumentException("Invalid --asset (expected key=file): " + spec);
+            }
+            String key = spec.substring(0, separator);
+            Path file = Path.of(spec.substring(separator + 1));
+            if (!Files.isRegularFile(file)) {
+                throw new IllegalArgumentException("Asset file not found: " + file);
+            }
+            String url = trimTrailingSlash(baseUrl) + "/" + file.getFileName();
+            assets.add(new UpdateManifestWriter.AssetInfo(key, url, Files.size(file), Hashing.sha256(file)));
+        }
+        if (assets.isEmpty()) {
+            throw new IllegalArgumentException("At least one --asset is required");
+        }
+
         String manifest = UpdateManifestWriter.build(channel, version, minSupported, notes,
-                OffsetDateTime.now().truncatedTo(ChronoUnit.SECONDS).toString(),
-                List.of(new UpdateManifestWriter.AssetInfo(assetKey, url, size, sha256)));
-
+                OffsetDateTime.now().truncatedTo(ChronoUnit.SECONDS).toString(), assets);
         Files.createDirectories(out.toAbsolutePath().getParent());
         Files.writeString(out, manifest);
-        System.out.println("Wrote update manifest: " + out);
+        System.out.println("Wrote update manifest: " + out + " (" + assets.size() + " assets)");
     }
 
-    static Map<String, String> parse(String[] args) throws IllegalArgumentException {
-        Map<String, String> options = new HashMap<>();
-        for (int i = 0; i < args.length; i++) {
-            String key = args[i];
-            if (!key.startsWith("--")) {
-                throw new IllegalArgumentException("Unexpected argument: " + key);
-            }
-            if (i + 1 >= args.length) {
-                throw new IllegalArgumentException("Missing value for " + key);
-            }
-            options.put(key.substring(2), args[++i]);
-        }
-        return options;
-    }
-
-    private static String require(Map<String, String> options, String key) {
-        String value = options.get(key);
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Missing required option --" + key);
-        }
-        return value;
+    private static String trimTrailingSlash(String value) {
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 }

@@ -199,6 +199,83 @@
 }
 
 /* ============================================
+   Update dialog
+   ============================================ */
+.update-dialog {
+    -fx-background-color: #ffffff;
+}
+
+.update-dialog-header {
+    -fx-background-color: linear-gradient(to right, #1a4fa0, #2f65ca);
+    -fx-padding: 18 22 16 22;
+}
+
+.update-dialog-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.update-dialog-version {
+    -fx-font-size: 13px;
+    -fx-text-fill: #d7e3f7;
+}
+
+.update-dialog-body {
+    -fx-padding: 18 22 8 22;
+}
+
+.update-dialog-field {
+    -fx-text-fill: #6c757d;
+    -fx-font-weight: bold;
+}
+
+.update-dialog-value {
+    -fx-text-fill: #212529;
+}
+
+.update-dialog-section {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #343a40;
+}
+
+.update-dialog-notes {
+    -fx-font-family: 'Consolas', 'Menlo', 'DejaVu Sans Mono', monospace;
+    -fx-font-size: 12px;
+    -fx-control-inner-background: #f8f9fa;
+}
+
+.update-dialog-status {
+    -fx-text-fill: #495057;
+}
+
+.update-dialog-progress {
+    -fx-pref-height: 12px;
+}
+
+.update-dialog-actions {
+    -fx-padding: 12 22 16 22;
+}
+
+.primary-button {
+    -fx-background-color: #2f65ca;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4;
+    -fx-padding: 6 18;
+    -fx-cursor: hand;
+}
+
+.primary-button:hover {
+    -fx-background-color: #1a4fa0;
+}
+
+.primary-button:disabled {
+    -fx-opacity: 0.6;
+}
+
+/* ============================================
    Remote Log Search: easier-to-grab scrollbars & divider
    ============================================ */
 .remote-log-search-dialog .scroll-bar:vertical {

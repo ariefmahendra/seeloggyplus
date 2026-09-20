@@ -1,6 +1,7 @@
 package com.seeloggyplus.controller;
 
 import com.seeloggyplus.update.UpdateAsset;
+import com.seeloggyplus.update.UpdateAssetKeys;
 import com.seeloggyplus.update.UpdateCheckResult;
 import com.seeloggyplus.update.UpdateCoordinator;
 import com.seeloggyplus.update.UpdateLayout;
@@ -50,6 +51,10 @@ public class UpdateDialogController {
     private Button downloadButton;
     @FXML
     private ProgressBar progressBar;
+    @FXML
+    private Label assetLabel;
+    @FXML
+    private Label sizeLabel;
 
     private UpdateCheckResult result;
     private boolean skipped;
@@ -113,18 +118,31 @@ public class UpdateDialogController {
         }
 
         if (actionable) {
+            String key = UpdateAssetKeys.preferred();
+            UpdateAsset asset = result.manifest().assetFor(key);
             versionLabel.setText(result.currentVersion() + "  \u2192  " + result.manifest().latest());
-            notesArea.setText(describeAssets(result));
+            if (assetLabel != null) {
+                assetLabel.setText(asset != null ? key : "-");
+            }
+            if (sizeLabel != null) {
+                sizeLabel.setText(asset != null && asset.size() > 0 ? formatBytes(asset.size()) : "");
+            }
+            notesArea.setText(buildReleaseNotes(result));
             boolean hasNotes = result.manifest().releaseNotesUrl() != null
                     && !result.manifest().releaseNotesUrl().isBlank();
             releaseNotesButton.setDisable(!hasNotes);
-            UpdateAsset asset = result.manifest().assetFor(UpdateService.DEFAULT_ASSET_KEY);
             downloadButton.setDisable(asset == null);
             setVisible(skipButton, !result.isForced());
             setVisible(laterButton, !result.isForced());
         } else {
             versionLabel.setText("Current version: " + result.currentVersion());
             notesArea.clear();
+            if (assetLabel != null) {
+                assetLabel.setText("-");
+            }
+            if (sizeLabel != null) {
+                sizeLabel.setText("");
+            }
             setVisible(releaseNotesButton, false);
             setVisible(downloadButton, false);
             setVisible(skipButton, false);
@@ -133,20 +151,38 @@ public class UpdateDialogController {
         statusLabel.setText(result.message() == null ? "" : result.message());
     }
 
-    private String describeAssets(UpdateCheckResult checkResult) {
+    private String buildReleaseNotes(UpdateCheckResult checkResult) {
         StringBuilder builder = new StringBuilder();
+        builder.append("Version ").append(checkResult.manifest().latest()).append('\n');
+        if (checkResult.manifest().releaseNotesUrl() != null
+                && !checkResult.manifest().releaseNotesUrl().isBlank()) {
+            builder.append("Release notes: ").append(checkResult.manifest().releaseNotesUrl()).append('\n');
+        }
+        builder.append('\n').append("Available packages:").append('\n');
         checkResult.manifest().assets().forEach((key, asset) -> {
-            builder.append(key).append('\n');
-            builder.append("  url    : ").append(asset.url()).append('\n');
+            builder.append("  \u2022 ").append(key);
             if (asset.size() > 0) {
-                builder.append("  size   : ").append(asset.size()).append(" bytes\n");
-            }
-            if (asset.sha256() != null && !asset.sha256().isBlank()) {
-                builder.append("  sha256 : ").append(asset.sha256()).append('\n');
+                builder.append("  (").append(formatBytes(asset.size())).append(')');
             }
             builder.append('\n');
         });
-        return builder.toString().stripTrailing();
+        builder.append('\n').append("You can keep working; the update downloads and installs")
+                .append(" in the background, then restart when ready.");
+        return builder.toString();
+    }
+
+    static String formatBytes(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+        String[] units = {"KB", "MB", "GB", "TB"};
+        double value = bytes;
+        int unit = -1;
+        do {
+            value /= 1024.0;
+            unit++;
+        } while (value >= 1024 && unit < units.length - 1);
+        return String.format(java.util.Locale.US, "%.1f %s", value, units[unit]);
     }
 
     private void setVisible(javafx.scene.Node node, boolean visible) {
@@ -170,7 +206,7 @@ public class UpdateDialogController {
         if (result == null || result.manifest() == null) {
             return;
         }
-        UpdateAsset asset = result.manifest().assetFor(UpdateService.DEFAULT_ASSET_KEY);
+        UpdateAsset asset = result.manifest().assetFor(UpdateAssetKeys.preferred());
         if (asset != null) {
             startInstall(asset, result.manifest().latest());
         }
