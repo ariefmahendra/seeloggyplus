@@ -11,8 +11,9 @@ permissions:
 
 jobs:
   release:
-    # Self-hosted runner PICONOS. Adjust labels if your runner uses different ones.
-    runs-on: [self-hosted, PICONOS]
+    # Default: any self-hosted runner. To target a specific one, set the repo variable
+    # RUNNER_LABELS = ["self-hosted","PICONOS"] (Settings -> Secrets and variables -> Actions -> Variables).
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
