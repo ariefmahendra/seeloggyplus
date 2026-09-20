@@ -61,6 +61,25 @@ public class UnifiedFileManagerDialogControllerTest {
     private MockFavoriteFolderService favoriteFolderService;
     private MockSSHService mockSshService;
 
+    // Platform-neutral filesystem root so tests pass on both Windows and Linux CI.
+    private static final boolean IS_WINDOWS =
+            System.getProperty("os.name", "").toLowerCase().contains("win");
+    private static final String SEP = IS_WINDOWS ? "\\" : "/";
+    private static final String HOME = IS_WINDOWS ? "C:\\" : "/";
+    private static final String FOLDER1 = HOME + "folder1";
+    private static final String FOLDER1_INNER = FOLDER1 + SEP + "folder1";
+    private static final String CUSTOM_DIR = HOME + "custom";
+    private static final String CACHE_DIR = HOME + "CacheDir";
+    private static final String STALE_DIR = HOME + "StaleDir";
+
+    private static String join(String base, String name) {
+        if (base == null || base.isEmpty()) {
+            return name;
+        }
+        char last = base.charAt(base.length() - 1);
+        return (last == '/' || last == '\\') ? base + name : base + SEP + name;
+    }
+
     @Start
     public void start(Stage stage) throws Exception {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
@@ -165,7 +184,7 @@ public class UnifiedFileManagerDialogControllerTest {
         invokeControllerMethod("navigateHome");
         Thread.sleep(1000); // Wait for background task
         WaitForAsyncUtils.waitForFxEvents();
-        assertEquals("C:\\", pathField.getText());
+        assertEquals(HOME, pathField.getText());
 
         // Select directory "folder1"
         Platform.runLater(() -> fileTable.getSelectionModel().select(0));
@@ -180,7 +199,7 @@ public class UnifiedFileManagerDialogControllerTest {
         });
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
-        assertEquals("C:\\folder1", pathField.getText());
+        assertEquals(FOLDER1, pathField.getText());
 
         // Select directory "folder1" (inside folder1)
         Platform.runLater(() -> fileTable.getSelectionModel().select(1)); // index 0 is "..", index 1 is "folder1"
@@ -195,35 +214,35 @@ public class UnifiedFileManagerDialogControllerTest {
         });
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
-        assertEquals("C:\\folder1\\folder1", pathField.getText());
+        assertEquals(FOLDER1_INNER, pathField.getText());
 
         // Back
         invokeControllerMethod("navigateBack");
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
-        assertEquals("C:\\folder1", pathField.getText());
+        assertEquals(FOLDER1, pathField.getText());
 
         // Forward
         invokeControllerMethod("navigateForward");
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
-        assertEquals("C:\\folder1\\folder1", pathField.getText());
+        assertEquals(FOLDER1_INNER, pathField.getText());
 
         // Up
         invokeControllerMethod("navigateUp");
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
-        assertEquals("C:\\folder1", pathField.getText());
+        assertEquals(FOLDER1, pathField.getText());
     }
 
     @Test
     public void testNavigateViaGoButton(FxRobot robot) throws Exception {
-        Platform.runLater(() -> pathField.setText("C:\\custom"));
+        Platform.runLater(() -> pathField.setText(CUSTOM_DIR));
         WaitForAsyncUtils.waitForFxEvents();
         robot.clickOn("#goButton");
         Thread.sleep(200);
         WaitForAsyncUtils.waitForFxEvents();
-        assertEquals("C:\\custom", pathField.getText());
+        assertEquals(CUSTOM_DIR, pathField.getText());
     }
 
     @Test
@@ -232,7 +251,7 @@ public class UnifiedFileManagerDialogControllerTest {
             try {
                 java.lang.reflect.Method navigateMethod = UnifiedFileManagerDialogController.class.getDeclaredMethod("navigateTo", String.class);
                 navigateMethod.setAccessible(true);
-                navigateMethod.invoke(controller, "C:\\");
+                navigateMethod.invoke(controller, HOME);
             } catch (Exception e) {}
         });
         Thread.sleep(1000);
@@ -338,7 +357,7 @@ public class UnifiedFileManagerDialogControllerTest {
             try {
                 java.lang.reflect.Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("navigateTo", String.class);
                 m.setAccessible(true);
-                m.invoke(controller, "C:\\CacheDir");
+                m.invoke(controller, CACHE_DIR);
             } catch (Exception e) {}
         });
         Thread.sleep(1000);
@@ -350,7 +369,7 @@ public class UnifiedFileManagerDialogControllerTest {
             try {
                 java.lang.reflect.Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("navigateTo", String.class);
                 m.setAccessible(true);
-                m.invoke(controller, "C:\\CacheDir");
+                m.invoke(controller, CACHE_DIR);
             } catch (Exception e) {}
         });
         Thread.sleep(200);
@@ -384,7 +403,7 @@ public class UnifiedFileManagerDialogControllerTest {
         tsField.setAccessible(true);
         tsField.set(staleEntry, System.currentTimeMillis() - (10 * 60 * 1000));
 
-        cache.put("local:C:\\StaleDir", staleEntry);
+        cache.put("local:" + STALE_DIR, staleEntry);
 
         localFileService.simulateDelay = true; // Service takes 500ms
         int initialCalls = localFileService.callCount;
@@ -393,7 +412,7 @@ public class UnifiedFileManagerDialogControllerTest {
             try {
                 java.lang.reflect.Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("navigateTo", String.class);
                 m.setAccessible(true);
-                m.invoke(controller, "C:\\StaleDir");
+                m.invoke(controller, STALE_DIR);
             } catch (Exception e) {}
         });
 
@@ -594,7 +613,7 @@ public class UnifiedFileManagerDialogControllerTest {
 
         @Override
         public String getHomeDirectory() {
-            return "C:\\";
+            return HOME;
         }
 
         @Override
@@ -610,9 +629,9 @@ public class UnifiedFileManagerDialogControllerTest {
                 }
             }
             List<FileInfo> list = new ArrayList<>();
-            FileInfo d1 = new FileInfo(); d1.setName("folder1"); d1.setDirectory(true); d1.setPath(directoryPath + "\\folder1"); d1.setOwner("localuser");
-            FileInfo f1 = new FileInfo(); f1.setName("file1.txt"); f1.setDirectory(false); f1.setPath(directoryPath + "\\file1.txt"); f1.setSize(1024L); f1.setOwner("localuser");
-            FileInfo f2 = new FileInfo(); f2.setName("file2.log"); f2.setDirectory(false); f2.setPath(directoryPath + "\\file2.log"); f2.setSize(5000000L); f2.setOwner("localuser");
+            FileInfo d1 = new FileInfo(); d1.setName("folder1"); d1.setDirectory(true); d1.setPath(join(directoryPath, "folder1")); d1.setOwner("localuser");
+            FileInfo f1 = new FileInfo(); f1.setName("file1.txt"); f1.setDirectory(false); f1.setPath(join(directoryPath, "file1.txt")); f1.setSize(1024L); f1.setOwner("localuser");
+            FileInfo f2 = new FileInfo(); f2.setName("file2.log"); f2.setDirectory(false); f2.setPath(join(directoryPath, "file2.log")); f2.setSize(5000000L); f2.setOwner("localuser");
             list.add(d1);
             list.add(f1);
             list.add(f2);
@@ -631,6 +650,8 @@ public class UnifiedFileManagerDialogControllerTest {
         public List<SSHServerModel> getAllServers() {
             SSHServerModel s = new SSHServerModel();
             s.setId("server1"); s.setName("Server 1"); s.setHost("localhost");
+            // Non-blank password so the controller never opens a password prompt in tests.
+            s.setPassword("dummy");
             return Arrays.asList(s);
         }
         @Override
@@ -694,7 +715,7 @@ public class UnifiedFileManagerDialogControllerTest {
             try {
                 java.lang.reflect.Method navigateMethod = UnifiedFileManagerDialogController.class.getDeclaredMethod("navigateTo", String.class);
                 navigateMethod.setAccessible(true);
-                navigateMethod.invoke(controller, "C:\\");
+                navigateMethod.invoke(controller, HOME);
             } catch (Exception e) {}
         });
         Thread.sleep(1500);
@@ -714,7 +735,7 @@ public class UnifiedFileManagerDialogControllerTest {
         Thread.sleep(1500);
         WaitForAsyncUtils.waitForFxEvents();
         
-        assertEquals("C:\\folder1", pathField.getText());
+        assertEquals(FOLDER1, pathField.getText());
 
         // Select file "file1.txt" (inside folder1)
         Platform.runLater(() -> fileTable.getSelectionModel().select(2)); // Should be a file inside folder1 (index 0 is "..", 1 is "folder1", 2 is "file1.txt")
