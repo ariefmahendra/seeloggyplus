@@ -60,6 +60,17 @@ class UpdateManifestTest {
     }
 
     @Test
+    void acceptsLocalhostUrlsForLocalSimulation() throws Exception {
+        String json = """
+                {"latest":"1.0.0",
+                 "assets":{"portable-nojre":{"url":"http://localhost:8000/app.zip"}},
+                 "releaseNotesUrl":"http://127.0.0.1:8000/notes.html"}
+                """;
+        UpdateManifest manifest = UpdateManifest.parse(json);
+        assertEquals("http://localhost:8000/app.zip", manifest.assetFor("portable-nojre").url());
+    }
+
+    @Test
     void rejectsNonHttpsAssetUrl() {
         String json = """
                 {"latest":"1.0.0","assets":{"a":{"url":"http://example.com/a.zip"}}}

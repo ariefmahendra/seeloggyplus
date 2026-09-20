@@ -38,6 +38,10 @@ public final class UpdateLayout {
 
     /** Directory that contains the running application (jar or classes folder). */
     public static Path installationRoot() {
+        String override = System.getProperty("seeloggyplus.installRoot");
+        if (override != null && !override.isBlank()) {
+            return java.nio.file.Paths.get(override);
+        }
         try {
             java.net.URI uri = UpdateLayout.class.getProtectionDomain().getCodeSource().getLocation().toURI();
             Path location = java.nio.file.Paths.get(uri);

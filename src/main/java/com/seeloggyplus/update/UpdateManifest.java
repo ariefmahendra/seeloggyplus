@@ -92,9 +92,15 @@ public record UpdateManifest(
     }
 
     private static void requireHttps(String url, String field) throws UpdateException {
-        if (url == null || !url.regionMatches(true, 0, "https://", 0, 8)) {
-            throw new UpdateException(field + " must be an https URL: " + url);
+        if (url == null || !isAllowedUrl(url)) {
+            throw new UpdateException(field + " must be an https (or localhost) URL: " + url);
         }
+    }
+
+    private static boolean isAllowedUrl(String url) {
+        return url.regionMatches(true, 0, "https://", 0, 8)
+                || url.regionMatches(true, 0, "http://localhost", 0, 16)
+                || url.regionMatches(true, 0, "http://127.0.0.1", 0, 16);
     }
 
     private static String required(JsonObject object, String field) throws UpdateException {

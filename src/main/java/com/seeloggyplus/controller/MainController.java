@@ -2897,6 +2897,10 @@ public class MainController {
     }
 
     private String currentUpdateChannel() {
+        String override = System.getProperty("seeloggyplus.updateChannel");
+        if (override != null && !override.isBlank()) {
+            return override;
+        }
         try {
             return preferenceService.getPreferencesByCode(UpdatePreferences.CHANNEL)
                     .filter(channel -> !channel.isBlank())
@@ -2907,6 +2911,12 @@ public class MainController {
     }
 
     private String updateManifestUrl() {
+        // Local simulation / testing override, e.g.
+        // -Dseeloggyplus.updateManifestUrl=http://localhost:8000/update-manifest.json
+        String override = System.getProperty("seeloggyplus.updateManifestUrl");
+        if (override != null && !override.isBlank()) {
+            return override;
+        }
         try {
             return preferenceService.getPreferencesByCode(UpdatePreferences.MANIFEST_URL)
                     .filter(url -> !url.isBlank())

@@ -69,6 +69,10 @@ class UpdateInstallerTest {
             assertTrue(Files.exists(staged.jar()));
             assertTrue(Files.exists(versions.resolve("0.3.0/help/index.html")),
                     "Wrapper folder must be stripped into the version directory");
+            try (Stream<Path> leftovers = Files.list(versions)) {
+                assertTrue(leftovers.noneMatch(p -> p.getFileName().toString().contains(".staging-")),
+                        "No staging directory may remain after a successful stage");
+            }
         } finally {
             deleteRecursively(work);
         }

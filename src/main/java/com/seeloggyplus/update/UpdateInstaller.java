@@ -55,6 +55,9 @@ public class UpdateInstaller {
                 temp = null;
             } else {
                 move(contentRoot, target);
+                // The wrapper folder was moved out; remove the now-empty staging directory.
+                deleteQuietly(temp);
+                temp = null;
             }
 
             Path jar = findJar(target);

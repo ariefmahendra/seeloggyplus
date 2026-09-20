@@ -109,6 +109,17 @@ tasks.register('runDev', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'com.seeloggyplus.Launcher'
     systemProperty 'seeloggyplus.dev', 'true'
+    // Optional local update simulation:
+    //   ./gradlew runDev -PupdateManifestUrl=http://localhost:8000/update-manifest.json
+    if (project.hasProperty('updateManifestUrl')) {
+        systemProperty 'seeloggyplus.updateManifestUrl', project.property('updateManifestUrl')
+    }
+    if (project.hasProperty('updateChannel')) {
+        systemProperty 'seeloggyplus.updateChannel', project.property('updateChannel')
+    }
+    if (project.hasProperty('installRoot')) {
+        systemProperty 'seeloggyplus.installRoot', project.property('installRoot')
+    }
 }
 
 tasks.register('fatJar', Jar) {
