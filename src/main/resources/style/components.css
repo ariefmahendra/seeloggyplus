@@ -1,3 +1,8 @@
+/* ============================================================
+   SeeLoggyPlus — Component Styles
+   Requires theme.css (design tokens) to be loaded first.
+   ============================================================ */
+
 .small-combo-box .list-cell {
     -fx-font-size: 12px;
 }
@@ -15,6 +20,32 @@
     -fx-alignment: TOP_LEFT;
 }
 
+/* Flat, muted column headers (compact enterprise look) */
+.table-view .column-header-background {
+    -fx-background-color: -sl-surface-sunken;
+    -fx-border-color: transparent transparent -sl-border transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.table-view .column-header,
+.table-view .filler {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent -sl-border-soft transparent transparent;
+    -fx-border-width: 0 1 0 0;
+    -fx-size: 26px;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: -sl-text-secondary;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.table-view .column-header .arrow {
+    -fx-background-color: -sl-text-muted;
+}
+
 /* 
    Headerless Mode for Raw View 
    Hides the column header area completely to mimic a text editor
@@ -23,6 +54,8 @@
     -fx-max-height: 0;
     -fx-pref-height: 0;
     -fx-min-height: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
     visibility: hidden;
 }
 
@@ -31,15 +64,84 @@
 }
 
 /* ============================================
-   Recent Files List & ListView (Uses default JavaFX theme)
-   ============================================ */
-
-/* ============================================
-   TabPane: Disable open/close sliding animation
+   TabPane: rectangular tabs + graphite accent
    ============================================ */
 .tab-pane {
     -fx-open-tab-animation: NONE;
     -fx-close-tab-animation: NONE;
+}
+
+.tab-pane > .tab-header-area {
+    -fx-padding: 0;
+}
+
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: -sl-surface-sunken;
+    -fx-border-color: transparent transparent -sl-border transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-background-insets: 0;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 2 0 0 0;
+    -fx-padding: 4 10 4 10;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:hover {
+    -fx-background-color: derive(-sl-surface-sunken, -4%);
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: -sl-brand transparent transparent transparent;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab .tab-label {
+    -fx-text-fill: -sl-text-muted;
+    -fx-font-size: 12px;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected .tab-label {
+    -fx-text-fill: -sl-text;
+    -fx-font-weight: bold;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab .tab-close-button {
+    -fx-background-color: -sl-text-faint;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab .tab-close-button:hover {
+    -fx-background-color: -sl-danger;
+}
+
+.tab-pane > .tab-content-area {
+    -fx-background-color: -sl-surface;
+}
+
+/* Suppress the focus ring that appears on the tab header when focus changes
+   (e.g. after clicking a log line in the canvas). */
+.tab-pane > .tab-header-area > .headers-region > .tab .focus-indicator,
+.tab-pane > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-color: transparent;
+}
+
+/* In-tab status indicators (created in MainController) */
+.tab-live-indicator {
+    -fx-fill: -sl-live;
+}
+
+.tab-badge-unread {
+    -fx-background-color: -sl-danger;
+    -fx-text-fill: white;
+    -fx-background-radius: 8;
+    -fx-padding: 0 5 0 5;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
 }
 
 /* ============================================
@@ -54,7 +156,7 @@
     -fx-pref-width: 10px;
     -fx-min-width: 10px;
     -fx-max-width: 10px;
-    -fx-border-color: #ededed;
+    -fx-border-color: -sl-border-soft;
     -fx-border-width: 0 0 0 1;
 }
 
@@ -62,27 +164,27 @@
     -fx-pref-height: 10px;
     -fx-min-height: 10px;
     -fx-max-height: 10px;
-    -fx-border-color: #ededed;
+    -fx-border-color: -sl-border-soft;
     -fx-border-width: 1 0 0 0;
 }
 
 .scroll-bar .track {
-    -fx-background-color: #fafafa;
+    -fx-background-color: -sl-scroll-track;
     -fx-background-insets: 0;
 }
 
 .scroll-bar .thumb {
-    -fx-background-color: #c4c4c4;
+    -fx-background-color: -sl-scroll-thumb;
     -fx-background-insets: 1;
     -fx-background-radius: 5px;
 }
 
 .scroll-bar .thumb:hover {
-    -fx-background-color: #8e8e8e;
+    -fx-background-color: -sl-scroll-thumb-hover;
 }
 
 .scroll-bar .thumb:pressed {
-    -fx-background-color: #555555;
+    -fx-background-color: -sl-scroll-thumb-pressed;
 }
 
 .scroll-bar .increment-button,
@@ -112,7 +214,7 @@
 
 .scroll-bar .corner,
 .scroll-pane .corner {
-    -fx-background-color: #fafafa;
+    -fx-background-color: -sl-scroll-track;
     -fx-background-insets: 0;
 }
 
@@ -121,64 +223,62 @@
    Empty State Styling
    ============================================ */
 .empty-state-pane {
-    -fx-background-color: #f8f9fa;
+    -fx-background-color: -sl-surface-alt;
     -fx-padding: 40px;
 }
 
 .empty-state-icon {
-    -fx-fill: #adb5bd;
+    -fx-fill: -sl-text-faint;
 }
 
 .empty-state-title {
-    -fx-font-family: 'Segoe UI', system-ui, sans-serif;
     -fx-font-size: 18px;
     -fx-font-weight: bold;
-    -fx-text-fill: #495057;
+    -fx-text-fill: -sl-text-secondary;
 }
 
 .empty-state-subtitle {
-    -fx-font-family: 'Segoe UI', system-ui, sans-serif;
     -fx-font-size: 12px;
-    -fx-text-fill: #6c757d;
+    -fx-text-fill: -sl-text-secondary;
 }
 
 .empty-state-button {
-    -fx-background-color: #2f65ca;
-    -fx-text-fill: white;
+    -fx-background-color: -sl-brand;
+    -fx-text-fill: -sl-on-brand;
     -fx-font-weight: bold;
     -fx-padding: 8 16;
-    -fx-background-radius: 4;
+    -fx-background-radius: 3;
     -fx-cursor: hand;
 }
 
 .empty-state-button:hover {
-    -fx-background-color: #1a4fa0;
+    -fx-background-color: -sl-brand-hover;
 }
 
 .empty-state-button .glyph-icon,
 .empty-state-button FontAwesomeIconView,
 .empty-state-button > .graphic > .glyph-icon {
-    -fx-fill: white;
-    fill: white;
+    -fx-fill: -sl-on-brand;
+    fill: -sl-on-brand;
 }
 
 /* ============================================
    Toggle Button Active Icon Styling
    ============================================ */
 .toggle-button:selected {
-    -fx-background-color: #2196F3;
-    -fx-text-fill: white;
+    -fx-background-color: -sl-brand;
+    -fx-text-fill: -sl-on-brand;
 }
 
 .toggle-button:selected .glyph-icon,
 .toggle-button:selected FontAwesomeIconView {
-    -fx-fill: white;
-    fill: white;
+    -fx-fill: -sl-on-brand;
+    fill: -sl-on-brand;
 }
 
 .toggle-button:selected > .graphic > .glyph-icon {
-    -fx-fill: white;
-    fill: white;
+    -fx-fill: -sl-on-brand;
+    fill: -sl-on-brand;
 }
 
 /* ============================================
@@ -191,34 +291,34 @@
 }
 
 .preview-line-number {
-    -fx-fill: #6c757d;
+    -fx-fill: -sl-text-muted;
 }
 
 .preview-target-line {
-    -fx-background-color: #d6e9ff;
+    -fx-background-color: -sl-preview-target;
 }
 
 /* ============================================
    Update dialog
    ============================================ */
 .update-dialog {
-    -fx-background-color: #ffffff;
+    -fx-background-color: -sl-surface;
 }
 
 .update-dialog-header {
-    -fx-background-color: linear-gradient(to right, #1a4fa0, #2f65ca);
+    -fx-background-color: linear-gradient(to right, -sl-brand-hover, -sl-brand);
     -fx-padding: 18 22 16 22;
 }
 
 .update-dialog-title {
     -fx-font-size: 20px;
     -fx-font-weight: bold;
-    -fx-text-fill: white;
+    -fx-text-fill: -sl-text-inverse;
 }
 
 .update-dialog-version {
     -fx-font-size: 13px;
-    -fx-text-fill: #d7e3f7;
+    -fx-text-fill: -sl-text-version;
 }
 
 .update-dialog-body {
@@ -226,28 +326,28 @@
 }
 
 .update-dialog-field {
-    -fx-text-fill: #6c757d;
+    -fx-text-fill: -sl-text-muted;
     -fx-font-weight: bold;
 }
 
 .update-dialog-value {
-    -fx-text-fill: #212529;
+    -fx-text-fill: -sl-text;
 }
 
 .update-dialog-section {
     -fx-font-size: 13px;
     -fx-font-weight: bold;
-    -fx-text-fill: #343a40;
+    -fx-text-fill: -sl-text-section;
 }
 
 .update-dialog-notes {
     -fx-font-family: 'Consolas', 'Menlo', 'DejaVu Sans Mono', monospace;
     -fx-font-size: 12px;
-    -fx-control-inner-background: #f8f9fa;
+    -fx-control-inner-background: -sl-surface-alt;
 }
 
 .update-dialog-status {
-    -fx-text-fill: #495057;
+    -fx-text-fill: -sl-text-secondary;
 }
 
 .update-dialog-progress {
@@ -256,23 +356,6 @@
 
 .update-dialog-actions {
     -fx-padding: 12 22 16 22;
-}
-
-.primary-button {
-    -fx-background-color: #2f65ca;
-    -fx-text-fill: white;
-    -fx-font-weight: bold;
-    -fx-background-radius: 4;
-    -fx-padding: 6 18;
-    -fx-cursor: hand;
-}
-
-.primary-button:hover {
-    -fx-background-color: #1a4fa0;
-}
-
-.primary-button:disabled {
-    -fx-opacity: 0.6;
 }
 
 /* ============================================
@@ -299,10 +382,162 @@
 
 .remote-log-search-dialog .split-pane-divider {
     -fx-padding: 0 3 0 3;
-    -fx-background-color: #dee2e6;
+    -fx-background-color: -sl-border;
     -fx-background-insets: 0;
 }
 
 .remote-log-search-dialog .split-pane-divider:hover {
-    -fx-background-color: #adb5bd;
+    -fx-background-color: -sl-text-faint;
+}
+
+/* ============================================
+   Button hierarchy
+   ============================================ */
+.btn-secondary {
+    -fx-background-color: -sl-surface-alt;
+    -fx-text-fill: -sl-text;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-cursor: hand;
+}
+
+.btn-secondary:hover {
+    -fx-background-color: -sl-surface-sunken;
+}
+
+.btn-secondary:pressed {
+    -fx-background-color: -sl-border-soft;
+}
+
+.btn-secondary:disabled {
+    -fx-opacity: 0.6;
+}
+
+/* ============================================
+   Form controls: consistent radius
+   ============================================ */
+.text-field,
+.password-field,
+.text-area,
+.combo-box,
+.choice-box,
+.spinner {
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+}
+
+/* Placeholder text must follow the theme (Modena derives a too-dark colour
+   in dark mode, making placeholder text invisible). */
+.text-input {
+    -fx-prompt-text-fill: -sl-text-secondary;
+}
+
+/* Single, clean focus border (Modena draws a focus ring + border + inner,
+   which renders as an ugly double border). */
+.text-field:focused,
+.password-field:focused,
+.text-area:focused {
+    -fx-background-color: -sl-brand, -fx-control-inner-background;
+    -fx-background-insets: 0, 1.5;
+    -fx-background-radius: 3, 2;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+
+/* ============================================
+   Toolbars & split pane
+   ============================================ */
+.tool-bar {
+    -fx-padding: 3 6 3 6;
+}
+
+.split-pane > .split-pane-divider {
+    -fx-padding: 0 1 0 1;
+    -fx-background-color: -sl-border;
+    -fx-background-insets: 0;
+}
+
+.split-pane > .split-pane-divider:hover {
+    -fx-background-color: -sl-text-faint;
+}
+
+/* ============================================
+   Tooltips
+   ============================================ */
+.tooltip {
+    -fx-background-color: -sl-chrome;
+    -fx-text-fill: -sl-chrome-text;
+    -fx-font-size: 11px;
+    -fx-background-radius: 3;
+    -fx-padding: 4 8 4 8;
+}
+
+/* ============================================
+   Colored icons (theme-independent, readable on light & dark)
+   Higher specificity than the default `.glyph-icon` rule.
+   ============================================ */
+/* Theme-tone icons: they follow the active theme like the rest of the UI.
+   Shape already distinguishes folders/logs/files; colour stays neutral. */
+FontAwesomeIconView.favorite-star {
+    -fx-fill: -sl-warning;
+}
+
+FontAwesomeIconView.file-icon-folder {
+    -fx-fill: -sl-text-secondary;
+}
+
+FontAwesomeIconView.file-icon-log {
+    -fx-fill: -sl-text-secondary;
+}
+
+FontAwesomeIconView.file-icon-file {
+    -fx-fill: -sl-text-muted;
+}
+
+/* ============================================
+   Search result panel & navigator
+   ============================================ */
+.search-results-header {
+    -fx-font-weight: bold;
+    -fx-font-size: 11px;
+    -fx-padding: 2 5 2 5;
+    -fx-text-fill: -sl-text-muted;
+}
+
+.search-navigator-status {
+    -fx-text-fill: -sl-chrome-text;
+    -fx-padding: 0 5 0 0;
+}
+
+/* ============================================
+   Menus & context menus (popup windows)
+   These inherit the stylesheet only when it is installed on the Scene.
+   ============================================ */
+.context-menu {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 1;
+    -fx-padding: 4 0 4 0;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.18), 8, 0, 0, 2);
+}
+
+.context-menu .menu-item {
+    -fx-padding: 4 12 4 12;
+}
+
+.context-menu .menu-item .label {
+    -fx-text-fill: -sl-text;
+}
+
+.context-menu .menu-item:focused {
+    -fx-background-color: -sl-brand;
+}
+
+.context-menu .menu-item:focused .label {
+    -fx-text-fill: -sl-on-brand;
+}
+
+.context-menu .separator .line {
+    -fx-border-color: -sl-border-soft;
 }

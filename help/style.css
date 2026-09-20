@@ -10,8 +10,8 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     font-size: 14px;
     line-height: 1.65;
-    color: #2d3436;
-    background: #f5f6f7;
+    color: #1f2329;
+    background: #f1f3f5;
     display: flex;
     min-height: 100vh;
 }
@@ -19,8 +19,8 @@ body {
 /* ===== Sidebar ===== */
 .sidebar {
     width: 250px;
-    background: #1e272e;
-    color: #d2dae2;
+    background: #2b3138;
+    color: #b8c0c8;
     position: fixed;
     top: 0;
     left: 0;
@@ -31,7 +31,7 @@ body {
 
 .sidebar-header {
     padding: 24px 20px 18px;
-    border-bottom: 1px solid #34495e;
+    border-bottom: 1px solid #3a424b;
 }
 
 .sidebar-header h2 {
@@ -44,7 +44,7 @@ body {
 .sidebar-header .version {
     display: block;
     font-size: 11px;
-    color: #808e9b;
+    color: #8b939c;
     margin-top: 3px;
 }
 
@@ -76,9 +76,9 @@ body {
 }
 
 .sidebar nav a.active {
-    background: rgba(52,152,219,0.15);
-    color: #74b9ff;
-    border-left-color: #3498db;
+    background: rgba(255,255,255,0.08);
+    color: #f1f3f5;
+    border-left-color: #adb5bd;
     font-weight: 500;
 }
 
@@ -99,16 +99,16 @@ section {
 h1 {
     font-size: 22px;
     font-weight: 700;
-    color: #1e272e;
+    color: #1f2329;
     margin-bottom: 14px;
     padding-bottom: 10px;
-    border-bottom: 2px solid #3498db;
+    border-bottom: 2px solid #343a40;
 }
 
 h3 {
     font-size: 15px;
     font-weight: 600;
-    color: #2d3436;
+    color: #1f2329;
     margin: 22px 0 8px;
 }
 
@@ -139,7 +139,7 @@ kbd {
     border: 1px solid #ccc;
     border-bottom-width: 2px;
     padding: 2px 7px;
-    color: #2d3436;
+    color: #1f2329;
     font-size: 12px;
     white-space: nowrap;
 }
@@ -192,7 +192,7 @@ th, td {
 th {
     background: #f0f3f5;
     font-weight: 600;
-    color: #2d3436;
+    color: #1f2329;
     font-size: 12.5px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -204,18 +204,18 @@ table.layout-table td:first-child {
     font-weight: 600;
     white-space: nowrap;
     width: 180px;
-    color: #2d3436;
+    color: #1f2329;
 }
 
 /* ===== Callouts ===== */
 .tip {
     margin: 16px 0;
     padding: 12px 16px;
-    background: #eaf6ff;
-    border-left: 4px solid #3498db;
+    background: #f1f3f5;
+    border-left: 4px solid #343a40;
     border-radius: 0 4px 4px 0;
     font-size: 13px;
-    color: #2d3436;
+    color: #1f2329;
 }
 
 .faq {

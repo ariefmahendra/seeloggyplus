@@ -1,6 +1,7 @@
 package com.seeloggyplus.controller;
 
 import com.seeloggyplus.ui.canvas.CanvasLogViewer;
+import com.seeloggyplus.util.AppTheme;
 import com.seeloggyplus.service.impl.*;
 import com.seeloggyplus.ui.cell.RecentFileListCell;
 import com.seeloggyplus.util.*;
@@ -60,9 +61,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class MainController {
-    private static final String TOGGLE_SELECTED_STYLE = "-fx-background-color: #2196F3; -fx-text-fill: white;";
-    private static final String TOGGLE_DESELECTED_STYLE = "";
-
     // FXML Components - MenuBar
     @FXML
     private MenuBar menuBar;
@@ -691,7 +689,6 @@ public class MainController {
         }
 
         if (logTabPane != null) {
-            logTabPane.setStyle("-fx-open-tab-animation: NONE; -fx-close-tab-animation: NONE;");
             logTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
                 onTabSelected(oldTab, newTab);
             });
@@ -867,11 +864,8 @@ public class MainController {
     }
 
     private void applyToggleStyle(ToggleButton button, boolean selected) {
-        if (selected) {
-            button.setStyle(TOGGLE_SELECTED_STYLE);
-        } else {
-            button.setStyle(TOGGLE_DESELECTED_STYLE);
-        }
+        // Colors are driven by CSS (:selected). The icon tint here keeps the
+        // active state visible even when no stylesheet is attached.
         updateToggleIconColor(button, selected);
     }
 
@@ -912,7 +906,15 @@ public class MainController {
                 prettified = prettifyJson();
             }
             if (!prettified && autoPrettifyXml) {
-                prettifyXml();
+                prettified = prettifyXml();
+            }
+            if (!prettified) {
+                // Ensure the raw detail text has a style class so it follows the theme.
+                try {
+                    detailCodeArea.setStyleSpans(0, computeHighlightingSpans(content));
+                } catch (Exception e) {
+                    logger.warn("Failed to apply detail highlighting", e);
+                }
             }
         }
     }
@@ -1781,10 +1783,8 @@ public class MainController {
             preferenceService
                     .saveOrUpdatePreferences(new Preference("main_auto_prettify_json", String.valueOf(newVal)));
             if (newVal) {
-                prettifyJsonButton.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
                 applyAutoPrettify();
             } else {
-                prettifyJsonButton.setStyle("");
                 restoreRawDetailIfNotPrettified();
             }
         });
@@ -1793,10 +1793,8 @@ public class MainController {
             autoPrettifyXml = newVal;
             preferenceService.saveOrUpdatePreferences(new Preference("main_auto_prettify_xml", String.valueOf(newVal)));
             if (newVal) {
-                prettifyXmlButton.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
                 applyAutoPrettify();
             } else {
-                prettifyXmlButton.setStyle("");
                 restoreRawDetailIfNotPrettified();
             }
         });
@@ -1808,10 +1806,9 @@ public class MainController {
             statusLabel.setCursor(Cursor.HAND);
             statusLabel.setOnMouseClicked(e -> handleGoToLine());
             statusLabel.setTooltip(new Tooltip("Click to Go To Line (Ctrl+G)"));
-            statusLabel.setOnMouseEntered(e -> statusLabel.setStyle(
-                    "-fx-font-family: 'Segoe UI', sans-serif; -fx-font-size: 11px; -fx-text-fill: #0066cc; -fx-underline: true;"));
-            statusLabel.setOnMouseExited(e -> statusLabel.setStyle(
-                    "-fx-font-family: 'Segoe UI', sans-serif; -fx-font-size: 11px; -fx-text-fill: #333333; -fx-underline: false;"));
+            if (!statusLabel.getStyleClass().contains("status-link")) {
+                statusLabel.getStyleClass().add("status-link");
+            }
         }
 
         updateBottomPanelDisplay();
@@ -1951,7 +1948,7 @@ public class MainController {
             dialog.setTitle("Open File");
             dialog.initModality(Modality.WINDOW_MODAL);
             dialog.initOwner(mainStage);
-            dialog.setScene(new Scene(root));
+            dialog.setScene(AppTheme.scene(root));
             dialog.setMaximized(true);
             dialog.setOnShown(e -> dialog.setMaximized(true));
 
@@ -2336,7 +2333,7 @@ public class MainController {
             dialog.initOwner(mainStage);
             dialog.initModality(Modality.WINDOW_MODAL);
             addAppIcon(dialog);
-            dialog.setScene(new Scene(root));
+            dialog.setScene(AppTheme.scene(root));
             dialog.setResizable(false);
             dialog.setWidth(550);
             dialog.setHeight(480);
@@ -2399,7 +2396,7 @@ public class MainController {
 
     static void restoreWindow(Stage mainStage, boolean wasMaximized, double oldX, double oldY, double oldWidth,
             double oldHeight, Parent root, Stage dialog) {
-        dialog.setScene(new Scene(root));
+        dialog.setScene(AppTheme.scene(root));
         dialog.showAndWait();
 
         Platform.runLater(() -> {
@@ -2602,7 +2599,7 @@ public class MainController {
         VirtualizedScrollPane<StyleClassedTextArea> vsp = new VirtualizedScrollPane<>(detailCodeArea);
 
         detailPlaceholderLabel = new Label("Select a log line from the table above to view formatted details, JSON/XML, or stack trace");
-        detailPlaceholderLabel.setStyle("-fx-text-fill: #888888; -fx-font-size: 12px; -fx-font-style: italic;");
+        detailPlaceholderLabel.getStyleClass().add("muted-italic");
         detailPlaceholderLabel.setWrapText(true);
         detailPlaceholderLabel.setAlignment(Pos.CENTER);
 
@@ -2882,7 +2879,7 @@ public class MainController {
             dialog.initModality(Modality.WINDOW_MODAL);
             dialog.setResizable(false);
             addAppIcon(dialog);
-            dialog.setScene(new Scene(root));
+            dialog.setScene(AppTheme.scene(root));
 
             dialog.showAndWait();
         } catch (IOException e) {
@@ -3038,7 +3035,7 @@ public class MainController {
             if (menuBar != null && menuBar.getScene() != null) {
                 dialog.initOwner(menuBar.getScene().getWindow());
             }
-            dialog.setScene(new Scene(root));
+            dialog.setScene(AppTheme.scene(root));
             dialog.showAndWait();
 
             if (updateController.isSkipped() && result.manifest() != null) {
@@ -4077,12 +4074,13 @@ public class MainController {
         String text = String.format("Used: %.0f MB / Total: %.0f MB (Max: %.0f MB)", usedMb, totalMb, maxMb);
         memoryStatusLabel.setText(text);
 
+        memoryBar.getStyleClass().removeAll("memory-ok", "memory-warn", "memory-high");
         if (progress > 0.85) {
-            memoryBar.setStyle("-fx-accent: #f44336; -fx-control-inner-background: #e0e0e0;"); // Red
+            memoryBar.getStyleClass().add("memory-high");
         } else if (progress > 0.60) {
-            memoryBar.setStyle("-fx-accent: #ff9800; -fx-control-inner-background: #e0e0e0;"); // Orange
+            memoryBar.getStyleClass().add("memory-warn");
         } else {
-            memoryBar.setStyle("-fx-accent: #2196f3; -fx-control-inner-background: #e0e0e0;"); // Blue
+            memoryBar.getStyleClass().add("memory-ok");
         }
 
         memoryBar.setProgress(progress);

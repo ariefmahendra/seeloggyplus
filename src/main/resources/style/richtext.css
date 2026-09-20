@@ -1,101 +1,101 @@
-/* RichTextFX Styling */
+/* RichTextFX Styling
+   Requires theme.css (design tokens) to be loaded on the scene root. */
 
 .log-area {
-    -fx-background-color: white;
+    -fx-background-color: -sl-surface;
 }
 
 .styled-text-area {
-    -fx-background-color: white;
+    -fx-background-color: -sl-surface;
 }
 
 /* Keywords */
 .error {
-    -fx-fill: #D32F2F;
+    -fx-fill: -sl-syntax-error;
     -fx-font-weight: bold;
 }
 
 .warn {
-    -fx-fill: #F57C00;
+    -fx-fill: -sl-syntax-warn;
     -fx-font-weight: bold;
 }
 
 .info {
-    -fx-fill: #1976D2;
+    -fx-fill: -sl-syntax-info;
 }
 
 .debug {
-    -fx-fill: #388E3C;
+    -fx-fill: -sl-syntax-debug;
 }
 
 .trace {
-    -fx-fill: #757575;
+    -fx-fill: -sl-syntax-trace;
 }
 
 .default {
-    -fx-fill: black;
+    -fx-fill: -sl-syntax-default;
 }
 
-/* Selection */
-/* Selection (The highlight background) */
+/* Selection highlight background (RichTextFX draws it via this path).
+   Light literal; theme-dark.css overrides with a higher-specificity rule.
+   Must match SelectionColors.LIGHT_BACKGROUND / .DARK_BACKGROUND. */
 .selection {
-    -fx-fill: #2196F3;
-    /* Blue highlight */
+    -fx-fill: rgba(52, 58, 64, 0.18);
     -fx-stroke: transparent;
 }
 
 /* Line Highlighting */
 .selected-line {
-    -fx-background-color: #E3F2FD;
-    /* Light Blue 50 */
+    -fx-background-color: -sl-syntax-selected-line;
 }
 
 /* JSON Syntax Highlighting */
 .json-key {
-    -fx-fill: #006699;
+    -fx-fill: -sl-syntax-json-key;
     -fx-font-weight: bold;
 }
 .json-string {
-    -fx-fill: #2E7D32;
+    -fx-fill: -sl-syntax-json-string;
 }
 .json-number {
-    -fx-fill: #D84315;
+    -fx-fill: -sl-syntax-json-number;
     -fx-font-weight: bold;
 }
 .json-boolean {
-    -fx-fill: #6A1B9A;
+    -fx-fill: -sl-syntax-json-boolean;
     -fx-font-weight: bold;
 }
 .json-null {
-    -fx-fill: #757575;
+    -fx-fill: -sl-syntax-json-null;
     -fx-font-style: italic;
 }
 .json-punctuation {
-    -fx-fill: #37474F;
+    -fx-fill: -sl-syntax-json-punct;
     -fx-font-weight: bold;
 }
 
 /* XML Syntax Highlighting */
 .xml-tag {
-    -fx-fill: #0D47A1;
+    -fx-fill: -sl-syntax-xml-tag;
     -fx-font-weight: bold;
 }
 .xml-attribute {
-    -fx-fill: #D84315;
+    -fx-fill: -sl-syntax-xml-attr;
 }
 .xml-equals {
-    -fx-fill: #37474F;
+    -fx-fill: -sl-syntax-xml-equals;
 }
 .xml-value {
-    -fx-fill: #2E7D32;
+    -fx-fill: -sl-syntax-xml-value;
 }
 .xml-comment {
-    -fx-fill: #757575;
+    -fx-fill: -sl-syntax-xml-comment;
     -fx-font-style: italic;
 }
 .xml-declaration {
-    -fx-fill: #00695C;
+    -fx-fill: -sl-syntax-xml-decl;
     -fx-font-weight: bold;
 }
 .xml-cdata {
-    -fx-fill: #AD1457;
+    -fx-fill: -sl-syntax-xml-cdata;
 }

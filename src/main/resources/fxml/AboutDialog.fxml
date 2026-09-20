@@ -21,7 +21,7 @@
             <Font name="System Bold" size="22.0" />
          </font>
       </Label>
-      <Label fx:id="versionLabel" textFill="#555555">
+      <Label fx:id="versionLabel" styleClass="about-version">
          <font>
             <Font size="13.0" />
          </font>
@@ -29,7 +29,7 @@
       <Separator prefWidth="200.0" />
       <TextFlow textAlignment="CENTER" lineSpacing="3.0">
          <children>
-            <Text strokeType="OUTSIDE" strokeWidth="0.0" text="A fast, lightweight log viewer built for developers and ops teams. Browse local log files, monitor remote servers in real-time over SSH, and quickly find what you need with powerful search and filtering." wrappingWidth="360.0">
+            <Text styleClass="about-description" strokeType="OUTSIDE" strokeWidth="0.0" text="A fast, lightweight log viewer built for developers and ops teams. Browse local log files, monitor remote servers in real-time over SSH, and quickly find what you need with powerful search and filtering." wrappingWidth="360.0">
                <font>
                   <Font size="12.0" />
                </font>
@@ -37,7 +37,7 @@
          </children>
       </TextFlow>
       <Separator prefWidth="200.0" />
-      <Label text="© 2025–2026 SeeLoggyPlus" textFill="#757575">
+      <Label text="© 2025–2026 SeeLoggyPlus" styleClass="about-copyright">
          <font>
             <Font size="11.0" />
          </font>

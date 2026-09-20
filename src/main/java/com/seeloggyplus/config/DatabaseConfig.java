@@ -21,8 +21,7 @@ public class DatabaseConfig {
 
     private DatabaseConfig() {
         try {
-            // Path dbPath = Path.of(System.getProperty("user.home"), "/.seeloggyplus", "/data", "seeloggyplus.db");
-            Path dbPath = Paths.get( ".","/.data", "seeloggyplus.db");
+            Path dbPath = com.seeloggyplus.util.AppPaths.dataFile("seeloggyplus.db");
 
             System.out.println(dbPath.toAbsolutePath());
 

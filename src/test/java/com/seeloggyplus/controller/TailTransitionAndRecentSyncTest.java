@@ -1,5 +1,7 @@
 package com.seeloggyplus.controller;
 
+import com.seeloggyplus.util.AppTheme;
+
 import com.seeloggyplus.dto.RecentFilesDto;
 import com.seeloggyplus.model.LogEntry;
 import com.seeloggyplus.model.LogFile;
@@ -77,7 +79,7 @@ public class TailTransitionAndRecentSyncTest {
         sessionMapField.setAccessible(true);
         sessionMap = (Map<Tab, LogSession>) sessionMapField.get(controller);
 
-        stage.setScene(new Scene(root));
+        stage.setScene(AppTheme.scene(root));
         stage.show();
     }
 

@@ -1,5 +1,7 @@
 package com.seeloggyplus.controller;
 
+import com.seeloggyplus.util.AppTheme;
+
 import com.seeloggyplus.model.SSHServerModel;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
 import javafx.application.Platform;
@@ -35,7 +37,7 @@ public class FileManagerFindInFilesButtonTest {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
         Parent root = loader.load();
         controller = loader.getController();
-        stage.setScene(new Scene(root));
+        stage.setScene(AppTheme.scene(root));
         stage.show();
 
         Field field = UnifiedFileManagerDialogController.class.getDeclaredField("findInFilesButton");

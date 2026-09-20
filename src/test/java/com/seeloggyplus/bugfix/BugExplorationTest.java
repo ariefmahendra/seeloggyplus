@@ -1,5 +1,7 @@
 package com.seeloggyplus.bugfix;
 
+import com.seeloggyplus.util.AppTheme;
+
 import com.seeloggyplus.model.FileInfo;
 import com.seeloggyplus.model.Preference;
 import com.seeloggyplus.model.SSHServerModel;
@@ -413,7 +415,7 @@ public class BugExplorationTest {
                     getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
             Parent root = loader.load();
             controller = loader.getController();
-            stage.setScene(new Scene(root));
+            stage.setScene(AppTheme.scene(root));
             stage.show();
 
             pathField = getField(controller, "pathField");

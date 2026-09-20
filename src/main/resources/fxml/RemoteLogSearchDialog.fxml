@@ -8,7 +8,6 @@
 <BorderPane fx:id="rootPane"
             xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.controller.RemoteLogSearchDialogController"
-            stylesheets="@../style/components.css"
             prefWidth="960" prefHeight="640">
 
     <!-- Top: Search Form -->
@@ -49,14 +48,14 @@
         <SplitPane orientation="VERTICAL" dividerPositions="0.55">
             <TableView fx:id="resultTable">
                 <columns>
-                    <TableColumn fx:id="fileColumn" text="File" prefWidth="360" minWidth="200"/>
-                    <TableColumn fx:id="lineColumn" text="Line" prefWidth="90" minWidth="70"/>
-                    <TableColumn fx:id="contentColumn" text="Content" prefWidth="480" minWidth="200"/>
+                    <TableColumn fx:id="fileColumn" text="FILE" prefWidth="360" minWidth="200"/>
+                    <TableColumn fx:id="lineColumn" text="LINE" prefWidth="90" minWidth="70"/>
+                    <TableColumn fx:id="contentColumn" text="CONTENT" prefWidth="480" minWidth="200"/>
                 </columns>
                 <placeholder>
                     <VBox alignment="CENTER" spacing="10">
-                        <FontAwesomeIconView glyphName="SEARCH" size="40" fill="gray"/>
-                        <Label text="No matching lines yet" textFill="gray"/>
+                        <FontAwesomeIconView glyphName="SEARCH" size="40" styleClass="empty-state-icon"/>
+                        <Label text="No matching lines yet" styleClass="empty-state-subtitle"/>
                     </VBox>
                 </placeholder>
             </TableView>

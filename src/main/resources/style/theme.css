@@ -1,0 +1,421 @@
+/* ============================================================
+   SeeLoggyPlus — Design Tokens & Base Theme
+   ------------------------------------------------------------
+   Visual language: Enterprise Data-dense (Splunk/Grafana)
+   Accent          : Graphite / neutral dark
+   Density         : Compact
+   Chrome          : Dark graphite (#2b3138)
+   See docs/UI_PLAN.md for the full specification.
+
+   Single source of truth for the application palette.
+   Loaded globally on every FXML root (main view + dialogs).
+
+   JavaFX only supports "looked-up colors" as CSS variables
+   (they must resolve to a color). Spacing, radii and the type
+   scale are therefore documented conventions:
+
+     Spacing : 4 / 8 / 12
+     Radius  : 3 / 4
+     Type    : 11 / 12 / 13 / 15 / 18 / 20
+   ============================================================ */
+
+.root {
+    /* ---- Chrome (menu / toolbar / status bar) ------------------ */
+    -sl-chrome: #2b3138;
+    -sl-chrome-hover: #3a424b;
+    -sl-chrome-pressed: #4a535e;
+    -sl-chrome-text: #d7dbe0;
+    -sl-chrome-text-muted: #a0a8b0;
+
+    /* ---- Accent (interactive) ---------------------------------- */
+    -sl-brand: #343a40;
+    -sl-brand-hover: #212529;
+    -sl-brand-pressed: #111418;
+    -sl-brand-soft: #e9ecef;
+    -sl-brand-faint: rgba(52, 58, 64, 0.25);
+    -sl-on-brand: #ffffff;
+
+    /* ---- Surfaces ---------------------------------------------- */
+    -sl-bg: #f1f3f5;
+    -sl-surface: #ffffff;
+    -sl-surface-alt: #f8f9fa;
+    -sl-surface-sunken: #e9ecef;
+    -sl-overlay: rgba(0, 0, 0, 0.45);
+
+    /* ---- Borders ----------------------------------------------- */
+    -sl-border: #ced4da;
+    -sl-border-soft: #e9ecef;
+    -sl-border-strong: #adb5bd;
+
+    /* ---- Text -------------------------------------------------- */
+    -sl-text: #1f2329;
+    -sl-text-secondary: #495057;
+    -sl-text-muted: #6c757d;
+    -sl-text-faint: #828a91;
+    -sl-text-inverse: #ffffff;
+    -sl-text-version: #aeb6bf;
+    -sl-text-section: #343a40;
+
+    /* ---- Misc --------------------------------------------------- */
+    -sl-preview-target: #dde3e9;
+    /* Shared text-selection highlight (canvas, detail panel, text controls) */
+    -sl-selection-bg: rgba(52, 58, 64, 0.18);
+
+    /* ---- Semantic (desaturated) -------------------------------- */
+    -sl-success: #2f855a;
+    -sl-warning: #92400e;
+    -sl-danger: #c0392b;
+    -sl-danger-hover: #a03325;
+    -sl-danger-soft: #fbeeed;
+    -sl-info: #2b6cb0;
+    -sl-live: #2f855a;
+
+    /* Bright variants for indicators on dark chrome (status bar memory gauge) */
+    -sl-chrome-success: #4ade80;
+    -sl-chrome-warning: #fbbf24;
+    -sl-chrome-danger: #fca5a5;
+
+    /* ---- Scrollbar --------------------------------------------- */
+    -sl-scroll-track: #f1f3f5;
+    -sl-scroll-thumb: #c1c7cd;
+    -sl-scroll-thumb-hover: #98a1a9;
+    -sl-scroll-thumb-pressed: #6b7480;
+
+    /* ---- Log levels (subtle tint, not solid badges) ------------ */
+    -sl-level-fatal-bg: #fde8e8;
+    -sl-level-fatal-fg: #7f1d1d;
+    -sl-level-error-bg: #fde8e8;
+    -sl-level-error-fg: #b91c1c;
+    -sl-level-warn-bg: #fdf3e3;
+    -sl-level-warn-fg: #92400e;
+    -sl-level-info-bg: #e8f0fe;
+    -sl-level-info-fg: #1d4ed8;
+    -sl-level-debug-bg: #eef0f2;
+    -sl-level-debug-fg: #4b5563;
+    -sl-level-trace-bg: #f4f5f6;
+    -sl-level-trace-fg: #6b7280;
+
+    -sl-row-error-bg: #fdecec;
+    -sl-row-error-sel: #fbd9d9;
+    -sl-row-warn-bg: #fdf8e8;
+    -sl-row-warn-sel: #fbf0c9;
+
+    /* ---- Syntax highlighting (raw / richtext) ------------------ */
+    -sl-syntax-error: #b91c1c;
+    -sl-syntax-warn: #92400e;
+    -sl-syntax-info: #2b6cb0;
+    -sl-syntax-debug: #2f855a;
+    -sl-syntax-trace: #6c757d;
+    -sl-syntax-default: #1f2329;
+    -sl-syntax-selection: #1d4ed8;
+    -sl-syntax-selected-line: #e9ecef;
+    -sl-syntax-json-key: #0b5563;
+    -sl-syntax-json-string: #2f855a;
+    -sl-syntax-json-number: #b45309;
+    -sl-syntax-json-boolean: #6b21a8;
+    -sl-syntax-json-null: #6c757d;
+    -sl-syntax-json-punct: #343a40;
+    -sl-syntax-xml-tag: #1e3a8a;
+    -sl-syntax-xml-attr: #b45309;
+    -sl-syntax-xml-equals: #343a40;
+    -sl-syntax-xml-value: #2f855a;
+    -sl-syntax-xml-comment: #6c757d;
+    -sl-syntax-xml-decl: #0f766e;
+    -sl-syntax-xml-cdata: #9d174d;
+
+    /* ---- Typography -------------------------------------------- */
+    -fx-font-family: "Segoe UI";
+    -fx-font-size: 12px;
+    -fx-font-smoothing-type: gray;
+
+    /* ---- Map onto Modena so default controls inherit the brand -- */
+    -fx-accent: -sl-brand;
+    -fx-focus-color: -sl-brand;
+    -fx-faint-focus-color: transparent;
+    -fx-highlight-fill: -sl-selection-bg;
+    -fx-highlight-text-fill: -sl-text;
+}
+
+/* ============================================================
+   Dark chrome: menu bar
+   ============================================================ */
+.app-menubar {
+    -fx-background-color: -sl-chrome;
+}
+
+.app-menubar .label {
+    -fx-text-fill: -sl-chrome-text;
+}
+
+.app-menubar .menu:hover,
+.app-menubar .menu:showing {
+    -fx-background-color: -sl-chrome-hover;
+}
+
+/* ============================================================
+   Dark chrome: toolbar
+   ============================================================ */
+.app-toolbar {
+    -fx-background-color: -sl-chrome;
+    -fx-border-color: -sl-chrome-hover;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 3 6 3 6;
+}
+
+.app-toolbar .label {
+    -fx-text-fill: -sl-chrome-text;
+}
+
+.app-toolbar .button,
+.app-toolbar .toggle-button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 3;
+    -fx-text-fill: -sl-chrome-text;
+    -fx-padding: 4 7 4 7;
+    -fx-cursor: hand;
+}
+
+.app-toolbar .button:hover,
+.app-toolbar .toggle-button:hover {
+    -fx-background-color: -sl-chrome-hover;
+}
+
+.app-toolbar .button:pressed,
+.app-toolbar .toggle-button:pressed,
+.app-toolbar .toggle-button:selected,
+.app-toolbar .toggle-button:selected:hover {
+    -fx-background-color: -sl-chrome-pressed;
+}
+
+.app-toolbar .button:disabled,
+.app-toolbar .toggle-button:disabled {
+    -fx-opacity: 0.45;
+}
+
+.app-toolbar .button .glyph-icon,
+.app-toolbar .toggle-button .glyph-icon,
+.app-toolbar .button FontAwesomeIconView,
+.app-toolbar .toggle-button FontAwesomeIconView {
+    -fx-fill: -sl-chrome-text;
+    fill: -sl-chrome-text;
+}
+
+.app-toolbar .separator .line {
+    -fx-border-color: -sl-chrome-pressed;
+    -fx-border-width: 0 1 0 0;
+}
+
+.app-toolbar .text-field {
+    -fx-background-radius: 3;
+}
+
+/* Visible focus ring for controls on dark chrome (the author focus color is dark) */
+.app-menubar .menu:focused {
+    -fx-background-color: -sl-chrome-hover;
+}
+
+.app-toolbar .button:focused,
+.app-toolbar .toggle-button:focused,
+.status-bar .button:focused {
+    -fx-border-color: -sl-chrome-text;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
+}
+
+/* ============================================================
+   Dark chrome: status bar
+   ============================================================ */
+.status-bar {
+    -fx-padding: 2 10 2 10;
+    -fx-background-color: -sl-chrome;
+    -fx-border-color: -sl-chrome-hover;
+    -fx-border-width: 1 0 0 0;
+}
+
+.status-bar .label {
+    -fx-text-fill: -sl-chrome-text;
+}
+
+.status-text {
+    -fx-font-size: 11px;
+    -fx-text-fill: -sl-chrome-text;
+}
+
+.status-text-muted {
+    -fx-font-size: 11px;
+    -fx-text-fill: -sl-chrome-text-muted;
+}
+
+.status-bar .separator .line {
+    -fx-border-color: -sl-chrome-pressed;
+    -fx-border-width: 0 1 0 0;
+}
+
+.status-bar .button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 3;
+    -fx-text-fill: -sl-chrome-text;
+    -fx-cursor: hand;
+}
+
+.status-bar .button:hover {
+    -fx-background-color: -sl-chrome-hover;
+}
+
+.status-memory-bar {
+    -fx-accent: -sl-chrome-text;
+    -fx-control-inner-background: #4a535e;
+}
+
+.status-memory-bar.memory-ok {
+    -fx-accent: -sl-chrome-success;
+}
+
+.status-memory-bar.memory-warn {
+    -fx-accent: -sl-chrome-warning;
+}
+
+.status-memory-bar.memory-high {
+    -fx-accent: -sl-chrome-danger;
+}
+
+.status-link {
+    -fx-cursor: hand;
+}
+
+.status-link:hover {
+    -fx-underline: true;
+    -fx-text-fill: -sl-text-inverse;
+}
+
+/* ============================================================
+   Typography helpers
+   ============================================================ */
+.section-title {
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-text-fill: -sl-text;
+}
+
+.panel-title {
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-text-fill: -sl-text-secondary;
+}
+
+.text-bold {
+    -fx-font-weight: bold;
+}
+
+.muted-italic {
+    -fx-text-fill: -sl-text-secondary;
+    -fx-font-size: 12px;
+    -fx-font-style: italic;
+}
+
+.text-secondary {
+    -fx-text-fill: -sl-text-secondary;
+}
+
+/* About dialog */
+.about-version {
+    -fx-text-fill: -sl-text-muted;
+}
+
+.about-copyright {
+    -fx-text-fill: -sl-text-faint;
+}
+
+.about-description {
+    -fx-fill: -sl-text-secondary;
+}
+
+/* ============================================================
+   Icons
+   Default icon color follows the theme text color so icons stay
+   visible in dark mode. Colored icons override this via classes
+   defined in components.css.
+   ============================================================ */
+.glyph-icon,
+FontAwesomeIconView {
+    -fx-fill: -sl-text;
+}
+
+/* ============================================================
+   Generic buttons
+   ============================================================ */
+.btn-primary {
+    -fx-background-color: -sl-brand;
+    -fx-text-fill: -sl-on-brand;
+    -fx-font-weight: bold;
+    -fx-background-radius: 3;
+    -fx-padding: 5 16;
+    -fx-cursor: hand;
+}
+
+.btn-primary:hover {
+    -fx-background-color: -sl-brand-hover;
+}
+
+.btn-primary:pressed {
+    -fx-background-color: -sl-brand-pressed;
+}
+
+.btn-primary:disabled {
+    -fx-opacity: 0.6;
+}
+
+.btn-danger-outline {
+    -fx-base: -sl-danger-soft;
+    -fx-text-fill: -sl-danger;
+    -fx-border-color: -sl-danger;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-cursor: hand;
+}
+
+.btn-danger-outline:hover {
+    -fx-base: #f6dedb;
+}
+
+.btn-compact {
+    -fx-font-size: 10px;
+    -fx-padding: 2 5;
+}
+
+/* ============================================================
+   Loading overlay
+   ============================================================ */
+.loading-overlay {
+    -fx-background-color: -sl-overlay;
+}
+
+.loading-card {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 4;
+    -fx-padding: 24;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.25), 10, 0, 0, 2);
+    -fx-min-width: 300;
+    -fx-max-width: 400;
+}
+
+.loading-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -sl-text;
+}
+
+.loading-subtitle {
+    -fx-font-size: 13px;
+    -fx-text-fill: -sl-text-muted;
+}
+
+/* ============================================================
+   Detail panel container (main window)
+   ============================================================ */
+.detail-container {
+    -fx-border-color: -sl-border-strong;
+    -fx-border-width: 1;
+}

@@ -3,6 +3,7 @@ package com.seeloggyplus.controller;
 import com.seeloggyplus.dto.RemoteFileInfo;
 import com.seeloggyplus.model.FavoriteFolder;
 import com.seeloggyplus.model.FileInfo;
+import com.seeloggyplus.util.AppTheme;
 import com.seeloggyplus.model.Preference;
 import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.service.FavoriteFolderService;
@@ -278,7 +279,7 @@ public class UnifiedFileManagerDialogController {
         if (locationListView.getParent() instanceof VBox leftPanel) {
             int index = leftPanel.getChildren().indexOf(locationListView);
             Label favoritesLabel = new Label("Favorites");
-            favoritesLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+            favoritesLabel.getStyleClass().add("section-title");
             if (index != -1) {
                 leftPanel.getChildren().add(index + 1, new Separator());
                 leftPanel.getChildren().add(index + 2, favoritesLabel);
@@ -297,7 +298,7 @@ public class UnifiedFileManagerDialogController {
 
             {
                 icon.setSize("16");
-                icon.setFill(Color.GOLD);
+                icon.getStyleClass().add("favorite-star");
             }
 
             @Override
@@ -377,19 +378,20 @@ public class UnifiedFileManagerDialogController {
                 } else {
                     FileInfo file = (FileInfo) row.getItem();
                     String targetStyle = "";
+                    icon.getStyleClass().removeAll("file-icon-folder", "file-icon-log", "file-icon-file");
                     if (file.isDirectory()) {
                         icon.setIcon(FontAwesomeIcon.FOLDER);
-                        icon.setFill(Color.DARKGOLDENROD);
+                        icon.getStyleClass().add("file-icon-folder");
                         boolean isFavorite = favoritePathsCache.contains(file.getPath());
                         if (isFavorite) {
                             targetStyle = "-fx-font-weight: bold;";
                         }
                     } else if (file.isLogFile()) {
                         icon.setIcon(FontAwesomeIcon.FILE_TEXT_ALT);
-                        icon.setFill(Color.STEELBLUE);
+                        icon.getStyleClass().add("file-icon-log");
                     } else {
                         icon.setIcon(FontAwesomeIcon.FILE_ALT);
-                        icon.setFill(Color.DARKGRAY);
+                        icon.getStyleClass().add("file-icon-file");
                     }
                     if (!java.util.Objects.equals(row.getStyle(), targetStyle)) {
                         row.setStyle(targetStyle);
@@ -1216,7 +1218,7 @@ public class UnifiedFileManagerDialogController {
             if (cancelButton != null && cancelButton.getScene() != null) {
                 dialog.initOwner(cancelButton.getScene().getWindow());
             }
-            dialog.setScene(new Scene(root));
+            dialog.setScene(AppTheme.scene(root));
             dialog.showAndWait();
 
             FileInfo chosen = searchController.getChosenFile();

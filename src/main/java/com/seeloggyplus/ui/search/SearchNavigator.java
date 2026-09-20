@@ -14,7 +14,7 @@ public class SearchNavigator extends HBox {
 
     public SearchNavigator() {
         this.statusLabel = new Label("0 matches");
-        this.statusLabel.setStyle("-fx-text-fill: #666; -fx-padding: 0 5 0 0;");
+        this.statusLabel.getStyleClass().add("search-navigator-status");
 
         this.prevButton = new Button();
         FontAwesomeIconView upIcon = new FontAwesomeIconView();

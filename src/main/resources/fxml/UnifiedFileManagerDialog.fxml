@@ -12,7 +12,7 @@
     <!-- Top: Navigation & Search -->
     <top>
         <VBox>
-            <ToolBar>
+            <ToolBar styleClass="app-toolbar">
                 <Button fx:id="backButton" disable="true">
                     <graphic>
                         <FontAwesomeIconView glyphName="ARROW_LEFT" size="14"/>
@@ -92,7 +92,7 @@
                 <padding>
                     <Insets top="10" right="5" bottom="10" left="10"/>
                 </padding>
-                <Label text="Locations" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+                <Label text="Locations" styleClass="section-title"/>
                 <ListView fx:id="locationListView" VBox.vgrow="ALWAYS"/>
                 <Button fx:id="manageServersButton" text="Manage Servers" maxWidth="Infinity">
                     <graphic>
@@ -106,17 +106,17 @@
                 <TableView fx:id="fileTable" VBox.vgrow="ALWAYS">
                     <columns>
                         <TableColumn fx:id="iconColumn" text="" prefWidth="40" minWidth="40" maxWidth="40" sortable="false"/>
-                        <TableColumn fx:id="nameColumn" text="Name" prefWidth="350" minWidth="150"/>
-                        <TableColumn fx:id="sizeColumn" text="Size" prefWidth="100" minWidth="80"/>
-                        <TableColumn fx:id="typeColumn" text="Type" prefWidth="100" minWidth="80"/>
-                        <TableColumn fx:id="modifiedColumn" text="Modified" prefWidth="150" minWidth="120"/>
-                        <TableColumn fx:id="permissionsColumn" text="Permissions" prefWidth="100" minWidth="90"/>
-                        <TableColumn fx:id="ownerColumn" text="Owner" prefWidth="100" minWidth="80"/>
+                        <TableColumn fx:id="nameColumn" text="NAME" prefWidth="350" minWidth="150"/>
+                        <TableColumn fx:id="sizeColumn" text="SIZE" prefWidth="100" minWidth="80"/>
+                        <TableColumn fx:id="typeColumn" text="TYPE" prefWidth="100" minWidth="80"/>
+                        <TableColumn fx:id="modifiedColumn" text="MODIFIED" prefWidth="150" minWidth="120"/>
+                        <TableColumn fx:id="permissionsColumn" text="PERMISSIONS" prefWidth="100" minWidth="90"/>
+                        <TableColumn fx:id="ownerColumn" text="OWNER" prefWidth="100" minWidth="80"/>
                     </columns>
                     <placeholder>
                         <VBox alignment="CENTER" spacing="10">
-                            <FontAwesomeIconView glyphName="FOLDER_OPEN" size="48" fill="gray"/>
-                            <Label text="No files found" textFill="gray"/>
+                            <FontAwesomeIconView glyphName="FOLDER_OPEN" size="48" styleClass="empty-state-icon"/>
+                            <Label text="No files found" styleClass="empty-state-subtitle"/>
                         </VBox>
                     </placeholder>
                 </TableView>

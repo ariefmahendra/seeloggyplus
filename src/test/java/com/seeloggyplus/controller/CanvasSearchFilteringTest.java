@@ -1,5 +1,7 @@
 package com.seeloggyplus.controller;
 
+import com.seeloggyplus.util.AppTheme;
+
 import com.seeloggyplus.model.LogEntry;
 import com.seeloggyplus.model.LogSession;
 import com.seeloggyplus.ui.canvas.CanvasLogViewer;
@@ -36,7 +38,7 @@ public class CanvasSearchFilteringTest {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
         Parent root = loader.load();
         controller = loader.getController();
-        stage.setScene(new Scene(root));
+        stage.setScene(AppTheme.scene(root));
         stage.show();
     }
 
