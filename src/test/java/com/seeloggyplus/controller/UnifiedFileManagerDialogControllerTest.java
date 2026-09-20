@@ -601,11 +601,25 @@ public class UnifiedFileManagerDialogControllerTest {
         assertEquals("localuser", file1.getOwner());
         assertEquals("localuser", ownerCol.getCellObservableValue(file1).getValue());
 
-        // Now switch to remote server and verify remote owner mapping
+        // Now switch to remote server and verify remote owner mapping.
+        // Build the LocationItem via reflection so the test does not depend on servers
+        // already existing in the local database (empty DB on CI runners).
         Platform.runLater(() -> {
             try {
-                ListView<?> locationListView = getField("locationListView");
-                locationListView.getSelectionModel().select(1); // Server 1
+                Class<?> locationItemClass = Class.forName(
+                        "com.seeloggyplus.controller.UnifiedFileManagerDialogController$LocationItem");
+                java.lang.reflect.Method m = UnifiedFileManagerDialogController.class
+                        .getDeclaredMethod("handleLocationSelected", locationItemClass);
+                m.setAccessible(true);
+                SSHServerModel s = new SSHServerModel();
+                s.setId("server1");
+                s.setName("Server 1");
+                s.setHost("test.com");
+                s.setUsername("user");
+                s.setPassword("pass");
+                s.setDefaultPath("/");
+                Object item = locationItemClass.getConstructors()[0].newInstance("Server 1", null, s);
+                m.invoke(controller, item);
             } catch (Exception ignored) {}
         });
 
