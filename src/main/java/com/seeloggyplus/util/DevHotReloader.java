@@ -40,6 +40,10 @@ public class DevHotReloader {
     private static final Logger logger = LoggerFactory.getLogger(DevHotReloader.class);
 
     private static final String CSS_SOURCE_PATH = "src/main/resources/style/components.css";
+    private static final List<String> CSS_SOURCE_PATHS = List.of(
+            "src/main/resources/style/theme.css",
+            "src/main/resources/style/components.css",
+            "src/main/resources/style/theme-dark.css");
     private static final String FXML_SOURCE_PATH = "src/main/resources/fxml/MainView.fxml";
 
     private static ScheduledExecutorService watcherExecutor;
@@ -71,10 +75,7 @@ public class DevHotReloader {
         logger.info("DevHotReloader: Development environment detected. Initializing Desktop GUI Hot Reload...");
 
         // 1. Initial timestamp recording
-        File cssFile = new File(CSS_SOURCE_PATH);
-        if (cssFile.exists()) {
-            lastCssModified = cssFile.lastModified();
-        }
+        lastCssModified = latestCssModified();
 
         File fxmlFile = new File(FXML_SOURCE_PATH);
         if (fxmlFile.exists()) {
@@ -117,15 +118,12 @@ public class DevHotReloader {
 
         watcherExecutor.scheduleWithFixedDelay(() -> {
             try {
-                // Check CSS
-                File cssFile = new File(CSS_SOURCE_PATH);
-                if (cssFile.exists()) {
-                    long modified = cssFile.lastModified();
-                    if (modified > lastCssModified) {
-                        lastCssModified = modified;
-                        logger.info("[DevHotReloader] Detected change in: {}", cssFile.getName());
-                        Platform.runLater(() -> reloadCss(stage, scene, true));
-                    }
+                // Check watched CSS sources (theme.css, components.css)
+                long cssModified = latestCssModified();
+                if (cssModified > lastCssModified) {
+                    lastCssModified = cssModified;
+                    logger.info("[DevHotReloader] Detected change in CSS sources");
+                    Platform.runLater(() -> reloadCss(stage, scene, true));
                 }
 
                 // Check FXML (optional notification/log)
@@ -155,46 +153,60 @@ public class DevHotReloader {
         }
 
         long startTime = System.currentTimeMillis();
-        File sourceCss = new File(CSS_SOURCE_PATH);
-        if (!sourceCss.exists()) {
-            isReloading.set(false);
-            return;
-        }
+        List<String> newCssUrls = new ArrayList<>();
 
         try {
-            // Create a temporary CSS file with a unique name to bypass JavaFX's internal stylesheet cache
-            File tempCss = File.createTempFile("seeloggy-hotreload-", ".css");
-            tempCss.deleteOnExit();
-            Files.copy(sourceCss.toPath(), tempCss.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            for (String sourcePath : CSS_SOURCE_PATHS) {
+                File sourceCss = new File(sourcePath);
+                if (!sourceCss.exists()) {
+                    continue;
+                }
+                // Only load the dark overrides while dark mode is active.
+                if (sourcePath.contains("theme-dark.css") && !AppTheme.isDark()) {
+                    continue;
+                }
+                // Create a temporary CSS file with a unique name to bypass JavaFX's internal stylesheet cache
+                // Keep the source name in the temp file name so its origin stays
+                // identifiable (e.g. AppTheme can remove a stale dark copy).
+                String base = sourceCss.getName().replaceAll("\\.css$", "");
+                File tempCss = File.createTempFile("seeloggy-hotreload-" + base + "-", ".css");
+                tempCss.deleteOnExit();
+                Files.copy(sourceCss.toPath(), tempCss.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
-            createdTempFiles.add(tempCss);
-            // Clean up older temp files if there are more than 5
-            while (createdTempFiles.size() > 5) {
+                createdTempFiles.add(tempCss);
+                newCssUrls.add(tempCss.toURI().toURL().toExternalForm());
+            }
+
+            if (newCssUrls.isEmpty()) {
+                isReloading.set(false);
+                return;
+            }
+
+            // Clean up older temp files, keeping the most recent batches
+            while (createdTempFiles.size() > CSS_SOURCE_PATHS.size() * 3) {
                 File oldFile = createdTempFiles.remove(0);
                 try {
                     oldFile.delete();
                 } catch (Exception ignored) {}
             }
 
-            String newCssUrl = tempCss.toURI().toURL().toExternalForm();
-
             Platform.runLater(() -> {
                 try {
                     Parent root = scene.getRoot();
                     if (root != null) {
-                        // Remove previous components.css or hotreload stylesheets
-                        root.getStylesheets().removeIf(url -> url.contains("components.css") || url.contains("hotreload"));
+                        // Remove previous theme/components or hotreload stylesheets
+                        root.getStylesheets().removeIf(DevHotReloader::isReloadableCss);
                     }
-                    scene.getStylesheets().removeIf(url -> url.contains("components.css") || url.contains("hotreload"));
+                    scene.getStylesheets().removeIf(DevHotReloader::isReloadableCss);
 
-                    // Add new stylesheet
-                    scene.getStylesheets().add(newCssUrl);
+                    // Add new stylesheets
+                    scene.getStylesheets().addAll(newCssUrls);
                     if (root != null) {
                         root.applyCss();
                     }
 
                     long elapsed = System.currentTimeMillis() - startTime;
-                    logger.info("[DevHotReloader] ⚡ CSS reloaded successfully in {} ms: {}", elapsed, sourceCss.getName());
+                    logger.info("[DevHotReloader] ⚡ CSS reloaded successfully in {} ms", elapsed);
 
                     if (showToast && stage != null && stage.isShowing()) {
                         showToast(stage, "⚡ CSS Hot-Reloaded (" + elapsed + "ms)");
@@ -208,6 +220,22 @@ public class DevHotReloader {
             isReloading.set(false);
             logger.error("[DevHotReloader] Failed to reload CSS", e);
         }
+    }
+
+    private static boolean isReloadableCss(String url) {
+        return url.contains("theme.css") || url.contains("theme-dark.css")
+                || url.contains("components.css") || url.contains("hotreload");
+    }
+
+    private static long latestCssModified() {
+        long latest = 0;
+        for (String path : CSS_SOURCE_PATHS) {
+            File file = new File(path);
+            if (file.exists()) {
+                latest = Math.max(latest, file.lastModified());
+            }
+        }
+        return latest;
     }
 
     /**

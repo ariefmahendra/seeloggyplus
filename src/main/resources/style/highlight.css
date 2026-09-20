@@ -1,52 +1,53 @@
 /* ============================================
    Professional Log Level Colors
    Based on industry standards (IntelliJ, VSCode, LogExpert)
+   Requires theme.css (design tokens) to be loaded first.
    ============================================ */
 
 /* FATAL - Bright Red with Dark Background (Most Critical) */
 .log-level-fatal {
-    -fx-background-color: #8B0000;  /* Dark red background */
-    -fx-text-fill: #FFFFFF;          /* White text */
+    -fx-background-color: -sl-level-fatal-bg;
+    -fx-text-fill: -sl-level-fatal-fg;
     -fx-font-weight: bold;
     -fx-padding: 2 4 2 4;
 }
 
 /* ERROR - Red (Critical) */
 .log-level-error {
-    -fx-background-color: #CC0000;  /* Red background */
-    -fx-text-fill: #FFFFFF;          /* White text */
+    -fx-background-color: -sl-level-error-bg;
+    -fx-text-fill: -sl-level-error-fg;
     -fx-font-weight: bold;
     -fx-padding: 2 4 2 4;
 }
 
 /* WARN / WARNING - Orange/Yellow (Attention) */
 .log-level-warn {
-    -fx-background-color: #FF8C00;  /* Dark orange background */
-    -fx-text-fill: #000000;          /* Black text for contrast */
+    -fx-background-color: -sl-level-warn-bg;
+    -fx-text-fill: -sl-level-warn-fg;
     -fx-font-weight: bold;
     -fx-padding: 2 4 2 4;
 }
 
 /* INFO - Blue/Cyan (Informational) */
 .log-level-info {
-    -fx-background-color: #1E90FF;  /* Dodger blue background */
-    -fx-text-fill: #FFFFFF;          /* White text */
+    -fx-background-color: -sl-level-info-bg;
+    -fx-text-fill: -sl-level-info-fg;
     -fx-font-weight: normal;
     -fx-padding: 2 4 2 4;
 }
 
 /* DEBUG - Green/Gray (Development) */
 .log-level-debug {
-    -fx-background-color: #808080;  /* Gray background */
-    -fx-text-fill: #FFFFFF;          /* White text */
+    -fx-background-color: -sl-level-debug-bg;
+    -fx-text-fill: -sl-level-debug-fg;
     -fx-font-weight: normal;
     -fx-padding: 2 4 2 4;
 }
 
 /* TRACE - Light Gray (Verbose) */
 .log-level-trace {
-    -fx-background-color: #A9A9A9;  /* Light gray background */
-    -fx-text-fill: #000000;          /* Black text */
+    -fx-background-color: -sl-level-trace-bg;
+    -fx-text-fill: -sl-level-trace-fg;
     -fx-font-weight: normal;
     -fx-padding: 2 4 2 4;
 }
@@ -67,18 +68,18 @@
    ============================================ */
 
 .log-row-error {
-    -fx-background-color: #ffebee; /* Very Light Red */
+    -fx-background-color: -sl-row-error-bg;
     /* Disable cache to avoid memory overhead with 1M+ rows */
 }
 
 .log-row-error:selected {
-     -fx-background-color: #ffcdd2; /* Darker Red for selection */
+     -fx-background-color: -sl-row-error-sel;
 }
 
 .log-row-warn {
-    -fx-background-color: #fffde7; /* Very Light Yellow */
+    -fx-background-color: -sl-row-warn-bg;
 }
 
 .log-row-warn:selected {
-    -fx-background-color: #fff9c4; /* Darker Yellow for selection */
+    -fx-background-color: -sl-row-warn-sel;
 }

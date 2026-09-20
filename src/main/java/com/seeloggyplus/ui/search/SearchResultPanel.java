@@ -1,13 +1,19 @@
 package com.seeloggyplus.ui.search;
 
 import com.seeloggyplus.util.IntArrayList;
+import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.VPos;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.input.MouseButton;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
+import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -31,13 +37,16 @@ public class SearchResultPanel extends VBox {
     private static final int PADDING = 4;
     private static final Font MONO_FONT = Font.font("Consolas", FontWeight.NORMAL, 12);
     private static final Font LINE_NUM_FONT = Font.font("Consolas", FontWeight.NORMAL, 10);
-    private static final Color BG_COLOR = Color.WHITE;
-    private static final Color TEXT_COLOR = Color.BLACK;
-    private static final Color LINE_NUM_COLOR = Color.GRAY;
-    private static final Color LINE_NUM_BG = Color.rgb(245, 245, 245);
-    private static final Color SELECTION_COLOR = Color.rgb(51, 153, 255, 0.3);
-    private static final Color HIGHLIGHT_BG = Color.YELLOW;
-    private static final Color HOVER_COLOR = Color.rgb(230, 240, 255);
+
+    // Palette — swapped at runtime between light and dark (Canvas ignores CSS)
+    private Color bgColor;
+    private Color textColor;
+    private Color lineNumColor;
+    private Color lineNumBg;
+    private Color selectionColor;
+    private Color highlightBg;
+    private Color hoverColor;
+    private boolean darkMode;
 
     private final Label headerLabel;
     private final Canvas canvas;
@@ -76,7 +85,7 @@ public class SearchResultPanel extends VBox {
         charWidth = measure.getLayoutBounds().getWidth();
 
         headerLabel = new Label("Search Results");
-        headerLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 11px; -fx-padding: 2 5;");
+        headerLabel.getStyleClass().add("search-results-header");
 
         canvas = new Canvas();
         gc = canvas.getGraphicsContext2D();
@@ -151,6 +160,56 @@ public class SearchResultPanel extends VBox {
         });
 
         setupMouseHandlers();
+
+        applyPalette(false);
+
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                Parent themeRoot = newScene.getRoot();
+                if (themeRoot != null) {
+                    themeRoot.getStyleClass().addListener(
+                            (ListChangeListener<String>) change -> updateThemeFromScene());
+                }
+                updateThemeFromScene();
+            }
+        });
+    }
+
+    private void applyPalette(boolean dark) {
+        this.darkMode = dark;
+        if (dark) {
+            bgColor = Color.web("#1e2226");
+            textColor = Color.web("#d7dbe0");
+            lineNumColor = Color.web("#8b939c");
+            lineNumBg = Color.web("#262b30");
+            selectionColor = com.seeloggyplus.ui.SelectionColors.background(true);
+            highlightBg = Color.web("#facc15", 0.35);
+            hoverColor = Color.web("#2a3036");
+        } else {
+            bgColor = Color.WHITE;
+            textColor = Color.BLACK;
+            lineNumColor = Color.web("#6c757d");
+            lineNumBg = Color.web("#f1f3f5");
+            selectionColor = com.seeloggyplus.ui.SelectionColors.background(false);
+            highlightBg = Color.YELLOW;
+            hoverColor = Color.web("#e6f0ff");
+        }
+        setBackground(new Background(new BackgroundFill(bgColor, CornerRadii.EMPTY, Insets.EMPTY)));
+        render();
+    }
+
+    public void setDarkMode(boolean dark) {
+        if (this.darkMode == dark) {
+            return;
+        }
+        applyPalette(dark);
+    }
+
+    private void updateThemeFromScene() {
+        Scene scene = getScene();
+        boolean dark = scene != null && scene.getRoot() != null
+                && scene.getRoot().getStyleClass().contains("theme-dark");
+        setDarkMode(dark);
     }
 
     public void setOnLineSelected(SearchHitCallback handler) {
@@ -376,7 +435,7 @@ public class SearchResultPanel extends VBox {
         double height = canvas.getHeight();
         if (width <= 0 || height <= 0) return;
 
-        gc.setFill(BG_COLOR);
+        gc.setFill(bgColor);
         gc.fillRect(0, 0, width, height);
 
         if (matchedLines == null || itemCount == 0) return;
@@ -403,19 +462,19 @@ public class SearchResultPanel extends VBox {
 
             // Hover background
             if (matchIdx == hoveredIndex && matchIdx != selectedIndex) {
-                gc.setFill(HOVER_COLOR);
+                gc.setFill(hoverColor);
                 gc.fillRect(leftMargin, y, width - leftMargin, LINE_HEIGHT);
             }
 
             // Selection background
             if (matchIdx == selectedIndex) {
-                gc.setFill(SELECTION_COLOR);
+                gc.setFill(selectionColor);
                 gc.fillRect(leftMargin, y, width - leftMargin, LINE_HEIGHT);
             }
 
             // Search highlight
             if (searchPattern != null && !line.isEmpty()) {
-                gc.setFill(HIGHLIGHT_BG);
+                gc.setFill(highlightBg);
                 Matcher m = searchPattern.matcher(line);
                 while (m.find()) {
                     double startX = drawX + m.start() * charWidth;
@@ -431,14 +490,14 @@ public class SearchResultPanel extends VBox {
             int visStart = Math.max(0, (int) ((leftMargin - drawX) / charWidth));
             int visEnd = Math.min(line.length(), (int) ((width - drawX) / charWidth) + 1);
             if (visStart < visEnd && visEnd > 0) {
-                gc.setFill(TEXT_COLOR);
+                gc.setFill(textColor);
                 gc.fillText(line.substring(visStart, visEnd), drawX + visStart * charWidth, y + 2);
             }
         }
         gc.restore();
 
         // Line number gutter
-        gc.setFill(LINE_NUM_BG);
+        gc.setFill(lineNumBg);
         gc.fillRect(0, 0, leftMargin - 4, height);
         gc.setFont(LINE_NUM_FONT);
 
@@ -452,7 +511,7 @@ public class SearchResultPanel extends VBox {
             long globalLine = matchedLines.get(matchIdx);
             String lineNumStr = String.valueOf(globalLine + 1);
             double numX = leftMargin - 8 - lineNumStr.length() * charWidth;
-            gc.setFill(LINE_NUM_COLOR);
+            gc.setFill(lineNumColor);
             gc.fillText(lineNumStr, numX, y + 2);
         }
     }

@@ -1,5 +1,7 @@
 package com.seeloggyplus.controller;
 
+import com.seeloggyplus.util.AppTheme;
+
 import com.seeloggyplus.model.FavoriteFolder;
 import com.seeloggyplus.model.FileInfo;
 import com.seeloggyplus.model.Preference;
@@ -48,7 +50,7 @@ public class SortPersistenceIntegrationTest {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
         Parent root = loader.load();
         controller = loader.getController();
-        stage.setScene(new Scene(root));
+        stage.setScene(AppTheme.scene(root));
         stage.show();
 
         fileTable = getField("fileTable");

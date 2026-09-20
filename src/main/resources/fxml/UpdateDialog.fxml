@@ -7,7 +7,6 @@
 <BorderPane fx:id="rootPane"
             xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.controller.UpdateDialogController"
-            stylesheets="@../style/components.css"
             styleClass="update-dialog"
             prefWidth="600" prefHeight="440">
 
@@ -41,12 +40,12 @@
 
     <bottom>
         <HBox spacing="10" alignment="CENTER_RIGHT" styleClass="update-dialog-actions">
-            <Button fx:id="closeButton" text="Close" onAction="#handleClose"/>
-            <Button fx:id="skipButton" text="Skip this version" onAction="#handleSkip"/>
-            <Button fx:id="laterButton" text="Later" onAction="#handleLater"/>
-            <Button fx:id="releaseNotesButton" text="Release Notes" onAction="#handleReleaseNotes"/>
+            <Button fx:id="closeButton" text="Close" onAction="#handleClose" styleClass="btn-secondary"/>
+            <Button fx:id="skipButton" text="Skip this version" onAction="#handleSkip" styleClass="btn-secondary"/>
+            <Button fx:id="laterButton" text="Later" onAction="#handleLater" styleClass="btn-secondary"/>
+            <Button fx:id="releaseNotesButton" text="Release Notes" onAction="#handleReleaseNotes" styleClass="btn-secondary"/>
             <Button fx:id="downloadButton" text="Download" onAction="#handleDownload"
-                    defaultButton="true" styleClass="primary-button"/>
+                    defaultButton="true" styleClass="btn-primary"/>
         </HBox>
     </bottom>
 

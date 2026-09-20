@@ -3,6 +3,7 @@ package com.seeloggyplus.controller;
 import com.seeloggyplus.model.Preference;
 import com.seeloggyplus.service.PreferenceService;
 import com.seeloggyplus.service.impl.PreferenceServiceImpl;
+import com.seeloggyplus.util.AppTheme;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -32,6 +33,8 @@ public class PreferencesDialogController {
     private CheckBox mainAutoPrettifyJsonCheckBox;
     @FXML
     private CheckBox mainAutoPrettifyXmlCheckBox;
+    @FXML
+    private CheckBox darkModeCheckBox;
     @FXML
     private Spinner<Integer> lpLineLimitSpinner;
     @FXML
@@ -65,6 +68,18 @@ public class PreferencesDialogController {
         setupFontFamilyComboBox();
         setupButtons();
         loadPreferences();
+        setupThemeToggle();
+    }
+
+    private void setupThemeToggle() {
+        if (darkModeCheckBox == null) {
+            return;
+        }
+        darkModeCheckBox.setSelected("dark".equalsIgnoreCase(getPreference("app_theme", "light")));
+        darkModeCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            savePreference("app_theme", newVal ? "dark" : "light");
+            AppTheme.setDark(newVal);
+        });
     }
 
     private void setupSpinners() {
@@ -141,6 +156,9 @@ public class PreferencesDialogController {
 
         savePreference("app_font_size", String.valueOf(appFontSizeSpinner.getValue()));
         savePreference("app_font_family", appFontFamilyComboBox.getValue());
+        if (darkModeCheckBox != null) {
+            savePreference("app_theme", darkModeCheckBox.isSelected() ? "dark" : "light");
+        }
         savePreference("app_max_memory_gb", String.valueOf(appMaxMemorySpinner.getValue()));
 
         // Update launcher.properties for max memory
@@ -190,7 +208,8 @@ public class PreferencesDialogController {
 
     private void updateLauncherConfig(int maxMemoryGb) {
         try {
-            java.io.File configFile = new java.io.File("launcher.properties");
+            java.io.File configFile = new java.io.File(
+                    System.getProperty("seeloggyplus.launcherProperties", "launcher.properties"));
             java.util.Properties props = new java.util.Properties();
 
             // Read existing properties if file exists

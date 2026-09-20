@@ -18,7 +18,7 @@
             <padding>
                 <Insets top="10" right="10" bottom="10" left="10"/>
             </padding>
-            <Label text="Preview:" style="-fx-font-weight: bold;"/>
+            <Label text="Preview:" styleClass="text-bold"/>
             <Label fx:id="fileNameLabel" text="/path/to/some/file.log"/>
         </VBox>
     </top>

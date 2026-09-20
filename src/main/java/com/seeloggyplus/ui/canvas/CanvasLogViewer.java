@@ -3,7 +3,11 @@ package com.seeloggyplus.ui.canvas;
 import com.seeloggyplus.util.LineOffsetIndex;
 import com.seeloggyplus.util.MappedFileReader;
 import javafx.animation.AnimationTimer;
+import javafx.collections.ListChangeListener;
+import javafx.geometry.Insets;
 import javafx.geometry.VPos;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.ScrollBar;
@@ -51,17 +55,28 @@ public class CanvasLogViewer extends GridPane {
     private static final Font MONO_FONT = Font.font("Consolas", FontWeight.NORMAL, 13);
     private static final Font LINE_NUM_FONT = Font.font("Consolas", FontWeight.NORMAL, 11);
 
-    private static final Color BG_COLOR = Color.WHITE;
-    private static final Color TEXT_COLOR = Color.BLACK;
-    private static final Color LINE_NUM_COLOR = Color.GRAY;
-    private static final Color LINE_NUM_BG = Color.rgb(245, 245, 245);
-    private static final Color SELECTION_COLOR = Color.rgb(51, 153, 255, 0.3);
+    // Palette — swapped at runtime between light and dark (Canvas ignores CSS).
+    private Color bgColor;
+    private Color textColor;
+    private Color lineNumColor;
+    private Color lineNumBg;
+    private Color selectionColor;
+    private Color fatalText;
+    private Color errorText;
+    private Color warnText;
+    private Color infoText;
+    private Color debugText;
+    private Color traceText;
+    private Color fatalBar;
+    private Color errorBar;
+    private Color warnBar;
+    private Color fatalTint;
+    private Color errorTint;
+    private Color warnTint;
+    private Color highlightBg;
+    private boolean darkMode;
 
-    private static final Color ERROR_COLOR = Color.RED;
-    private static final Color WARN_COLOR = Color.rgb(255, 140, 0);
-    private static final Color INFO_COLOR = Color.rgb(0, 128, 0);
-    private static final Color DEBUG_COLOR = Color.GRAY;
-
+    // Level codes: 0 none, 1 FATAL, 2 ERROR, 3 WARN, 4 INFO, 5 DEBUG, 6 TRACE
     private static final Pattern LEVEL_PATTERN = Pattern.compile("\\b(ERROR|FATAL|WARN|WARNING|INFO|DEBUG|TRACE)\\b",
             Pattern.CASE_INSENSITIVE);
 
@@ -85,7 +100,6 @@ public class CanvasLogViewer extends GridPane {
     private long filteredCount = 0;
 
     private Pattern searchPattern = null;
-    private static final Color HIGHLIGHT_BG = Color.YELLOW;
 
     private long selectedLine = -1;
     private long selectionAnchor = -1; // Anchor for Shift+Click range selection
@@ -179,6 +193,20 @@ public class CanvasLogViewer extends GridPane {
         setMinSize(0, 0);
         setPrefSize(Region.USE_COMPUTED_SIZE, Region.USE_COMPUTED_SIZE);
         setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
+        // Initial palette (light); switched automatically when the scene theme changes.
+        applyPalette(false);
+
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                Parent themeRoot = newScene.getRoot();
+                if (themeRoot != null) {
+                    themeRoot.getStyleClass().addListener(
+                            (ListChangeListener<String>) change -> updateThemeFromScene());
+                }
+                updateThemeFromScene();
+            }
+        });
 
         // Initial render
         render();
@@ -514,30 +542,125 @@ public class CanvasLogViewer extends GridPane {
     // Line content cache — avoids re-reading and re-allocating strings for lines
     // that haven't changed between frames during smooth scroll
     private String[] lineCache = new String[0];
-    private Color[] lineColorCache = new Color[0];
+    private int[] lineLevelCache = new int[0];
     private long lineCacheStartLine = -1;
 
-    private Color detectLogLevelColor(String line) {
-        if (line == null || line.isEmpty()) return TEXT_COLOR;
+    private static int detectLevelCode(String line) {
+        if (line == null || line.isEmpty()) return 0;
         CharSequence levelScanRange = line.length() > 120 ? line.subSequence(0, 120) : line;
         Matcher levelMatcher = LEVEL_PATTERN.matcher(levelScanRange);
         if (levelMatcher.find()) {
             String level = levelMatcher.group(1).toUpperCase();
             return switch (level) {
-                case "ERROR", "FATAL" -> ERROR_COLOR;
-                case "WARN", "WARNING" -> WARN_COLOR;
-                case "INFO" -> INFO_COLOR;
-                case "DEBUG", "TRACE" -> DEBUG_COLOR;
-                default -> TEXT_COLOR;
+                case "FATAL" -> 1;
+                case "ERROR" -> 2;
+                case "WARN", "WARNING" -> 3;
+                case "INFO" -> 4;
+                case "DEBUG" -> 5;
+                case "TRACE" -> 6;
+                default -> 0;
             };
         }
-        return TEXT_COLOR;
+        return 0;
+    }
+
+    private Color levelTextColor(int code) {
+        return switch (code) {
+            case 1 -> fatalText;
+            case 2 -> errorText;
+            case 3 -> warnText;
+            case 4 -> infoText;
+            case 5 -> debugText;
+            case 6 -> traceText;
+            default -> textColor;
+        };
+    }
+
+    private Color levelBarColor(int code) {
+        return switch (code) {
+            case 1 -> fatalBar;
+            case 2 -> errorBar;
+            case 3 -> warnBar;
+            default -> null;
+        };
+    }
+
+    private Color levelTintColor(int code) {
+        return switch (code) {
+            case 1 -> fatalTint;
+            case 2 -> errorTint;
+            case 3 -> warnTint;
+            default -> null;
+        };
+    }
+
+    /**
+     * Applies the light or dark palette. Canvas rendering cannot consume CSS, so
+     * colors are switched programmatically when the scene theme changes.
+     */
+    private void applyPalette(boolean dark) {
+        this.darkMode = dark;
+        if (dark) {
+            bgColor = Color.web("#1e2226");
+            textColor = Color.web("#d7dbe0");
+            lineNumColor = Color.web("#8b939c");
+            lineNumBg = Color.web("#262b30");
+            selectionColor = com.seeloggyplus.ui.SelectionColors.background(true);
+            fatalText = Color.web("#ff8a80");
+            errorText = Color.web("#f87171");
+            warnText = Color.web("#fbbf24");
+            infoText = Color.web("#6ea8fe");
+            debugText = Color.web("#9aa3ac");
+            traceText = Color.web("#9aa3ac");
+            fatalBar = Color.web("#ef4444");
+            errorBar = Color.web("#ef4444");
+            warnBar = Color.web("#f59e0b");
+            fatalTint = Color.web("#ef4444", 0.12);
+            errorTint = Color.web("#ef4444", 0.10);
+            warnTint = Color.web("#f59e0b", 0.10);
+            highlightBg = Color.web("#facc15", 0.35);
+        } else {
+            bgColor = Color.web("#ffffff");
+            textColor = Color.web("#1f2329");
+            lineNumColor = Color.web("#6c757d");
+            lineNumBg = Color.web("#f1f3f5");
+            selectionColor = com.seeloggyplus.ui.SelectionColors.background(false);
+            fatalText = Color.web("#7f1d1d");
+            errorText = Color.web("#b91c1c");
+            warnText = Color.web("#92400e");
+            infoText = Color.web("#2b6cb0");
+            debugText = Color.web("#6c757d");
+            traceText = Color.web("#6c757d");
+            fatalBar = Color.web("#b91c1c");
+            errorBar = Color.web("#dc2626");
+            warnBar = Color.web("#d97706");
+            fatalTint = Color.web("#fdecec");
+            errorTint = Color.web("#fdecec");
+            warnTint = Color.web("#fdf8e8");
+            highlightBg = Color.YELLOW;
+        }
+        setBackground(new Background(new BackgroundFill(bgColor, CornerRadii.EMPTY, Insets.EMPTY)));
+        render();
+    }
+
+    public void setDarkMode(boolean dark) {
+        if (this.darkMode == dark) {
+            return;
+        }
+        applyPalette(dark);
+    }
+
+    private void updateThemeFromScene() {
+        Scene scene = getScene();
+        boolean dark = scene != null && scene.getRoot() != null
+                && scene.getRoot().getStyleClass().contains("theme-dark");
+        setDarkMode(dark);
     }
 
     private void render() {
         double width = canvas.getWidth();
         double height = canvas.getHeight();
-        gc.setFill(BG_COLOR);
+        gc.setFill(bgColor);
         gc.fillRect(0, 0, width, height);
 
         // Allow rendering if we have either a reader OR a tail buffer
@@ -553,7 +676,7 @@ public class CanvasLogViewer extends GridPane {
         // Populate line cache — reuse strings when currentTopLine hasn't changed
         if (lineCache.length < linesToRender) {
             lineCache = new String[linesToRender + 10]; // small over-alloc
-            lineColorCache = new Color[linesToRender + 10];
+            lineLevelCache = new int[linesToRender + 10];
             lineCacheStartLine = -1; // force refill
         }
         if (lineCacheStartLine != currentTopLine) {
@@ -562,14 +685,14 @@ public class CanvasLogViewer extends GridPane {
                 long viewIndex = currentTopLine + i;
                 if (viewIndex >= effectiveLineCount) {
                     lineCache[i] = null;
-                    lineColorCache[i] = TEXT_COLOR;
+                    lineLevelCache[i] = 0;
                     continue;
                 }
                 long actualLineIndex = (filteredIndexes != null)
                         ? filteredIndexes.get((int) viewIndex) : viewIndex;
                 String content = getLineContent(actualLineIndex);
                 lineCache[i] = content;
-                lineColorCache[i] = detectLogLevelColor(content);
+                lineLevelCache[i] = detectLevelCode(content);
             }
         }
 
@@ -595,13 +718,13 @@ public class CanvasLogViewer extends GridPane {
 
             String line = lineCache[i];
             if (line == null) line = "";
-            Color color = lineColorCache[i] != null ? lineColorCache[i] : TEXT_COLOR;
-            renderLineContent(line, color, leftMargin, y, actualLineIndex);
+            int level = lineLevelCache[i];
+            renderLineContent(line, level, leftMargin, y, actualLineIndex);
         }
         gc.restore();
 
         // Line number gutter
-        gc.setFill(LINE_NUM_BG);
+        gc.setFill(lineNumBg);
         gc.fillRect(0, 0, leftMargin - 5, height);
 
         // Set font once for all line numbers
@@ -618,14 +741,22 @@ public class CanvasLogViewer extends GridPane {
             double y = PADDING + i * LINE_HEIGHT - scrollOffsetY;
             if (y + LINE_HEIGHT < 0 || y > height) continue;
 
-            gc.setFill(LINE_NUM_COLOR);
+            // Severity accent bar in the gutter gap (fixed; not affected by h-scroll)
+            int level = (i < lineLevelCache.length) ? lineLevelCache[i] : 0;
+            Color bar = levelBarColor(level);
+            if (bar != null) {
+                gc.setFill(bar);
+                gc.fillRect(leftMargin - 5, y, 5, LINE_HEIGHT);
+            }
+
+            gc.setFill(lineNumColor);
             String lineNumStr = String.valueOf(actualLineIndex + 1);
             double numX = leftMargin - 10 - lineNumStr.length() * charWidth;
             gc.fillText(lineNumStr, numX, y + 2);
         }
     }
 
-    private void renderLineContent(String line, Color baseColor, double x, double y, long globalIndex) {
+    private void renderLineContent(String line, int levelCode, double x, double y, long globalIndex) {
         double drawX = x - currentScrollX;
         double canvasWidth = canvas.getWidth();
 
@@ -640,9 +771,16 @@ public class CanvasLogViewer extends GridPane {
 
         boolean isSelected = selectedLineIndexes.contains(globalIndex);
 
-        // 1. Draw Selection Background (FIRST)
+        // 0. Subtle row tint for severe levels (behind selection & highlights)
+        Color tint = levelTintColor(levelCode);
+        if (tint != null) {
+            gc.setFill(tint);
+            gc.fillRect(drawX, y, canvasWidth - leftMargin + currentScrollX, LINE_HEIGHT);
+        }
+
+        // 1. Draw Selection Background
         if (isSelected) {
-            gc.setFill(SELECTION_COLOR);
+            gc.setFill(selectionColor);
             gc.fillRect(drawX, y, canvasWidth - leftMargin + currentScrollX, LINE_HEIGHT);
         }
 
@@ -650,7 +788,7 @@ public class CanvasLogViewer extends GridPane {
         if (searchPattern != null) {
             Matcher m = searchPattern.matcher(line);
             // Skip matches entirely before visible area
-            gc.setFill(HIGHLIGHT_BG);
+            gc.setFill(highlightBg);
             while (m.find()) {
                 if (m.end() < visStart) continue;
                 if (m.start() > visEnd) break;
@@ -660,13 +798,27 @@ public class CanvasLogViewer extends GridPane {
             }
         }
 
-        // Only render the visible substring using pre-cached baseColor
-        gc.setFill(baseColor != null ? baseColor : TEXT_COLOR);
+        // 3. Base text is always dark — readability over decoration
+        gc.setFill(textColor);
         if (visStart > 0 || visEnd < line.length()) {
             String visibleText = line.substring(visStart, visEnd);
             gc.fillText(visibleText, drawX + visStart * charWidth, y + 2);
         } else {
             gc.fillText(line, drawX, y + 2);
+        }
+
+        // 4. Recolor only the level token (subtle severity accent)
+        if (levelCode != 0) {
+            CharSequence scan = line.length() > 120 ? line.substring(0, 120) : line;
+            Matcher lm = LEVEL_PATTERN.matcher(scan);
+            if (lm.find()) {
+                int s = Math.max(lm.start(), visStart);
+                int e = Math.min(lm.end(), visEnd);
+                if (s < e) {
+                    gc.setFill(levelTextColor(levelCode));
+                    gc.fillText(line.substring(s, e), drawX + s * charWidth, y + 2);
+                }
+            }
         }
     }
 

@@ -6,12 +6,12 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 <?import javafx.scene.shape.Rectangle?>
-<BorderPane minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" stylesheets="@../style/components.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
+<BorderPane minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
     <top>
         <VBox>
-            <MenuBar fx:id="menuBar">
+            <MenuBar fx:id="menuBar" styleClass="app-menubar">
                 <!-- File Menu -->
-                <Menu text="File">
+                <Menu text="_File">
                     <MenuItem accelerator="Ctrl+O" onAction="#handleOpen" text="Open..." />
                     <MenuItem fx:id="closeTabMenuItem" accelerator="Ctrl+W" onAction="#handleCloseCurrentTab" text="Close Tab" />
                     <MenuItem fx:id="closeAllTabsMenuItem" onAction="#handleCloseAllTabs" text="Close All Tabs" />
@@ -20,7 +20,7 @@
                 </Menu>
 
                 <!-- View Menu -->
-                <Menu text="View">
+                <Menu text="_View">
                     <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel" />
                     <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel" />
                     <SeparatorMenuItem />
@@ -29,14 +29,14 @@
                 </Menu>
 
                 <!-- Settings Menu -->
-                <Menu text="Settings">
+                <Menu text="_Settings">
                     <MenuItem fx:id="serverManagementMenuItem" accelerator="Ctrl+M" text="Server Management..." />
                     <SeparatorMenuItem />
                     <MenuItem fx:id="preferencesMenuItem" text="Preferences..." />
                 </Menu>
 
                 <!-- Help Menu -->
-                <Menu text="Help">
+                <Menu text="_Help">
                     <MenuItem fx:id="helpContentsMenuItem" text="Help Contents" accelerator="F1" />
                     <SeparatorMenuItem />
                     <MenuItem fx:id="checkUpdatesMenuItem" text="Check for Updates..." onAction="#handleCheckForUpdates" />
@@ -46,7 +46,7 @@
             </MenuBar>
 
             <!-- Toolbar -->
-            <ToolBar>
+            <ToolBar styleClass="app-toolbar">
                 <ToggleButton fx:id="toggleLeftPanelButton" selected="true">
                     <graphic>
                         <FontAwesomeIconView glyphName="FOLDER_OPEN" size="12" />
@@ -134,11 +134,7 @@
                     </padding>
 
                     <HBox spacing="5">
-                        <Label prefHeight="18.0" prefWidth="294.0" text="Recent Log Files" HBox.hgrow="ALWAYS">
-                            <font>
-                                <Font name="System Bold" size="12.0" />
-                            </font>
-                        </Label>
+                        <Label prefHeight="18.0" prefWidth="294.0" text="Recent Log Files" HBox.hgrow="ALWAYS" styleClass="panel-title" />
                         <Separator prefWidth="200.0" HBox.hgrow="ALWAYS" />
                         <Button fx:id="pinLeftPanelButton">
                             <graphic>
@@ -176,7 +172,7 @@
                                 </Button>
                             </VBox>
 
-                            <TabPane fx:id="logTabPane" style="-fx-open-tab-animation: NONE; -fx-close-tab-animation: NONE;" tabClosingPolicy="ALL_TABS" tabDragPolicy="REORDER" visible="false" managed="false" />
+                            <TabPane fx:id="logTabPane" tabClosingPolicy="ALL_TABS" tabDragPolicy="REORDER" visible="false" managed="false" />
                         </StackPane>
                     </VBox>
 
@@ -187,11 +183,7 @@
                         </padding>
 
                         <HBox alignment="CENTER_LEFT" spacing="10">
-                            <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS">
-                                <font>
-                                    <Font name="System Bold" size="12.0" />
-                                </font>
-                            </Label>
+                            <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS" styleClass="panel-title" />
 
                             <HBox alignment="CENTER_LEFT" spacing="5">
                                 <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
@@ -238,7 +230,7 @@
                             </HBox>
                         </HBox>
                         
-                        <StackPane fx:id="detailContainer" VBox.vgrow="ALWAYS" style="-fx-border-color: #cccccc; -fx-border-width: 1;">
+                        <StackPane fx:id="detailContainer" VBox.vgrow="ALWAYS" styleClass="detail-container">
                              <padding>
                                  <Insets/>
                              </padding>
@@ -248,20 +240,12 @@
             </SplitPane>
 
             <!-- Loading Overlay -->
-            <VBox fx:id="loadingOverlay" alignment="CENTER" visible="false" style="-fx-background-color: rgba(0, 0, 0, 0.4);">
-                <VBox alignment="CENTER" spacing="15" style="-fx-background-color: white; -fx-background-radius: 8; -fx-padding: 25; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 10, 0, 0, 0); -fx-min-width: 300; -fx-max-width: 400;">
+            <VBox fx:id="loadingOverlay" alignment="CENTER" visible="false" styleClass="loading-overlay">
+                <VBox alignment="CENTER" spacing="15" styleClass="loading-card">
                     <ProgressIndicator fx:id="loadingProgress" minWidth="60" minHeight="60" maxWidth="60" maxHeight="60" />
-                    <Label text="Processing Request..." textFill="#333333">
-                        <font>
-                            <Font name="System Bold" size="18.0" />
-                        </font>
-                    </Label>
-                    <Label fx:id="loadingLabel" text="Please wait..." textFill="#666666" wrapText="true" textAlignment="CENTER">
-                        <font>
-                            <Font size="14.0" />
-                        </font>
-                    </Label>
-                    <Button text="Cancel" onAction="#handleCancelProcessing" style="-fx-base: #ffdddd; -fx-text-fill: #cc0000; -fx-border-color: #cc0000; -fx-border-radius: 3; -fx-background-radius: 3;">
+                    <Label text="Processing Request..." styleClass="loading-title" />
+                    <Label fx:id="loadingLabel" text="Please wait..." wrapText="true" textAlignment="CENTER" styleClass="loading-subtitle" />
+                    <Button text="Cancel" onAction="#handleCancelProcessing" styleClass="btn-danger-outline">
                         <tooltip>
                             <Tooltip text="Stop current operation" />
                         </tooltip>
@@ -277,21 +261,21 @@
     </center>
 
     <bottom>
-        <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-padding: 3 10 3 10; -fx-background-color: #f0f0f0; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;">
+        <HBox alignment="CENTER_LEFT" spacing="10" styleClass="status-bar">
             <!-- Status Info (left side) -->
-            <Label fx:id="statusLabel" text="Line: 0 / 0 (0%)" style="-fx-font-family: 'Segoe UI', sans-serif; -fx-font-size: 11px; -fx-text-fill: #333333;"/>
+            <Label fx:id="statusLabel" text="Line: 0 / 0 (0%)" styleClass="status-text"/>
             <Separator orientation="VERTICAL" />
             
             <!-- Spacer to push memory stats to right -->
             <Region HBox.hgrow="ALWAYS" />
             
             <!-- Memory Stats (right side) -->
-             <Button text="GC" onAction="#handleGC" style="-fx-font-size: 10px; -fx-padding: 2 5;">
+             <Button text="GC" onAction="#handleGC" styleClass="btn-compact">
                 <tooltip><Tooltip text="Run Garbage Collection" /></tooltip>
              </Button>
             <Separator orientation="VERTICAL" />
-            <Label fx:id="memoryStatusLabel" text="Memory: ..." style="-fx-font-family: 'Segoe UI', sans-serif; -fx-font-size: 11px; -fx-text-fill: #555555;"/>
-            <ProgressBar fx:id="memoryBar" prefWidth="100" progress="0.0" style="-fx-accent: #2196f3; -fx-control-inner-background: #e0e0e0;" >
+            <Label fx:id="memoryStatusLabel" text="Memory: ..." styleClass="status-text-muted"/>
+            <ProgressBar fx:id="memoryBar" prefWidth="100" progress="0.0" styleClass="status-memory-bar" >
                 <tooltip><Tooltip text="Heap Usage" /></tooltip>
             </ProgressBar>
         </HBox>

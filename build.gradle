@@ -77,8 +77,16 @@ processResources.dependsOn generateVersionProperties
 
 test {
     useJUnitPlatform()
+    // The UI test suite builds many JavaFX scenes/stages; give the test JVM headroom.
+    maxHeapSize = '2g'
     // Keep tests hermetic: never hit the real update endpoint.
     systemProperty 'seeloggyplus.disableUpdateCheck', 'true'
+    // Isolate test data (DB, keystore, recent files) from the developer's real .data
+    systemProperty 'seeloggyplus.dataDir', "${buildDir}/test-data"
+    systemProperty 'seeloggyplus.launcherProperties', "${buildDir}/test-data/launcher.properties"
+    doFirst {
+        delete file("${buildDir}/test-data")
+    }
 
     // Headless JavaFX (Monocle) for CI runners without a display.
     // Enable with: ./gradlew test -PheadlessTest

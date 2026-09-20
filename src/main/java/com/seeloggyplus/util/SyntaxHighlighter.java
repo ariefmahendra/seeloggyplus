@@ -70,11 +70,11 @@ public class SyntaxHighlighter {
                 styleClass = "default";
             }
 
-            spansBuilder.add(Collections.emptyList(), matcher.start() - lastEnd);
+            spansBuilder.add(Collections.singleton("default"), matcher.start() - lastEnd);
             spansBuilder.add(Collections.singleton(styleClass), matcher.end() - matcher.start());
             lastEnd = matcher.end();
         }
-        spansBuilder.add(Collections.emptyList(), text.length() - lastEnd);
+        spansBuilder.add(Collections.singleton("default"), text.length() - lastEnd);
         return spansBuilder.create();
     }
 
@@ -91,7 +91,7 @@ public class SyntaxHighlighter {
         StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
 
         while (matcher.find()) {
-            spansBuilder.add(Collections.emptyList(), matcher.start() - lastEnd);
+            spansBuilder.add(Collections.singleton("default"), matcher.start() - lastEnd);
 
             if (matcher.group("COMMENT") != null) {
                 spansBuilder.add(Collections.singleton("xml-comment"), matcher.end() - matcher.start());
@@ -111,14 +111,14 @@ public class SyntaxHighlighter {
                     Matcher attrMatcher = ATTRIBUTES_PATTERN.matcher(attributesText);
                     int lastAttrEnd = 0;
                     while (attrMatcher.find()) {
-                        spansBuilder.add(Collections.emptyList(), attrMatcher.start() - lastAttrEnd);
+                        spansBuilder.add(Collections.singleton("default"), attrMatcher.start() - lastAttrEnd);
                         spansBuilder.add(Collections.singleton("xml-attribute"), attrMatcher.group(1).length());
                         spansBuilder.add(Collections.singleton("xml-equals"), attrMatcher.group(2).length());
                         spansBuilder.add(Collections.singleton("xml-value"), attrMatcher.group(3).length());
                         lastAttrEnd = attrMatcher.end();
                     }
                     if (attributesText.length() > lastAttrEnd) {
-                        spansBuilder.add(Collections.emptyList(), attributesText.length() - lastAttrEnd);
+                        spansBuilder.add(Collections.singleton("default"), attributesText.length() - lastAttrEnd);
                     }
                 }
 
@@ -128,7 +128,7 @@ public class SyntaxHighlighter {
             }
             lastEnd = matcher.end();
         }
-        spansBuilder.add(Collections.emptyList(), text.length() - lastEnd);
+        spansBuilder.add(Collections.singleton("default"), text.length() - lastEnd);
         return spansBuilder.create();
     }
 
@@ -153,11 +153,11 @@ public class SyntaxHighlighter {
                 case "TRACE" -> "trace";
                 default -> "default";
             };
-            spansBuilder.add(Collections.emptyList(), matcher.start() - lastKwEnd);
+            spansBuilder.add(Collections.singleton("default"), matcher.start() - lastKwEnd);
             spansBuilder.add(Collections.singleton(styleClass), matcher.end() - matcher.start());
             lastKwEnd = matcher.end();
         }
-        spansBuilder.add(Collections.emptyList(), text.length() - lastKwEnd);
+        spansBuilder.add(Collections.singleton("default"), text.length() - lastKwEnd);
         return spansBuilder.create();
     }
 }

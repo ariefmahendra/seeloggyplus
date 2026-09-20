@@ -1,5 +1,7 @@
 package com.seeloggyplus.controller;
 
+import com.seeloggyplus.util.AppTheme;
+
 import com.seeloggyplus.model.FileInfo;
 import com.seeloggyplus.model.PreviewLine;
 import com.seeloggyplus.model.RemoteLogSearchMatch;
@@ -59,8 +61,13 @@ public class RemoteLogSearchDialogControllerTest {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RemoteLogSearchDialog.fxml"));
         Parent root = loader.load();
         controller = loader.getController();
-        stage.setScene(new Scene(root));
+        stage.setScene(AppTheme.scene(root));
+        // Explicit size so the split-pane preview area always has height to
+        // render its cells (the shared headless stage can be resized by other tests).
+        stage.setWidth(1100);
+        stage.setHeight(760);
         stage.show();
+        stage.centerOnScreen();
 
         resultTable = getField("resultTable");
         previewList = getField("previewList");
@@ -143,7 +150,7 @@ public class RemoteLogSearchDialogControllerTest {
     }
 
     private void waitUntil(Callable<Boolean> condition) throws Exception {
-        long deadline = System.currentTimeMillis() + 5000;
+        long deadline = System.currentTimeMillis() + 10000;
         while (System.currentTimeMillis() < deadline) {
             WaitForAsyncUtils.waitForFxEvents();
             if (condition.call()) return;
@@ -164,6 +171,23 @@ public class RemoteLogSearchDialogControllerTest {
     private void selectFirstMatchAndWaitForPreview() throws Exception {
         Platform.runLater(() -> resultTable.getSelectionModel().select(0));
         waitUntil(() -> !previewList.getItems().isEmpty());
+        // The preview cell graphics are built lazily; wait until at least one
+        // cell rendered its content before tests inspect/highlight them.
+        waitUntil(this::previewCellRendered);
+    }
+
+    private boolean previewCellRendered() throws Exception {
+        return WaitForAsyncUtils.asyncFx(() -> {
+            previewList.applyCss();
+            previewList.layout();
+            for (javafx.scene.Node node : previewList.lookupAll(".list-cell")) {
+                if (node instanceof javafx.scene.control.ListCell<?> cell
+                        && cell.getGraphic() instanceof javafx.scene.layout.HBox) {
+                    return true;
+                }
+            }
+            return false;
+        }).get();
     }
 
     private Set<javafx.scene.Node> findHighlights(javafx.scene.Parent root) throws Exception {

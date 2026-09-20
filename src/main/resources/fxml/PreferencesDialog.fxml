@@ -55,6 +55,7 @@
                                     <ComboBox fx:id="appFontFamilyComboBox" prefWidth="200.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
                                  </children>
                               </GridPane>
+                              <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark mode" />
                               <Separator prefWidth="200.0" />
                               <Label text="Performance">
                                  <font>
@@ -199,7 +200,7 @@
                                        <children>
                                           <Button fx:id="sshOpenDownloadDirButton" mnemonicParsing="false" text="Open Folder" />
                                           <Button fx:id="sshCleanDownloadsButton" mnemonicParsing="false" text="Clean Downloads" />
-                                          <Label fx:id="sshDownloadInfoLabel" textFill="#888888" />
+                                           <Label fx:id="sshDownloadInfoLabel" styleClass="text-secondary" />
                                        </children>
                                     </HBox>
                                  </children>

@@ -1,5 +1,7 @@
 package com.seeloggyplus.controller;
 
+import com.seeloggyplus.util.AppTheme;
+
 import com.seeloggyplus.model.LogFile;
 import com.seeloggyplus.model.LogSession;
 import com.seeloggyplus.ui.canvas.CanvasLogViewer;
@@ -52,7 +54,7 @@ public class MainControllerOpenAtLineTest {
         sessionMapField.setAccessible(true);
         sessionMap = (Map<Tab, LogSession>) sessionMapField.get(controller);
 
-        stage.setScene(new Scene(root));
+        stage.setScene(AppTheme.scene(root));
         stage.show();
     }
 

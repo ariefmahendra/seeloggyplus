@@ -1,5 +1,7 @@
 package com.seeloggyplus.controller;
 
+import com.seeloggyplus.util.AppTheme;
+
 import com.seeloggyplus.update.Hashing;
 import com.seeloggyplus.update.UpdateCheckResult;
 import com.seeloggyplus.update.UpdateCoordinator;
@@ -59,7 +61,7 @@ public class UpdateDialogControllerTest {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UpdateDialog.fxml"));
         Parent root = loader.load();
         controller = loader.getController();
-        stage.setScene(new Scene(root));
+        stage.setScene(AppTheme.scene(root));
         stage.show();
 
         titleLabel = getField("titleLabel");

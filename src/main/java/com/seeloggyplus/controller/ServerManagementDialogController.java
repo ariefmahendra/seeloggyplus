@@ -3,6 +3,7 @@ package com.seeloggyplus.controller;
 import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.service.ServerManagementService;
 import com.seeloggyplus.service.impl.ServerManagementServiceImpl;
+import com.seeloggyplus.util.AppTheme;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
@@ -286,7 +287,7 @@ public class ServerManagementDialogController {
             dialog.setTitle("Add SSH Server");
             dialog.initModality(Modality.APPLICATION_MODAL);
             dialog.initOwner(addServerButton.getScene().getWindow());
-            dialog.setScene(new Scene(root));
+            dialog.setScene(AppTheme.scene(root));
 
             showAndWaitAndRestore(dialog);
 
@@ -321,7 +322,7 @@ public class ServerManagementDialogController {
             dialog.setTitle("Edit SSH Server");
             dialog.initModality(Modality.APPLICATION_MODAL);
             dialog.initOwner(editServerButton.getScene().getWindow());
-            dialog.setScene(new Scene(root));
+            dialog.setScene(AppTheme.scene(root));
 
             showAndWaitAndRestore(dialog);
 
@@ -356,7 +357,7 @@ public class ServerManagementDialogController {
             dialog.setTitle("Clone SSH Server");
             dialog.initModality(Modality.APPLICATION_MODAL);
             dialog.initOwner(cloneServerButton.getScene().getWindow());
-            dialog.setScene(new Scene(root));
+            dialog.setScene(AppTheme.scene(root));
 
             showAndWaitAndRestore(dialog);
 

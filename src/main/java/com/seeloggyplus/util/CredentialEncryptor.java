@@ -111,7 +111,7 @@ public class CredentialEncryptor {
     // -------------------------------------------------------------------------
 
     private static SecretKey loadOrCreateKey() {
-        Path keyPath = Paths.get(".", ".data", ".keystore");
+        Path keyPath = AppPaths.dataFile(".keystore");
         try {
             if (Files.exists(keyPath)) {
                 byte[] keyBytes = Base64.getDecoder().decode(Files.readString(keyPath).trim());

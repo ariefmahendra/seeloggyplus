@@ -12,7 +12,7 @@
     <!-- Top Toolbar -->
     <top>
         <VBox>
-            <ToolBar>
+            <ToolBar styleClass="app-toolbar">
                 <Button fx:id="addServerButton" text="Add Server">
                     <graphic>
                         <FontAwesomeIconView glyphName="PLUS" size="14"/>
@@ -65,18 +65,18 @@
     <center>
         <TableView fx:id="serverTable" VBox.vgrow="ALWAYS">
             <columns>
-                <TableColumn fx:id="nameColumn" text="Name" prefWidth="150" minWidth="100"/>
-                <TableColumn fx:id="hostColumn" text="Host" prefWidth="200" minWidth="150"/>
-                <TableColumn fx:id="portColumn" text="Port" prefWidth="70" minWidth="60" maxWidth="80"/>
-                <TableColumn fx:id="usernameColumn" text="Username" prefWidth="120" minWidth="80"/>
-                <TableColumn fx:id="defaultPathColumn" text="Default Path" prefWidth="200" minWidth="150"/>
-                <TableColumn fx:id="lastUsedColumn" text="Last Used" prefWidth="150" minWidth="120"/>
+                <TableColumn fx:id="nameColumn" text="NAME" prefWidth="150" minWidth="100"/>
+                <TableColumn fx:id="hostColumn" text="HOST" prefWidth="200" minWidth="150"/>
+                <TableColumn fx:id="portColumn" text="PORT" prefWidth="70" minWidth="60" maxWidth="80"/>
+                <TableColumn fx:id="usernameColumn" text="USERNAME" prefWidth="120" minWidth="80"/>
+                <TableColumn fx:id="defaultPathColumn" text="DEFAULT PATH" prefWidth="200" minWidth="150"/>
+                <TableColumn fx:id="lastUsedColumn" text="LAST USED" prefWidth="150" minWidth="120"/>
             </columns>
             <placeholder>
                 <VBox alignment="CENTER" spacing="10">
-                    <FontAwesomeIconView glyphName="SERVER" size="48"/>
-                    <Label text="No SSH servers configured"/>
-                    <Label text="Click 'Add Server' to create a new SSH server configuration"/>
+                    <FontAwesomeIconView glyphName="SERVER" size="48" styleClass="empty-state-icon"/>
+                    <Label text="No SSH servers configured" styleClass="empty-state-title"/>
+                    <Label text="Click 'Add Server' to create a new SSH server configuration" styleClass="empty-state-subtitle"/>
                 </VBox>
             </placeholder>
         </TableView>

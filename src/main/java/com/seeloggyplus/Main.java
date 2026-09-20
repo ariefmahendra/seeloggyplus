@@ -1,6 +1,7 @@
 package com.seeloggyplus;
 
 import com.seeloggyplus.service.PreferenceService;
+import com.seeloggyplus.util.AppTheme;
 import com.seeloggyplus.service.impl.PreferenceServiceImpl;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -55,12 +56,17 @@ public class Main extends Application {
         this.preferenceService = new PreferenceServiceImpl();
 
         try {
+            // Restore the saved theme before building the scene
+            AppTheme.setDark(preferenceService.getPreferencesByCode("app_theme")
+                    .map("dark"::equalsIgnoreCase)
+                    .orElse(false));
+
             // Load main view
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
             Parent root = loader.load();
 
-            // Create scene
-            Scene scene = new Scene(root);
+            // Create scene (themed; stylesheets at scene level so menus/popups inherit them)
+            Scene scene = AppTheme.scene(root);
 
             // Configure stage
             primaryStage.setTitle(APP_TITLE + " v" + VERSION);
