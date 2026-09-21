@@ -61,6 +61,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class MainController {
+    private boolean sceneKeyNavInstalled = false;
+
     /** Tab-header horizontal-scroll throttling (one tab per gesture). */
     private static final double TAB_HEADER_SCROLL_THRESHOLD = 30;
     private static final long TAB_HEADER_SCROLL_COOLDOWN_MS = 260;
@@ -699,6 +701,17 @@ public class MainController {
                 onTabSelected(oldTab, newTab);
             });
 
+            // Scene-level fallback so the arrow keys move the log viewer even
+            // when focus is not on the canvas (e.g. on the tab pane or a pane).
+            if (menuBar != null) {
+                menuBar.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                    if (newScene != null && !sceneKeyNavInstalled) {
+                        sceneKeyNavInstalled = true;
+                        newScene.addEventFilter(KeyEvent.KEY_PRESSED, this::handleGlobalLogNavigation);
+                    }
+                });
+            }
+
             // Intercept UP/DOWN/PAGE_UP/PAGE_DOWN/HOME/END keys so TabPane never changes tabs on arrow keys,
             // and instead routes line scrolling/navigation directly to the log canvas viewer.
             logTabPane.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
@@ -925,6 +938,45 @@ public class MainController {
         if (button.getScene() != null) {
             button.applyCss();
         }
+    }
+
+    /**
+     * Global (scene-level) navigation: route Up/Down/PageUp/PageDown/Home/End to the
+     * active log viewer, unless a text input, list/table or the detail text area has
+     * focus (those need the arrow keys for their own caret/selection).
+     */
+    private void handleGlobalLogNavigation(KeyEvent event) {
+        if (event.isConsumed()) {
+            return;
+        }
+        KeyCode code = event.getCode();
+        boolean navigationKey = code == KeyCode.UP || code == KeyCode.DOWN
+                || code == KeyCode.PAGE_UP || code == KeyCode.PAGE_DOWN
+                || ((code == KeyCode.HOME || code == KeyCode.END) && event.isControlDown());
+        if (!navigationKey || canvasLogViewer == null) {
+            return;
+        }
+        if (usesArrowKeysForItself(event.getTarget())) {
+            return;
+        }
+        canvasLogViewer.handleKeyNavigation(event);
+        if (event.isConsumed()) {
+            canvasLogViewer.requestCanvasFocus();
+        }
+    }
+
+    private static boolean usesArrowKeysForItself(Object target) {
+        if (!(target instanceof Node node)) {
+            return true;
+        }
+        return node instanceof javafx.scene.control.TextInputControl
+                || node instanceof javafx.scene.control.ListView
+                || node instanceof javafx.scene.control.TableView
+                || node instanceof javafx.scene.control.TreeView
+                || node instanceof javafx.scene.control.ScrollBar
+                || node instanceof javafx.scene.control.Slider
+                || node instanceof javafx.scene.control.MenuBar
+                || node.getStyleClass().contains("styled-text-area");
     }
 
     /** True when the scroll target is inside the tab header (not the log content). */

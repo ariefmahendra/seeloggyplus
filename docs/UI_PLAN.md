@@ -227,6 +227,9 @@ Chrome netral graphite; data yang berbicara. Tidak ada aksen biru dekoratif.
 - ✅ Ikon file/favorit memakai **tone tema** (bukan warna jenuh): folder/log
   `-sl-text-secondary`, file `-sl-text-muted`, bintang favorit `-sl-warning`,
   sehingga menyatu di light maupun dark.
+- ✅ Navigasi tombol panah: route UP/DOWN/PAGE/HOME/END dipindah ke **level Scene**
+  agar log viewer tetap bergerak walau fokus bukan di canvas (tetap menghormati
+  input teks, list/table, dan detail RichTextFX).
 - ✅ Tombol step scrollbar (atas/bawah & kiri/kanan) diaktifkan lagi agar bisa
   memindah satu baris dengan klik; scrollbar Find in Files diperlebar (16px,
   thumb min 44px).
@@ -283,6 +286,8 @@ Chrome netral graphite; data yang berbicara. Tidak ada aksen biru dekoratif.
   pressed, focused, selected) untuk light & dark; plus ikon berwarna file/favorit.
 - `LabelContrastTest` — SEMUA label di setiap dialog (termasuk label input field)
   kontras (>= 4.5:1) di light & dark.
+- `LogViewerArrowKeyNavigationTest` — tombol panah keyboard (Up/Down) memindah
+  baris log viewer lewat navigasi level Scene, meski fokus bukan di canvas.
 - `ScrollBarDefectTest` — tombol step (atas/bawah) scrollbar terlihat & berfungsi;
   scrollbar Find in Files cukup lebar (>= 16px, thumb >= 40px).
 - `PreviewSelectionThemeTest` — baris preview terpilih memakai warna seleksi
