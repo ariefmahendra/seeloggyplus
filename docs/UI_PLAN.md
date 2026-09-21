@@ -227,6 +227,13 @@ Chrome netral graphite; data yang berbicara. Tidak ada aksen biru dekoratif.
 - ✅ Ikon file/favorit memakai **tone tema** (bukan warna jenuh): folder/log
   `-sl-text-secondary`, file `-sl-text-muted`, bintang favorit `-sl-warning`,
   sehingga menyatu di light maupun dark.
+- ✅ Tombol step scrollbar (atas/bawah & kiri/kanan) diaktifkan lagi agar bisa
+  memindah satu baris dengan klik; scrollbar Find in Files diperlebar (16px,
+  thumb min 44px).
+- ✅ Seleksi baris preview Find in Files memakai `-sl-selection-bg` + teks tema.
+- ✅ Scroll horizontal (atau Shift+wheel) pada header tab memindah tab terpilih.
+- ✅ Ikon toggle toolbar: `applyCss()` setelah pewarnaan programatik agar warna
+  tema selalu konsisten.
 - ✅ Baris/item terpilih saat kontrol tidak fokus: `-fx-selection-bar-non-focused`
   dibuat gelap (`#2f353c`) + `-fx-selection-bar-text` terang di dark, agar ikon
   dan teks yang memakai tone tema tetap terlihat.
@@ -276,6 +283,14 @@ Chrome netral graphite; data yang berbicara. Tidak ada aksen biru dekoratif.
   pressed, focused, selected) untuk light & dark; plus ikon berwarna file/favorit.
 - `LabelContrastTest` — SEMUA label di setiap dialog (termasuk label input field)
   kontras (>= 4.5:1) di light & dark.
+- `ScrollBarDefectTest` — tombol step (atas/bawah) scrollbar terlihat & berfungsi;
+  scrollbar Find in Files cukup lebar (>= 16px, thumb >= 40px).
+- `PreviewSelectionThemeTest` — baris preview terpilih memakai warna seleksi
+  bersama + teks tema (kontras >= 4.5:1) di light & dark.
+- `TabScrollSwitchTest` — scroll horizontal / Shift+wheel pada header tab
+  memindah tab terpilih.
+- `ToolbarToggleIconThemeTest` — ikon toggle toolbar (Tail/Follow) memakai
+  warna tema di semua state, light & dark.
 - `SelectedRowInactiveContrastTest` — baris/item terpilih saat kontrol **tidak
   fokus** (TableView/ListView) tetap kontras: ikon >= 3:1 dan teks >= 4.5:1,
   light & dark.
