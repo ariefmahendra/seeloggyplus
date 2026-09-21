@@ -148,10 +148,12 @@ public class CanvasLogViewer extends GridPane {
         vScrollBar.setOrientation(javafx.geometry.Orientation.VERTICAL);
         vScrollBar.setVisibleAmount(50);
         vScrollBar.setUnitIncrement(1); // Arrow button clicks scroll 1 line
-        // Stabilize scrollbar thickness so layout math doesn't oscillate
-        vScrollBar.setPrefWidth(10);
-        vScrollBar.setMinWidth(10);
-        vScrollBar.setMaxWidth(10);
+        // Stabilize scrollbar thickness so layout math doesn't oscillate.
+        // Slightly wider so the up/down step buttons are easy to click.
+        vScrollBar.setPrefWidth(14);
+        vScrollBar.setMinWidth(14);
+        vScrollBar.setMaxWidth(14);
+        vScrollBar.getStyleClass().add("log-scroll-bar");
 
         hScrollBar = new ScrollBar();
         hScrollBar.setOrientation(javafx.geometry.Orientation.HORIZONTAL);
