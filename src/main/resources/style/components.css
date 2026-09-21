@@ -187,29 +187,19 @@
     -fx-background-color: -sl-scroll-thumb-pressed;
 }
 
+/* Keep the up/down (and left/right) step buttons visible so a single line/row
+   can be moved at a time by clicking them. */
 .scroll-bar .increment-button,
 .scroll-bar .decrement-button {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
-    -fx-padding: 0;
-    -fx-pref-width: 0;
-    -fx-pref-height: 0;
-    -fx-min-width: 0;
-    -fx-min-height: 0;
-    -fx-max-width: 0;
-    -fx-max-height: 0;
+    -fx-padding: 2;
 }
 
 .scroll-bar .increment-arrow,
 .scroll-bar .decrement-arrow {
-    -fx-shape: " ";
-    -fx-padding: 0;
-    -fx-pref-width: 0;
-    -fx-pref-height: 0;
-    -fx-min-width: 0;
-    -fx-min-height: 0;
-    -fx-max-width: 0;
-    -fx-max-height: 0;
+    -fx-background-color: -sl-text-muted;
+    -fx-padding: 2 3;
 }
 
 .scroll-bar .corner,
@@ -291,7 +281,7 @@
 }
 
 .preview-line-number {
-    -fx-fill: -sl-text-muted;
+    -fx-text-fill: -sl-text-muted;
 }
 
 .preview-target-line {
@@ -362,22 +352,39 @@
    Remote Log Search: easier-to-grab scrollbars & divider
    ============================================ */
 .remote-log-search-dialog .scroll-bar:vertical {
-    -fx-pref-width: 14px;
-    -fx-min-width: 14px;
-    -fx-max-width: 14px;
+    -fx-pref-width: 16px;
+    -fx-min-width: 16px;
+    -fx-max-width: 16px;
 }
 
 .remote-log-search-dialog .scroll-bar:horizontal {
-    -fx-pref-height: 14px;
-    -fx-min-height: 14px;
-    -fx-max-height: 14px;
+    -fx-pref-height: 16px;
+    -fx-min-height: 16px;
+    -fx-max-height: 16px;
 }
 
 .remote-log-search-dialog .scroll-bar .thumb {
     -fx-background-insets: 2;
     -fx-background-radius: 6px;
-    -fx-min-height: 32px;
-    -fx-min-width: 32px;
+    -fx-min-height: 44px;
+    -fx-min-width: 44px;
+}
+
+/* Selected / highlighted preview line: use the shared (translucent) selection
+   colour and keep theme text colours so it stays readable in both themes. */
+.remote-log-search-dialog .list-cell:selected,
+.remote-log-search-dialog .list-cell:filled:selected {
+    -fx-background-color: -sl-selection-bg;
+}
+
+.remote-log-search-dialog .list-cell:selected .label,
+.remote-log-search-dialog .list-cell:selected .text {
+    -fx-text-fill: -sl-text;
+    -fx-fill: -sl-text;
+}
+
+.remote-log-search-dialog .list-cell:selected .preview-line-number {
+    -fx-text-fill: -sl-text-muted;
 }
 
 .remote-log-search-dialog .split-pane-divider {
