@@ -61,6 +61,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class MainController {
+    /** Tab-header horizontal-scroll throttling (one tab per gesture). */
+    private static final double TAB_HEADER_SCROLL_THRESHOLD = 30;
+    private static final long TAB_HEADER_SCROLL_COOLDOWN_MS = 260;
+    private double tabHeaderScrollAccumulator = 0;
+    private long lastTabHeaderSwitchAt = 0;
+
     // FXML Components - MenuBar
     @FXML
     private MenuBar menuBar;
@@ -708,7 +714,8 @@ public class MainController {
             });
 
             // Horizontal scroll (or Shift+wheel) over the tab header moves the
-            // selected tab left/right.
+            // selected tab left/right. Deliberately throttled so a single gesture
+            // moves exactly one tab (trackpads emit many small scroll events).
             logTabPane.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, event -> {
                 if (!isInTabHeaderArea(event.getTarget())) {
                     return;
@@ -720,12 +727,27 @@ public class MainController {
                 if (Math.abs(delta) < 0.01) {
                     return;
                 }
+                event.consume();
+
+                long now = System.currentTimeMillis();
+                if (now - lastTabHeaderSwitchAt < TAB_HEADER_SCROLL_COOLDOWN_MS) {
+                    return;
+                }
+                if (Math.signum(delta) != Math.signum(tabHeaderScrollAccumulator)) {
+                    tabHeaderScrollAccumulator = 0;
+                }
+                tabHeaderScrollAccumulator += delta;
+                if (Math.abs(tabHeaderScrollAccumulator) < TAB_HEADER_SCROLL_THRESHOLD) {
+                    return;
+                }
+                int direction = tabHeaderScrollAccumulator > 0 ? 1 : -1;
+                tabHeaderScrollAccumulator = 0;
                 int index = logTabPane.getSelectionModel().getSelectedIndex();
-                int next = delta > 0 ? index + 1 : index - 1;
+                int next = index + direction;
                 if (next >= 0 && next < logTabPane.getTabs().size()) {
                     logTabPane.getSelectionModel().select(next);
+                    lastTabHeaderSwitchAt = now;
                 }
-                event.consume();
             });
 
             logTabPane.setOnMouseClicked(event -> {

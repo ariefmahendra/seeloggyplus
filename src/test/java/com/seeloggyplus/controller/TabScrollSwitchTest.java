@@ -64,18 +64,38 @@ class TabScrollSwitchTest {
             Node header = pane.lookup(".tab-header-area");
             assertNotNull(header, "tab header area must be available");
 
-            Event.fireEvent(header, scrollEvent(40, 0, false));
+            // The handler is throttled (cooldown) so one gesture moves one tab;
+            // wait out the cooldown between separate gestures in the test.
+            fireAndWait(header, scrollEvent(40, 0, false));
             assertEquals(1, pane.getSelectionModel().getSelectedIndex(),
                     "scroll right must move to the next tab");
 
-            Event.fireEvent(header, scrollEvent(-40, 0, false));
+            fireAndWait(header, scrollEvent(-40, 0, false));
             assertEquals(0, pane.getSelectionModel().getSelectedIndex(),
                     "scroll left must move back to the previous tab");
 
-            Event.fireEvent(header, scrollEvent(0, 40, true));
+            fireAndWait(header, scrollEvent(0, 40, true));
             assertEquals(1, pane.getSelectionModel().getSelectedIndex(),
                     "Shift+wheel over the header must move to the next tab");
+
+            // A burst of small events from a single gesture must not skip tabs.
+            int before = pane.getSelectionModel().getSelectedIndex();
+            for (int i = 0; i < 5; i++) {
+                Event.fireEvent(header, scrollEvent(8, 0, false));
+            }
+            assertTrue(Math.abs(pane.getSelectionModel().getSelectedIndex() - before) <= 1,
+                    "a single scroll gesture must not skip multiple tabs");
         });
+    }
+
+    private static void fireAndWait(Node header, ScrollEvent event) {
+        Event.fireEvent(header, event);
+        try {
+            Thread.sleep(320);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        WaitForAsyncUtils.waitForFxEvents();
     }
 
     private TabPane logTabPane() {
