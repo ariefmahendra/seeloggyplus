@@ -77,6 +77,16 @@ docs/UI_PLAN.md
 # jqwik property-based testing database (local cache)
 .jqwik-database
 
+# Auto-generated launcher config (recreated at runtime; launcher has defaults)
+launcher.properties
+
+# JVM / tooling artifacts
+*.hprof
+.attach_pid*
+*.orig
+*.rej
+*.bak
+
 # Temporary files
 *.tmp
 *.temp
