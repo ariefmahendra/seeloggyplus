@@ -139,16 +139,37 @@ jobs:
         shell: bash
         run: cat build/distributions/update-manifest.json
 
+      - name: Build release notes from CHANGELOG
+        shell: bash
+        run: |
+          set -e
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" {flag=1; next}
+            flag && /^## \[/ {exit}
+            flag {print}
+          ' CHANGELOG.md > release-body.md
+          if [ ! -s release-body.md ]; then
+            {
+              echo "Release ${VERSION}"
+              echo ""
+              echo "See CHANGELOG.md for details."
+            } > release-body.md
+          fi
+          echo "----- release-body.md -----"
+          cat release-body.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release-body.md
           files: |
             build/distributions/seeloggyplus-Portable-linux.zip
             build/distributions/seeloggyplus-Portable-linux-jre.zip
             build/distributions/seeloggyplus-Portable-win.zip
             build/distributions/seeloggyplus-Portable-win-jre.zip
             build/distributions/update-manifest.json
-          generate_release_notes: true
 
       - name: Stage manifest for GitHub Pages
         shell: bash
