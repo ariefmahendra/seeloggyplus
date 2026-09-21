@@ -69,10 +69,11 @@ labels** (`feature`, `bug`, `ui`, `test`, `docs`, `build`, `chore`, …).
    - runs the test suite,
    - builds the portable packages for Windows/Linux (with and without JRE),
    - merges the update manifests,
-   - **creates the GitHub Release** and attaches the artifacts,
+   - **creates the GitHub Release**, using the matching `CHANGELOG.md` section as the
+     release body, and attaches the artifacts,
    - publishes `update-manifest.json` to `gh-pages`.
-8. Verify the release page and the generated notes. Edit the notes if you want a
-   short professional summary on top (the categorized list is appended).
+8. Verify the release page and its notes. A ready-to-use narrative per version also
+   lives in `docs/release-notes/<version>.md` for manual publishing.
 
 ## One-off / manual release (if CI is unavailable)
 
@@ -83,6 +84,8 @@ gh release create X.Y.Z \
   --title "SeeLoggyPlus X.Y.Z — <short title>" \
   --notes-file docs/release-notes/X.Y.Z.md
 ```
+
+Release notes per version are kept in `docs/release-notes/` (e.g. `0.4.3.md`).
 
 Prefer the automated workflow; use this only as a fallback.
 
