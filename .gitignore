@@ -71,6 +71,9 @@ logs/
 # Application specific
 .seeloggyplus/
 
+# Local design/planning notes (kept locally, not published)
+docs/UI_PLAN.md
+
 # Temporary files
 *.tmp
 *.temp
