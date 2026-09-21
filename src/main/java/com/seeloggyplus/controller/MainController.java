@@ -707,6 +707,27 @@ public class MainController {
                 }
             });
 
+            // Horizontal scroll (or Shift+wheel) over the tab header moves the
+            // selected tab left/right.
+            logTabPane.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, event -> {
+                if (!isInTabHeaderArea(event.getTarget())) {
+                    return;
+                }
+                double delta = event.getDeltaX();
+                if (Math.abs(delta) < 0.01 && event.isShiftDown()) {
+                    delta = event.getDeltaY();
+                }
+                if (Math.abs(delta) < 0.01) {
+                    return;
+                }
+                int index = logTabPane.getSelectionModel().getSelectedIndex();
+                int next = delta > 0 ? index + 1 : index - 1;
+                if (next >= 0 && next < logTabPane.getTabs().size()) {
+                    logTabPane.getSelectionModel().select(next);
+                }
+                event.consume();
+            });
+
             logTabPane.setOnMouseClicked(event -> {
                 if (event.getButton() == MouseButton.MIDDLE) {
                     javafx.scene.Node target = (javafx.scene.Node) event.getTarget();
@@ -877,6 +898,28 @@ public class MainController {
         } else if (graphic instanceof javafx.scene.shape.Shape shape) {
             shape.setFill(selected ? Color.WHITE : Color.web("#333333"));
         }
+        // Re-apply CSS so the theme's icon colour wins immediately (otherwise the
+        // programmatic fill above can linger and look off-colour in the toolbar).
+        if (button.getScene() != null) {
+            button.applyCss();
+        }
+    }
+
+    /** True when the scroll target is inside the tab header (not the log content). */
+    private boolean isInTabHeaderArea(Object target) {
+        if (!(target instanceof Node node)) {
+            return false;
+        }
+        while (node != null) {
+            if (node.getStyleClass().contains("tab-header-area")) {
+                return true;
+            }
+            if (node == logTabPane) {
+                return false;
+            }
+            node = node.getParent();
+        }
+        return false;
     }
 
     private void normalizeLayoutState() {
