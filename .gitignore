@@ -74,6 +74,9 @@ logs/
 # Local design/planning notes (kept locally, not published)
 docs/UI_PLAN.md
 
+# jqwik property-based testing database (local cache)
+.jqwik-database
+
 # Temporary files
 *.tmp
 *.temp
