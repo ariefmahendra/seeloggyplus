@@ -1,27 +1,27 @@
 {
   "channel": "stable",
-  "latest": "0.4.2",
-  "releaseNotesUrl": "https://github.com/ariefmahendra/seeloggyplus/releases/tag/0.4.2",
+  "latest": "0.4.3",
+  "releaseNotesUrl": "https://github.com/ariefmahendra/seeloggyplus/releases/tag/0.4.3",
   "assets": {
     "windows-nojre": {
-      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.4.2/seeloggyplus-Portable-win.zip",
-      "size": 68144361,
-      "sha256": "d5cb543f5e3f2e812831c90cdac6b629a6461a5cddedabe95cc5cd66eef2c5d1"
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.4.3/seeloggyplus-Portable-win.zip",
+      "size": 68144970,
+      "sha256": "5ab6603fe06e09b1e685a7f784e316b3114a580ce6965c2b404fe800aa92b6f7"
     },
     "windows-jre": {
-      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.4.2/seeloggyplus-Portable-win-jre.zip",
-      "size": 103486400,
-      "sha256": "492e42c6a2464b60f53e25792b851a64b4d4d49b0fc8f8bb0bf5a590dd49a33c"
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.4.3/seeloggyplus-Portable-win-jre.zip",
+      "size": 103487009,
+      "sha256": "711ae66c5d564dbde594f5175ed77af7702fc5070f51c4dabf76a710f55a43fe"
     },
     "linux-nojre": {
-      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.4.2/seeloggyplus-Portable-linux.zip",
-      "size": 75573950,
-      "sha256": "6670f9e839a6d74a8a21e272cc1a416f0a24c71d3dd79d4fc16a51b226ad74b6"
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.4.3/seeloggyplus-Portable-linux.zip",
+      "size": 75574509,
+      "sha256": "fecb4568d55e2386b521e119e776d81723b846ac59996b37be88bf34f11d62be"
     },
     "linux-jre": {
-      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.4.2/seeloggyplus-Portable-linux-jre.zip",
-      "size": 114219791,
-      "sha256": "898d1231fff41994304fdf9088ad579afff64e700162d7e6eb36630b2185b049"
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.4.3/seeloggyplus-Portable-linux-jre.zip",
+      "size": 114220350,
+      "sha256": "c11aac44e404a3fdd0ed0f9d71fe41b87d803e2f67db4a8156a18877b56e31e1"
     }
   }
 }
