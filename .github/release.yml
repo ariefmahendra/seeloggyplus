@@ -1,0 +1,40 @@
+# Configuration for GitHub's automatically generated release notes.
+# Used by .github/workflows/release.yml (generate_release_notes: true).
+# Categories are driven by pull-request labels.
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+    authors:
+      - dependabot[bot]
+  categories:
+    - title: 🚀 Features
+      labels:
+        - feature
+        - enhancement
+    - title: 🐛 Bug Fixes
+      labels:
+        - bug
+        - fix
+    - title: 🎨 UI & Design
+      labels:
+        - ui
+        - design
+        - theme
+    - title: 🧪 Tests
+      labels:
+        - test
+        - tests
+    - title: 📝 Documentation
+      labels:
+        - documentation
+        - docs
+    - title: 🔧 Build, CI & Chores
+      labels:
+        - build
+        - ci
+        - chore
+        - dependencies
+    - title: Other Changes
+      labels:
+        - "*"
