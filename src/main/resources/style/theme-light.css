@@ -1,0 +1,131 @@
+/* ============================================================
+   SeeLoggyPlus - Light Theme
+   ------------------------------------------------------------
+   Overrides ALL design tokens from theme.css so the ENTIRE UI is
+   light, including the chrome (menu bar / toolbar / status bar)
+   that is dark graphite in the default theme. Interactive states
+   (hover / selected / focus) use the blue accent via the
+   `-sl-accent*` tokens.
+
+   Loaded AFTER theme.css + components.css, so its `.root` token
+   values win. Popup windows inherit it because it is installed at
+   Scene level (see AppTheme). Root style class: `theme-light`.
+   ============================================================ */
+
+.root {
+    /* ---- Chrome (menu / toolbar / status bar) ------------------ */
+    -sl-chrome: #e9ecef;
+    -sl-chrome-hover: #dee2e6;
+    -sl-chrome-pressed: #ced4da;
+    -sl-chrome-text: #1f2329;
+    -sl-chrome-text-muted: #5c636a;
+
+    /* ---- Accent (interactive) ---------------------------------- */
+    -sl-brand: #2563eb;
+    -sl-brand-hover: #1d4ed8;
+    -sl-brand-pressed: #1e40af;
+    -sl-brand-soft: #dbeafe;
+    -sl-brand-faint: rgba(37, 99, 235, 0.22);
+    -sl-on-brand: #ffffff;
+
+    /* ---- Interaction (hover / selected / pressed / focus) ------ */
+    -sl-accent: #2563eb;
+    -sl-accent-hover: #1d4ed8;
+    -sl-accent-pressed: #1e40af;
+    -sl-accent-text: #ffffff;
+
+    /* ---- Surfaces ---------------------------------------------- */
+    -sl-bg: #f1f3f5;
+    -sl-surface: #ffffff;
+    -sl-surface-alt: #f8f9fa;
+    -sl-surface-sunken: #e9ecef;
+    -sl-overlay: rgba(0, 0, 0, 0.45);
+
+    /* ---- Borders ----------------------------------------------- */
+    -sl-border: #ced4da;
+    -sl-border-soft: #e9ecef;
+    -sl-border-strong: #adb5bd;
+
+    /* ---- Text -------------------------------------------------- */
+    -sl-text: #1f2329;
+    -sl-text-secondary: #495057;
+    -sl-text-muted: #6c757d;
+    -sl-text-faint: #828a91;
+    -sl-text-inverse: #ffffff;
+    -sl-text-version: #aeb6bf;
+    -sl-text-section: #343a40;
+
+    /* ---- Misc -------------------------------------------------- */
+    -sl-preview-target: #dbeafe;
+    -sl-selection-bg: rgba(52, 58, 64, 0.18);
+
+    /* ---- Semantic ---------------------------------------------- */
+    -sl-success: #2f855a;
+    -sl-warning: #92400e;
+    -sl-danger: #c0392b;
+    -sl-danger-hover: #a03325;
+    -sl-danger-soft: #fbeeed;
+    -sl-danger-soft-hover: #f6dedb;
+    -sl-info: #2b6cb0;
+    -sl-live: #2f855a;
+
+    -sl-chrome-success: #2f855a;
+    -sl-chrome-warning: #b45309;
+    -sl-chrome-danger: #c0392b;
+    -sl-memory-track: #ced4da;
+
+    /* ---- Scrollbar --------------------------------------------- */
+    -sl-scroll-track: #f1f3f5;
+    -sl-scroll-thumb: #c1c7cd;
+    -sl-scroll-thumb-hover: #98a1a9;
+    -sl-scroll-thumb-pressed: #6b7480;
+
+    /* ---- Log levels -------------------------------------------- */
+    -sl-level-fatal-bg: #fde8e8;
+    -sl-level-fatal-fg: #7f1d1d;
+    -sl-level-error-bg: #fde8e8;
+    -sl-level-error-fg: #b91c1c;
+    -sl-level-warn-bg: #fdf3e3;
+    -sl-level-warn-fg: #92400e;
+    -sl-level-info-bg: #e8f0fe;
+    -sl-level-info-fg: #1d4ed8;
+    -sl-level-debug-bg: #eef0f2;
+    -sl-level-debug-fg: #4b5563;
+    -sl-level-trace-bg: #f4f5f6;
+    -sl-level-trace-fg: #6b7280;
+
+    -sl-row-error-bg: #fdecec;
+    -sl-row-error-sel: #fbd9d9;
+    -sl-row-warn-bg: #fdf8e8;
+    -sl-row-warn-sel: #fbf0c9;
+
+    /* ---- Syntax highlighting ----------------------------------- */
+    -sl-syntax-error: #b91c1c;
+    -sl-syntax-warn: #92400e;
+    -sl-syntax-info: #2b6cb0;
+    -sl-syntax-debug: #2f855a;
+    -sl-syntax-trace: #6c757d;
+    -sl-syntax-default: #1f2329;
+    -sl-syntax-selection: #1d4ed8;
+    -sl-syntax-selected-line: #e9ecef;
+    -sl-syntax-json-key: #0b5563;
+    -sl-syntax-json-string: #2f855a;
+    -sl-syntax-json-number: #b45309;
+    -sl-syntax-json-boolean: #6b21a8;
+    -sl-syntax-json-null: #6c757d;
+    -sl-syntax-json-punct: #343a40;
+    -sl-syntax-xml-tag: #1e3a8a;
+    -sl-syntax-xml-attr: #b45309;
+    -sl-syntax-xml-equals: #343a40;
+    -sl-syntax-xml-value: #2f855a;
+    -sl-syntax-xml-comment: #6c757d;
+    -sl-syntax-xml-decl: #0f766e;
+    -sl-syntax-xml-cdata: #9d174d;
+}
+
+/* Tooltips follow the chrome in the default theme; keep them readable on the
+   light chrome by giving them a dark background with light text. */
+.tooltip {
+    -fx-background-color: #343a40;
+    -fx-text-fill: #f1f3f5;
+}

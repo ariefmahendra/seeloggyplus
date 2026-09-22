@@ -55,7 +55,12 @@
                                     <ComboBox fx:id="appFontFamilyComboBox" prefWidth="200.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
                                  </children>
                               </GridPane>
-                              <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark mode" />
+                              <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                 <children>
+                                    <Label text="Theme:" />
+                                    <ComboBox fx:id="themeComboBox" prefWidth="150.0" />
+                                 </children>
+                              </HBox>
                               <Separator prefWidth="200.0" />
                               <Label text="Performance">
                                  <font>

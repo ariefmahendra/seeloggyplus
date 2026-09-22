@@ -1691,9 +1691,10 @@ public class MainController {
                 RecentFile recentFile = new RecentFile();
                 recentFile.setFileId(logFile.getId());
                 recentFile.setLastOpened(LocalDateTime.now());
+                recentFile.setMode(startTail ? RecentFile.MODE_TAIL : RecentFile.MODE_OPEN);
                 recentFileService.save(logFile, recentFile);
                 refreshRecentFilesList();
-                logger.info("Added file to recent files: {}", file.getName());
+                logger.info("Added file to recent files: {} (mode={})", file.getName(), recentFile.getMode());
             }
 
             if (selectInRecent) {
@@ -2119,6 +2120,36 @@ public class MainController {
 
     private void openRemoteLogFile(String remotePath, String remoteFileName, SSHServiceImpl sshService,
             SSHServerModel sshServer, int targetLine) {
+        // Never create a second tab (and never re-download) for a remote file that is
+        // already open, whether it is currently streaming (REMOTE) or was downloaded
+        // (LOCAL). Re-downloading while a tail is active used to fail with an SSH
+        // channel error; reuse the existing tab instead.
+        for (Map.Entry<Tab, LogSession> entry : sessionMap.entrySet()) {
+            LogSession s = entry.getValue();
+            boolean sameRemoteStream = s.getSessionType() == LogSession.SessionType.REMOTE
+                    && remotePath.equals(s.getRemotePath())
+                    && s.getSshServer() != null && sshServer != null
+                    && s.getSshServer().getId() != null
+                    && s.getSshServer().getId().equals(sshServer.getId());
+            boolean sameDownloadedRemoteFile = s.getSessionType() == LogSession.SessionType.LOCAL
+                    && s.getLogFileRecord() != null
+                    && s.getLogFileRecord().isRemote()
+                    && remotePath.equals(s.getLogFileRecord().getFilePath())
+                    && sshServer != null && sshServer.getId() != null
+                    && sshServer.getId().equals(s.getLogFileRecord().getSshServerID());
+            if (sameRemoteStream || sameDownloadedRemoteFile) {
+                logger.info("Remote file already open, selecting existing tab instead of re-downloading: {}",
+                        remotePath);
+                if (logTabPane != null) {
+                    logTabPane.getSelectionModel().select(entry.getKey());
+                }
+                if (sshService != null) {
+                    sshService.disconnect();
+                }
+                return;
+            }
+        }
+
         File cachedFile = downloadedRemoteFiles.get(remoteDownloadKey(remotePath, sshServer));
         if (cachedFile != null && cachedFile.isFile()) {
             logger.info("Reusing cached remote download {} for {}", cachedFile.getAbsolutePath(), remotePath);
@@ -2528,9 +2559,20 @@ public class MainController {
         });
     }
 
+    /**
+     * Whether a Recent entry should be reopened in live tail mode. Entries saved
+     * before the mode column existed return {@code null}/OPEN and open normally.
+     */
+    static boolean isTailModeRecent(RecentFilesDto recentFile) {
+        return recentFile != null && RecentFile.MODE_TAIL.equalsIgnoreCase(recentFile.openMode());
+    }
+
     private void handleRecentFileSelected(RecentFilesDto recentFile) {
         if (recentFile == null || recentFile.logFile() == null) return;
         LogFile logFile = recentFile.logFile();
+        // Reopen the file the way it was last viewed: TAIL streams again, otherwise
+        // fall back to a normal OPEN (download for remote files).
+        boolean tailMode = isTailModeRecent(recentFile);
 
         if (logFile.isRemote()) {
             String filePath = logFile.getFilePath();
@@ -2569,7 +2611,9 @@ public class MainController {
             SSHServerModel cachedServer = logFile.getSshServerID() == null ? null
                     : serverManagementService.getServerById(logFile.getSshServerID());
             File cachedDownload = downloadedRemoteFiles.get(remoteDownloadKey(logFile.getFilePath(), logFile.getSshServerID()));
-            if (cachedDownload != null && cachedDownload.isFile()) {
+            // A cached download is only a valid shortcut for normal OPEN mode. In TAIL
+            // mode we must reconnect and stream, even if a downloaded copy is cached.
+            if (!tailMode && cachedDownload != null && cachedDownload.isFile()) {
                 logger.info("Opening cached remote download from Recent: {}", cachedDownload.getAbsolutePath());
                 openLocalLogFile(cachedDownload, logFile.getName(), cachedServer, logFile.getFilePath(), false);
                 return;
@@ -2636,10 +2680,15 @@ public class MainController {
             connectTask.setOnSucceeded(e -> {
                 SSHServiceImpl sshService = connectTask.getValue();
                 if (sshService != null) {
-                    logger.info("SSH connected for remote recent file, opening normally.");
+                    SSHServerModel server = serverManagementService.getServerById(logFile.getSshServerID());
                     resetFilters();
-                    openRemoteLogFile(logFile.getFilePath(), logFile.getName(), sshService,
-                            serverManagementService.getServerById(logFile.getSshServerID()));
+                    if (tailMode) {
+                        logger.info("SSH connected for remote recent file, resuming TAIL mode.");
+                        startRemoteTail(logFile.getFilePath(), sshService, server);
+                    } else {
+                        logger.info("SSH connected for remote recent file, opening normally.");
+                        openRemoteLogFile(logFile.getFilePath(), logFile.getName(), sshService, server);
+                    }
                 }
 
             });
@@ -2683,9 +2732,9 @@ public class MainController {
                 }
             }
 
-            logger.info("Opening recent file: {} with RAW config", file.getName());
+            logger.info("Opening recent file: {} with RAW config (tail={})", file.getName(), tailMode);
             resetFilters();
-            openLocalLogFile(file, false);
+            openLocalLogFile(file, false, tailMode);
         }
     }
 
@@ -3678,6 +3727,7 @@ public class MainController {
                 RecentFile recent = new RecentFile();
                 recent.setFileId(logFile.getId());
                 recent.setLastOpened(LocalDateTime.now());
+                recent.setMode(RecentFile.MODE_TAIL);
 
                 recentFileService.save(logFile, recent);
                 createdNewRecent = true;
@@ -3685,6 +3735,11 @@ public class MainController {
                 logger.info("Created new RecentFile for remote tail: fileId={}, serverId={}", logFile.getId(), serverId);
             } else {
                 createdNewRecent = false;
+                // Persist the mode so double-clicking this Recent entry streams it again,
+                // but keep the original lastOpened so the list order does not jump.
+                RecentFile existingRecent = existingRecentOpt.get();
+                existingRecent.setMode(RecentFile.MODE_TAIL);
+                recentFileService.save(logFile, existingRecent);
                 logger.info("Remote tail for existing recent fileId={}, NOT updating lastOpened (no re-sort)",
                         logFile.getId());
             }

@@ -48,7 +48,8 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 "pc.name AS config_name, " +
                 "pc.description AS config_description, " +
                 "pc.regex_pattern, " +
-                "pc.timestamp_format " +
+                "pc.timestamp_format, " +
+                "rf.mode AS open_mode " +
                 "FROM recent_files rf " +
                 "JOIN log_files lf ON rf.file_id = lf.id " +
                 "LEFT JOIN parsing_configs pc ON lf.parsing_configuration_id = pc.id " +
@@ -69,7 +70,9 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
 
     @Override
     public void save(RecentFile recentFile) {
-        String sql = "INSERT OR REPLACE INTO recent_files (id, file_id, last_opened) VALUES (?, ?, ?)";
+        // file_id is UNIQUE, so INSERT OR REPLACE updates the existing row (timestamp
+        // and remembered OPEN/TAIL mode) instead of inserting duplicates.
+        String sql = "INSERT OR REPLACE INTO recent_files (id, file_id, last_opened, mode) VALUES (?, ?, ?, ?)";
         Connection conn = getConnection();
         try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
             preparedStatement.setString(1, recentFile.getId());
@@ -80,9 +83,10 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 ? recentFile.getLastOpened().toString()
                 : java.time.LocalDateTime.now().toString();
             preparedStatement.setString(3, lastOpenedStr);
+            preparedStatement.setString(4, recentFile.getMode());
 
             preparedStatement.executeUpdate();
-            logger.info("Successfully saved recent file: {}", recentFile.getFileId());
+            logger.info("Successfully saved recent file: {} (mode={})", recentFile.getFileId(), recentFile.getMode());
         } catch (SQLException e) {
             logger.error("Error saving recent file: {}", recentFile.getId(), e);
         }
@@ -116,7 +120,8 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 "pc.name AS config_name, " +
                 "pc.description AS config_description, " +
                 "pc.regex_pattern, " +
-                "pc.timestamp_format " +
+                "pc.timestamp_format, " +
+                "rf.mode AS open_mode " +
                 "FROM recent_files rf " +
                 "JOIN log_files lf ON rf.file_id = lf.id " +
                 "LEFT JOIN parsing_configs pc ON lf.parsing_configuration_id = pc.id " +
@@ -140,7 +145,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
     @Override
     public Optional<RecentFile> findByFileId(String fileId) {
         RecentFile recentFile = null;
-        String sql = "SELECT id, file_id, last_opened FROM recent_files WHERE file_id = ?";
+        String sql = "SELECT id, file_id, last_opened, mode FROM recent_files WHERE file_id = ?";
 
         Connection conn = getConnection();
         try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
@@ -187,6 +192,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
         recentFile.setId(rs.getString("id"));
         recentFile.setFileId(rs.getString("file_id"));
         recentFile.setLastOpened(LocalDateTime.parse(rs.getString("last_opened")));
+        recentFile.setMode(rs.getString("mode"));
         return recentFile;
     }
 
@@ -227,6 +233,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
             parsingConfig.validatePattern();
         }
 
-        return new RecentFilesDto(logFile, parsingConfig, serverName);
+        String openMode = rs.getString("open_mode");
+        return new RecentFilesDto(logFile, parsingConfig, serverName, openMode);
     }
 }

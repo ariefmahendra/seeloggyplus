@@ -97,6 +97,7 @@ public class DatabaseConfig {
                 "id TEXT PRIMARY KEY," +
                 "file_id TEXT NOT NULL UNIQUE," +
                 "last_opened TEXT NOT NULL," +
+                "mode TEXT," +
                 "FOREIGN KEY (file_id) REFERENCES log_files(id) ON DELETE CASCADE" +
                 ");";
 
@@ -119,9 +120,44 @@ public class DatabaseConfig {
             
             // Migration: Add timestamp_format column if not exists
             migrateTimestampFormat();
+            // Migration: Add recent_files.mode column if not exists
+            migrateRecentFileMode();
         } catch (SQLException e) {
             logger.error("Failed to create tables.", e);
         }
+    }
+
+    /**
+     * Migration: Add mode column to existing recent_files table.
+     * The mode records whether the file was last opened in normal (OPEN) or
+     * streaming (TAIL) mode so the Recent list can reopen it the same way.
+     */
+    private void migrateRecentFileMode() {
+        if (columnExists("recent_files", "mode")) {
+            logger.debug("mode column already exists in recent_files table");
+            return;
+        }
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("ALTER TABLE recent_files ADD COLUMN mode TEXT");
+            logger.info("Migration: Added mode column to recent_files table");
+        } catch (SQLException e) {
+            logger.error("Failed to migrate recent_files.mode column", e);
+        }
+    }
+
+    private boolean columnExists(String table, String column) {
+        String sql = "PRAGMA table_info(" + table + ")";
+        try (Statement stmt = connection.createStatement();
+             var rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                if (column.equals(rs.getString("name"))) {
+                    return true;
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to inspect columns for table {}", table, e);
+        }
+        return false;
     }
     
     /**

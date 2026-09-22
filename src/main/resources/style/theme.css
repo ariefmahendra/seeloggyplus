@@ -35,6 +35,15 @@
     -sl-brand-faint: rgba(52, 58, 64, 0.25);
     -sl-on-brand: #ffffff;
 
+    /* ---- Interaction (hover / selected / pressed / focus) ------ */
+    /* Every interactive state uses these tokens, so a theme can change the
+       accent colour (e.g. the all-light theme uses blue) without touching
+       component rules. */
+    -sl-accent: #4a535e;
+    -sl-accent-hover: #3a424b;
+    -sl-accent-pressed: #2b3138;
+    -sl-accent-text: #d7dbe0;
+
     /* ---- Surfaces ---------------------------------------------- */
     -sl-bg: #f1f3f5;
     -sl-surface: #ffffff;
@@ -67,6 +76,7 @@
     -sl-danger: #c0392b;
     -sl-danger-hover: #a03325;
     -sl-danger-soft: #fbeeed;
+    -sl-danger-soft-hover: #f6dedb;
     -sl-info: #2b6cb0;
     -sl-live: #2f855a;
 
@@ -74,6 +84,8 @@
     -sl-chrome-success: #4ade80;
     -sl-chrome-warning: #fbbf24;
     -sl-chrome-danger: #fca5a5;
+    /* Track behind the memory gauge on the chrome */
+    -sl-memory-track: #4a535e;
 
     /* ---- Scrollbar --------------------------------------------- */
     -sl-scroll-track: #f1f3f5;
@@ -149,7 +161,13 @@
 
 .app-menubar .menu:hover,
 .app-menubar .menu:showing {
-    -fx-background-color: -sl-chrome-hover;
+    -fx-background-color: -sl-accent-hover;
+}
+
+.app-menubar .menu:hover > .label,
+.app-menubar .menu:showing > .label,
+.app-menubar .menu:focused > .label {
+    -fx-text-fill: -sl-accent-text;
 }
 
 /* ============================================================
@@ -174,18 +192,40 @@
     -fx-text-fill: -sl-chrome-text;
     -fx-padding: 4 7 4 7;
     -fx-cursor: hand;
+    /* Reserve the focus-ring space up-front (transparent) so the button does not
+       grow when it gains focus / is clicked. Only the colour changes on focus. */
+    -fx-border-color: transparent;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
 }
 
 .app-toolbar .button:hover,
 .app-toolbar .toggle-button:hover {
-    -fx-background-color: -sl-chrome-hover;
+    -fx-background-color: -sl-accent-hover;
 }
 
 .app-toolbar .button:pressed,
-.app-toolbar .toggle-button:pressed,
+.app-toolbar .toggle-button:pressed {
+    -fx-background-color: -sl-accent-pressed;
+}
+
 .app-toolbar .toggle-button:selected,
 .app-toolbar .toggle-button:selected:hover {
-    -fx-background-color: -sl-chrome-pressed;
+    -fx-background-color: -sl-accent;
+}
+
+/* Icons follow the accent so they stay visible on the accent background
+   (e.g. white on the blue accent of the all-light theme). */
+.app-toolbar .button:hover .glyph-icon,
+.app-toolbar .button:hover FontAwesomeIconView,
+.app-toolbar .button:pressed .glyph-icon,
+.app-toolbar .button:pressed FontAwesomeIconView,
+.app-toolbar .toggle-button:hover .glyph-icon,
+.app-toolbar .toggle-button:hover FontAwesomeIconView,
+.app-toolbar .toggle-button:selected .glyph-icon,
+.app-toolbar .toggle-button:selected FontAwesomeIconView {
+    -fx-fill: -sl-accent-text;
+    fill: -sl-accent-text;
 }
 
 .app-toolbar .button:disabled,
@@ -210,15 +250,15 @@
     -fx-background-radius: 3;
 }
 
-/* Visible focus ring for controls on dark chrome (the author focus color is dark) */
+/* Visible focus ring for controls on the chrome (theme accent colour) */
 .app-menubar .menu:focused {
-    -fx-background-color: -sl-chrome-hover;
+    -fx-background-color: -sl-accent-hover;
 }
 
 .app-toolbar .button:focused,
 .app-toolbar .toggle-button:focused,
 .status-bar .button:focused {
-    -fx-border-color: -sl-chrome-text;
+    -fx-border-color: -sl-accent;
     -fx-border-width: 1;
     -fx-border-radius: 3;
 }
@@ -258,15 +298,19 @@
     -fx-background-radius: 3;
     -fx-text-fill: -sl-chrome-text;
     -fx-cursor: hand;
+    /* Reserve focus-ring space so the button never resizes on focus/click. */
+    -fx-border-color: transparent;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
 }
 
 .status-bar .button:hover {
-    -fx-background-color: -sl-chrome-hover;
+    -fx-background-color: -sl-accent-hover;
 }
 
 .status-memory-bar {
     -fx-accent: -sl-chrome-text;
-    -fx-control-inner-background: #4a535e;
+    -fx-control-inner-background: -sl-memory-track;
 }
 
 .status-memory-bar.memory-ok {
@@ -287,7 +331,7 @@
 
 .status-link:hover {
     -fx-underline: true;
-    -fx-text-fill: -sl-text-inverse;
+    -fx-text-fill: -sl-accent-text;
 }
 
 /* ============================================================
@@ -377,7 +421,7 @@ FontAwesomeIconView {
 }
 
 .btn-danger-outline:hover {
-    -fx-base: #f6dedb;
+    -fx-base: -sl-danger-soft-hover;
 }
 
 .btn-compact {

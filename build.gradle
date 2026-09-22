@@ -63,17 +63,28 @@ dependencies {
     testImplementation 'net.jqwik:jqwik:1.9.2'
 }
 
-// Generates a version.properties file from the project version
-task generateVersionProperties {
+// Generates a version.properties file from the project version.
+//
+// The file is written to a dedicated generated-resources directory (NOT directly
+// into processResources' output dir) and that directory is registered as an extra
+// resource source. Declaring `version` as an input and the directory as an output
+// makes the generation cache-correct: Gradle's up-to-date checks / build cache can
+// no longer restore a stale processResources output that drops version.properties,
+// which previously made released builds fall back to the "DEV" version.
+def generatedVersionResources = "$buildDir/generated/version-resources"
+
+def generateVersionProperties = tasks.register('generateVersionProperties') {
+    inputs.property('version', project.version.toString())
+    outputs.dir(generatedVersionResources)
     doLast {
-        def propsFile = file("$buildDir/resources/main/version.properties")
+        def propsFile = file("${generatedVersionResources}/version.properties")
         propsFile.parentFile.mkdirs()
         propsFile.text = "version=${project.version}"
     }
 }
 // Ensure the properties file is generated before resources are processed
-// Ensure the properties file is generated before resources are processed
 processResources.dependsOn generateVersionProperties
+sourceSets.main.resources.srcDir(generatedVersionResources)
 
 test {
     useJUnitPlatform()
