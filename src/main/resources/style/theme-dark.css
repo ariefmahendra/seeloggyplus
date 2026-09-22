@@ -24,6 +24,12 @@
     -sl-brand-faint: rgba(120, 132, 144, 0.35);
     -sl-on-brand: #ffffff;
 
+    /* ---- Interaction (hover / selected / pressed / focus) ------ */
+    -sl-accent: #434b53;
+    -sl-accent-hover: #343b42;
+    -sl-accent-pressed: #23282d;
+    -sl-accent-text: #d7dbe0;
+
     /* ---- Surfaces ---------------------------------------------- */
     -sl-bg: #171a1d;
     -sl-surface: #1e2226;
@@ -54,12 +60,14 @@
     -sl-danger: #f87171;
     -sl-danger-hover: #ef4444;
     -sl-danger-soft: #3a2426;
+    -sl-danger-soft-hover: #4a2a28;
     -sl-info: #6ea8fe;
     -sl-live: #4ade80;
 
     -sl-chrome-success: #4ade80;
     -sl-chrome-warning: #fbbf24;
     -sl-chrome-danger: #fca5a5;
+    -sl-memory-track: #4a535e;
 
     /* ---- Scrollbar --------------------------------------------- */
     -sl-scroll-track: #1e2226;

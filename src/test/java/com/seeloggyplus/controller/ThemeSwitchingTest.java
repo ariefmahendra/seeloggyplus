@@ -5,7 +5,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -20,9 +20,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * End-to-end switching between light and dark mode through the real entry point
- * (the Preferences "Dark mode" checkbox) and verifies every open window updates
- * and reverts correctly.
+ * End-to-end switching between Graphite / Light / Dark through the real entry
+ * point (the Preferences "Theme" combo box) and verifies every open window
+ * updates and reverts correctly.
  */
 @ExtendWith(ApplicationExtension.class)
 class ThemeSwitchingTest {
@@ -31,7 +31,7 @@ class ThemeSwitchingTest {
     private Stage prefsStage;
     private Scene mainScene;
     private Scene prefsScene;
-    private CheckBox darkModeCheckBox;
+    private ComboBox<String> themeComboBox;
 
     @Start
     void start(Stage stage) throws Exception {
@@ -45,9 +45,9 @@ class ThemeSwitchingTest {
         FXMLLoader prefsLoader = new FXMLLoader(getClass().getResource("/fxml/PreferencesDialog.fxml"));
         Parent prefsRoot = prefsLoader.load();
         PreferencesDialogController prefsController = prefsLoader.getController();
-        Field field = PreferencesDialogController.class.getDeclaredField("darkModeCheckBox");
+        Field field = PreferencesDialogController.class.getDeclaredField("themeComboBox");
         field.setAccessible(true);
-        darkModeCheckBox = (CheckBox) field.get(prefsController);
+        themeComboBox = (ComboBox<String>) field.get(prefsController);
 
         prefsScene = AppTheme.scene(prefsRoot);
         prefsStage = new Stage();
@@ -59,8 +59,8 @@ class ThemeSwitchingTest {
     void resetTheme() {
         // Cleanup touches live nodes/scenes, so it must run on the FX thread.
         onFxThread(() -> {
-            if (darkModeCheckBox != null) {
-                darkModeCheckBox.setSelected(false);
+            if (themeComboBox != null) {
+                themeComboBox.setValue("Graphite");
             }
             AppTheme.setDark(false);
             if (prefsStage != null) {
@@ -72,7 +72,7 @@ class ThemeSwitchingTest {
     @Test
     void switchingToDarkUpdatesAllWindows() {
         onFxThread(() -> {
-            darkModeCheckBox.setSelected(true);
+            themeComboBox.setValue("Dark");
             assertTrue(AppTheme.isDark(), "theme state must be dark");
 
             assertTrue(hasDark(mainScene), "main scene must include theme-dark.css");
@@ -85,14 +85,30 @@ class ThemeSwitchingTest {
     }
 
     @Test
-    void switchingBackToLightRevertsAllWindows() {
+    void switchingToLightAppliesLightThemeEverywhere() {
         onFxThread(() -> {
-            darkModeCheckBox.setSelected(true);
-            darkModeCheckBox.setSelected(false);
+            themeComboBox.setValue("Light");
 
-            assertFalse(AppTheme.isDark(), "theme state must be light again");
+            assertFalse(AppTheme.isDark(), "light theme is not dark");
+            assertEquals(AppTheme.Theme.LIGHT, AppTheme.getTheme());
+            assertTrue(hasLight(mainScene), "main scene must include theme-light.css");
+            assertTrue(hasLight(prefsScene), "preferences scene must include theme-light.css");
+            assertFalse(hasDark(mainScene), "light theme must not keep theme-dark.css");
+            assertTrue(mainScene.getRoot().getStyleClass().contains("theme-light"),
+                    "main root must carry theme-light");
+        });
+    }
+
+    @Test
+    void switchingBackToGraphiteRevertsAllWindows() {
+        onFxThread(() -> {
+            themeComboBox.setValue("Dark");
+            themeComboBox.setValue("Graphite");
+
+            assertFalse(AppTheme.isDark(), "theme state must be graphite again");
             assertFalse(hasDark(mainScene), "main scene must drop theme-dark.css");
             assertFalse(hasDark(prefsScene), "preferences scene must drop theme-dark.css");
+            assertFalse(hasLight(mainScene), "graphite must not include theme-light.css");
             assertFalse(mainScene.getRoot().getStyleClass().contains("theme-dark"),
                     "main root must drop theme-dark");
             assertFalse(prefsScene.getRoot().getStyleClass().contains("theme-dark"),
@@ -101,15 +117,15 @@ class ThemeSwitchingTest {
     }
 
     @Test
-    void switchingBackToLightRemovesHotReloadDarkCopy() {
+    void switchingBackToGraphiteRemovesHotReloadDarkCopy() {
         onFxThread(() -> {
-            darkModeCheckBox.setSelected(true);
+            themeComboBox.setValue("Dark");
 
             // Simulate a hot-reload temp copy of the dark stylesheet on every scene.
             mainScene.getStylesheets().add("file:/tmp/seeloggy-hotreload-theme-dark-999.css");
             prefsScene.getStylesheets().add("file:/tmp/seeloggy-hotreload-theme-dark-999.css");
 
-            darkModeCheckBox.setSelected(false);
+            themeComboBox.setValue("Graphite");
 
             assertFalse(mainScene.getStylesheets().stream().anyMatch(url -> url.contains("theme-dark")),
                     "main scene must drop the hot-reload dark copy");
@@ -118,23 +134,12 @@ class ThemeSwitchingTest {
         });
     }
 
-    @Test
-    void multipleTogglesStayConsistent() {
-        onFxThread(() -> {
-            for (int i = 0; i < 3; i++) {
-                darkModeCheckBox.setSelected(true);
-                assertTrue(hasDark(mainScene));
-                assertTrue(hasDark(prefsScene));
-
-                darkModeCheckBox.setSelected(false);
-                assertFalse(hasDark(mainScene));
-                assertFalse(hasDark(prefsScene));
-            }
-        });
-    }
-
     private static boolean hasDark(Scene scene) {
         return scene.getStylesheets().stream().anyMatch(url -> url.endsWith("theme-dark.css"));
+    }
+
+    private static boolean hasLight(Scene scene) {
+        return scene.getStylesheets().stream().anyMatch(url -> url.endsWith("theme-light.css"));
     }
 
     private static void onFxThread(Runnable action) {

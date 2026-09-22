@@ -43,6 +43,7 @@ public class DevHotReloader {
     private static final List<String> CSS_SOURCE_PATHS = List.of(
             "src/main/resources/style/theme.css",
             "src/main/resources/style/components.css",
+            "src/main/resources/style/theme-light.css",
             "src/main/resources/style/theme-dark.css");
     private static final String FXML_SOURCE_PATH = "src/main/resources/fxml/MainView.fxml";
 
@@ -161,8 +162,11 @@ public class DevHotReloader {
                 if (!sourceCss.exists()) {
                     continue;
                 }
-                // Only load the dark overrides while dark mode is active.
-                if (sourcePath.contains("theme-dark.css") && !AppTheme.isDark()) {
+                // Only load the variant overrides while that theme is active.
+                if (sourcePath.contains("theme-dark.css") && AppTheme.getTheme() != AppTheme.Theme.DARK) {
+                    continue;
+                }
+                if (sourcePath.contains("theme-light.css") && AppTheme.getTheme() != AppTheme.Theme.LIGHT) {
                     continue;
                 }
                 // Create a temporary CSS file with a unique name to bypass JavaFX's internal stylesheet cache
@@ -224,6 +228,7 @@ public class DevHotReloader {
 
     private static boolean isReloadableCss(String url) {
         return url.contains("theme.css") || url.contains("theme-dark.css")
+                || url.contains("theme-light.css")
                 || url.contains("components.css") || url.contains("hotreload");
     }
 

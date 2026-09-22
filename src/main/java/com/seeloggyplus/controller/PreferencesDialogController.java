@@ -34,7 +34,7 @@ public class PreferencesDialogController {
     @FXML
     private CheckBox mainAutoPrettifyXmlCheckBox;
     @FXML
-    private CheckBox darkModeCheckBox;
+    private ComboBox<String> themeComboBox;
     @FXML
     private Spinner<Integer> lpLineLimitSpinner;
     @FXML
@@ -68,18 +68,43 @@ public class PreferencesDialogController {
         setupFontFamilyComboBox();
         setupButtons();
         loadPreferences();
-        setupThemeToggle();
+        setupThemeSelector();
     }
 
-    private void setupThemeToggle() {
-        if (darkModeCheckBox == null) {
+    private static final String THEME_GRAPHITE = "Graphite";
+    private static final String THEME_LIGHT = "Light";
+    private static final String THEME_DARK = "Dark";
+
+    private void setupThemeSelector() {
+        if (themeComboBox == null) {
             return;
         }
-        darkModeCheckBox.setSelected("dark".equalsIgnoreCase(getPreference("app_theme", "light")));
-        darkModeCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            savePreference("app_theme", newVal ? "dark" : "light");
-            AppTheme.setDark(newVal);
+        themeComboBox.setItems(FXCollections.observableArrayList(THEME_GRAPHITE, THEME_LIGHT, THEME_DARK));
+        AppTheme.Theme current = AppTheme.Theme.fromPreference(getPreference("app_theme", "graphite"));
+        themeComboBox.setValue(labelFor(current));
+        themeComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+            AppTheme.Theme selected = themeForLabel(newVal);
+            savePreference("app_theme", selected.preferenceValue());
+            AppTheme.setTheme(selected);
         });
+    }
+
+    private static String labelFor(AppTheme.Theme theme) {
+        return switch (theme) {
+            case LIGHT -> THEME_LIGHT;
+            case DARK -> THEME_DARK;
+            case GRAPHITE -> THEME_GRAPHITE;
+        };
+    }
+
+    private static AppTheme.Theme themeForLabel(String label) {
+        if (THEME_LIGHT.equals(label)) {
+            return AppTheme.Theme.LIGHT;
+        }
+        if (THEME_DARK.equals(label)) {
+            return AppTheme.Theme.DARK;
+        }
+        return AppTheme.Theme.GRAPHITE;
     }
 
     private void setupSpinners() {
@@ -156,8 +181,8 @@ public class PreferencesDialogController {
 
         savePreference("app_font_size", String.valueOf(appFontSizeSpinner.getValue()));
         savePreference("app_font_family", appFontFamilyComboBox.getValue());
-        if (darkModeCheckBox != null) {
-            savePreference("app_theme", darkModeCheckBox.isSelected() ? "dark" : "light");
+        if (themeComboBox != null) {
+            savePreference("app_theme", themeForLabel(themeComboBox.getValue()).preferenceValue());
         }
         savePreference("app_max_memory_gb", String.valueOf(appMaxMemorySpinner.getValue()));
 

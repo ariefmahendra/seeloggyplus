@@ -57,9 +57,9 @@ public class Main extends Application {
 
         try {
             // Restore the saved theme before building the scene
-            AppTheme.setDark(preferenceService.getPreferencesByCode("app_theme")
-                    .map("dark"::equalsIgnoreCase)
-                    .orElse(false));
+            AppTheme.setTheme(preferenceService.getPreferencesByCode("app_theme")
+                    .map(AppTheme.Theme::fromPreference)
+                    .orElse(AppTheme.Theme.GRAPHITE));
 
             // Load main view
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
