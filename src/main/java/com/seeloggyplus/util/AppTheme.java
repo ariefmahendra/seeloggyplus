@@ -116,7 +116,13 @@ public final class AppTheme {
      * Canvas-based views (which ignore CSS) can react too.
      */
     public static void setTheme(Theme newTheme) {
-        theme = newTheme == null ? Theme.GRAPHITE : newTheme;
+        Theme normalized = newTheme == null ? Theme.GRAPHITE : newTheme;
+        if (normalized == theme) {
+            // Re-applying the current theme churns stylesheets/style classes on every
+            // open window (and can race with in-flight layout); skip when unchanged.
+            return;
+        }
+        theme = normalized;
         applyToAllWindows(theme);
     }
 
