@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-22
+
+### Added
+- **All-light theme**: a third, fully light theme (light menu bar / toolbar / status bar
+  and light surfaces) alongside the default graphite and dark themes, selectable from
+  Preferences → Theme.
+
+### Changed
+- Interactive states (hover / selected / pressed / focus) now use dedicated accent
+  tokens, so the menu bar, toolbar, status bar and icons consistently follow the active
+  theme. In the light theme the accent is blue.
+- Toolbar buttons no longer change size when focused or clicked (the focus-ring space is
+  reserved); only the colour changes.
+
+### Fixed
+- **Release build**: packaged apps no longer report version `DEV`. `version.properties`
+  is generated into a declared, cache-correct resource directory and is always included.
+- **Recent files**: the last open mode (normal/OPEN vs. live tail) is remembered and the
+  entry reopens the same way, instead of a previously tailed file switching to download.
+- **Remote files**: opening a file that is already streaming now reuses its tab instead
+  of downloading again, which previously failed with an SSH channel error.
+- Removed remaining hard-coded component colours and completed per-theme token coverage.
+
+### Tests
+- Added `AppVersionTest`, `RecentFileModeRepositoryTest`, `RecentFileOpenModeTest`,
+  `LightThemeTest`, `ThemeTokensTest`, `ThemeComponentParityTest`.
+- Updated `ThemeSwitchingTest` for the new theme selector.
+
 ## [0.4.3] - 2026-09-21
 
 ### Fixed
@@ -75,7 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.3...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.0...HEAD
+[0.5.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.3...0.5.0
 [0.4.3]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.2...0.4.3
 [0.4.2]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.1...0.4.2
 [0.4.1]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.0...0.4.1
