@@ -45,10 +45,31 @@ public final class UpdateLayout {
         try {
             java.net.URI uri = UpdateLayout.class.getProtectionDomain().getCodeSource().getLocation().toURI();
             Path location = java.nio.file.Paths.get(uri);
-            return Files.isDirectory(location) ? location : location.getParent();
+            Path dir = Files.isDirectory(location) ? location : location.getParent();
+            return resolveLayoutRoot(dir);
         } catch (Exception e) {
             return java.nio.file.Paths.get(System.getProperty("user.dir"));
         }
+    }
+
+    /**
+     * Maps the directory the running jar/classes live in to the actual installation
+     * root. In the blue/green layout the launcher runs {@code versions/&lt;v&gt;/seeloggyplus.jar},
+     * so that directory is folded back up to the root that owns {@code current} and
+     * {@code versions/} — instead of treating the version folder itself as the root.
+     */
+    static Path resolveLayoutRoot(Path location) {
+        if (location == null) {
+            return java.nio.file.Paths.get(System.getProperty("user.dir"));
+        }
+        Path parent = location.getParent();
+        if (parent != null && VERSIONS_DIR.equals(String.valueOf(parent.getFileName()))) {
+            Path root = parent.getParent();
+            if (root != null) {
+                return root;
+            }
+        }
+        return location;
     }
 
     public Path root() {

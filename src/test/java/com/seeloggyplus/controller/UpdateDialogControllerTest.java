@@ -9,6 +9,7 @@ import com.seeloggyplus.update.UpdateDownloader;
 import com.seeloggyplus.update.UpdateInstaller;
 import com.seeloggyplus.update.UpdateLayout;
 import com.seeloggyplus.update.UpdateManifest;
+import com.seeloggyplus.util.AppPaths;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -234,5 +235,13 @@ public class UpdateDialogControllerTest {
         assertFalse(downloadButton.isVisible());
         assertFalse(releaseNotesButton.isVisible());
         assertFalse(skipButton.isVisible());
+    }
+
+    @Test
+    public void stagingDirectoryLivesInTheAppDataFolder() {
+        Path staging = UpdateDialogController.stagingDirectory();
+        assertEquals(AppPaths.dataDir().resolve("updates"), staging,
+                "updates must be staged under the existing app data folder, not the system temp dir");
+        assertEquals("updates", staging.getFileName().toString());
     }
 }

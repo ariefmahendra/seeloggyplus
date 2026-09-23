@@ -105,6 +105,26 @@ class UpdateInstallerTest {
     }
 
     @Test
+    void doesNotSearchRecursivelyForTheJar() throws Exception {
+        Path work = Files.createTempDirectory("seeloggy-stage");
+        try {
+            // The jar is nested below the wrapper. The installer must rely on the
+            // known package layout (jar directly inside the version directory) and
+            // reject this instead of walking the tree to find it.
+            Path zip = createZip(work, new String[] {
+                    "SeeloggyPlus/nested/seeloggyplus.jar"
+            }, "jar-bytes".getBytes());
+            Path versions = work.resolve("versions");
+
+            assertThrows(UpdateException.class,
+                    () -> new UpdateInstaller().stage(zip, versions, "0.3.0", null));
+            assertNoLeftovers(versions);
+        } finally {
+            deleteRecursively(work);
+        }
+    }
+
+    @Test
     void verifiesStagedJarChecksum() throws Exception {
         Path work = Files.createTempDirectory("seeloggy-stage");
         try {
