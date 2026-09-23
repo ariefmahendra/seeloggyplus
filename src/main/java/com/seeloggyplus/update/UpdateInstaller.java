@@ -60,8 +60,11 @@ public class UpdateInstaller {
                 temp = null;
             }
 
-            Path jar = findJar(target);
-            if (jar == null) {
+            // The package layout is known (the optional single wrapper folder is
+            // stripped above), so the jar always ends up directly inside the version
+            // directory. Do not walk the tree to look for it.
+            Path jar = target.resolve(UpdateLayout.APP_JAR_NAME);
+            if (!Files.isRegularFile(jar)) {
                 throw new UpdateException("seeloggyplus.jar not found in update package");
             }
             if (expectedJarSha256 != null && !expectedJarSha256.isBlank()) {
@@ -149,15 +152,6 @@ public class UpdateInstaller {
             }
         }
         return temp;
-    }
-
-    private static Path findJar(Path root) throws IOException {
-        try (Stream<Path> walk = Files.walk(root)) {
-            return walk.filter(Files::isRegularFile)
-                    .filter(path -> path.getFileName().toString().equalsIgnoreCase("seeloggyplus.jar"))
-                    .findFirst()
-                    .orElse(null);
-        }
     }
 
     private static void move(Path source, Path target) throws IOException {

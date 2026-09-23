@@ -6,6 +6,7 @@ import com.seeloggyplus.update.UpdateCheckResult;
 import com.seeloggyplus.update.UpdateCoordinator;
 import com.seeloggyplus.update.UpdateLayout;
 import com.seeloggyplus.update.UpdateService;
+import com.seeloggyplus.util.AppPaths;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -269,10 +270,18 @@ public class UpdateDialogController {
 
     private UpdateCoordinator activeCoordinator() {
         if (coordinator == null) {
-            Path staging = Path.of(System.getProperty("java.io.tmpdir"), "seeloggyplus-update");
-            coordinator = new UpdateCoordinator(UpdateLayout.installationRoot(), staging);
+            coordinator = new UpdateCoordinator(UpdateLayout.installationRoot(), stagingDirectory());
         }
         return coordinator;
+    }
+
+    /**
+     * Directory used to download/stage updates. It lives inside the application data
+     * directory (the same folder that already holds the database) instead of the
+     * system temp directory.
+     */
+    static Path stagingDirectory() {
+        return AppPaths.dataDir().resolve("updates");
     }
 
     private void defaultRelaunch() {

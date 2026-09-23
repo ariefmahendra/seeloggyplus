@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-22
+
+### Fixed
+- **Self-update**: downloads are staged in the application data folder
+  (`<data>/updates`) that already exists, instead of the system temp directory.
+- **Self-update**: the installer locates `seeloggyplus.jar` from the known package
+  layout instead of recursively walking the extracted files.
+- **Self-update**: the installation root is resolved correctly for the blue/green
+  `versions/<version>` layout, so subsequent updates stage and activate in the right
+  place.
+
+### Tests
+- Added `UpdateLayoutTest`; extended `UpdateInstallerTest` (no recursive jar search)
+  and `UpdateDialogControllerTest` (staging directory lives in the app data folder).
+
 ## [0.5.0] - 2026-09-22
 
 ### Added
@@ -103,7 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.1...HEAD
+[0.5.1]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.3...0.5.0
 [0.4.3]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.2...0.4.3
 [0.4.2]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.1...0.4.2
