@@ -548,3 +548,91 @@ FontAwesomeIconView.file-icon-file {
 .context-menu .separator .line {
     -fx-border-color: -sl-border-soft;
 }
+
+/* Dropdown popups (ComboBox / ChoiceBox / ChoiceDialog) follow the active theme
+   surface instead of Modena defaults, so they never render dark on the light
+   Graphite / Light themes. */
+.combo-box-popup .list-view,
+.choice-box-popup .list-view {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 1;
+}
+
+.combo-box-popup .list-cell,
+.choice-box-popup .list-cell {
+    -fx-background-color: -sl-surface;
+    -fx-text-fill: -sl-text;
+    -fx-padding: 4 10 4 10;
+}
+
+.combo-box-popup .list-cell:filled:hover,
+.choice-box-popup .list-cell:filled:hover {
+    -fx-background-color: -sl-brand-soft;
+    -fx-text-fill: -sl-text;
+}
+
+.combo-box-popup .list-cell:filled:selected,
+.choice-box-popup .list-cell:filled:selected {
+    -fx-background-color: -sl-accent;
+    -fx-text-fill: -sl-accent-text;
+}
+
+/* Icons on chrome must not inherit the dark text of the content surface. */
+.app-toolbar > .glyph-icon, .app-toolbar > FontAwesomeIconView,
+.status-bar .glyph-icon, .status-bar FontAwesomeIconView,
+.menu-bar > .container > .menu-button .glyph-icon,
+.menu-bar > .container > .menu-button FontAwesomeIconView {
+    -fx-fill: -sl-chrome-text;
+}
+.btn-primary .glyph-icon, .btn-primary FontAwesomeIconView {
+    -fx-fill: -sl-on-brand;
+}
+.list-cell:filled:selected .glyph-icon,
+.tree-cell:filled:selected .glyph-icon,
+.table-row-cell:filled:selected .glyph-icon,
+.list-cell:filled:selected FontAwesomeIconView,
+.tree-cell:filled:selected FontAwesomeIconView,
+.table-row-cell:filled:selected FontAwesomeIconView {
+    -fx-fill: -sl-accent-text;
+}
+.recent-files-list .list-cell .server-label {
+    -fx-text-fill: -sl-text;
+}
+.recent-files-list .list-cell:selected .server-label {
+    -fx-text-fill: -sl-accent-text;
+}
+
+/* Keep selection visible when keyboard focus moves to search or another pane. */
+.table-view, .list-view, .tree-view {
+    -fx-selection-bar: -sl-accent;
+    -fx-selection-bar-non-focused: -sl-accent;
+    -fx-selection-bar-text: -sl-accent-text;
+}
+.table-row-cell:filled:selected, .list-cell:filled:selected, .tree-cell:filled:selected {
+    -fx-background-color: -sl-accent;
+    -fx-text-fill: -sl-accent-text;
+}
+.table-row-cell:filled:selected .table-cell,
+.table-row-cell:filled:selected .label,
+.list-cell:filled:selected .label, .tree-cell:filled:selected .label {
+    -fx-text-fill: -sl-accent-text;
+}
+
+.table-row-cell:drop-target {
+    -fx-border-color: -sl-accent;
+    -fx-border-width: 2;
+}
+
+/* Drop indicator when dragging a server onto a group folder in the location tree.
+   Uses background layers (no border) so the cell keeps exactly the same size
+   while dragging: an accent bar on the left plus a soft fill for the row. */
+.tree-cell:drop-target {
+    -fx-background-color: -sl-accent, -sl-brand-soft;
+    -fx-background-insets: 0, 0 0 0 3;
+    -fx-background-radius: 0;
+}
+
+.app-toolbar .check-box {
+    -fx-text-fill: -sl-chrome-text;
+}

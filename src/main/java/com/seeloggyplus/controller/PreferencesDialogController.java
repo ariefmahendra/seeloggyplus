@@ -56,6 +56,7 @@ public class PreferencesDialogController {
     @FXML
     private Button cancelButton;
 
+    @FXML private ComboBox<String> fileDoubleClickComboBox;
     private PreferenceService preferenceService;
     @Setter
     private Runnable onSaveCallback;
@@ -142,6 +143,8 @@ public class PreferencesDialogController {
     }
 
     private void loadPreferences() {
+        fileDoubleClickComboBox.setItems(FXCollections.observableArrayList("Open/Download", "Tail"));
+        fileDoubleClickComboBox.setValue("TAIL".equalsIgnoreCase(getPreference("file_double_click_action", "OPEN")) ? "Tail" : "Open/Download");
         appFontSizeSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("app_font_size", "12")));
         appFontFamilyComboBox.getSelectionModel().select(getPreference("app_font_family", "Consolas"));
         appMaxMemorySpinner.getValueFactory().setValue(Integer.parseInt(getPreference("app_max_memory_gb", "4")));
@@ -199,6 +202,7 @@ public class PreferencesDialogController {
         savePreference("ssh_connection_timeout", String.valueOf(sshTimeoutSpinner.getValue()));
         savePreference("ssh_download_directory", sshDownloadDirField.getText() != null ? sshDownloadDirField.getText().trim() : "");
 
+        savePreference("file_double_click_action", "Tail".equals(fileDoubleClickComboBox.getValue()) ? "TAIL" : "OPEN");
         logger.info("Preferences saved.");
 
         if (onSaveCallback != null) {

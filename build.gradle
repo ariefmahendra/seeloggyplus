@@ -100,17 +100,16 @@ test {
     }
 
     // Headless JavaFX (Monocle) for CI runners without a display.
-    // Enable with: ./gradlew test -PheadlessTest
-    if (project.hasProperty('headlessTest')) {
-        systemProperty 'testfx.robot', 'glass'
-        systemProperty 'testfx.headless', 'true'
-        systemProperty 'glass.platform', 'Monocle'
-        systemProperty 'monocle.platform', 'Headless'
-        systemProperty 'prism.order', 'sw'
-        systemProperty 'prism.text', 't2k'
-        systemProperty 'java.awt.headless', 'true'
-    }
+    // Always headless, including local runs.
+    systemProperty 'testfx.robot', 'glass'
+    systemProperty 'testfx.headless', 'true'
+    systemProperty 'glass.platform', 'Monocle'
+    systemProperty 'monocle.platform', 'Headless'
+    systemProperty 'prism.order', 'sw'
+    systemProperty 'prism.text', 't2k'
+    systemProperty 'java.awt.headless', 'true'
 
+    finalizedBy 'testSummary'
     testLogging {
         events "passed", "skipped", "failed"
         exceptionFormat "full"
@@ -174,6 +173,7 @@ tasks.register('packagePortableNoJre', Zip) {
             rename { "${project.name}.jar" }
         }
         from('launcher.bat')
+        from('SeeLoggyPlus.vbs')
         from('launcher.sh')
         from('launcher.properties')
         from('LAUNCHER_README.md')
@@ -200,6 +200,7 @@ tasks.register('packagePortableWithJre', Zip) {
             rename { "${project.name}.jar" }
         }
         from('launcher.bat')
+        from('SeeLoggyPlus.vbs')
         from('launcher.sh')
         from('launcher.properties')
         from('LAUNCHER_README.md')
@@ -330,5 +331,22 @@ jacocoTestReport {
     reports {
         xml.required = true
         html.required = true
+    }
+}
+tasks.register('testSummary') {
+    doLast {
+        def totals = [tests: 0, failures: 0, errors: 0, skipped: 0]
+        fileTree("${buildDir}/test-results/test").matching { include 'TEST-*.xml' }.each { f ->
+            def xml = new XmlSlurper().parse(f)
+            totals.keySet().each { key -> totals[key] = totals[key] + Integer.parseInt(xml.attributes()[key]?.toString() ?: '0') }
+        }
+        def failed = totals.failures + totals.errors
+        println "==================== TEST SUMMARY ===================="
+        println "  Total   : ${totals.tests}"
+        println "  Passed  : ${totals.tests - failed - totals.skipped}"
+        println "  Failed  : ${failed}"
+        println "  Skipped : ${totals.skipped}"
+        println "  Result  : ${failed == 0 && totals.tests > 0 ? 'PASS' : 'FAIL'}"
+        println "======================================================"
     }
 }

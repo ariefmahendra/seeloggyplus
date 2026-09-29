@@ -25,7 +25,8 @@ public class DatabaseConfig {
 
             System.out.println(dbPath.toAbsolutePath());
 
-            if (!Files.exists(dbPath)){
+            boolean isNewDatabase = !Files.exists(dbPath);
+            if (isNewDatabase){
                 File dbFile = new File(dbPath.toUri());
                 File parentDir = dbFile.getParentFile();
                 if (parentDir != null && !parentDir.exists()) {
@@ -40,9 +41,11 @@ public class DatabaseConfig {
             String resultPath = String.format("jdbc:sqlite:%s", dbPath.toAbsolutePath());
             connection = DriverManager.getConnection(resultPath);
             logger.info("Database connection established.");
+            if (!isNewDatabase) DatabaseMigrator.migrate(connection, dbPath, false);
             createTables();
+            if (isNewDatabase) DatabaseMigrator.migrate(connection, dbPath, true);
         } catch (SQLException e) {
-            logger.error("Failed to connect to database.", e);
+            throw new IllegalStateException("Failed to initialize database", e);
         }
     }
 
@@ -53,7 +56,7 @@ public class DatabaseConfig {
         return instance;
     }
 
-    private void createTables() {
+    private void createTables() throws SQLException {
         String createParsingConfigTable = "CREATE TABLE IF NOT EXISTS parsing_configs ("
                 + "id TEXT PRIMARY KEY,"
                 + "name TEXT NOT NULL UNIQUE,"
@@ -72,7 +75,8 @@ public class DatabaseConfig {
                 + "default_path TEXT,"
                 + "created_at TEXT NOT NULL,"
                 + "last_used TEXT,"
-                + "save_password BOOLEAN NOT NULL DEFAULT 0"
+                + "save_password BOOLEAN NOT NULL DEFAULT 0,"
+                + "favorite BOOLEAN NOT NULL DEFAULT 0, sort_order INTEGER, group_name TEXT"
                 + ");";
 
         String createPreferencesTable = "CREATE TABLE IF NOT EXISTS preferences ("
@@ -109,6 +113,11 @@ public class DatabaseConfig {
                 "UNIQUE(path, locationId)" +
                 ");";
 
+        String createServerGroupsTable = "CREATE TABLE IF NOT EXISTS server_groups (" +
+                "name TEXT PRIMARY KEY," +
+                "sort_order INTEGER" +
+                ");";
+
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(createParsingConfigTable);
             stmt.execute(createSshServerTable);
@@ -116,76 +125,9 @@ public class DatabaseConfig {
             stmt.execute(createLogFileTable);
             stmt.execute(createRecentFiles);
             stmt.execute(createFavoriteFoldersTable);
+            stmt.execute(createServerGroupsTable);
             logger.info("Tables created or already exist.");
             
-            // Migration: Add timestamp_format column if not exists
-            migrateTimestampFormat();
-            // Migration: Add recent_files.mode column if not exists
-            migrateRecentFileMode();
-        } catch (SQLException e) {
-            logger.error("Failed to create tables.", e);
-        }
-    }
-
-    /**
-     * Migration: Add mode column to existing recent_files table.
-     * The mode records whether the file was last opened in normal (OPEN) or
-     * streaming (TAIL) mode so the Recent list can reopen it the same way.
-     */
-    private void migrateRecentFileMode() {
-        if (columnExists("recent_files", "mode")) {
-            logger.debug("mode column already exists in recent_files table");
-            return;
-        }
-        try (Statement stmt = connection.createStatement()) {
-            stmt.execute("ALTER TABLE recent_files ADD COLUMN mode TEXT");
-            logger.info("Migration: Added mode column to recent_files table");
-        } catch (SQLException e) {
-            logger.error("Failed to migrate recent_files.mode column", e);
-        }
-    }
-
-    private boolean columnExists(String table, String column) {
-        String sql = "PRAGMA table_info(" + table + ")";
-        try (Statement stmt = connection.createStatement();
-             var rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                if (column.equals(rs.getString("name"))) {
-                    return true;
-                }
-            }
-        } catch (SQLException e) {
-            logger.error("Failed to inspect columns for table {}", table, e);
-        }
-        return false;
-    }
-    
-    /**
-     * Migration: Add timestamp_format column to existing parsing_configs table
-     */
-    private void migrateTimestampFormat() {
-        String checkColumn = "PRAGMA table_info(parsing_configs)";
-        boolean columnExists = false;
-        
-        try (Statement stmt = connection.createStatement();
-             var rs = stmt.executeQuery(checkColumn)) {
-            while (rs.next()) {
-                String columnName = rs.getString("name");
-                if ("timestamp_format".equals(columnName)) {
-                    columnExists = true;
-                    break;
-                }
-            }
-            
-            if (!columnExists) {
-                String addColumn = "ALTER TABLE parsing_configs ADD COLUMN timestamp_format TEXT";
-                stmt.execute(addColumn);
-                logger.info("Migration: Added timestamp_format column to parsing_configs table");
-            } else {
-                logger.debug("timestamp_format column already exists in parsing_configs table");
-            }
-        } catch (SQLException e) {
-            logger.error("Failed to migrate timestamp_format column", e);
         }
     }
 }

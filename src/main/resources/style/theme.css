@@ -389,7 +389,43 @@ FontAwesomeIconView {
 
 /* ============================================================
    Generic buttons
+   Every button in the application (dialogs, forms, file manager)
+   follows the theme surface/text/border tokens instead of the
+   default JavaFX (Modena) look. Toolbar/status/primary variants
+   below override these rules.
    ============================================================ */
+.button,
+.toggle-button {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 3;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 3;
+    -fx-border-width: 1;
+    -fx-text-fill: -sl-text;
+    -fx-padding: 5 12 5 12;
+    -fx-cursor: hand;
+}
+
+.button:hover,
+.toggle-button:hover {
+    -fx-background-color: -sl-surface-sunken;
+}
+
+.button:pressed,
+.toggle-button:pressed {
+    -fx-background-color: -sl-border-soft;
+}
+
+.button:focused,
+.toggle-button:focused {
+    -fx-border-color: -sl-accent;
+}
+
+.button:disabled,
+.toggle-button:disabled {
+    -fx-opacity: 0.6;
+}
+
 .btn-primary {
     -fx-background-color: -sl-brand;
     -fx-text-fill: -sl-on-brand;

@@ -6,7 +6,8 @@ import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.service.PreferenceService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
-import javafx.scene.control.ListView;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeView;
 import javafx.scene.control.TableView;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -71,22 +72,24 @@ class FileManagerStatePersistenceTest {
         prefField.setAccessible(true);
         prefField.set(controller, prefService);
 
-        // Inject locationListView
-        Field locListField = UnifiedFileManagerDialogController.class.getDeclaredField("locationListView");
-        locListField.setAccessible(true);
-        ListView<Object> locationListView = new ListView<>();
-        locListField.set(controller, locationListView);
+        // Inject locationTree (local node + server node)
+        Field locTreeField = UnifiedFileManagerDialogController.class.getDeclaredField("locationTree");
+        locTreeField.setAccessible(true);
+        TreeView<UnifiedFileManagerDialogController.LocationItem> locationTree = new TreeView<>();
+        locationTree.setShowRoot(false);
 
-        // Create LocationItem class and items
-        Class<?> locItemClass = Class.forName("com.seeloggyplus.controller.UnifiedFileManagerDialogController$LocationItem");
-        Object localItem = locItemClass.getConstructors()[0].newInstance("Local Drive", null, null);
-
+        var localItem = UnifiedFileManagerDialogController.LocationItem.local();
         SSHServerModel server2 = new SSHServerModel();
         server2.setId("server2");
         server2.setName("Server 2");
-        Object server2Item = locItemClass.getConstructors()[0].newInstance("Server 2", null, server2);
+        var server2Item = UnifiedFileManagerDialogController.LocationItem.of(server2);
 
-        locationListView.setItems(FXCollections.observableArrayList(localItem, server2Item));
+        TreeItem<UnifiedFileManagerDialogController.LocationItem> root = new TreeItem<>();
+        root.setExpanded(true);
+        root.getChildren().add(new TreeItem<>(localItem));
+        root.getChildren().add(new TreeItem<>(server2Item));
+        locationTree.setRoot(root);
+        locTreeField.set(controller, locationTree);
 
         // Inject currentLocation
         Field curLocField = UnifiedFileManagerDialogController.class.getDeclaredField("currentLocation");
@@ -112,7 +115,9 @@ class FileManagerStatePersistenceTest {
         restoreLocMethod.setAccessible(true);
         restoreLocMethod.invoke(controller);
 
-        assertEquals(1, locationListView.getSelectionModel().getSelectedIndex());
+        assertEquals(1, locationTree.getSelectionModel().getSelectedIndex());
+        assertEquals("Server 2",
+                locationTree.getSelectionModel().getSelectedItem().getValue().getServer().getName());
     }
 
     @Test

@@ -57,6 +57,23 @@ class IconContrastTest {
     }
 
     @Test
+    void graphiteStatusAndPrimaryButtonIconsContrast() {
+        onFxThread(() -> {
+            AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+            Button statusButton = new Button("Status");
+            var statusIcon = new FontAwesomeIconView(FontAwesomeIcon.INFO_CIRCLE);
+            statusButton.setGraphic(statusIcon);
+            VBox status = new VBox(statusButton); status.getStyleClass().add("status-bar");
+            Button primary = new Button("Open"); primary.getStyleClass().add("btn-primary");
+            var primaryIcon = new FontAwesomeIconView(FontAwesomeIcon.FOLDER_OPEN);
+            primary.setGraphic(primaryIcon);
+            stage.setScene(AppTheme.scene(new VBox(status, primary))); stage.show();
+            assertContrast(statusButton, statusIcon, "Graphite status icon");
+            assertContrast(primary, primaryIcon, "Graphite primary action icon");
+        });
+    }
+
+    @Test
     void toolbarIconContrastsInAllStates() {
         onFxThread(() -> {
             ToggleButton toolbarToggle = new ToggleButton();
@@ -77,9 +94,9 @@ class IconContrastTest {
             stage.setHeight(220);
             stage.show();
 
-            for (boolean dark : new boolean[] {false, true}) {
-                AppTheme.setDark(dark);
-                String mode = dark ? "dark" : "light";
+            for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                AppTheme.setTheme(theme);
+                String mode = theme.name();
 
                 reset(toolbarToggle);
                 assertContrast(toolbarButton, buttonIcon, "toolbar button default " + mode);
@@ -127,9 +144,9 @@ class IconContrastTest {
             stage.setScene(scene);
             stage.show();
 
-            for (boolean dark : new boolean[] {false, true}) {
-                AppTheme.setDark(dark);
-                String mode = dark ? "dark" : "light";
+            for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                AppTheme.setTheme(theme);
+                String mode = theme.name();
 
                 reset(surfaceToggle);
                 assertContrast(surfaceToggle, toggleIcon, "surface toggle default " + mode);
@@ -163,11 +180,11 @@ class IconContrastTest {
             stage.setScene(scene);
             stage.show();
 
-            for (boolean dark : new boolean[] {false, true}) {
-                AppTheme.setDark(dark);
+            for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                AppTheme.setTheme(theme);
                 root.applyCss();
                 root.layout();
-                String mode = dark ? "dark" : "light";
+                String mode = theme.name();
                 assertContrast(null, folder, "file folder icon " + mode);
                 assertContrast(null, log, "file log icon " + mode);
                 assertContrast(null, file, "file icon " + mode);

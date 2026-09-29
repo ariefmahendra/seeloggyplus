@@ -3,7 +3,6 @@ package com.seeloggyplus.controller;
 import com.seeloggyplus.util.AppTheme;
 
 import com.seeloggyplus.model.SSHServerModel;
-import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -57,12 +56,9 @@ public class FileManagerFindInFilesButtonTest {
     private Object remoteLocation() throws Exception {
         Class<?> locationClass = Class.forName(
                 "com.seeloggyplus.controller.UnifiedFileManagerDialogController$LocationItem");
-        Constructor<?> constructor = locationClass.getDeclaredConstructor(
-                String.class, FontAwesomeIcon.class, SSHServerModel.class);
-        constructor.setAccessible(true);
         SSHServerModel server = new SSHServerModel("Prod", "10.0.0.1", 22, "user");
         server.setId("srv-location");
-        return constructor.newInstance("Prod", FontAwesomeIcon.SERVER, server);
+        return locationClass.getDeclaredMethod("of", SSHServerModel.class).invoke(null, server);
     }
 
     /**

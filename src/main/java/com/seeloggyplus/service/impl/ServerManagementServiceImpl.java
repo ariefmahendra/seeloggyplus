@@ -33,6 +33,55 @@ import java.util.UUID;
      * @throws IllegalArgumentException if server is null or invalid
      */
     @Override
+    public void reorderServers(List<String> ids) {
+        serverManagementRepository.reorderServers(ids);
+    }
+
+    @Override
+    public List<String> getGroupNames() {
+        return serverManagementRepository.getGroupNames();
+    }
+
+    @Override
+    public void createGroup(String name) {
+        String clean = normalizeGroupName(name);
+        if (serverManagementRepository.getGroupNames().contains(clean)) {
+            return;
+        }
+        serverManagementRepository.createGroup(clean);
+        logger.info("Created server group: {}", clean);
+    }
+
+    @Override
+    public void renameGroup(String oldName, String newName) {
+        String from = normalizeGroupName(oldName);
+        String to = normalizeGroupName(newName);
+        if (from.equals(to)) {
+            return;
+        }
+        if (serverManagementRepository.getGroupNames().contains(to)) {
+            throw new IllegalArgumentException("A group named '" + to + "' already exists");
+        }
+        serverManagementRepository.renameGroup(from, to);
+        logger.info("Renamed server group '{}' to '{}'", from, to);
+    }
+
+    @Override
+    public void deleteGroup(String name) {
+        String clean = normalizeGroupName(name);
+        serverManagementRepository.deleteGroup(clean);
+        logger.info("Deleted server group: {}", clean);
+    }
+
+    private static String normalizeGroupName(String name) {
+        String clean = name == null ? "" : name.trim();
+        if (clean.isEmpty()) {
+            throw new IllegalArgumentException("Group name cannot be empty");
+        }
+        return clean;
+    }
+
+    @Override
     public void saveServer(SSHServerModel server) {
         if (server == null) {
             logger.error("Attempted to save null server");
@@ -171,6 +220,7 @@ import java.util.UUID;
         clone.setPassword(source.getPassword());
         clone.setDefaultPath(source.getDefaultPath() != null ? source.getDefaultPath() : "/");
         clone.setSavePassword(source.isSavePassword());
+        clone.setGroupName(source.getGroupName());
         clone.setCreatedAt(LocalDateTime.now());
         clone.setLastUsed(null);
         clone.setConnectionStatus(SSHServerModel.ConnectionStatus.UNKNOWN);

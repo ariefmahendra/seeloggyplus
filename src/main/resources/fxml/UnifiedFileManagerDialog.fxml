@@ -93,7 +93,15 @@
                     <Insets top="10" right="5" bottom="10" left="10"/>
                 </padding>
                 <Label text="Locations" styleClass="section-title"/>
-                <ListView fx:id="locationListView" VBox.vgrow="ALWAYS"/>
+                <TreeView fx:id="locationTree" VBox.vgrow="ALWAYS" showRoot="false"/>
+                <Button fx:id="newGroupButton" text="New group..." maxWidth="Infinity">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="FOLDER_OPEN"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Create a folder to group servers (or right-click a server to move it)"/>
+                    </tooltip>
+                </Button>
                 <Button fx:id="manageServersButton" text="Manage Servers" maxWidth="Infinity">
                     <graphic>
                         <FontAwesomeIconView glyphName="COG"/>

@@ -35,6 +35,9 @@ public class SSHServerModel {
     private LocalDateTime createdAt;
     private LocalDateTime lastUsed;
     private boolean savePassword;
+    private boolean favorite;
+    private Integer sortOrder;
+    private String groupName;
     
     // Transient field - not stored in database
     private transient ConnectionStatus connectionStatus = ConnectionStatus.UNKNOWN;

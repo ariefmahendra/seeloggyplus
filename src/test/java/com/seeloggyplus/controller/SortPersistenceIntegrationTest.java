@@ -345,9 +345,10 @@ public class SortPersistenceIntegrationTest {
     private Object createLocationItem(String name, SSHServerModel server) throws Exception {
         Class<?> cls = Class.forName(
             "com.seeloggyplus.controller.UnifiedFileManagerDialogController$LocationItem");
-        var ctor = cls.getDeclaredConstructors()[0];
-        ctor.setAccessible(true);
-        return ctor.newInstance(name, null, server);
+        if (server == null) {
+            return cls.getDeclaredMethod("local").invoke(null);
+        }
+        return cls.getDeclaredMethod("of", SSHServerModel.class).invoke(null, server);
     }
 
     // =========================================================================
@@ -391,6 +392,11 @@ public class SortPersistenceIntegrationTest {
     }
 
     static class StubServerManagementService implements ServerManagementService {
+        @Override public void reorderServers(java.util.List<String> ids) { throw new UnsupportedOperationException(); }
+        @Override public List<String> getGroupNames() { return List.of(); }
+        @Override public void createGroup(String name) {}
+        @Override public void renameGroup(String oldName, String newName) {}
+        @Override public void deleteGroup(String name) {}
         @Override public void saveServer(SSHServerModel s) {}
         @Override public void deleteServer(String id) {}
         @Override public void updateServerLastUsed(String id) {}

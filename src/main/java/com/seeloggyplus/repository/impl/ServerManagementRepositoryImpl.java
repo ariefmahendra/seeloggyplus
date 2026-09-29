@@ -31,15 +31,122 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
     // SQL Queries
     private static final String SQL_CHECK_EXISTS = "SELECT COUNT(*) FROM ssh_servers WHERE id = ?";
     private static final String SQL_INSERT = 
-        "INSERT INTO ssh_servers(id, name, host, port, username, password, default_path, created_at, last_used, save_password) " +
-        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO ssh_servers(id, name, host, port, username, password, default_path, created_at, last_used, save_password, favorite, sort_order, group_name) " +
+        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MIN(sort_order), 0) - 1 FROM ssh_servers), ?)";
     private static final String SQL_UPDATE = 
         "UPDATE ssh_servers SET name = ?, host = ?, port = ?, username = ?, password = ?, " +
-        "default_path = ?, save_password = ? WHERE id = ?";
+        "default_path = ?, save_password = ?, favorite = ?, group_name = ? WHERE id = ?";
     private static final String SQL_DELETE = "DELETE FROM ssh_servers WHERE id = ?";
     private static final String SQL_UPDATE_LAST_USED = "UPDATE ssh_servers SET last_used = ? WHERE id = ?";
-    private static final String SQL_GET_ALL = "SELECT * FROM ssh_servers ORDER BY created_at DESC";
+    private static final String SQL_GET_ALL = "SELECT * FROM ssh_servers ORDER BY sort_order ASC, created_at DESC, id ASC";
     private static final String SQL_GET_BY_ID = "SELECT * FROM ssh_servers WHERE id = ?";
+    private static final String SQL_GET_GROUPS = "SELECT name FROM server_groups ORDER BY sort_order ASC, name ASC";
+    private static final String SQL_INSERT_GROUP = "INSERT OR IGNORE INTO server_groups(name, sort_order) "
+            + "VALUES(?, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM server_groups))";
+
+    /** Dedicated connection so a multi-statement group change commits or rolls back as a unit. */
+    private Connection openDedicatedConnection() throws SQLException {
+        return DriverManager.getConnection(DatabaseConfig.getInstance().getConnection().getMetaData().getURL());
+    }
+
+    @Override
+    public List<String> getGroupNames() {
+        List<String> names = new ArrayList<>();
+        try {
+            Connection connection = DatabaseConfig.getInstance().getConnection();
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(SQL_GET_GROUPS)) {
+                while (rs.next()) {
+                    names.add(rs.getString(1));
+                }
+            }
+            return names;
+        } catch (SQLException e) {
+            logger.error("Failed to retrieve server groups", e);
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
+    public void createGroup(String name) {
+        try (Connection c = openDedicatedConnection();
+             PreparedStatement ps = c.prepareStatement(SQL_INSERT_GROUP)) {
+            ps.setString(1, name);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            logger.error("Failed to create server group: {}", name, e);
+            throw new RuntimeException("Database error while creating server group", e);
+        }
+    }
+
+    @Override
+    public void renameGroup(String oldName, String newName) {
+        try (Connection c = openDedicatedConnection()) {
+            c.setAutoCommit(false);
+            try (PreparedStatement rename = c.prepareStatement("UPDATE server_groups SET name = ? WHERE name = ?");
+                 PreparedStatement ensure = c.prepareStatement(SQL_INSERT_GROUP);
+                 PreparedStatement members = c.prepareStatement("UPDATE ssh_servers SET group_name = ? WHERE group_name = ?")) {
+                rename.setString(1, newName);
+                rename.setString(2, oldName);
+                rename.executeUpdate();
+                ensure.setString(1, newName);
+                ensure.executeUpdate();
+                members.setString(1, newName);
+                members.setString(2, oldName);
+                members.executeUpdate();
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to rename server group {} to {}", oldName, newName, e);
+            throw new RuntimeException("Database error while renaming server group", e);
+        }
+    }
+
+    @Override
+    public void deleteGroup(String name) {
+        try (Connection c = openDedicatedConnection()) {
+            c.setAutoCommit(false);
+            try (PreparedStatement delete = c.prepareStatement("DELETE FROM server_groups WHERE name = ?");
+                 PreparedStatement clearMembers = c.prepareStatement("UPDATE ssh_servers SET group_name = NULL WHERE group_name = ?")) {
+                delete.setString(1, name);
+                delete.executeUpdate();
+                clearMembers.setString(1, name);
+                clearMembers.executeUpdate();
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to delete server group: {}", name, e);
+            throw new RuntimeException("Database error while deleting server group", e);
+        }
+    }
+
+    @Override
+    public void reorderServers(List<String> ids) {
+        if (ids == null || ids.stream().anyMatch(java.util.Objects::isNull)
+                || new java.util.HashSet<>(ids).size() != ids.size())
+            throw new IllegalArgumentException("Server IDs must be unique and non-null");
+        // Use a dedicated connection so rollback cannot include another UI operation.
+        try (Connection c = DriverManager.getConnection(DatabaseConfig.getInstance().getConnection().getMetaData().getURL())) {
+            c.setAutoCommit(false);
+            try (PreparedStatement ps = c.prepareStatement("UPDATE ssh_servers SET sort_order = ? WHERE id = ?")) {
+                List<String> order = new ArrayList<>(ids);
+                try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery(SQL_GET_ALL)) {
+                    while (rs.next()) if (!order.contains(rs.getString("id"))) order.add(rs.getString("id"));
+                }
+                for (int i = 0; i < order.size(); i++) {
+                    ps.setInt(1, i); ps.setString(2, order.get(i));
+                    if (ps.executeUpdate() != 1) throw new SQLException("Server no longer exists: " + order.get(i));
+                }
+                c.commit();
+            } catch (SQLException e) { c.rollback(); throw e; }
+        } catch (SQLException e) { throw new IllegalStateException("Could not save server order", e); }
+    }
 
     /**
      * Save or update SSH server configuration
@@ -95,6 +202,8 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
             ps.setString(8, server.getCreatedAt() != null ? server.getCreatedAt().toString() : LocalDateTime.now().toString());
             ps.setString(9, server.getLastUsed() != null ? server.getLastUsed().toString() : null);
             ps.setBoolean(10, server.isSavePassword());
+            ps.setBoolean(11, server.isFavorite());
+            ps.setString(12, server.getGroupName());
             
             int affected = ps.executeUpdate();
             if (affected == 0) {
@@ -115,7 +224,9 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
             ps.setString(5, CredentialEncryptor.getInstance().encrypt(server.getPassword()));
             ps.setString(6, server.getDefaultPath());
             ps.setBoolean(7, server.isSavePassword());
-            ps.setString(8, server.getId());
+            ps.setBoolean(8, server.isFavorite());
+            ps.setString(9, server.getGroupName());
+            ps.setString(10, server.getId());
             
             int affected = ps.executeUpdate();
             if (affected == 0) {
@@ -247,6 +358,9 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
         SSHServerModel server = new SSHServerModel();
         
         server.setId(rs.getString("id"));
+        server.setFavorite(rs.getBoolean("favorite"));
+        server.setSortOrder(rs.getInt("sort_order"));
+        server.setGroupName(rs.getString("group_name"));
         server.setName(rs.getString("name"));
         server.setHost(rs.getString("host"));
         server.setPort(rs.getInt("port"));

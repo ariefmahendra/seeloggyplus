@@ -147,7 +147,7 @@
                     </HBox>
 
                     <TextField fx:id="recentFilesFilterField" promptText="Filter recent logs..." />
-                    <ListView fx:id="recentFilesListView" VBox.vgrow="ALWAYS" />
+                    <TreeView fx:id="recentFilesTreeView" VBox.vgrow="ALWAYS" showRoot="false" />
 
                     <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files">
                         <graphic>
