@@ -4,7 +4,9 @@ import com.seeloggyplus.util.AppTheme;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.VBox;
@@ -112,6 +114,194 @@ class ButtonThemeTest {
                         theme + ": primary button must not use the plain light surface");
             }
         });
+    }
+
+    @Test
+    @DisplayName("toolbar/status buttons keep readable text on hover, pressed and selected")
+    void toolbarInteractiveStatesKeepReadableText() {
+        javafx.css.PseudoClass hover = javafx.css.PseudoClass.getPseudoClass("hover");
+        javafx.css.PseudoClass pressed = javafx.css.PseudoClass.getPseudoClass("pressed");
+        onFxThread(() -> {
+            Button toolbarButton = new Button("Find in Files");
+            ToggleButton toolbarToggle = new ToggleButton("Tail");
+            javafx.scene.control.ToolBar toolbar = new javafx.scene.control.ToolBar(toolbarButton, toolbarToggle);
+            toolbar.getStyleClass().add("app-toolbar");
+            Button statusButton = new Button("Status");
+            VBox status = new VBox(statusButton);
+            status.getStyleClass().add("status-bar");
+            VBox root = new VBox(toolbar, status);
+
+            Scene scene = AppTheme.scene(root);
+            stage.setScene(scene);
+            stage.show();
+
+            for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                useTheme(theme);
+                root.applyCss();
+                root.layout();
+                WaitForAsyncUtils.waitForFxEvents();
+                String mode = theme.name();
+
+                toolbarButton.pseudoClassStateChanged(hover, true);
+                root.applyCss();
+                root.layout();
+                assertReadable(toolbarButton, "toolbar hover " + mode);
+
+                toolbarButton.pseudoClassStateChanged(hover, false);
+                toolbarButton.pseudoClassStateChanged(pressed, true);
+                root.applyCss();
+                root.layout();
+                assertReadable(toolbarButton, "toolbar pressed " + mode);
+                toolbarButton.pseudoClassStateChanged(pressed, false);
+
+                toolbarToggle.setSelected(true);
+                root.applyCss();
+                root.layout();
+                assertReadable(toolbarToggle, "toolbar toggle selected " + mode);
+
+                toolbarToggle.pseudoClassStateChanged(hover, true);
+                root.applyCss();
+                root.layout();
+                assertReadable(toolbarToggle, "toolbar toggle selected+hover " + mode);
+                toolbarToggle.pseudoClassStateChanged(hover, false);
+                toolbarToggle.setSelected(false);
+
+                statusButton.pseudoClassStateChanged(hover, true);
+                root.applyCss();
+                root.layout();
+                assertReadable(statusButton, "status hover " + mode);
+                statusButton.pseudoClassStateChanged(hover, false);
+            }
+        });
+    }
+
+    @Test
+    @DisplayName("focused buttons and dropdowns keep readable text in every theme")
+    void focusedControlsKeepReadableText() {
+        onFxThread(() -> {
+            javafx.css.PseudoClass focused = javafx.css.PseudoClass.getPseudoClass("focused");
+            Button plain = new Button("Close");
+            Button defaultButton = new Button("Open & Jump");
+            defaultButton.setDefaultButton(true);
+            Button primary = new Button("Search");
+            primary.getStyleClass().add("btn-primary");
+            ToggleButton toggle = new ToggleButton("Regex");
+            ComboBox<String> combo = new ComboBox<>();
+            combo.getItems().addAll("1", "3", "5", "10");
+            combo.getSelectionModel().selectFirst();
+            VBox root = new VBox(6, plain, defaultButton, primary, toggle, combo);
+
+            Scene scene = AppTheme.scene(root);
+            stage.setScene(scene);
+            stage.show();
+            root.applyCss();
+            root.layout();
+            WaitForAsyncUtils.waitForFxEvents();
+
+            for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                useTheme(theme);
+                for (javafx.scene.control.Control control : new javafx.scene.control.Control[]{
+                        plain, defaultButton, primary, toggle, combo}) {
+                    control.pseudoClassStateChanged(focused, true);
+                }
+                root.applyCss();
+                root.layout();
+                WaitForAsyncUtils.waitForFxEvents();
+                String mode = theme.name();
+
+                assertReadable(plain, "plain focused " + mode);
+                assertReadable(defaultButton, "default focused " + mode);
+                assertReadable(primary, "primary focused " + mode);
+                assertReadable(toggle, "toggle focused " + mode);
+                assertReadableCombo(combo, "dropdown focused " + mode);
+
+                for (javafx.scene.control.Control control : new javafx.scene.control.Control[]{
+                        plain, defaultButton, primary, toggle, combo}) {
+                    control.pseudoClassStateChanged(focused, false);
+                }
+            }
+        });
+    }
+
+    private static void assertReadable(javafx.scene.control.Labeled control, String label) {
+        assertNotNull(control.getBackground(), label + ": background must resolve");
+        Color background = toColor(control.getBackground().getFills().get(0).getFill());
+        Color text = control.getTextFill() instanceof Color c ? c : null;
+        assertNotNull(background, label + ": background must be a colour");
+        assertNotNull(text, label + ": text fill must be a colour");
+        assertTrue(contrast(text, background) >= 4.5,
+                String.format("%s: text contrast too low: %.2f:1 (fg=%s bg=%s)",
+                        label, contrast(text, background), text, background));
+    }
+
+    private static void assertReadableCombo(ComboBox<?> combo, String label) {
+        ListCell<?> cell = (ListCell<?>) combo.lookup(".list-cell");
+        assertNotNull(cell, label + ": dropdown value cell must exist");
+        assertNotNull(combo.getBackground(), label + ": background must resolve");
+        Color background = toColor(combo.getBackground().getFills().get(0).getFill());
+        Color text = cell.getTextFill() instanceof Color c ? c : null;
+        assertNotNull(background, label + ": background must be a colour");
+        assertNotNull(text, label + ": text fill must be a colour");
+        assertTrue(contrast(text, background) >= 4.5,
+                String.format("%s: text contrast too low: %.2f:1 (fg=%s bg=%s)",
+                        label, contrast(text, background), text, background));
+    }
+
+    @Test
+    @DisplayName("dark-filled controls (selected toggle, primary/empty-state button, memory track) draw no outline")
+    void darkFilledControlsHaveNoOutline() {
+        onFxThread(() -> {
+            Button primary = new Button("Open File...");
+            primary.getStyleClass().add("empty-state-button");
+            ToggleButton selectedToggle = new ToggleButton();
+            selectedToggle.setSelected(true);
+            javafx.scene.control.ProgressBar memory = new javafx.scene.control.ProgressBar(0.5);
+            memory.getStyleClass().add("status-memory-bar");
+            javafx.scene.layout.HBox statusBar = new javafx.scene.layout.HBox(memory);
+            statusBar.getStyleClass().add("status-bar");
+            VBox root = new VBox(6, primary, selectedToggle, statusBar);
+
+            Scene scene = AppTheme.scene(root);
+            stage.setScene(scene);
+            stage.show();
+            root.applyCss();
+            root.layout();
+            WaitForAsyncUtils.waitForFxEvents();
+
+            assertNoVisibleOutline(primary, "empty-state button");
+            assertNoVisibleOutline(selectedToggle, "selected toggle");
+            assertTrue(luminance(toColor(primary.getBackground().getFills().get(0).getFill())) < 0.3,
+                    "empty-state button must be a dark, filled button");
+
+            javafx.scene.Node track = memory.lookup(".track");
+            assertNotNull(track, "memory bar track must exist");
+            assertNoVisibleOutline((javafx.scene.layout.Region) track, "memory bar track");
+            Color trackFill = toColor(((javafx.scene.layout.Region) track).getBackground().getFills().get(0).getFill());
+            assertNotNull(trackFill);
+            assertTrue(luminance(trackFill) < 0.4, "memory bar track must stay a flat dark tone");
+        });
+    }
+
+    private static void assertNoVisibleOutline(javafx.scene.layout.Region region, String label) {
+        javafx.scene.layout.Border border = region.getBorder();
+        if (border == null) {
+            return;
+        }
+        for (javafx.scene.layout.BorderStroke stroke : border.getStrokes()) {
+            for (javafx.scene.paint.Paint paint : new javafx.scene.paint.Paint[]{
+                    stroke.getTopStroke(), stroke.getBottomStroke(),
+                    stroke.getLeftStroke(), stroke.getRightStroke()}) {
+                assertTrue(isTransparentOrNull(paint),
+                        label + " must not draw a visible outline, found " + paint);
+            }
+        }
+    }
+
+    private static boolean isTransparentOrNull(javafx.scene.paint.Paint paint) {
+        if (paint == null) {
+            return true;
+        }
+        return paint instanceof Color c && c.getOpacity() <= 0.05;
     }
 
     private void useTheme(AppTheme.Theme theme) {

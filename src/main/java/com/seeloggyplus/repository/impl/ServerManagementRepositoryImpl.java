@@ -43,6 +43,19 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
     private static final String SQL_GET_GROUPS = "SELECT name FROM server_groups ORDER BY sort_order ASC, name ASC";
     private static final String SQL_INSERT_GROUP = "INSERT OR IGNORE INTO server_groups(name, sort_order) "
             + "VALUES(?, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM server_groups))";
+    private static final String SQL_RENAME_GROUP_SUBTREE =
+            "UPDATE server_groups SET name = ? || SUBSTR(name, ?) WHERE name = ? OR name LIKE ? ESCAPE '\\'";
+    private static final String SQL_RENAME_MEMBERS_SUBTREE =
+            "UPDATE ssh_servers SET group_name = ? || SUBSTR(group_name, ?) WHERE group_name = ? OR group_name LIKE ? ESCAPE '\\'";
+    private static final String SQL_DELETE_GROUP_SUBTREE =
+            "DELETE FROM server_groups WHERE name = ? OR name LIKE ? ESCAPE '\\'";
+    private static final String SQL_CLEAR_MEMBERS_SUBTREE =
+            "UPDATE ssh_servers SET group_name = NULL WHERE group_name = ? OR group_name LIKE ? ESCAPE '\\'";
+
+    /** Escapes LIKE wildcards so group names containing % or _ behave literally. */
+    private static String likePrefix(String path) {
+        return path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%";
+    }
 
     /** Dedicated connection so a multi-statement group change commits or rolls back as a unit. */
     private Connection openDedicatedConnection() throws SQLException {
@@ -83,17 +96,26 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
     public void renameGroup(String oldName, String newName) {
         try (Connection c = openDedicatedConnection()) {
             c.setAutoCommit(false);
-            try (PreparedStatement rename = c.prepareStatement("UPDATE server_groups SET name = ? WHERE name = ?");
+            try (PreparedStatement renameGroups = c.prepareStatement(SQL_RENAME_GROUP_SUBTREE);
                  PreparedStatement ensure = c.prepareStatement(SQL_INSERT_GROUP);
-                 PreparedStatement members = c.prepareStatement("UPDATE ssh_servers SET group_name = ? WHERE group_name = ?")) {
-                rename.setString(1, newName);
-                rename.setString(2, oldName);
-                rename.executeUpdate();
+                 PreparedStatement renameMembers = c.prepareStatement(SQL_RENAME_MEMBERS_SUBTREE)) {
+                // Rename the whole subtree: "A" and "A/Child" both move to the new path.
+                String oldPrefix = likePrefix(oldName);
+                int suffixStart = oldName.length() + 1;
+                renameGroups.setString(1, newName);
+                renameGroups.setInt(2, suffixStart);
+                renameGroups.setString(3, oldName);
+                renameGroups.setString(4, oldPrefix);
+                renameGroups.executeUpdate();
+
                 ensure.setString(1, newName);
                 ensure.executeUpdate();
-                members.setString(1, newName);
-                members.setString(2, oldName);
-                members.executeUpdate();
+
+                renameMembers.setString(1, newName);
+                renameMembers.setInt(2, suffixStart);
+                renameMembers.setString(3, oldName);
+                renameMembers.setString(4, oldPrefix);
+                renameMembers.executeUpdate();
                 c.commit();
             } catch (SQLException e) {
                 c.rollback();
@@ -109,11 +131,15 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
     public void deleteGroup(String name) {
         try (Connection c = openDedicatedConnection()) {
             c.setAutoCommit(false);
-            try (PreparedStatement delete = c.prepareStatement("DELETE FROM server_groups WHERE name = ?");
-                 PreparedStatement clearMembers = c.prepareStatement("UPDATE ssh_servers SET group_name = NULL WHERE group_name = ?")) {
+            try (PreparedStatement delete = c.prepareStatement(SQL_DELETE_GROUP_SUBTREE);
+                 PreparedStatement clearMembers = c.prepareStatement(SQL_CLEAR_MEMBERS_SUBTREE)) {
+                // Deleting a group removes its descendants; member servers survive ungrouped.
+                String prefix = likePrefix(name);
                 delete.setString(1, name);
+                delete.setString(2, prefix);
                 delete.executeUpdate();
                 clearMembers.setString(1, name);
+                clearMembers.setString(2, prefix);
                 clearMembers.executeUpdate();
                 c.commit();
             } catch (SQLException e) {

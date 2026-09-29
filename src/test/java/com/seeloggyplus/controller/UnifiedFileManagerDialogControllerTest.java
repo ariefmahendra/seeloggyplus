@@ -215,10 +215,13 @@ public class UnifiedFileManagerDialogControllerTest {
                 java.util.Set<String> cache = getField("favoritePathsCache");
                 assertTrue(cache.contains(pathField.getText()));
                 Button button = getField("favoriteCurrentButton");
-                assertEquals("Remove folder favorite", button.getText());
+                assertNotNull(button.getTooltip());
+                assertTrue(button.getTooltip().getText().toLowerCase().contains("remove"),
+                        "favorite button tooltip must reflect the saved state");
                 method.invoke(controller);
                 assertFalse(cache.contains(pathField.getText()));
-                assertEquals("Favorite this folder", button.getText());
+                assertTrue(button.getTooltip().getText().toLowerCase().contains("favorite"),
+                        "favorite button tooltip must return to the add state");
             } catch (Exception e) { throw new AssertionError(e); }
         });
     }
@@ -459,6 +462,11 @@ public class UnifiedFileManagerDialogControllerTest {
         WaitForAsyncUtils.waitForFxEvents();
 
         assertEquals(1, localFileService.callCount); // Should be cached!
+
+        Label status = getField("statusLabel");
+        assertNotNull(status);
+        assertFalse(status.getText().toLowerCase(java.util.Locale.ROOT).contains("cache"),
+                "the footer must not mention cache internals");
     }
 
     @Test

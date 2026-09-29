@@ -44,6 +44,9 @@ class FileManagerGroupingTest {
     @SuppressWarnings("unchecked")
     void start(Stage stage) throws Exception {
         this.stage = stage;
+        // Never let a leftover server preference connect during FXML initialization.
+        new com.seeloggyplus.service.impl.PreferenceServiceImpl().saveOrUpdatePreferences(
+                new com.seeloggyplus.model.Preference("file_manager_last_location", "local"));
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
         Parent root = loader.load();
         controller = loader.getController();
@@ -100,25 +103,57 @@ class FileManagerGroupingTest {
     }
 
     private TreeItem<UnifiedFileManagerDialogController.LocationItem> groupNode(String name) {
-        for (TreeItem<UnifiedFileManagerDialogController.LocationItem> child : locationTree.getRoot().getChildren()) {
-            var value = child.getValue();
-            if (value != null && value.isGroup() && name.equals(value.getGroupName())) {
-                return child;
+        return findGroupNode(locationTree.getRoot(), name);
+    }
+
+    private static TreeItem<UnifiedFileManagerDialogController.LocationItem> findGroupNode(
+            TreeItem<UnifiedFileManagerDialogController.LocationItem> node, String name) {
+        var value = node.getValue();
+        if (value != null && value.isGroup() && name.equals(value.getGroupName())) {
+            return node;
+        }
+        for (TreeItem<UnifiedFileManagerDialogController.LocationItem> child : node.getChildren()) {
+            TreeItem<UnifiedFileManagerDialogController.LocationItem> found = findGroupNode(child, name);
+            if (found != null) {
+                return found;
             }
         }
         return null;
     }
 
     private TreeItem<UnifiedFileManagerDialogController.LocationItem> serverNode(String id) {
-        for (TreeItem<UnifiedFileManagerDialogController.LocationItem> folder : locationTree.getRoot().getChildren()) {
-            for (TreeItem<UnifiedFileManagerDialogController.LocationItem> child : folder.getChildren()) {
-                var value = child.getValue();
-                if (value != null && value.isServer() && id.equals(value.getServer().getId())) {
-                    return child;
-                }
+        return findServerNode(locationTree.getRoot(), id);
+    }
+
+    private static TreeItem<UnifiedFileManagerDialogController.LocationItem> findServerNode(
+            TreeItem<UnifiedFileManagerDialogController.LocationItem> node, String id) {
+        var value = node.getValue();
+        if (value != null && value.isServer() && id.equals(value.getServer().getId())) {
+            return node;
+        }
+        for (TreeItem<UnifiedFileManagerDialogController.LocationItem> child : node.getChildren()) {
+            TreeItem<UnifiedFileManagerDialogController.LocationItem> found = findServerNode(child, id);
+            if (found != null) {
+                return found;
             }
         }
         return null;
+    }
+
+    private UnifiedFileManagerDialogController.LocationItem currentLocation() throws Exception {
+        Field field = UnifiedFileManagerDialogController.class.getDeclaredField("currentLocation");
+        field.setAccessible(true);
+        return (UnifiedFileManagerDialogController.LocationItem) field.get(controller);
+    }
+
+    private void setCurrentLocation(UnifiedFileManagerDialogController.LocationItem item) {
+        try {
+            Field field = UnifiedFileManagerDialogController.class.getDeclaredField("currentLocation");
+            field.setAccessible(true);
+            field.set(controller, item);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test
@@ -229,6 +264,98 @@ class FileManagerGroupingTest {
         assertNotNull(serverNodeByRoot(server.getId()), "the server must stay, now ungrouped");
         assertNull(serverService.getServerById(server.getId()).getGroupName());
         assertFalse(serverService.getGroupNames().contains(group));
+    }
+
+    @Test
+    @DisplayName("a group can contain another group (nested folders)")
+    void nestedGroupCanBeCreatedInsideAGroup() {
+        String parent = unique("Parent");
+        String child = parent + "/" + unique("Child");
+        createGroup(parent);
+        createGroup(child);
+
+        TreeItem<UnifiedFileManagerDialogController.LocationItem> parentNode = groupNode(parent);
+        TreeItem<UnifiedFileManagerDialogController.LocationItem> childNode = groupNode(child);
+        assertNotNull(parentNode, "the parent group must exist");
+        assertNotNull(childNode, "the nested group must exist");
+        assertEquals(childNode, parentNode.getChildren().get(0),
+                "the nested group must render inside its parent folder");
+        assertEquals(child.substring(child.lastIndexOf('/') + 1), childNode.getValue().getLabel(),
+                "nested folders show only their own name");
+        assertTrue(serverService.getGroupNames().contains(child));
+    }
+
+    @Test
+    @DisplayName("a server can be moved into a nested group")
+    void serverMovesIntoNestedGroup() {
+        String parent = unique("Parent");
+        String child = parent + "/" + unique("Child");
+        SSHServerModel server = createServer(unique("server"), null);
+        createGroup(parent);
+        createGroup(child);
+
+        runFx(() -> controller.moveServerToGroup(server.getId(), child));
+
+        TreeItem<UnifiedFileManagerDialogController.LocationItem> node = serverNode(server.getId());
+        assertNotNull(node);
+        assertEquals(child, node.getParent().getValue().getGroupName());
+        assertEquals(child, serverService.getServerById(server.getId()).getGroupName());
+    }
+
+    @Test
+    @DisplayName("renaming a parent updates its nested folder path")
+    void renamingParentMovesNestedGroup() {
+        String parent = unique("Parent");
+        String child = parent + "/" + unique("Child");
+        SSHServerModel server = createServer(unique("server"), child);
+        createGroup(parent);
+        createGroup(child);
+
+        String renamed = unique("Renamed");
+        runFx(() -> controller.renameGroup(parent, renamed));
+        createdGroups.add(renamed);
+
+        assertNull(groupNode(parent));
+        assertNotNull(groupNode(renamed + "/" + child.substring(child.lastIndexOf('/') + 1)));
+        assertEquals(renamed + "/" + child.substring(child.lastIndexOf('/') + 1),
+                serverService.getServerById(server.getId()).getGroupName());
+    }
+
+    @Test
+    @DisplayName("selecting a server node must not open it (a drag starts with a selection)")
+    void selectingAServerDoesNotOpenIt() throws Exception {
+        SSHServerModel server = createServer(unique("server"), null);
+        runFx(controller::rebuildLocationTree);
+        Object before = currentLocation();
+
+        runFx(() -> locationTree.getSelectionModel().select(serverNode(server.getId())));
+
+        assertSame(before, currentLocation(), "selection alone must never navigate/connect");
+    }
+
+    @Test
+    @DisplayName("moving a server via drag/context menu must not open it")
+    void movingAServerDoesNotOpenIt() throws Exception {
+        String group = unique("MoveSafe");
+        SSHServerModel server = createServer(unique("server"), null);
+        createGroup(group);
+        Object before = currentLocation();
+
+        runFx(() -> controller.moveServerToGroup(server.getId(), group));
+
+        assertSame(before, currentLocation(), "moving a server must keep the current location");
+    }
+
+    @Test
+    @DisplayName("clicking a location opens it")
+    void clickOpensLocation() throws Exception {
+        SSHServerModel server = createServer(unique("server"), null);
+        runFx(controller::rebuildLocationTree);
+        setCurrentLocation(UnifiedFileManagerDialogController.LocationItem.of(server));
+
+        runFx(() -> controller.handleLocationClick(UnifiedFileManagerDialogController.LocationItem.local()));
+
+        assertTrue(currentLocation().isLocal(), "a click must open the clicked location");
     }
 
     @Test

@@ -236,13 +236,19 @@
     -fx-background-color: -sl-brand;
     -fx-text-fill: -sl-on-brand;
     -fx-font-weight: bold;
-    -fx-padding: 8 16;
     -fx-background-radius: 3;
+    -fx-border-color: transparent;
     -fx-cursor: hand;
 }
 
 .empty-state-button:hover {
     -fx-background-color: -sl-brand-hover;
+}
+
+.empty-state-button:focused {
+    -fx-background-color: -sl-brand;
+    -fx-text-fill: -sl-on-brand;
+    -fx-border-color: -sl-accent;
 }
 
 .empty-state-button .glyph-icon,
@@ -258,6 +264,8 @@
 .toggle-button:selected {
     -fx-background-color: -sl-brand;
     -fx-text-fill: -sl-on-brand;
+    /* No leftover outline: selected toggles must look flat and clean. */
+    -fx-border-color: transparent;
 }
 
 .toggle-button:selected .glyph-icon,
@@ -371,19 +379,20 @@
 }
 
 /* Selected / highlighted preview line: use the shared (translucent) selection
-   colour and keep theme text colours so it stays readable in both themes. */
-.remote-log-search-dialog .list-cell:selected,
-.remote-log-search-dialog .list-cell:filled:selected {
+   colour and keep theme text colours so it stays readable in both themes.
+   Scoped to the preview list so it cannot leak onto the Context dropdown. */
+.remote-log-search-dialog .preview-list .list-cell:selected,
+.remote-log-search-dialog .preview-list .list-cell:filled:selected {
     -fx-background-color: -sl-selection-bg;
 }
 
-.remote-log-search-dialog .list-cell:selected .label,
-.remote-log-search-dialog .list-cell:selected .text {
+.remote-log-search-dialog .preview-list .list-cell:selected .label,
+.remote-log-search-dialog .preview-list .list-cell:selected .text {
     -fx-text-fill: -sl-text;
     -fx-fill: -sl-text;
 }
 
-.remote-log-search-dialog .list-cell:selected .preview-line-number {
+.remote-log-search-dialog .preview-list .list-cell:selected .preview-line-number {
     -fx-text-fill: -sl-text-muted;
 }
 
@@ -549,9 +558,68 @@ FontAwesomeIconView.file-icon-file {
     -fx-border-color: -sl-border-soft;
 }
 
-/* Dropdown popups (ComboBox / ChoiceBox / ChoiceDialog) follow the active theme
-   surface instead of Modena defaults, so they never render dark on the light
-   Graphite / Light themes. */
+/* Collapsible panel sections (e.g. Favorite folders in File Management). */
+.titled-pane > .title {
+    -fx-background-color: -sl-surface-alt;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 3 3 0 0;
+    -fx-border-radius: 3 3 0 0;
+    -fx-padding: 4 8 4 8;
+}
+
+.titled-pane > .title .label,
+.titled-pane > .title > .text {
+    -fx-text-fill: -sl-text;
+}
+
+.titled-pane > .title > .arrow-button .arrow {
+    -fx-background-color: -sl-text-secondary;
+}
+
+.titled-pane > .content {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 0 1 1 1;
+    -fx-border-radius: 0 0 3 3;
+    -fx-padding: 4;
+}
+
+/* Dropdown fields (ComboBox / ChoiceBox / ChoiceDialog) look like normal form
+   fields in every theme: light surface with dark text on Graphite/Light, and
+   only the Dark theme renders them dark. The dropdown list uses a neutral
+   light highlight instead of the dark accent / blue accent. */
+.combo-box,
+.choice-box {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 3;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
+}
+
+.combo-box .list-cell,
+.choice-box .label {
+    -fx-background-color: transparent;
+    -fx-text-fill: -sl-text;
+}
+
+.combo-box:focused,
+.choice-box:focused {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: -sl-accent;
+}
+
+.combo-box:focused .list-cell,
+.choice-box:focused .label {
+    -fx-text-fill: -sl-text;
+}
+
+.combo-box .arrow,
+.choice-box .arrow {
+    -fx-background-color: -sl-text-secondary;
+}
+
 .combo-box-popup .list-view,
 .choice-box-popup .list-view {
     -fx-background-color: -sl-surface;
@@ -567,15 +635,11 @@ FontAwesomeIconView.file-icon-file {
 }
 
 .combo-box-popup .list-cell:filled:hover,
-.choice-box-popup .list-cell:filled:hover {
-    -fx-background-color: -sl-brand-soft;
-    -fx-text-fill: -sl-text;
-}
-
+.choice-box-popup .list-cell:filled:hover,
 .combo-box-popup .list-cell:filled:selected,
 .choice-box-popup .list-cell:filled:selected {
-    -fx-background-color: -sl-accent;
-    -fx-text-fill: -sl-accent-text;
+    -fx-background-color: -sl-surface-sunken;
+    -fx-text-fill: -sl-text;
 }
 
 /* Icons on chrome must not inherit the dark text of the content surface. */

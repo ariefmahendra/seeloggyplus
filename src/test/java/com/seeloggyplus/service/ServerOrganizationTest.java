@@ -151,6 +151,58 @@ class ServerOrganizationTest {
     }
 
     @Test
+    @DisplayName("nested groups create their ancestors and rename/delete the whole subtree")
+    void nestedGroupsCreateAncestorsAndRenameSubtree() {
+        group("Parent");
+        service.createGroup("Parent/Child");
+        createdGroups.add("Parent/Child");
+
+        assertTrue(service.getGroupNames().contains("Parent"));
+        assertTrue(service.getGroupNames().contains("Parent/Child"));
+
+        SSHServerModel server = create("Nested");
+        server.setGroupName("Parent/Child");
+        service.saveServer(server);
+
+        service.renameGroup("Parent", "Renamed");
+        createdGroups.add("Renamed");
+        createdGroups.add("Renamed/Child");
+
+        assertTrue(service.getGroupNames().contains("Renamed"));
+        assertTrue(service.getGroupNames().contains("Renamed/Child"));
+        assertFalse(service.getGroupNames().contains("Parent/Child"));
+        assertEquals("Renamed/Child", service.getServerById(server.getId()).getGroupName());
+
+        service.deleteGroup("Renamed");
+        assertFalse(service.getGroupNames().contains("Renamed"));
+        assertFalse(service.getGroupNames().contains("Renamed/Child"));
+        assertNull(service.getServerById(server.getId()).getGroupName(),
+                "servers inside a deleted subtree must survive ungrouped");
+    }
+
+    @Test
+    @DisplayName("a nested path auto-creates missing ancestors and rejects blank segments")
+    void nestedPathValidation() {
+        service.createGroup(" A / B / C ");
+        createdGroups.add("A");
+        createdGroups.add("A/B");
+        createdGroups.add("A/B/C");
+
+        assertTrue(service.getGroupNames().containsAll(List.of("A", "A/B", "A/B/C")),
+                "creating a/b/c must also create a and a/b");
+        assertThrows(IllegalArgumentException.class, () -> service.createGroup("Bad//Path"));
+        assertThrows(IllegalArgumentException.class, () -> service.createGroup("  "));
+    }
+
+    @Test
+    @DisplayName("a group cannot be renamed into itself")
+    void renameIntoSelfRejected() {
+        group("Self");
+        assertThrows(IllegalArgumentException.class, () -> service.renameGroup("Self", "Self/Sub"));
+        assertTrue(service.getGroupNames().contains("Self"));
+    }
+
+    @Test
     @DisplayName("getGroupNames keeps creation order")
     void groupOrderIsStable() {
         group("Zulu");
