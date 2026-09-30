@@ -338,9 +338,20 @@ jacocoTestReport {
 tasks.register('testSummary') {
     doLast {
         def totals = [tests: 0, failures: 0, errors: 0, skipped: 0]
+        def failedTests = []
         fileTree("${buildDir}/test-results/test").matching { include 'TEST-*.xml' }.each { f ->
             def xml = new XmlSlurper().parse(f)
             totals.keySet().each { key -> totals[key] = totals[key] + Integer.parseInt(xml.attributes()[key]?.toString() ?: '0') }
+            xml.testcase.each { tc ->
+                def problem = tc.failure.size() > 0 ? tc.failure[0] : (tc.error.size() > 0 ? tc.error[0] : null)
+                if (problem != null) {
+                    def message = problem.@message.text().replaceAll('\\s+', ' ')
+                    if (message.length() > 140) {
+                        message = message.substring(0, 140) + '...'
+                    }
+                    failedTests << "  - ${tc.@classname.text()}.${tc.@name.text()}: ${message}"
+                }
+            }
         }
         def failed = totals.failures + totals.errors
         println "==================== TEST SUMMARY ===================="
@@ -350,5 +361,9 @@ tasks.register('testSummary') {
         println "  Skipped : ${totals.skipped}"
         println "  Result  : ${failed == 0 && totals.tests > 0 ? 'PASS' : 'FAIL'}"
         println "======================================================"
+        if (!failedTests.isEmpty()) {
+            println "FAILED TESTS:"
+            failedTests.each { println it }
+        }
     }
 }
