@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-30
+
+### Fixed
+- **Release pipeline**: the 0.6.0 CI run failed before publishing a release, so
+  0.6.1 is the first published build of the 0.6 line with the same feature set.
+  Failing tests are now listed on the workflow run summary (visible without
+  admin access to logs), and two UI assertions were hardened so they are stable
+  across CI machines:
+  - the remote-tail reload test now blocks the fake connect on a latch instead
+    of using wall-clock sleeps;
+  - the Browse button size assertions use platform-tolerant tolerances;
+  - the Gradle `testSummary` now lists the failing test names and messages.
+
 ## [0.6.0] - 2026-09-30
 
 ### Added
@@ -170,7 +183,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.0...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.1...HEAD
+[0.6.1]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.1...0.6.0
 [0.5.1]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.3...0.5.0
