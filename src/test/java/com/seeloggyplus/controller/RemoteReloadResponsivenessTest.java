@@ -36,12 +36,16 @@ class RemoteReloadResponsivenessTest {
     private ServerManagementService serverService;
     private SSHServerModel server;
 
-    /** Connect attempt that takes a long time (like a slow SSH handshake). */
+    /** Connect attempt that blocks until the test releases it (like a slow handshake). */
     static class SlowSshService extends SSHServiceImpl {
+        final CountDownLatch connectStarted = new CountDownLatch(1);
+        final CountDownLatch releaseConnect = new CountDownLatch(1);
+
         @Override
         public boolean connect(String host, int port, String username, String password) {
+            connectStarted.countDown();
             try {
-                Thread.sleep(800);
+                releaseConnect.await(5, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -91,10 +95,11 @@ class RemoteReloadResponsivenessTest {
         LogFile logFile = new LogFile();
         logFile.setId(UUID.randomUUID().toString());
         logFile.setSshServerID(server.getId());
+        SlowSshService slow = new SlowSshService();
         setField("currentLogFromDb", logFile);
         setField("monitoringRemotePath", "/var/log/slow.log");
         setField("tailModeEnabled", true);
-        setField("activeTailSshService", new SlowSshService());
+        setField("activeTailSshService", slow);
 
         Platform.runLater(() -> {
             try {
@@ -106,20 +111,25 @@ class RemoteReloadResponsivenessTest {
                 throw new RuntimeException(e);
             }
         });
-        // Give the reload a moment to start while the (slow) connect is running.
-        Thread.sleep(150);
+        assertTrue(slow.connectStarted.await(3, TimeUnit.SECONDS),
+                "the reconnect must actually start");
 
-        long startedAt = System.nanoTime();
-        CountDownLatch marker = new CountDownLatch(1);
-        Platform.runLater(marker::countDown);
-        assertTrue(marker.await(2, TimeUnit.SECONDS), "FX thread must remain responsive");
-        long blockedMs = (System.nanoTime() - startedAt) / 1_000_000;
+        try {
+            // The connect is still blocked; the FX thread must stay free regardless
+            // of how slow the CI machine is.
+            long startedAt = System.nanoTime();
+            CountDownLatch marker = new CountDownLatch(1);
+            Platform.runLater(marker::countDown);
+            assertTrue(marker.await(2, TimeUnit.SECONDS),
+                    "FX thread must remain responsive while the reconnect runs");
+            long blockedMs = (System.nanoTime() - startedAt) / 1_000_000;
+            assertTrue(blockedMs < 500,
+                    "reloading must run the SSH reconnect off the FX thread (blocked " + blockedMs + "ms)");
+        } finally {
+            slow.releaseConnect.countDown();
+        }
 
-        assertTrue(blockedMs < 500,
-                "reloading must run the SSH reconnect off the FX thread (blocked " + blockedMs + "ms)");
-
-        // Let the background connect finish (it fails after ~800ms) and settle.
-        Thread.sleep(1000);
+        Thread.sleep(300);
         WaitForAsyncUtils.waitForFxEvents();
     }
 }
