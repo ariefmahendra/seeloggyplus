@@ -38,7 +38,7 @@ public final class DatabaseMigrator {
     private static final Logger logger = LoggerFactory.getLogger(DatabaseMigrator.class);
 
     /** Current expected schema version. Increment when adding a migration. */
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
 
     /** How many rolling backups to keep next to the database. */
     private static final int KEEP_BACKUPS = 3;
@@ -79,6 +79,7 @@ public final class DatabaseMigrator {
             migrateRecentFileMode(connection);
             migrateServerOrganization(connection);
             migrateServerGroups(connection);
+            migrateServerAuth(connection);
             setUserVersion(connection, SCHEMA_VERSION);
             connection.commit();
             logger.info("Database migration to version {} completed", SCHEMA_VERSION);
@@ -119,6 +120,13 @@ public final class DatabaseMigrator {
         addColumnIfMissing(connection, "ssh_servers", "sort_order", "INTEGER");
         addColumnIfMissing(connection, "ssh_servers", "group_name", "TEXT");
         backfillSortOrder(connection);
+    }
+
+    /** v4: per-server authentication method (password or private key). */
+    private static void migrateServerAuth(Connection connection) throws SQLException {
+        addColumnIfMissing(connection, "ssh_servers", "auth_type", "TEXT");
+        addColumnIfMissing(connection, "ssh_servers", "key_path", "TEXT");
+        addColumnIfMissing(connection, "ssh_servers", "key_passphrase", "TEXT");
     }
 
     /** v3: first-class server groups, so an empty group survives a restart. */

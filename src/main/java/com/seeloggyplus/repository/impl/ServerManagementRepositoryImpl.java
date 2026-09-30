@@ -31,11 +31,12 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
     // SQL Queries
     private static final String SQL_CHECK_EXISTS = "SELECT COUNT(*) FROM ssh_servers WHERE id = ?";
     private static final String SQL_INSERT = 
-        "INSERT INTO ssh_servers(id, name, host, port, username, password, default_path, created_at, last_used, save_password, favorite, sort_order, group_name) " +
-        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MIN(sort_order), 0) - 1 FROM ssh_servers), ?)";
+        "INSERT INTO ssh_servers(id, name, host, port, username, password, default_path, created_at, last_used, save_password, favorite, sort_order, group_name, auth_type, key_path, key_passphrase) " +
+        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MIN(sort_order), 0) - 1 FROM ssh_servers), ?, ?, ?, ?)";
     private static final String SQL_UPDATE = 
         "UPDATE ssh_servers SET name = ?, host = ?, port = ?, username = ?, password = ?, " +
-        "default_path = ?, save_password = ?, favorite = ?, group_name = ? WHERE id = ?";
+        "default_path = ?, save_password = ?, favorite = ?, group_name = ?, " +
+        "auth_type = ?, key_path = ?, key_passphrase = ? WHERE id = ?";
     private static final String SQL_DELETE = "DELETE FROM ssh_servers WHERE id = ?";
     private static final String SQL_UPDATE_LAST_USED = "UPDATE ssh_servers SET last_used = ? WHERE id = ?";
     private static final String SQL_GET_ALL = "SELECT * FROM ssh_servers ORDER BY sort_order ASC, created_at DESC, id ASC";
@@ -230,6 +231,9 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
             ps.setBoolean(10, server.isSavePassword());
             ps.setBoolean(11, server.isFavorite());
             ps.setString(12, server.getGroupName());
+            ps.setString(13, server.getAuthType());
+            ps.setString(14, server.getKeyPath());
+            ps.setString(15, encryptSecret(server.getKeyPassphrase()));
             
             int affected = ps.executeUpdate();
             if (affected == 0) {
@@ -252,7 +256,10 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
             ps.setBoolean(7, server.isSavePassword());
             ps.setBoolean(8, server.isFavorite());
             ps.setString(9, server.getGroupName());
-            ps.setString(10, server.getId());
+            ps.setString(10, server.getAuthType());
+            ps.setString(11, server.getKeyPath());
+            ps.setString(12, encryptSecret(server.getKeyPassphrase()));
+            ps.setString(13, server.getId());
             
             int affected = ps.executeUpdate();
             if (affected == 0) {
@@ -387,6 +394,12 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
         server.setFavorite(rs.getBoolean("favorite"));
         server.setSortOrder(rs.getInt("sort_order"));
         server.setGroupName(rs.getString("group_name"));
+        String authType = rs.getString("auth_type");
+        server.setAuthType(authType == null || authType.isBlank()
+                ? com.seeloggyplus.model.SSHServerModel.AUTH_PASSWORD
+                : authType);
+        server.setKeyPath(rs.getString("key_path"));
+        server.setKeyPassphrase(decryptSecret(rs.getString("key_passphrase")));
         server.setName(rs.getString("name"));
         server.setHost(rs.getString("host"));
         server.setPort(rs.getInt("port"));
@@ -425,6 +438,22 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
         }
         
         return server;
+    }
+
+    /** Encrypts an optional secret (null/blank stays null). */
+    private static String encryptSecret(String secret) {
+        if (secret == null || secret.isBlank()) {
+            return null;
+        }
+        return CredentialEncryptor.getInstance().encrypt(secret);
+    }
+
+    /** Decrypts an optional secret (legacy plaintext passes through). */
+    private static String decryptSecret(String secret) {
+        if (secret == null || secret.isBlank()) {
+            return null;
+        }
+        return CredentialEncryptor.getInstance().decrypt(secret);
     }
 
     /**

@@ -28,7 +28,9 @@ javafx {
 }
 
 dependencies {
-    implementation 'com.jcraft:jsch:0.1.55'
+    // mwiede/jsch is a drop-in fork of JSch that supports modern keys
+    // (ed25519, ecdsa, rsa-sha2) which the original 0.1.55 does not.
+    implementation 'com.github.mwiede:jsch:0.2.20'
     compileOnly 'org.projectlombok:lombok:1.18.34'
     annotationProcessor 'org.projectlombok:lombok:1.18.34'
     testCompileOnly 'org.projectlombok:lombok:1.18.34'

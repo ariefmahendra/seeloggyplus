@@ -10,6 +10,7 @@ import com.seeloggyplus.service.FavoriteFolderService;
 import com.seeloggyplus.service.LocalFileService;
 import com.seeloggyplus.service.PreferenceService;
 import com.seeloggyplus.service.ServerManagementService;
+import com.seeloggyplus.service.SshConnectFlow;
 import com.seeloggyplus.service.impl.FavoriteFolderServiceImpl;
 import com.seeloggyplus.service.impl.LocalFileServiceImpl;
 import com.seeloggyplus.service.impl.PreferenceServiceImpl;
@@ -1010,8 +1011,8 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void connectToRemote(SSHServerModel server) {
-        String password = server.getPassword();
-        if (password == null || password.isBlank()) {
+        String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+        if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
             logger.info("Password for server {} is not saved, prompting user.", server.getName());
             suppressAutoRefresh = true; // Prevent focus-triggered refresh while dialog is open
             PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
@@ -1043,7 +1044,7 @@ public class UnifiedFileManagerDialogController {
         Task<Boolean> connectTask = new Task<>() {
             @Override
             protected Boolean call() {
-                boolean connected = connectingService.connect(server.getHost(), server.getPort(), server.getUsername(), finalPassword);
+                boolean connected = SshConnectFlow.connect(connectingService, server, finalPassword);
                 if (isCancelled()) { connectingService.disconnect(); return false; }
                 return connected;
             }
@@ -1063,8 +1064,12 @@ public class UnifiedFileManagerDialogController {
                 updateStatus("Connection failed");
                 progressIndicator.setVisible(false);
                 fileTable.setCursor(javafx.scene.Cursor.DEFAULT);
+                String detail = connectingService.getLastConnectError();
                 showError("Connection Error",
-                        "Could not connect to " + server.getHost() + ". Please check credentials.");
+                        "Could not connect to " + server.getHost() + "."
+                                + (detail == null || detail.isBlank()
+                                        ? " Please check credentials."
+                                        : "\n" + detail));
                 selectLocalLocation(); // Go back to local on failure
             }
         });
@@ -1096,11 +1101,11 @@ public class UnifiedFileManagerDialogController {
             activeSshService = sshServiceFactory.get();
         }
         SSHServerModel server = currentLocation.getServer();
-        String password = server.getPassword();
-        if (password == null || password.isBlank()) {
+        String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+        if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
             throw new IOException("SSH session is not active and no password is saved for server: " + server.getName());
         }
-        boolean ok = activeSshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
+        boolean ok = SshConnectFlow.connect(activeSshService, server, password);
         if (!ok || !activeSshService.isConnected()) {
             throw new IOException("Failed to establish SSH connection to " + server.getHost());
         }

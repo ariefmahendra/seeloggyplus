@@ -3,6 +3,7 @@ package com.seeloggyplus.controller;
 import com.seeloggyplus.ui.canvas.CanvasLogViewer;
 import com.seeloggyplus.util.AppTheme;
 import com.seeloggyplus.service.impl.*;
+import com.seeloggyplus.service.SshConnectFlow;
 import com.seeloggyplus.ui.cell.RecentFileTreeCell;
 import com.seeloggyplus.util.*;
 import javafx.animation.Animation;
@@ -1852,19 +1853,36 @@ public class MainController {
             currentParsingConfig = parsingConfigService.findDefault().orElseGet(ParsingConfig::createRawConfig);
         }
         showLoading("Reloading remote tail...");
-        try {
-            String password = server.getPassword();
-            if (password == null || password.isBlank()) {
-                logger.warn("Cannot get password for reload, relying on existing session.");
+
+        // Reconnect off the UI thread: SSH handshakes can take many seconds and
+        // previously froze the whole window (Not Responding) during reload.
+        final SSHServiceImpl service = activeTailSshService;
+        final String remotePath = monitoringRemotePath;
+        Thread.ofVirtual().name("tail-reload").start(() -> {
+            boolean connected = false;
+            String failure = null;
+            try {
+                String secret = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+                connected = SshConnectFlow.connect(service, server, secret);
+                if (!connected) {
+                    failure = service.getLastConnectError();
+                }
+            } catch (Exception e) {
+                logger.error("Failed to re-connect for tail reload", e);
+                failure = e.getMessage();
             }
-            activeTailSshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
-            startRemoteTail(monitoringRemotePath, activeTailSshService, server);
-        } catch (Exception e) {
-            logger.error("Failed to re-connect for tail reload", e);
-            showError("Reload Error", "Failed to re-connect to server: " + e.getMessage());
-        } finally {
-            hideLoading();
-        }
+            final boolean ok = connected;
+            final String detail = failure;
+            Platform.runLater(() -> {
+                hideLoading();
+                if (ok) {
+                    startRemoteTail(remotePath, service, server);
+                } else {
+                    showError("Reload Error", "Failed to re-connect to server: "
+                            + (detail == null || detail.isBlank() ? server.getHost() : detail));
+                }
+            });
+        });
     }
 
     private void reloadLastRemoteTail() {
@@ -1892,9 +1910,9 @@ public class MainController {
             @Override
             protected Boolean call() {
                 if (sshService.isConnected()) return true;
-                String password = server.getPassword();
-                if (password == null || password.isBlank()) return false;
-                return sshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
+                String secret = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+                if (!server.usesKeyAuth() && (secret == null || secret.isBlank())) return false;
+                return SshConnectFlow.connect(sshService, server, secret);
             }
         };
         connectTask.setOnSucceeded(e -> {
@@ -2675,20 +2693,26 @@ public class MainController {
                     }
 
                     final CompletableFuture<String> passwordFuture = new CompletableFuture<>();
-                    Platform.runLater(() -> {
-                        String password = server.getPassword();
-                        if (password == null || password.isBlank()) {
-                            logger.info("Password for server {} is not saved, prompting user.", server.getName());
-                            PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(),
-                                    server.getUsername());
-                            prompt.showAndWait().ifPresentOrElse(passwordFuture::complete,
-                                    () -> passwordFuture.complete(null));
-                        } else {
-                            passwordFuture.complete(password);
-                        }
-                    });
+                    if (server.usesKeyAuth()) {
+                        // Key authentication: the passphrase (or null for an unencrypted key) is
+                        // stored with the server, no interactive prompt needed.
+                        passwordFuture.complete(server.getKeyPassphrase());
+                    } else {
+                        Platform.runLater(() -> {
+                            String password = server.getPassword();
+                            if (password == null || password.isBlank()) {
+                                logger.info("Password for server {} is not saved, prompting user.", server.getName());
+                                PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(),
+                                        server.getUsername());
+                                prompt.showAndWait().ifPresentOrElse(passwordFuture::complete,
+                                        () -> passwordFuture.complete(null));
+                            } else {
+                                passwordFuture.complete(password);
+                            }
+                        });
+                    }
                     String password = passwordFuture.get();
-                    if (password == null) {
+                    if (!server.usesKeyAuth() && password == null) {
                         logger.info("User cancelled password prompt for remote recent file.");
                         updateMessage("SSH connection cancelled.");
                         cancel();
@@ -2697,8 +2721,7 @@ public class MainController {
 
                     updateMessage("Connecting to " + server.getHost() + "...");
                     SSHServiceImpl sshService = new SSHServiceImpl();
-                    boolean connected = sshService.connect(server.getHost(), server.getPort(), server.getUsername(),
-                            password);
+                    boolean connected = SshConnectFlow.connect(sshService, server, password);
 
                     if (!connected) {
                         throw new IOException("Could not connect to " + server.getHost());
@@ -3451,8 +3474,8 @@ public class MainController {
             }
 
             final SSHServerModel finalServer = server;
-            String password = server.getPassword();
-            if (password == null || password.isBlank()) {
+            String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+            if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
                 com.seeloggyplus.util.PasswordPromptDialog prompt = new com.seeloggyplus.util.PasswordPromptDialog(
                         server.getHost(), server.getUsername());
                 Optional<String> result = prompt.showAndWait();
@@ -3471,7 +3494,7 @@ public class MainController {
 
                 @Override
                 protected Boolean call() throws Exception {
-                    return newSsh.connect(finalServer.getHost(), finalServer.getPort(), finalServer.getUsername(), finalPassword);
+                    return SshConnectFlow.connect(newSsh, finalServer, finalPassword);
                 }
 
                 @Override
@@ -3535,9 +3558,9 @@ public class MainController {
             return;
         }
 
-        // Logic to get password (saved or prompt)
-        String password = server.getPassword();
-        if (password == null || password.isBlank()) {
+        // Logic to get the secret (saved password/passphrase or prompt)
+        String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+        if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
             com.seeloggyplus.util.PasswordPromptDialog prompt = new com.seeloggyplus.util.PasswordPromptDialog(
                     server.getHost(), server.getUsername());
             Optional<String> result = prompt.showAndWait();
@@ -3557,7 +3580,7 @@ public class MainController {
 
             @Override
             protected Boolean call() throws Exception {
-                return sshService.connect(server.getHost(), server.getPort(), server.getUsername(), finalPassword);
+                return SshConnectFlow.connect(sshService, server, finalPassword);
             }
 
             @Override

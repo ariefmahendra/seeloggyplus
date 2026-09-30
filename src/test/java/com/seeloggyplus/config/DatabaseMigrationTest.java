@@ -176,6 +176,39 @@ class DatabaseMigrationTest {
     }
 
     @Test
+    void migratesServerAuthColumnsPreservingData() throws Exception {
+        Path dbFile = tempDir.resolve("auth.db");
+        try (Connection c = connect(dbFile)) {
+            createLegacySchema(c);
+            insertLegacyServer(c, "s1", "One", "2024-01-01T00:00:00");
+            DatabaseMigrator.migrate(c, dbFile, false);
+
+            // Simulate a v3 database: auth columns do not exist yet.
+            try (Statement st = c.createStatement()) {
+                st.execute("ALTER TABLE ssh_servers DROP COLUMN auth_type");
+                st.execute("ALTER TABLE ssh_servers DROP COLUMN key_path");
+                st.execute("ALTER TABLE ssh_servers DROP COLUMN key_passphrase");
+                st.execute("PRAGMA user_version = 3");
+            }
+
+            DatabaseMigrator.migrate(c, dbFile, false);
+
+            assertTrue(DatabaseMigrator.columnExists(c, "ssh_servers", "auth_type"));
+            assertTrue(DatabaseMigrator.columnExists(c, "ssh_servers", "key_path"));
+            assertTrue(DatabaseMigrator.columnExists(c, "ssh_servers", "key_passphrase"));
+            assertEquals(DatabaseMigrator.SCHEMA_VERSION, DatabaseMigrator.getUserVersion(c));
+            assertEquals(1, countServers(c), "server rows must survive the auth migration");
+            assertNull(queryString(c, "SELECT auth_type FROM ssh_servers WHERE id = 's1'"),
+                    "legacy rows keep null auth_type (interpreted as password)");
+            assertTrue(hasBackup(dbFile));
+
+            // Idempotent.
+            DatabaseMigrator.migrate(c, dbFile, false);
+            assertEquals(1, countServers(c));
+        }
+    }
+
+    @Test
     void failureAfterFirstAlterRollsBackAllEarlierChanges() throws Exception {
         Path db = tempDir.resolve("rollback.db");
         try (Connection c = connect(db); Statement st = c.createStatement()) {

@@ -76,7 +76,8 @@ public class DatabaseConfig {
                 + "created_at TEXT NOT NULL,"
                 + "last_used TEXT,"
                 + "save_password BOOLEAN NOT NULL DEFAULT 0,"
-                + "favorite BOOLEAN NOT NULL DEFAULT 0, sort_order INTEGER, group_name TEXT"
+                + "favorite BOOLEAN NOT NULL DEFAULT 0, sort_order INTEGER, group_name TEXT,"
+                + " auth_type TEXT, key_path TEXT, key_passphrase TEXT"
                 + ");";
 
         String createPreferencesTable = "CREATE TABLE IF NOT EXISTS preferences ("

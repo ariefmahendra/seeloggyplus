@@ -14,6 +14,30 @@ import java.util.function.Consumer;
 public interface SSHService {
 
     /**
+     * Sets the authentication method for the next connect call (password or
+     * private key). Default implementations keep password-only behaviour.
+     */
+    default void setAuthConfig(com.seeloggyplus.ssh.SshAuthConfig config) {
+        // password-only services do not need auth configuration
+    }
+
+    /**
+     * Persists the pending unknown host key after the user accepted it, so the
+     * next connect attempt can succeed.
+     */
+    default void trustPendingHostKey() {
+        // no-op for services without host-key verification
+    }
+
+    /**
+     * Human-readable reason for the last failed connect attempt, or {@code null}
+     * when the last attempt succeeded (e.g. a missing key file or an auth error).
+     */
+    default String getLastConnectError() {
+        return null;
+    }
+
+    /**
      * Connects to a remote SSH server.
      *
      * @param host     Remote host address.

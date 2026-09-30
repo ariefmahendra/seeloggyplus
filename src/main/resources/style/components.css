@@ -558,6 +558,25 @@ FontAwesomeIconView.file-icon-file {
     -fx-border-color: -sl-border-soft;
 }
 
+/* Compact action button next to a form field (e.g. Browse for a key file):
+   keeps its own height instead of stretching to the field height. */
+.browse-button {
+    -fx-padding: 4 10 4 10;
+    -fx-font-size: 12px;
+}
+
+/* Scrollable dialog forms (e.g. Server Edit): keep the dialog surface visible
+   behind the scroll pane and never hide the action row. */
+.dialog-form-scroll {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.dialog-form-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
 /* Collapsible panel sections (e.g. Favorite folders in File Management). */
 .titled-pane > .title {
     -fx-background-color: -sl-surface-alt;

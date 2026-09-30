@@ -18,6 +18,11 @@ import java.util.Objects;
 @NoArgsConstructor
 public class SSHServerModel {
 
+    /** Password authentication (default, backwards compatible). */
+    public static final String AUTH_PASSWORD = "PASSWORD";
+    /** Private-key authentication using {@link #keyPath} (+ optional {@link #keyPassphrase}). */
+    public static final String AUTH_KEY = "KEY";
+
     public enum ConnectionStatus {
         UNKNOWN,      // Not tested yet
         CONNECTED,    // Successfully connected
@@ -38,6 +43,9 @@ public class SSHServerModel {
     private boolean favorite;
     private Integer sortOrder;
     private String groupName;
+    private String authType = AUTH_PASSWORD;
+    private String keyPath;
+    private String keyPassphrase;
     
     // Transient field - not stored in database
     private transient ConnectionStatus connectionStatus = ConnectionStatus.UNKNOWN;
@@ -49,6 +57,11 @@ public class SSHServerModel {
         this.username = username;
         this.savePassword = false;
         this.createdAt = LocalDateTime.now();
+    }
+
+    /** True when this server authenticates with a private key file. */
+    public boolean usesKeyAuth() {
+        return AUTH_KEY.equalsIgnoreCase(authType);
     }
 
     /**
