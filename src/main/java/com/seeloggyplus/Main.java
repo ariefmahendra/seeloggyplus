@@ -55,6 +55,8 @@ public class Main extends Application {
         this.primaryStage = primaryStage;
         this.preferenceService = new PreferenceServiceImpl();
 
+        ensureSilentLauncher();
+
         try {
             // Restore the saved theme before building the scene
             AppTheme.setTheme(preferenceService.getPreferencesByCode("app_theme")
@@ -98,6 +100,31 @@ public class Main extends Application {
         } catch (IOException e) {
             logger.error("Failed to load main view", e);
             showErrorAndExit("Failed to start application: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Recreates the Windows silent launcher when it is missing. It is intentionally
+     * not shipped in update packages (older installers reject unknown entries), so
+     * the app heals the installation root on startup. Best effort only.
+     */
+    private void ensureSilentLauncher() {
+        if (Boolean.getBoolean("seeloggyplus.dev")) {
+            return;
+        }
+        try {
+            java.nio.file.Path location = java.nio.file.Paths.get(
+                    getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
+            if (java.nio.file.Files.isDirectory(location)) {
+                // Running from classes (IDE/tests); no installation root to heal.
+                return;
+            }
+            com.seeloggyplus.update.UpdateLayout layout =
+                    new com.seeloggyplus.update.UpdateLayout(
+                            com.seeloggyplus.update.UpdateLayout.installationRoot());
+            com.seeloggyplus.update.SilentLauncherInstaller.ensure(layout.root());
+        } catch (Exception e) {
+            logger.debug("Could not ensure the silent launcher", e);
         }
     }
 

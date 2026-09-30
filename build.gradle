@@ -175,7 +175,8 @@ tasks.register('packagePortableNoJre', Zip) {
             rename { "${project.name}.jar" }
         }
         from('launcher.bat')
-        from('SeeLoggyPlus.vbs')
+        // SeeLoggyPlus.vbs is intentionally NOT packaged: older installers reject
+        // unknown package entries. The app recreates it on startup (SilentLauncherInstaller).
         from('launcher.sh')
         from('launcher.properties')
         from('LAUNCHER_README.md')
@@ -202,7 +203,7 @@ tasks.register('packagePortableWithJre', Zip) {
             rename { "${project.name}.jar" }
         }
         from('launcher.bat')
-        from('SeeLoggyPlus.vbs')
+        // SeeLoggyPlus.vbs is intentionally NOT packaged (see packagePortableNoJre).
         from('launcher.sh')
         from('launcher.properties')
         from('LAUNCHER_README.md')
