@@ -45,9 +45,10 @@ labels** (`feature`, `bug`, `ui`, `test`, `docs`, `build`, `chore`, …).
 
 ## Release description format (mandatory)
 
-The GitHub Release body is taken **verbatim** from the `[X.Y.Z]` section in
-`CHANGELOG.md`, so that section must be end-user ready — never a one-line
-internal note.
+The GitHub Release body is **the `docs/release-notes/<version>.md` file**, copied
+verbatim by the release workflow. The matching `[X.Y.Z]` section in `CHANGELOG.md`
+is only the fallback (and the historical record), so both must stay in sync and
+end-user ready — never a one-line internal note.
 
 Required order inside `[X.Y.Z]`:
 
