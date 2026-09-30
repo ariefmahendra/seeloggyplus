@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-30
+
+### Fixed
+- **Release pipeline**: the CI `test` job failed for both 0.6.0 and 0.6.1 because
+  `UnifiedFileManagerDialogControllerTest.testServerConnectionFailure` asserted the
+  path is not `/` after falling back to local — wrong on Linux, where the local home
+  is `/`. The test now asserts the active location is local and the path equals the
+  local home, so 0.6.2 is the first published build of the 0.6 line.
+
 ## [0.6.1] - 2026-09-30
 
 ### Fixed
@@ -183,7 +192,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.1...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.2...HEAD
+[0.6.2]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.1...0.6.0
 [0.5.1]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.0...0.5.1
