@@ -23,6 +23,19 @@ Panduan wajib untuk siapa pun (manusia atau agent) yang bekerja di repository in
   Jangan menghapus task `testSummary` atau perintah `finalizedBy 'testSummary'` pada task `test`.
 - Jika ada test yang gagal, perbaiki sampai hijau sebelum menyatakan pekerjaan selesai. Jangan menonaktifkan/menghapus test untuk "menghijaukan" build.
 
+### 1a. Alur testing per fitur (WAJIB untuk agent/opencode)
+
+1. **Tulis/update unit test dulu** untuk fitur atau bug yang sedang dikerjakan; jangan menunggu sampai semua pekerjaan selesai.
+2. **Jalankan hanya test yang terkait fitur itu** selama iterasi (cepat), dengan filter `--tests`, contoh:
+   `.\gradlew.bat --no-daemon test --tests "com.seeloggyplus.controller.NamaControllerTest" --tests "com.seeloggyplus.service.NamaServiceTest"`
+   - Pilih kelas test yang berhubungan langsung dengan file yang diubah (controller/service/repository/UI cell).
+   - Jangan menjalankan seluruh suite berulang-ulang selagi fitur masih dikerjakan.
+3. **Setelah test fitur hijau dan perubahan dianggap final**, baru jalankan seluruh suite satu kali:
+   `.\gradlew.bat --no-daemon test` lalu `.\gradlew.bat --no-daemon build`.
+4. Selalu tampilkan blok TEST SUMMARY dari langkah terakhir (fitur atau suite penuh) di akhir jawaban.
+5. Untuk perubahan UI/tema, sertakan test kontras/ukuran yang relevan (mis. `ButtonThemeTest`, `PopupThemeTest`, `TreeDropIndicatorTest`, `FileManagerLeftPanelLayoutTest`) sebagai bagian dari test fitur, bukan hanya suite penuh.
+6. Jangan pernah mengubah test agar mengikuti bug (mis. melonggarkan ambang kontras atau menghapus assertion) demi build hijau.
+
 ## 2. Build & Run (WAJIB)
 
 - Pastikan `.\gradlew.bat build` berhasil sebelum menutup pekerjaan.
@@ -59,3 +72,19 @@ Panduan wajib untuk siapa pun (manusia atau agent) yang bekerja di repository in
 
 - Java 21, JavaFX 21 via Gradle wrapper, SQLite (xerial), JUnit 5 + TestFX, Lombok.
 - Jalankan perintah Gradle lewat wrapper (`gradlew`), bukan Gradle global.
+
+## 7. Kebersihan file & dead code (WAJIB)
+
+- Setiap refactor/perbaikan wajib **menghapus file yang tidak dipakai lagi**: kelas/service/repository/UI component mati, FXML/CSS/script tak terpakai, dan test yang menguji kode yang sudah dihapus.
+- Sebelum menghapus, buktikan tidak ada referensi dengan mencari nama kelas/API di `src/` (termasuk FXML/CSS/test). Setelah menghapus, jalankan test terkait (§1a) lalu suite penuh.
+- Jangan tinggalkan artefak lokal di root repo: log test/build/run-dev, hasil diagnosa sementara (`*.log`, `focus-report.txt`, dsb.). Hapus atau pastikan sudah masuk `.gitignore`.
+- File lokal yang tidak boleh di-commit: dokumen kerja/feedback pribadi (`docs/UI_PLAN.md`, `docs/FEEDBACK_*.md`), `.jqwik-database`, `bin/`, `build/`, `logs/`, `.data/`, `launcher.properties` (lihat `.gitignore`). Dokumen seperti `FEEDBACK_IMPLEMENTATION.md` cukup disimpan lokal sebagai catatan; jangan dibawa ke git.
+- Saat commit: periksa `git status`; hanya file relevan yang boleh ikut. Jangan pernah commit log/artefak build atau data user.
+
+## 8. Rilis (WAJIB)
+
+- Proses rilis **wajib mengikuti `docs/RELEASING.md`** (checklist lengkap ada di sana).
+- Ringkasan alur: suite test hijau (§1a) → `.\gradlew.bat --no-daemon build` → update `CHANGELOG.md` → bump versi di `gradle.properties` → commit `chore(release): X.Y.Z` di `dev` → merge `--no-ff` ke `main` → push `main` + `dev` → tag `X.Y.Z` dan push tag (memicu workflow Release).
+- Semver: MAJOR = breaking, MINOR = fitur, PATCH = bugfix. Pesan commit memakai Conventional Commits (`feat|fix|test|docs|refactor|perf|build|ci|chore`).
+- Jangan merilis saat working tree kotor, test gagal, atau build gagal. Semua perubahan wajib sudah di-commit dan hijau.
+- Release notes per versi disimpan di `docs/release-notes/<versi>.md`; dokumen ini bagian dari proses rilis dan **boleh** di-commit (berbeda dengan dokumen kerja/feedback pribadi di §7).

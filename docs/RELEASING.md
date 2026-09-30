@@ -45,10 +45,11 @@ labels** (`feature`, `bug`, `ui`, `test`, `docs`, `build`, `chore`, …).
 
 ## Release checklist
 
-1. Ensure `dev` is green locally:
+1. Ensure `dev` is green locally (the test suite is always headless):
    ```bash
-   ./gradlew test -PheadlessTest
+   ./gradlew --no-daemon test
    ```
+   On Windows use `.\gradlew.bat --no-daemon test`.
 2. Update `CHANGELOG.md`:
    - Move the relevant entries from `[Unreleased]` into a new version section.
    - Add the compare/release links at the bottom.
