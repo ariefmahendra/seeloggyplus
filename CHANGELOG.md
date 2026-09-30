@@ -9,12 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.2] - 2026-09-30
 
+**First published build of the 0.6 line.** The 0.6.0 and 0.6.1 release workflows failed
+in the CI `test` job before publishing, so 0.6.2 ships the complete 0.6 feature set.
+
+### Added
+- **SSH private-key authentication**: per-server auth method (password or private key),
+  key file picker and optional encrypted passphrase. Modern keys (ed25519, ecdsa,
+  rsa-sha2) are supported.
+- **Host-key verification (trust-on-first-use)**: an app-managed `known_hosts` file, a
+  fingerprint confirmation dialog, and a hard refusal when a saved host key changes
+  (possible MITM).
+- **Server groups in File Management**: WinSCP/MobaXterm-style Locations tree with
+  persistent nested groups, New/Rename/Delete, Move to group and drag & drop (dragging
+  never connects; click or Enter opens a location).
+- **Recent Files tree**: entries grouped per server with expandable nodes; search
+  matches server, file name and path across all words.
+- **Windows silent launcher** (`SeeLoggyPlus.vbs`); `launcher.bat --console` for
+  diagnostics.
+- **Double-click preference** (Open/Download or Tail) in Preferences  General.
+
+### Changed
+- Server Management is CRUD-only (favorite, grouping and drag-to-reorder moved out).
+- Buttons and dropdowns consistently follow the theme tokens, with readable
+  focus/hover/pressed states and neutral dropdown selection.
+- File Management's left panel is compact (icon action bar, collapsible Favorite
+  folders) and the footer no longer reports cache internals.
+- Reloading an active remote tail reconnects off the UI thread.
+
 ### Fixed
 - **Release pipeline**: the CI `test` job failed for both 0.6.0 and 0.6.1 because
   `UnifiedFileManagerDialogControllerTest.testServerConnectionFailure` asserted the
   path is not `/` after falling back to local — wrong on Linux, where the local home
   is `/`. The test now asserts the active location is local and the path equals the
-  local home, so 0.6.2 is the first published build of the 0.6 line.
+  local home.
+- Connect failures show the real reason (missing key file, auth failure) instead of a
+  generic message; the Server editor form scrolls and keeps its action buttons visible.
+- Database upgrades v3 (`server_groups`) and v4 (auth columns) are additive,
+  transactional and automatically backed up.
+
+### Tests
+- 472 headless tests green, including migrations, auth persistence/encryption,
+  known-hosts trust-on-first-use, connect flow, theme contrast, grouping and reload
+  responsiveness.
 
 ## [0.6.1] - 2026-09-30
 
