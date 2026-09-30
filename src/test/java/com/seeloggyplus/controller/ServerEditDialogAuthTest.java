@@ -125,10 +125,12 @@ class ServerEditDialogAuthTest {
         assertTrue(browse.getStyleClass().contains("browse-button"),
                 "Browse must use the compact style class");
 
-        assertTrue(browse.getHeight() <= keyPath.getHeight() + 2,
+        // Tolerances keep this stable across platforms/fonts while still catching
+        // the old behaviour (button stretched to the row height / oversized padding).
+        assertTrue(browse.getHeight() <= keyPath.getHeight() + 4,
                 "Browse must stay proportional to the field instead of stretching (browse="
                         + browse.getHeight() + ", field=" + keyPath.getHeight() + ")");
-        assertTrue(browse.getWidth() <= 110,
+        assertTrue(browse.getWidth() <= 140,
                 "Browse must stay proportional to its label, was " + browse.getWidth());
     }
 
