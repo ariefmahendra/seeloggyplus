@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-09-30
+
+Patch release that makes self-update work again from older versions.
+
+### Fixed
+- **Self-update from 0.5.x**: 0.5.1 rejected the 0.6.2 package because it contained
+  `SeeLoggyPlus.vbs`, a file the old installer's content whitelist does not know. The
+  portable packages no longer ship that file; the app recreates the silent Windows
+  launcher in the installation root on startup when it is missing, so updates from
+  older releases stage and activate normally again.
+
+### Tests
+- Added `SelfUpdateEndToEndTest`: a realistic portable package goes through the real
+  download (injected stream) → stage → activate → health → rollback flow, a failed
+  download leaves the installation untouched, and the package entries are pinned
+  against the older 0.5.x installer whitelist.
+- Added `SilentLauncherInstallerTest`; `WindowsLauncherTest` now guards that the
+  silent launcher is never part of a package.
+
 ## [0.6.2] - 2026-09-30
 
 **First published build of the 0.6 line.** The 0.6.0 and 0.6.1 release workflows failed
@@ -228,7 +247,8 @@ in the CI `test` job before publishing, so 0.6.2 ships the complete 0.6 feature 
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.2...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.3...HEAD
+[0.6.3]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.2...0.6.3
 [0.6.2]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.1...0.6.0
