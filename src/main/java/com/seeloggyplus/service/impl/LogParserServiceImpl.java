@@ -2,7 +2,6 @@ package com.seeloggyplus.service.impl;
 
 import com.seeloggyplus.model.LogEntry;
 import com.seeloggyplus.model.ParsingConfig;
-import com.seeloggyplus.pipeline.Pipeline;
 import com.seeloggyplus.service.LogParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +12,6 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -94,14 +92,6 @@ public class LogParserServiceImpl implements LogParser {
      */
     @Override
     public LogEntry parseLine(String line, long lineNumber) {
-        return new LogEntry(lineNumber, line);
-    }
-
-    /**
-     * Parses a single line.
-     * Deprecated: Use simple LogEntry constructor instead.
-     */
-    public LogEntry parseLine(String line, long lineNumber, Pipeline pipeline, DateTimeFormatter dateFormatter) {
         return new LogEntry(lineNumber, line);
     }
 
