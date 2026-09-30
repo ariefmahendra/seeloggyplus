@@ -92,7 +92,7 @@ Binding guide for anyone (human or agent) working in this repository.
 
 ### 8a. Standard release-description format (MANDATORY)
 
-- The **GitHub Release body is taken verbatim** from the `[X.Y.Z]` section in `CHANGELOG.md` by the workflow. That section must therefore be complete and end-user ready, not a one-line internal note.
+- The **GitHub Release body is the `docs/release-notes/<version>.md` file**, copied verbatim by the workflow. The `[X.Y.Z]` section in `CHANGELOG.md` is the fallback (and the historical record); both must stay in sync and end-user ready, never a one-line internal note.
 - Standard order inside the `[X.Y.Z]` section in `CHANGELOG.md`:
   1. a short opening paragraph (optional, e.g. "First published build of the X line.");
   2. `### Added`, then `### Changed`, then `### Fixed`, then `### Tests` (only the relevant sections, in this order);
@@ -100,7 +100,7 @@ Binding guide for anyone (human or agent) working in this repository.
   For the first release of a feature line, summarize the main features under `### Added` — do not list only the CI fix.
 - `docs/release-notes/<version>.md` is mandatory and follows the standard structure:
   `# SeeLoggyPlus <version>` → `## Overview` → `## Features` / `## Fixed` / `## Improvements` (whichever apply) → `## Tests` → `## Upgrade notes` → a `**Full changelog:**` line with the compare link to the previous version.
-- If a release body was already published with the wrong format: fix `CHANGELOG.md` + `docs/release-notes/<version>.md`, push, then edit the release:
+- If a release body was already published with the wrong format (or from the CHANGELOG fallback): fix `CHANGELOG.md` + `docs/release-notes/<version>.md`, push, then edit the release:
   `gh release edit X.Y.Z --notes-file docs/release-notes/X.Y.Z.md` (requires `gh auth login`).
   Without `gh`, use `git credential fill` + the GitHub API `PATCH /repos/<owner>/<repo>/releases/<id>` with the release-notes file as the body.
 
