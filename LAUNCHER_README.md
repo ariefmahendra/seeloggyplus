@@ -1,6 +1,6 @@
 ## Windows: start without a terminal
 
-Double-click `SeeLoggyPlus.vbs` (or create a shortcut to it). It launches the application without a terminal window. Keep it alongside `launcher.bat` in the distribution.
+Double-click `SeeLoggyPlus.vbs` (or create a shortcut to it). It launches the application without a terminal window. The app creates this file next to `launcher.bat` on first start (it is intentionally not part of update packages, which older installers would reject).
 
 For diagnostics run `launcher.bat --console`. Directly double-clicking a `.bat` can briefly show Windows cmd; use the `.vbs` entry point for a fully hidden launch. Java is selected from launcher.properties, bundled JRE, JAVA_HOME, then PATH.
 
