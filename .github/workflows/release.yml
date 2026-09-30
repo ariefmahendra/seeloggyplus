@@ -42,12 +42,18 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          for f in build/test-results/test/*.xml; do
-            if grep -q "<failure" "$f"; then
-              echo "===== $f ====="
-              grep -B 2 -A 40 "<failure" "$f" | head -n 120
-            fi
-          done
+          {
+            echo "## Failing tests"
+            echo '```'
+            for f in build/test-results/test/*.xml; do
+              if grep -q "<failure" "$f"; then
+                echo "===== $(basename "$f") ====="
+                awk '/<testcase /{name=$0} /<failure/{print name}' "$f"
+                grep -A 12 "<failure" "$f" | head -n 40
+              fi
+            done
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test report
         if: failure()
