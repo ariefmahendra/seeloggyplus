@@ -629,9 +629,13 @@ public class UnifiedFileManagerDialogControllerTest {
         Thread.sleep(1500); // Wait for connect task
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Should NOT be connected, fallback to local so path doesn't change to "/"
-        assertNotEquals("/", pathField.getText());
+        // The failed connect must fall back to the local location. Comparing the path
+        // against "/" would be wrong on Unix (the local home is "/" there too), so
+        // assert the active location and the local home path instead.
         assertTrue(mockSshService.connectCalled);
+        assertNull(controller.getActiveServer(), "a failed connect must fall back to a local location");
+        assertEquals(localFileService.getHomeDirectory(), pathField.getText(),
+                "the path must show the local home after the fallback");
     }
 
     @Test
