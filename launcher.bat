@@ -3,6 +3,10 @@ REM SeeLoggy+ Launcher for Windows
 REM This script reads configuration from launcher.properties and starts the application
 
 setlocal enabledelayedexpansion
+set "SCRIPT_DIR=%~dp0"
+set "CONSOLE_MODE=0"
+if /i "%~1"=="--console" set "CONSOLE_MODE=1"
+cd /d "%SCRIPT_DIR%"
 
 REM Default values
 set DEFAULT_MEM=4
@@ -10,7 +14,7 @@ set MAX_MEM=%DEFAULT_MEM%
 set CUSTOM_JAVA_HOME=
 
 REM Config file path
-set CONFIG_FILE=launcher.properties
+set "CONFIG_FILE=%SCRIPT_DIR%launcher.properties"
 
 REM Read configuration from properties file if it exists
 if exist "%CONFIG_FILE%" (
@@ -66,6 +70,13 @@ if exist "%SCRIPT_DIR%current" (
 echo Starting SeeLoggy+ with %MAX_MEM%GB max memory...
 
 REM Launch application (JavaFX modules are already bundled in fat JAR)
-"!JAVA_CMD!" -Xmx%MAX_MEM%g -jar "!APP_JAR!"
+if "!CONSOLE_MODE!"=="1" (
+    "!JAVA_CMD!" -Xmx%MAX_MEM%g -jar "!APP_JAR!"
+) else (
+    REM javaw keeps the application independent of any console window.
+    set "JAVA_CMD=!JAVA_CMD:java.exe=javaw.exe!"
+    if "!JAVA_CMD!"=="java" set "JAVA_CMD=javaw"
+    start "" "!JAVA_CMD!" -Xmx%MAX_MEM%g -jar "!APP_JAR!"
+)
 
 endlocal

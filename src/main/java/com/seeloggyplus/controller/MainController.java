@@ -3,7 +3,8 @@ package com.seeloggyplus.controller;
 import com.seeloggyplus.ui.canvas.CanvasLogViewer;
 import com.seeloggyplus.util.AppTheme;
 import com.seeloggyplus.service.impl.*;
-import com.seeloggyplus.ui.cell.RecentFileListCell;
+import com.seeloggyplus.service.SshConnectFlow;
+import com.seeloggyplus.ui.cell.RecentFileTreeCell;
 import com.seeloggyplus.util.*;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
@@ -104,14 +105,13 @@ public class MainController {
     @FXML
     private TextField recentFilesFilterField;
     @FXML
-    private ListView<RecentFilesDto> recentFilesListView;
+    private TreeView<RecentFileTreeCell.RecentNode> recentFilesTreeView;
     @FXML
     private Button clearRecentButton;
     @FXML
     private Button pinLeftPanelButton;
 
     private final ObservableList<RecentFilesDto> allRecentFiles = FXCollections.observableArrayList();
-    private FilteredList<RecentFilesDto> filteredRecentFiles;
     private Label detailPlaceholderLabel;
 
     // FXML Components - Center Panel (Log Table)
@@ -435,58 +435,38 @@ public class MainController {
 
         MenuItem openFileMenuItem = new MenuItem("Open File");
         openFileMenuItem.setOnAction(actionEvent -> {
-            RecentFilesDto selected = recentFilesListView.getSelectionModel().getSelectedItem();
-            if (selected != null) {
-                handleRecentFileSelected(selected);
+            RecentFileTreeCell.RecentNode selected = selectedRecentNode();
+            if (selected != null && selected.isFile()) {
+                handleRecentFileSelected(selected.getFile());
             }
         });
 
         MenuItem deleteFromRecentMenuItem = new MenuItem("Delete from Recent");
         deleteFromRecentMenuItem.setOnAction(actionEvent -> {
-            ObservableList<RecentFilesDto> selected = recentFilesListView.getSelectionModel().getSelectedItems();
-            if (selected != null && !selected.isEmpty()) {
+            if (!selectedRecentFiles().isEmpty()) {
                 handleClearRecentFiles();
             }
         });
 
         leftPanelContextMenu.getItems().addAll(openFileMenuItem, new SeparatorMenuItem(), deleteFromRecentMenuItem);
-        recentFilesListView.setCellFactory(
-                listView -> new RecentFileListCell(serverManagementService, () -> monitoringRemotePath));
-        recentFilesListView.getStyleClass().add("recent-files-list");
+        recentFilesTreeView.setShowRoot(false);
+        recentFilesTreeView.setCellFactory(tree ->
+                new RecentFileTreeCell(() -> monitoringRemotePath));
+        recentFilesTreeView.getStyleClass().add("recent-files-list");
         allRecentFiles.setAll(recentFileService.findAll());
-        filteredRecentFiles = new FilteredList<>(allRecentFiles, p -> true);
-        recentFilesListView.setItems(filteredRecentFiles);
-        recentFilesListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        recentFilesListView.setContextMenu(leftPanelContextMenu);
+        rebuildRecentTree();
+        recentFilesTreeView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        recentFilesTreeView.setContextMenu(leftPanelContextMenu);
 
         if (recentFilesFilterField != null) {
-            recentFilesFilterField.textProperty().addListener((obs, oldVal, newVal) -> {
-                filteredRecentFiles.setPredicate(dto -> {
-                    if (newVal == null || newVal.isBlank()) return true;
-                    String filter = newVal.toLowerCase().trim();
-                    LogFile file = dto.logFile();
-                    if (file == null) return false;
-                    boolean matchesName = file.getName() != null && file.getName().toLowerCase().contains(filter);
-                    boolean matchesPath = file.getFilePath() != null && file.getFilePath().toLowerCase().contains(filter);
-                    boolean matchesServer = false;
-                    if (file.isRemote() && file.getSshServerID() != null) {
-                        try {
-                            SSHServerModel server = serverManagementService.getServerById(file.getSshServerID());
-                            if (server != null && server.getName() != null && server.getName().toLowerCase().contains(filter)) {
-                                matchesServer = true;
-                            }
-                        } catch (Exception ignored) {}
-                    }
-                    return matchesName || matchesPath || matchesServer;
-                });
-            });
+            recentFilesFilterField.textProperty().addListener((obs, oldVal, newVal) -> rebuildRecentTree());
         }
 
-        recentFilesListView.setOnMouseClicked(event -> {
+        recentFilesTreeView.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2 && event.getButton() == MouseButton.PRIMARY) {
-                RecentFilesDto selected = recentFilesListView.getSelectionModel().getSelectedItem();
-                if (selected != null) {
-                    handleRecentFileSelected(selected);
+                RecentFileTreeCell.RecentNode selected = selectedRecentNode();
+                if (selected != null && selected.isFile()) {
+                    handleRecentFileSelected(selected.getFile());
                 }
             }
         });
@@ -494,6 +474,64 @@ public class MainController {
         clearRecentButton.setOnAction(e -> handleClearRecentFiles());
         pinLeftPanelButton.setOnAction(e -> handleToggleLeftPanelPin());
         updateLeftPanelDisplay();
+    }
+
+    /** Rebuilds the recent-files tree grouped by source (server name or Local). */
+    void rebuildRecentTree() {
+        if (recentFilesTreeView == null) {
+            return;
+        }
+        TreeItem<RecentFileTreeCell.RecentNode> root =
+                new TreeItem<>(RecentFileTreeCell.RecentNode.root());
+        root.setExpanded(true);
+        String query = recentFilesFilterField != null ? recentFilesFilterField.getText() : null;
+        Map<String, TreeItem<RecentFileTreeCell.RecentNode>> servers = new LinkedHashMap<>();
+        for (RecentFilesDto dto : allRecentFiles) {
+            if (!RecentFileTreeCell.matches(dto, query)) {
+                continue;
+            }
+            String source = RecentFileTreeCell.sourceLabel(dto);
+            TreeItem<RecentFileTreeCell.RecentNode> serverNode = servers.computeIfAbsent(source, name -> {
+                TreeItem<RecentFileTreeCell.RecentNode> item =
+                        new TreeItem<>(RecentFileTreeCell.RecentNode.server(name));
+                item.setExpanded(true);
+                root.getChildren().add(item);
+                return item;
+            });
+            serverNode.getChildren().add(new TreeItem<>(RecentFileTreeCell.RecentNode.file(dto)));
+        }
+        recentFilesTreeView.setRoot(root);
+    }
+
+    private RecentFileTreeCell.RecentNode selectedRecentNode() {
+        TreeItem<RecentFileTreeCell.RecentNode> item = recentFilesTreeView.getSelectionModel().getSelectedItem();
+        return item == null ? null : item.getValue();
+    }
+
+    private List<RecentFilesDto> selectedRecentFiles() {
+        List<RecentFilesDto> files = new ArrayList<>();
+        for (TreeItem<RecentFileTreeCell.RecentNode> item
+                : recentFilesTreeView.getSelectionModel().getSelectedItems()) {
+            if (item != null && item.getValue() != null && item.getValue().isFile()) {
+                files.add(item.getValue().getFile());
+            }
+        }
+        return files;
+    }
+
+    private List<TreeItem<RecentFileTreeCell.RecentNode>> recentFileNodes() {
+        List<TreeItem<RecentFileTreeCell.RecentNode>> nodes = new ArrayList<>();
+        TreeItem<RecentFileTreeCell.RecentNode> root = recentFilesTreeView.getRoot();
+        if (root != null) {
+            for (TreeItem<RecentFileTreeCell.RecentNode> server : root.getChildren()) {
+                nodes.addAll(server.getChildren());
+            }
+        }
+        return nodes;
+    }
+
+    private boolean hasRecentFiles() {
+        return !recentFileNodes().isEmpty();
     }
 
     private void handleToggleLeftPanelPin() {
@@ -558,9 +596,9 @@ public class MainController {
      * Ensures reliable selection for both local and remote files.
      */
     void selectRecentFileForSession(LogSession session) {
-        if (session == null || recentFilesListView == null) {
-            if (recentFilesListView != null) {
-                Platform.runLater(() -> recentFilesListView.getSelectionModel().clearSelection());
+        if (session == null || recentFilesTreeView == null) {
+            if (recentFilesTreeView != null) {
+                Platform.runLater(() -> recentFilesTreeView.getSelectionModel().clearSelection());
             }
             return;
         }
@@ -591,14 +629,14 @@ public class MainController {
         final String recordId = logRecord != null ? logRecord.getId() : null;
 
         Platform.runLater(() -> {
-            recentFilesListView.getSelectionModel().clearSelection();
-            for (RecentFilesDto dto : recentFilesListView.getItems()) {
+            recentFilesTreeView.getSelectionModel().clearSelection();
+            for (TreeItem<RecentFileTreeCell.RecentNode> node : recentFileNodes()) {
+                RecentFilesDto dto = node.getValue().getFile();
                 if (dto != null && dto.logFile() != null) {
                     LogFile lf = dto.logFile();
                     // 1. Match by DB ID if available
                     if (recordId != null && recordId.equals(lf.getId())) {
-                        recentFilesListView.getSelectionModel().select(dto);
-                        recentFilesListView.scrollTo(dto);
+                        selectRecentNode(node);
                         return;
                     }
                     // 2. Match by path & remote status
@@ -606,14 +644,12 @@ public class MainController {
                         if (finalIsRemote) {
                             if (Objects.equals(finalServerId, lf.getSshServerID())
                                     && normalizePath(finalPath).equals(normalizePath(lf.getFilePath()))) {
-                                recentFilesListView.getSelectionModel().select(dto);
-                                recentFilesListView.scrollTo(dto);
+                                selectRecentNode(node);
                                 return;
                             }
                         } else {
                             if (normalizePath(finalPath).equalsIgnoreCase(normalizePath(lf.getFilePath()))) {
-                                recentFilesListView.getSelectionModel().select(dto);
-                                recentFilesListView.scrollTo(dto);
+                                selectRecentNode(node);
                                 return;
                             }
                         }
@@ -623,30 +659,34 @@ public class MainController {
         });
     }
 
+    private void selectRecentNode(TreeItem<RecentFileTreeCell.RecentNode> node) {
+        recentFilesTreeView.getSelectionModel().select(node);
+        recentFilesTreeView.scrollTo(recentFilesTreeView.getRow(node));
+    }
+
     /**
      * Selects the recent file entry matching the given path, server ID, and remote status.
      */
     private void selectRecentFile(String targetPath, String sshServerId, boolean isRemote) {
-        if (targetPath == null || recentFilesListView == null) {
+        if (targetPath == null || recentFilesTreeView == null) {
             return;
         }
         Platform.runLater(() -> {
-            recentFilesListView.getSelectionModel().clearSelection();
-            for (RecentFilesDto dto : recentFilesListView.getItems()) {
+            recentFilesTreeView.getSelectionModel().clearSelection();
+            for (TreeItem<RecentFileTreeCell.RecentNode> node : recentFileNodes()) {
+                RecentFilesDto dto = node.getValue().getFile();
                 if (dto != null && dto.logFile() != null) {
                     LogFile lf = dto.logFile();
                     if (lf.isRemote() == isRemote) {
                         if (isRemote) {
                             if (Objects.equals(sshServerId, lf.getSshServerID())
                                     && normalizePath(targetPath).equals(normalizePath(lf.getFilePath()))) {
-                                recentFilesListView.getSelectionModel().select(dto);
-                                recentFilesListView.scrollTo(dto);
+                                selectRecentNode(node);
                                 return;
                             }
                         } else {
                             if (normalizePath(targetPath).equalsIgnoreCase(normalizePath(lf.getFilePath()))) {
-                                recentFilesListView.getSelectionModel().select(dto);
-                                recentFilesListView.scrollTo(dto);
+                                selectRecentNode(node);
                                 return;
                             }
                         }
@@ -1813,19 +1853,36 @@ public class MainController {
             currentParsingConfig = parsingConfigService.findDefault().orElseGet(ParsingConfig::createRawConfig);
         }
         showLoading("Reloading remote tail...");
-        try {
-            String password = server.getPassword();
-            if (password == null || password.isBlank()) {
-                logger.warn("Cannot get password for reload, relying on existing session.");
+
+        // Reconnect off the UI thread: SSH handshakes can take many seconds and
+        // previously froze the whole window (Not Responding) during reload.
+        final SSHServiceImpl service = activeTailSshService;
+        final String remotePath = monitoringRemotePath;
+        Thread.ofVirtual().name("tail-reload").start(() -> {
+            boolean connected = false;
+            String failure = null;
+            try {
+                String secret = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+                connected = SshConnectFlow.connect(service, server, secret);
+                if (!connected) {
+                    failure = service.getLastConnectError();
+                }
+            } catch (Exception e) {
+                logger.error("Failed to re-connect for tail reload", e);
+                failure = e.getMessage();
             }
-            activeTailSshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
-            startRemoteTail(monitoringRemotePath, activeTailSshService, server);
-        } catch (Exception e) {
-            logger.error("Failed to re-connect for tail reload", e);
-            showError("Reload Error", "Failed to re-connect to server: " + e.getMessage());
-        } finally {
-            hideLoading();
-        }
+            final boolean ok = connected;
+            final String detail = failure;
+            Platform.runLater(() -> {
+                hideLoading();
+                if (ok) {
+                    startRemoteTail(remotePath, service, server);
+                } else {
+                    showError("Reload Error", "Failed to re-connect to server: "
+                            + (detail == null || detail.isBlank() ? server.getHost() : detail));
+                }
+            });
+        });
     }
 
     private void reloadLastRemoteTail() {
@@ -1853,9 +1910,9 @@ public class MainController {
             @Override
             protected Boolean call() {
                 if (sshService.isConnected()) return true;
-                String password = server.getPassword();
-                if (password == null || password.isBlank()) return false;
-                return sshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
+                String secret = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+                if (!server.usesKeyAuth() && (secret == null || secret.isBlank())) return false;
+                return SshConnectFlow.connect(sshService, server, secret);
             }
         };
         connectTask.setOnSucceeded(e -> {
@@ -1888,7 +1945,7 @@ public class MainController {
         clearSearch();
         clearDetail();
         updateTailButtonState();
-        recentFilesListView.getSelectionModel().clearSelection();
+        recentFilesTreeView.getSelectionModel().clearSelection();
         if (followTailButton != null) {
             Platform.runLater(() -> followTailButton.setSelected(false));
         }
@@ -2636,20 +2693,26 @@ public class MainController {
                     }
 
                     final CompletableFuture<String> passwordFuture = new CompletableFuture<>();
-                    Platform.runLater(() -> {
-                        String password = server.getPassword();
-                        if (password == null || password.isBlank()) {
-                            logger.info("Password for server {} is not saved, prompting user.", server.getName());
-                            PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(),
-                                    server.getUsername());
-                            prompt.showAndWait().ifPresentOrElse(passwordFuture::complete,
-                                    () -> passwordFuture.complete(null));
-                        } else {
-                            passwordFuture.complete(password);
-                        }
-                    });
+                    if (server.usesKeyAuth()) {
+                        // Key authentication: the passphrase (or null for an unencrypted key) is
+                        // stored with the server, no interactive prompt needed.
+                        passwordFuture.complete(server.getKeyPassphrase());
+                    } else {
+                        Platform.runLater(() -> {
+                            String password = server.getPassword();
+                            if (password == null || password.isBlank()) {
+                                logger.info("Password for server {} is not saved, prompting user.", server.getName());
+                                PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(),
+                                        server.getUsername());
+                                prompt.showAndWait().ifPresentOrElse(passwordFuture::complete,
+                                        () -> passwordFuture.complete(null));
+                            } else {
+                                passwordFuture.complete(password);
+                            }
+                        });
+                    }
                     String password = passwordFuture.get();
-                    if (password == null) {
+                    if (!server.usesKeyAuth() && password == null) {
                         logger.info("User cancelled password prompt for remote recent file.");
                         updateMessage("SSH connection cancelled.");
                         cancel();
@@ -2658,8 +2721,7 @@ public class MainController {
 
                     updateMessage("Connecting to " + server.getHost() + "...");
                     SSHServiceImpl sshService = new SSHServiceImpl();
-                    boolean connected = sshService.connect(server.getHost(), server.getPort(), server.getUsername(),
-                            password);
+                    boolean connected = SshConnectFlow.connect(sshService, server, password);
 
                     if (!connected) {
                         throw new IOException("Could not connect to " + server.getHost());
@@ -2930,8 +2992,8 @@ public class MainController {
     }
 
     private void handleClearRecentFiles() {
-        ObservableList<RecentFilesDto> selected = recentFilesListView.getSelectionModel().getSelectedItems();
-        if (selected != null && !selected.isEmpty()) {
+        List<RecentFilesDto> selected = selectedRecentFiles();
+        if (!selected.isEmpty()) {
             int count = selected.size();
 
             Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
@@ -2941,6 +3003,7 @@ public class MainController {
             Optional<ButtonType> result = showAndWaitAndRestore(alert);
             if (result.isPresent() && result.get() == ButtonType.OK) {
                 List<RecentFilesDto> listToDeleteRecentFiles = List.copyOf(selected);
+
 
                 for (RecentFilesDto recentFilesDto : listToDeleteRecentFiles) {
                     LogFile logFile = recentFilesDto.logFile();
@@ -2963,7 +3026,7 @@ public class MainController {
             return;
         }
 
-        if (recentFilesListView.getItems().isEmpty()) {
+        if (!hasRecentFiles()) {
             return;
         }
 
@@ -3031,6 +3094,7 @@ public class MainController {
 
     private void refreshRecentFilesList() {
         allRecentFiles.setAll(recentFileService.findAll());
+        rebuildRecentTree();
     }
 
     private void handleAbout() {
@@ -3410,8 +3474,8 @@ public class MainController {
             }
 
             final SSHServerModel finalServer = server;
-            String password = server.getPassword();
-            if (password == null || password.isBlank()) {
+            String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+            if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
                 com.seeloggyplus.util.PasswordPromptDialog prompt = new com.seeloggyplus.util.PasswordPromptDialog(
                         server.getHost(), server.getUsername());
                 Optional<String> result = prompt.showAndWait();
@@ -3430,7 +3494,7 @@ public class MainController {
 
                 @Override
                 protected Boolean call() throws Exception {
-                    return newSsh.connect(finalServer.getHost(), finalServer.getPort(), finalServer.getUsername(), finalPassword);
+                    return SshConnectFlow.connect(newSsh, finalServer, finalPassword);
                 }
 
                 @Override
@@ -3494,9 +3558,9 @@ public class MainController {
             return;
         }
 
-        // Logic to get password (saved or prompt)
-        String password = server.getPassword();
-        if (password == null || password.isBlank()) {
+        // Logic to get the secret (saved password/passphrase or prompt)
+        String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+        if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
             com.seeloggyplus.util.PasswordPromptDialog prompt = new com.seeloggyplus.util.PasswordPromptDialog(
                     server.getHost(), server.getUsername());
             Optional<String> result = prompt.showAndWait();
@@ -3516,7 +3580,7 @@ public class MainController {
 
             @Override
             protected Boolean call() throws Exception {
-                return sshService.connect(server.getHost(), server.getPort(), server.getUsername(), finalPassword);
+                return SshConnectFlow.connect(sshService, server, finalPassword);
             }
 
             @Override
@@ -3752,7 +3816,7 @@ public class MainController {
                 if (createdNewRecent) {
                     refreshRecentFilesList();
                 } else {
-                    recentFilesListView.refresh();
+                    recentFilesTreeView.refresh();
                 }
                 selectRecentFile(remotePath, fServerId, true);
             });
@@ -4082,7 +4146,7 @@ public class MainController {
         }
 
         monitoringRemotePath = null;
-        Platform.runLater(() -> recentFilesListView.refresh());
+        Platform.runLater(() -> recentFilesTreeView.refresh());
     }
 
     private void cleanupTempFiles() {
@@ -4708,8 +4772,8 @@ public class MainController {
             }
             clearDetail();
             updateTailButtonState();
-            if (recentFilesListView != null) {
-                Platform.runLater(() -> recentFilesListView.getSelectionModel().clearSelection());
+            if (recentFilesTreeView != null) {
+                Platform.runLater(() -> recentFilesTreeView.getSelectionModel().clearSelection());
             }
             updateBottomBarLineCount(null);
         }

@@ -33,6 +33,85 @@ import java.util.UUID;
      * @throws IllegalArgumentException if server is null or invalid
      */
     @Override
+    public void reorderServers(List<String> ids) {
+        serverManagementRepository.reorderServers(ids);
+    }
+
+    @Override
+    public List<String> getGroupNames() {
+        return serverManagementRepository.getGroupNames();
+    }
+
+    @Override
+    public void createGroup(String name) {
+        String clean = normalizeGroupPath(name);
+        List<String> existing = serverManagementRepository.getGroupNames();
+        // Create any missing ancestor so nested paths ("Parent/Child") always render.
+        StringBuilder path = new StringBuilder();
+        for (String segment : clean.split("/")) {
+            if (path.length() > 0) {
+                path.append('/');
+            }
+            path.append(segment);
+            String current = path.toString();
+            if (!existing.contains(current)) {
+                serverManagementRepository.createGroup(current);
+                existing.add(current);
+                logger.info("Created server group: {}", current);
+            }
+        }
+    }
+
+    @Override
+    public void renameGroup(String oldName, String newName) {
+        String from = normalizeGroupPath(oldName);
+        String to = normalizeGroupPath(newName);
+        if (from.equals(to)) {
+            return;
+        }
+        if (to.equals(from) || to.startsWith(from + "/")) {
+            throw new IllegalArgumentException("A group cannot be moved inside itself");
+        }
+        if (serverManagementRepository.getGroupNames().contains(to)) {
+            throw new IllegalArgumentException("A group named '" + to + "' already exists");
+        }
+        // Make sure the target parent exists before renaming the subtree.
+        int lastSlash = to.lastIndexOf('/');
+        if (lastSlash > 0) {
+            createGroup(to.substring(0, lastSlash));
+        }
+        serverManagementRepository.renameGroup(from, to);
+        logger.info("Renamed server group '{}' to '{}'", from, to);
+    }
+
+    @Override
+    public void deleteGroup(String name) {
+        String clean = normalizeGroupPath(name);
+        serverManagementRepository.deleteGroup(clean);
+        logger.info("Deleted server group subtree: {}", clean);
+    }
+
+    /** Normalizes a group path ("Parent/Child"), rejecting blank segments. */
+    private static String normalizeGroupPath(String name) {
+        String raw = name == null ? "" : name.trim();
+        if (raw.isEmpty()) {
+            throw new IllegalArgumentException("Group name cannot be empty");
+        }
+        StringBuilder normalized = new StringBuilder();
+        for (String segment : raw.split("/", -1)) {
+            String clean = segment.trim();
+            if (clean.isEmpty()) {
+                throw new IllegalArgumentException("Group name cannot contain an empty name");
+            }
+            if (normalized.length() > 0) {
+                normalized.append('/');
+            }
+            normalized.append(clean);
+        }
+        return normalized.toString();
+    }
+
+    @Override
     public void saveServer(SSHServerModel server) {
         if (server == null) {
             logger.error("Attempted to save null server");
@@ -171,6 +250,10 @@ import java.util.UUID;
         clone.setPassword(source.getPassword());
         clone.setDefaultPath(source.getDefaultPath() != null ? source.getDefaultPath() : "/");
         clone.setSavePassword(source.isSavePassword());
+        clone.setGroupName(source.getGroupName());
+        clone.setAuthType(source.getAuthType());
+        clone.setKeyPath(source.getKeyPath());
+        clone.setKeyPassphrase(source.getKeyPassphrase());
         clone.setCreatedAt(LocalDateTime.now());
         clone.setLastUsed(null);
         clone.setConnectionStatus(SSHServerModel.ConnectionStatus.UNKNOWN);

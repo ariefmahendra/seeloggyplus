@@ -1,0 +1,125 @@
+package com.seeloggyplus.controller;
+
+import com.seeloggyplus.model.LogFile;
+import com.seeloggyplus.model.SSHServerModel;
+import com.seeloggyplus.service.ServerManagementService;
+import com.seeloggyplus.service.impl.SSHServiceImpl;
+import com.seeloggyplus.service.impl.ServerManagementServiceImpl;
+import com.seeloggyplus.util.AppTheme;
+import javafx.application.Platform;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.stage.Stage;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.testfx.framework.junit5.ApplicationExtension;
+import org.testfx.framework.junit5.Start;
+import org.testfx.util.WaitForAsyncUtils;
+
+import java.lang.reflect.Field;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Regression: reloading a remote tail must not block the JavaFX thread while the
+ * SSH reconnect runs (this used to freeze the window with "Not Responding").
+ */
+@ExtendWith(ApplicationExtension.class)
+class RemoteReloadResponsivenessTest {
+
+    private MainController controller;
+    private ServerManagementService serverService;
+    private SSHServerModel server;
+
+    /** Connect attempt that takes a long time (like a slow SSH handshake). */
+    static class SlowSshService extends SSHServiceImpl {
+        @Override
+        public boolean connect(String host, int port, String username, String password) {
+            try {
+                Thread.sleep(800);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return false;
+        }
+
+        @Override
+        public String getLastConnectError() {
+            return "simulated slow failure";
+        }
+    }
+
+    @Start
+    void start(Stage stage) throws Exception {
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
+        Parent root = loader.load();
+        controller = loader.getController();
+        stage.setScene(AppTheme.scene(root));
+        stage.show();
+        WaitForAsyncUtils.waitForFxEvents();
+
+        serverService = new ServerManagementServiceImpl();
+        server = new SSHServerModel("Reload-" + UUID.randomUUID().toString().substring(0, 8),
+                "127.0.0.1", 22, "user");
+        serverService.saveServer(server);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (server != null) {
+            try {
+                serverService.deleteServer(server.getId());
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private void setField(String name, Object value) throws Exception {
+        Field field = MainController.class.getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(controller, value);
+    }
+
+    @Test
+    @DisplayName("reload remote tail keeps the UI responsive during a slow reconnect")
+    void reloadDoesNotBlockTheFxThread() throws Exception {
+        LogFile logFile = new LogFile();
+        logFile.setId(UUID.randomUUID().toString());
+        logFile.setSshServerID(server.getId());
+        setField("currentLogFromDb", logFile);
+        setField("monitoringRemotePath", "/var/log/slow.log");
+        setField("tailModeEnabled", true);
+        setField("activeTailSshService", new SlowSshService());
+
+        Platform.runLater(() -> {
+            try {
+                java.lang.reflect.Method reload =
+                        MainController.class.getDeclaredMethod("reloadActiveRemoteTail");
+                reload.setAccessible(true);
+                reload.invoke(controller);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        // Give the reload a moment to start while the (slow) connect is running.
+        Thread.sleep(150);
+
+        long startedAt = System.nanoTime();
+        CountDownLatch marker = new CountDownLatch(1);
+        Platform.runLater(marker::countDown);
+        assertTrue(marker.await(2, TimeUnit.SECONDS), "FX thread must remain responsive");
+        long blockedMs = (System.nanoTime() - startedAt) / 1_000_000;
+
+        assertTrue(blockedMs < 500,
+                "reloading must run the SSH reconnect off the FX thread (blocked " + blockedMs + "ms)");
+
+        // Let the background connect finish (it fails after ~800ms) and settle.
+        Thread.sleep(1000);
+        WaitForAsyncUtils.waitForFxEvents();
+    }
+}

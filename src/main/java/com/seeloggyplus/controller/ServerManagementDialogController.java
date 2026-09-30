@@ -247,26 +247,17 @@ public class ServerManagementDialogController {
      * Filter servers based on search text
      */
     private void filterServers(String searchText) {
-        filteredServers.clear();
-
-        if (searchText == null || searchText.trim().isEmpty()) {
-            filteredServers.addAll(allServers);
-            return;
-        }
-
-        String search = searchText.toLowerCase();
-        for (SSHServerModel server : allServers) {
-            if (matchesSearch(server, search)) {
-                filteredServers.add(server);
-            }
-        }
+        String search = searchText == null ? "" : searchText.trim().toLowerCase(java.util.Locale.ROOT);
+        filteredServers.setAll(allServers.stream()
+                .filter(server -> search.isEmpty() || matchesSearch(server, search))
+                .toList());
     }
 
     /**
      * Check if server matches search criteria
      */
     private boolean matchesSearch(SSHServerModel server, String search) {
-        return (server.getName() != null && server.getName().toLowerCase().contains(search)) ||
+        return (server.getGroupName() != null && server.getGroupName().toLowerCase(java.util.Locale.ROOT).contains(search)) || (server.getName() != null && server.getName().toLowerCase().contains(search)) ||
                 server.getHost().toLowerCase().contains(search) ||
                 server.getUsername().toLowerCase().contains(search) ||
                 (server.getDefaultPath() != null && server.getDefaultPath().toLowerCase().contains(search));

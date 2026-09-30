@@ -8,7 +8,7 @@ import com.seeloggyplus.model.LogFile;
 import com.seeloggyplus.model.LogSession;
 import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.ui.canvas.CanvasLogViewer;
-import com.seeloggyplus.ui.cell.RecentFileListCell;
+import com.seeloggyplus.ui.cell.RecentFileTreeCell;
 import com.seeloggyplus.service.ServerManagementService;
 import com.seeloggyplus.util.LineOffsetIndex;
 import com.seeloggyplus.util.MappedFileReader;
@@ -19,8 +19,9 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
 import javafx.scene.control.Tab;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeView;
 import javafx.scene.control.TabPane;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.DisplayName;
@@ -53,7 +54,8 @@ public class TailTransitionAndRecentSyncTest {
 
     private MainController controller;
     private TabPane logTabPane;
-    private ListView<RecentFilesDto> recentFilesListView;
+    private TreeView<RecentFileTreeCell.RecentNode> recentFilesTreeView;
+    private ObservableList<RecentFilesDto> allRecentFiles;
     private Label statusLabel;
     private Map<Tab, LogSession> sessionMap;
 
@@ -67,9 +69,13 @@ public class TailTransitionAndRecentSyncTest {
         tabPaneField.setAccessible(true);
         logTabPane = (TabPane) tabPaneField.get(controller);
 
-        Field recentListField = MainController.class.getDeclaredField("recentFilesListView");
-        recentListField.setAccessible(true);
-        recentFilesListView = (ListView<RecentFilesDto>) recentListField.get(controller);
+        Field recentTreeField = MainController.class.getDeclaredField("recentFilesTreeView");
+        recentTreeField.setAccessible(true);
+        recentFilesTreeView = (TreeView<RecentFileTreeCell.RecentNode>) recentTreeField.get(controller);
+
+        Field allRecentField = MainController.class.getDeclaredField("allRecentFiles");
+        allRecentField.setAccessible(true);
+        allRecentFiles = (ObservableList<RecentFilesDto>) allRecentField.get(controller);
 
         Field statusLabelField = MainController.class.getDeclaredField("statusLabel");
         statusLabelField.setAccessible(true);
@@ -105,9 +111,9 @@ public class TailTransitionAndRecentSyncTest {
         remoteFile.setFilePath("/var/log/application.log");
         remoteFile.setRemote(true);
 
-        class TestCell extends RecentFileListCell {
-            TestCell() { super(null, () -> "/var/log/application.log"); }
-            void render(RecentFilesDto item) { updateItem(item, false); }
+        class TestCell extends RecentFileTreeCell {
+            TestCell() { super(() -> "/var/log/application.log"); }
+            void render(RecentFilesDto item) { updateItem(RecentFileTreeCell.RecentNode.file(item), false); }
         }
         TestCell cell = new TestCell();
         cell.render(new RecentFilesDto(remoteFile, null, "server"));
@@ -119,6 +125,7 @@ public class TailTransitionAndRecentSyncTest {
                 .map(node -> ((Label) node).getText())
                 .reduce("", (all, text) -> all + " " + text);
         assertFalse(renderedText.contains("Monitoring"));
+        assertFalse(renderedText.contains("Tail"), "Recent file rows must not show the open mode");
     }
 
     // =========================================================================
@@ -301,8 +308,9 @@ public class TailTransitionAndRecentSyncTest {
 
         Platform.runLater(() -> {
             try {
-                // Populate recent files list view
-                recentFilesListView.setItems(FXCollections.observableArrayList(dto1, dto2));
+                // Populate the recent files tree
+                allRecentFiles.setAll(dto1, dto2);
+                controller.rebuildRecentTree();
 
                 Tab tab1 = openSessionInController(session1);
                 Tab tab2 = openSessionInController(session2);
@@ -317,7 +325,7 @@ public class TailTransitionAndRecentSyncTest {
         WaitForAsyncUtils.waitForFxEvents();
 
         Platform.runLater(() -> {
-            RecentFilesDto selected = recentFilesListView.getSelectionModel().getSelectedItem();
+            RecentFilesDto selected = selectedRecentFile();
             assertNotNull(selected, "A recent file row must be selected");
             assertEquals("app2.log", selected.logFile().getName(), "Active tab 2 must be selected in recent list");
 
@@ -328,12 +336,18 @@ public class TailTransitionAndRecentSyncTest {
         WaitForAsyncUtils.waitForFxEvents();
 
         Platform.runLater(() -> {
-            RecentFilesDto selected = recentFilesListView.getSelectionModel().getSelectedItem();
+            RecentFilesDto selected = selectedRecentFile();
             assertNotNull(selected, "A recent file row must be selected");
             assertEquals("app1.log", selected.logFile().getName(), "Switching to tab 1 must select app1.log in recent list");
         });
 
         WaitForAsyncUtils.waitForFxEvents();
+    }
+
+    private RecentFilesDto selectedRecentFile() {
+        TreeItem<RecentFileTreeCell.RecentNode> item =
+                recentFilesTreeView.getSelectionModel().getSelectedItem();
+        return item == null || item.getValue() == null ? null : item.getValue().getFile();
     }
 
     // =========================================================================
@@ -500,7 +514,8 @@ public class TailTransitionAndRecentSyncTest {
 
         Platform.runLater(() -> {
             try {
-                recentFilesListView.setItems(FXCollections.observableArrayList(remoteDto));
+                allRecentFiles.setAll(remoteDto);
+                controller.rebuildRecentTree();
                 openSessionInController(downloadedSession);
 
                 controller.selectRecentFileForSession(downloadedSession);
@@ -512,7 +527,7 @@ public class TailTransitionAndRecentSyncTest {
         WaitForAsyncUtils.waitForFxEvents();
 
         Platform.runLater(() -> {
-            RecentFilesDto selected = recentFilesListView.getSelectionModel().getSelectedItem();
+            RecentFilesDto selected = selectedRecentFile();
             assertNotNull(selected, "Downloaded remote file must find and highlight its remote recent entry");
             assertEquals("/var/log/tomcat/catalina.out", selected.logFile().getFilePath());
         });

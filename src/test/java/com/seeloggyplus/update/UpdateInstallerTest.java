@@ -57,7 +57,8 @@ class UpdateInstallerTest {
             Path zip = createZip(work, new String[] {
                     "SeeloggyPlus/seeloggyplus.jar",
                     "SeeloggyPlus/help/index.html",
-                    "SeeloggyPlus/launcher.bat"
+                    "SeeloggyPlus/launcher.bat",
+                    "SeeloggyPlus/SeeLoggyPlus.vbs"
             }, "jar-bytes".getBytes());
             Path versions = work.resolve("versions");
 
@@ -67,6 +68,7 @@ class UpdateInstallerTest {
             assertEquals("0.3.0", staged.version());
             assertEquals(versions.resolve("0.3.0"), staged.directory());
             assertTrue(Files.exists(staged.jar()));
+            assertTrue(Files.exists(staged.directory().resolve("SeeLoggyPlus.vbs")));
             assertTrue(Files.exists(versions.resolve("0.3.0/help/index.html")),
                     "Wrapper folder must be stripped into the version directory");
             try (Stream<Path> leftovers = Files.list(versions)) {

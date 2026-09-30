@@ -93,12 +93,39 @@
                     <Insets top="10" right="5" bottom="10" left="10"/>
                 </padding>
                 <Label text="Locations" styleClass="section-title"/>
-                <ListView fx:id="locationListView" VBox.vgrow="ALWAYS"/>
-                <Button fx:id="manageServersButton" text="Manage Servers" maxWidth="Infinity">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="COG"/>
-                    </graphic>
-                </Button>
+                <HBox spacing="4" alignment="CENTER_LEFT">
+                    <Button fx:id="newGroupButton">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="FOLDER_OPEN" size="14"/>
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="New group (inside the selected group)"/>
+                        </tooltip>
+                    </Button>
+                    <Button fx:id="favoriteCurrentButton">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="STAR" size="14"/>
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Favorite this folder"/>
+                        </tooltip>
+                    </Button>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="manageServersButton">
+                        <graphic>
+                            <FontAwesomeIconView glyphName="COG" size="14"/>
+                        </graphic>
+                        <tooltip>
+                            <Tooltip text="Manage Servers"/>
+                        </tooltip>
+                    </Button>
+                </HBox>
+                <TreeView fx:id="locationTree" VBox.vgrow="ALWAYS" showRoot="false"/>
+                <TitledPane fx:id="favoritesPane" text="Favorite folders" expanded="false" maxHeight="220">
+                    <content>
+                        <VBox fx:id="favoritesBox" spacing="4"/>
+                    </content>
+                </TitledPane>
             </VBox>
             
             <!-- Right: File Browser -->

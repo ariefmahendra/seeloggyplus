@@ -261,6 +261,30 @@
     -fx-border-color: -sl-accent;
     -fx-border-width: 1;
     -fx-border-radius: 3;
+    -fx-text-fill: -sl-chrome-text;
+}
+
+.app-toolbar .button:focused,
+.status-bar .button:focused {
+    -fx-background-color: transparent;
+}
+
+/* Hover/pressed/selected states sit on the accent fill, so the label must use
+   the accent text token too (otherwise dark chrome-text lands on the blue
+   accent of the Light theme). Declared after the focused rule so a focused
+   button that is being hovered/pressed still switches its text. */
+.app-toolbar .button:hover,
+.app-toolbar .button:pressed,
+.status-bar .button:hover,
+.status-bar .button:pressed {
+    -fx-text-fill: -sl-accent-text;
+}
+
+.app-toolbar .toggle-button:hover,
+.app-toolbar .toggle-button:pressed,
+.app-toolbar .toggle-button:selected,
+.app-toolbar .toggle-button:selected:hover {
+    -fx-text-fill: -sl-accent-text;
 }
 
 /* ============================================================
@@ -311,6 +335,20 @@
 .status-memory-bar {
     -fx-accent: -sl-chrome-text;
     -fx-control-inner-background: -sl-memory-track;
+}
+
+/* Flat memory gauge on the chrome: no Modena highlight/border layers. */
+.status-memory-bar > .track {
+    -fx-background-color: -sl-memory-track;
+    -fx-background-insets: 0;
+    -fx-background-radius: 2;
+    -fx-border-color: transparent;
+}
+
+.status-memory-bar > .bar {
+    -fx-background-insets: 0;
+    -fx-background-radius: 2;
+    -fx-padding: 0;
 }
 
 .status-memory-bar.memory-ok {
@@ -389,12 +427,85 @@ FontAwesomeIconView {
 
 /* ============================================================
    Generic buttons
+   Every button in the application (dialogs, forms, file manager)
+   follows the theme surface/text/border tokens instead of the
+   default JavaFX (Modena) look. Toolbar/status/primary variants
+   below override these rules.
    ============================================================ */
+.button,
+.toggle-button {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 3;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 3;
+    -fx-border-width: 1;
+    -fx-text-fill: -sl-text;
+    -fx-padding: 5 12 5 12;
+    -fx-cursor: hand;
+}
+
+.button:hover,
+.toggle-button:hover {
+    -fx-background-color: -sl-surface-sunken;
+}
+
+.button:pressed,
+.toggle-button:pressed {
+    -fx-background-color: -sl-border-soft;
+}
+
+.button:focused,
+.toggle-button:focused {
+    -fx-border-color: -sl-accent;
+}
+
+.button:disabled,
+.toggle-button:disabled {
+    -fx-opacity: 0.6;
+}
+
+/* Explicit focus states: keep the themed surface/text (Modena would paint its
+   own focus layers and can leave dark text on a dark ring). The accent border
+   is the focus indicator. */
+.button:focused,
+.toggle-button:focused {
+    -fx-background-color: -sl-surface;
+    -fx-text-fill: -sl-text;
+    -fx-border-color: -sl-accent;
+}
+
+/* Default dialog action: brand-filled with readable text (never Modena blue). */
+.button:default {
+    -fx-background-color: -sl-brand;
+    -fx-text-fill: -sl-on-brand;
+    -fx-border-color: transparent;
+}
+
+.button:default:hover {
+    -fx-background-color: -sl-brand-hover;
+}
+
+.button:default:pressed {
+    -fx-background-color: -sl-brand-pressed;
+}
+
+.button:default:focused {
+    -fx-background-color: -sl-brand;
+    -fx-text-fill: -sl-on-brand;
+    -fx-border-color: -sl-accent;
+}
+
+.button:default .glyph-icon,
+.button:default FontAwesomeIconView {
+    -fx-fill: -sl-on-brand;
+}
+
 .btn-primary {
     -fx-background-color: -sl-brand;
     -fx-text-fill: -sl-on-brand;
     -fx-font-weight: bold;
     -fx-background-radius: 3;
+    -fx-border-color: transparent;
     -fx-padding: 5 16;
     -fx-cursor: hand;
 }
@@ -411,6 +522,12 @@ FontAwesomeIconView {
     -fx-opacity: 0.6;
 }
 
+.btn-primary:focused {
+    -fx-background-color: -sl-brand;
+    -fx-text-fill: -sl-on-brand;
+    -fx-border-color: -sl-accent;
+}
+
 .btn-danger-outline {
     -fx-base: -sl-danger-soft;
     -fx-text-fill: -sl-danger;
@@ -422,6 +539,12 @@ FontAwesomeIconView {
 
 .btn-danger-outline:hover {
     -fx-base: -sl-danger-soft-hover;
+}
+
+.btn-danger-outline:focused {
+    -fx-base: -sl-danger-soft;
+    -fx-text-fill: -sl-danger;
+    -fx-border-color: -sl-danger;
 }
 
 .btn-compact {

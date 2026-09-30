@@ -2,10 +2,13 @@ package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.service.ServerManagementService;
+import com.seeloggyplus.service.SshConnectFlow;
 import com.seeloggyplus.service.impl.SSHServiceImpl;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,6 +21,8 @@ import java.util.UUID;
 public class ServerEditDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(ServerEditDialogController.class);
+    private static final String AUTH_PASSWORD_LABEL = "Password";
+    private static final String AUTH_KEY_LABEL = "Private key";
 
     @FXML private TextField nameField;
     @FXML private TextField hostField;
@@ -26,6 +31,13 @@ public class ServerEditDialogController {
     @FXML private PasswordField passwordField;
     @FXML private TextField defaultPathField;
     @FXML private CheckBox savePasswordCheckBox;
+    @FXML private ChoiceBox<String> authTypeChoice;
+    @FXML private VBox passwordAuthBox;
+    @FXML private VBox keyAuthBox;
+    @FXML private TextField keyPathField;
+    @FXML private PasswordField keyPassphraseField;
+    @FXML private CheckBox savePassphraseCheckBox;
+    @FXML private Button browseKeyButton;
     
     @FXML private Label nameErrorLabel;
     @FXML private Label hostErrorLabel;
@@ -52,9 +64,30 @@ public class ServerEditDialogController {
     public void initialize() {
         sshService = new SSHServiceImpl();
 
+        setupAuthChoice();
         setupPasswordField();
         setupValidation();
         setupEventHandlers();
+    }
+
+    private void setupAuthChoice() {
+        authTypeChoice.getItems().setAll(AUTH_PASSWORD_LABEL, AUTH_KEY_LABEL);
+        authTypeChoice.getSelectionModel().select(AUTH_PASSWORD_LABEL);
+        authTypeChoice.getSelectionModel().selectedItemProperty()
+                .addListener((obs, old, selected) -> updateAuthVisibility());
+        updateAuthVisibility();
+    }
+
+    private boolean isKeyAuthSelected() {
+        return AUTH_KEY_LABEL.equals(authTypeChoice.getSelectionModel().getSelectedItem());
+    }
+
+    private void updateAuthVisibility() {
+        boolean keyAuth = isKeyAuthSelected();
+        passwordAuthBox.setVisible(!keyAuth);
+        passwordAuthBox.setManaged(!keyAuth);
+        keyAuthBox.setVisible(keyAuth);
+        keyAuthBox.setManaged(keyAuth);
     }
     
     /**
@@ -95,6 +128,20 @@ public class ServerEditDialogController {
         saveButton.setOnAction(e -> handleSave());
         cancelButton.setOnAction(e -> handleCancel());
         showPasswordButton.setOnAction(e -> togglePasswordVisibility());
+        browseKeyButton.setOnAction(e -> browseForKeyFile());
+    }
+
+    private void browseForKeyFile() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Select Private Key File");
+        java.io.File sshDir = new java.io.File(System.getProperty("user.home", "."), ".ssh");
+        if (sshDir.isDirectory()) {
+            chooser.setInitialDirectory(sshDir);
+        }
+        java.io.File chosen = chooser.showOpenDialog(browseKeyButton.getScene().getWindow());
+        if (chosen != null) {
+            keyPathField.setText(chosen.getAbsolutePath());
+        }
     }
 
     public void setServer(SSHServerModel server) {
@@ -106,6 +153,10 @@ public class ServerEditDialogController {
         passwordField.setText(server.getPassword() != null ? server.getPassword() : "");
         defaultPathField.setText(server.getDefaultPath() != null ? server.getDefaultPath() : "/");
         savePasswordCheckBox.setSelected(server.isSavePassword());
+        authTypeChoice.getSelectionModel().select(server.usesKeyAuth() ? AUTH_KEY_LABEL : AUTH_PASSWORD_LABEL);
+        keyPathField.setText(server.getKeyPath() != null ? server.getKeyPath() : "");
+        keyPassphraseField.setText(server.getKeyPassphrase() != null ? server.getKeyPassphrase() : "");
+        savePassphraseCheckBox.setSelected(server.getKeyPassphrase() != null && !server.getKeyPassphrase().isBlank());
     }
 
     public void setCloneServer(SSHServerModel original) {
@@ -120,12 +171,35 @@ public class ServerEditDialogController {
         passwordField.setText(original.getPassword() != null ? original.getPassword() : "");
         defaultPathField.setText(original.getDefaultPath() != null ? original.getDefaultPath() : "/");
         savePasswordCheckBox.setSelected(original.isSavePassword());
+        authTypeChoice.getSelectionModel().select(original.usesKeyAuth() ? AUTH_KEY_LABEL : AUTH_PASSWORD_LABEL);
+        keyPathField.setText(original.getKeyPath() != null ? original.getKeyPath() : "");
+        keyPassphraseField.setText(original.getKeyPassphrase() != null ? original.getKeyPassphrase() : "");
+        savePassphraseCheckBox.setSelected(
+                original.getKeyPassphrase() != null && !original.getKeyPassphrase().isBlank());
     }
 
     private void handleTest() {
         if (validateFields()) {
             return;
         }
+        boolean keyAuth = isKeyAuthSelected();
+        if (keyAuth && (keyPathField.getText() == null || keyPathField.getText().isBlank())) {
+            Alert warning = new Alert(Alert.AlertType.WARNING);
+            warning.setTitle("Private Key Required");
+            warning.setHeaderText("No private key file selected");
+            warning.setContentText("Choose the private key file used for this server.");
+            warning.showAndWait();
+            return;
+        }
+
+        SSHServerModel testServer = new SSHServerModel();
+        testServer.setHost(hostField.getText());
+        testServer.setPort(Integer.parseInt(portField.getText()));
+        testServer.setUsername(usernameField.getText());
+        testServer.setAuthType(keyAuth ? SSHServerModel.AUTH_KEY : SSHServerModel.AUTH_PASSWORD);
+        testServer.setKeyPath(keyPathField.getText());
+        testServer.setKeyPassphrase(keyPassphraseField.getText());
+        String secret = keyAuth ? keyPassphraseField.getText() : passwordField.getText();
 
         Alert progress = new Alert(Alert.AlertType.INFORMATION);
         progress.setTitle("Testing");
@@ -137,7 +211,7 @@ public class ServerEditDialogController {
             @Override
             protected Boolean call() {
                 try {
-                    return sshService.connect(hostField.getText(), Integer.parseInt(portField.getText()), usernameField.getText(), passwordField.getText());
+                    return SshConnectFlow.connect(sshService, testServer, secret);
                 } catch (Exception e) {
                     logger.error("Connection test failed", e);
                     return false;
@@ -152,13 +226,21 @@ public class ServerEditDialogController {
             Alert result = new Alert(success ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR);
             result.setTitle("Test Result");
             result.setHeaderText(success ? "Connection Successful" : "Connection Failed");
-            result.setContentText(success ? 
+            result.setContentText(success ?
                 "Successfully connected to the server!" :
-                "Failed to connect. Please check your credentials.");
+                formatTestFailure(sshService.getLastConnectError()));
             result.showAndWait();
         });
 
         new Thread(task).start();
+    }
+
+    /** Failure text for the Test Connection dialog; keeps the real reason visible. */
+    static String formatTestFailure(String detail) {
+        if (detail == null || detail.isBlank()) {
+            return "Failed to connect. Please check your credentials.";
+        }
+        return "Failed to connect:\n" + detail;
     }
 
     private void handleSave() {
@@ -187,6 +269,21 @@ public class ServerEditDialogController {
         } else {
             server.setPassword(null);
         }
+
+        boolean keyAuth = isKeyAuthSelected();
+        if (keyAuth && (keyPathField.getText() == null || keyPathField.getText().isBlank())) {
+            Alert warning = new Alert(Alert.AlertType.WARNING);
+            warning.setTitle("Private Key Required");
+            warning.setHeaderText("No private key file selected");
+            warning.setContentText("Choose the private key file used for this server.");
+            warning.showAndWait();
+            return;
+        }
+        server.setAuthType(keyAuth ? SSHServerModel.AUTH_KEY : SSHServerModel.AUTH_PASSWORD);
+        server.setKeyPath(keyAuth ? keyPathField.getText().trim() : null);
+        server.setKeyPassphrase(keyAuth && savePassphraseCheckBox.isSelected()
+                ? keyPassphraseField.getText()
+                : null);
 
         serverService.saveServer(server);
         savedServer = server;

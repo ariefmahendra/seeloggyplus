@@ -92,6 +92,9 @@ class PreviewSelectionThemeTest {
 
     private static ListView<String> buildPreviewList() {
         ListView<String> list = new ListView<>();
+        // The highlight rules are scoped to the preview list so they cannot leak
+        // onto other .list-cell controls (e.g. the Context dropdown button cell).
+        list.getStyleClass().add("preview-list");
         list.getItems().addAll("first line", "highlighted target line", "third line");
         list.setCellFactory(view -> new ListCell<>() {
             @Override

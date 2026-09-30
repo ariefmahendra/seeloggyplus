@@ -4,6 +4,8 @@ import com.jcraft.jsch.*;
 import com.seeloggyplus.dto.RemoteFileInfo;
 import com.seeloggyplus.service.LogParser;
 import com.seeloggyplus.service.SSHService;
+import com.seeloggyplus.ssh.HostKeyVerificationException;
+import com.seeloggyplus.ssh.SshAuthConfig;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +47,8 @@ public class SSHServiceImpl implements SSHService {
     @Getter
     private String username;
     private String password;
+    private volatile SshAuthConfig authConfig = SshAuthConfig.password();
+    private volatile String lastConnectError;
 
     private Session currentSession;
     private ChannelSftp reusableSftpChannel;
@@ -76,12 +80,33 @@ public class SSHServiceImpl implements SSHService {
 
         try {
             this.currentSession = SSHSessionManagerImpl.getInstance().getSession(this.host, this.port, this.username,
-                    this.password, ttlMillis);
+                    this.password, ttlMillis, authConfig);
+            lastConnectError = null;
             return this.currentSession.isConnected();
+        } catch (HostKeyVerificationException e) {
+            // Propagate so the UI can ask the user to trust the host key.
+            lastConnectError = e.getMessage();
+            throw e;
         } catch (JSchException e) {
             logger.error("Connection failed: {}", e.getMessage());
+            lastConnectError = e.getMessage();
             return false;
         }
+    }
+
+    @Override
+    public String getLastConnectError() {
+        return lastConnectError;
+    }
+
+    @Override
+    public void setAuthConfig(SshAuthConfig config) {
+        this.authConfig = config == null ? SshAuthConfig.password() : config;
+    }
+
+    @Override
+    public void trustPendingHostKey() {
+        SSHSessionManagerImpl.getInstance().trustPendingHostKey(host, port);
     }
 
     @Override

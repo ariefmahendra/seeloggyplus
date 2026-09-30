@@ -62,6 +62,11 @@
                                  </children>
                               </HBox>
                               <Separator prefWidth="200.0" />
+                              <HBox spacing="8" alignment="CENTER_LEFT">
+                                 <Label text="File double-click:"/>
+                                 <ComboBox fx:id="fileDoubleClickComboBox" prefWidth="160"/>
+                              </HBox>
+                              <Label text="File Management: double-click or Enter. Folders always open." wrapText="true"/>
                               <Label text="Performance">
                                  <font>
                                     <Font name="System Bold" size="14.0" />

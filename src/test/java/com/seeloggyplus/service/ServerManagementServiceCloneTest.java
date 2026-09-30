@@ -29,6 +29,9 @@ public class ServerManagementServiceCloneTest {
         originalServer.setPassword("SecretP@ss123");
         originalServer.setDefaultPath("/var/log/nginx");
         originalServer.setSavePassword(true);
+        originalServer.setAuthType(SSHServerModel.AUTH_KEY);
+        originalServer.setKeyPath("C:\\keys\\id_ed25519");
+        originalServer.setKeyPassphrase("key-pass");
 
         serverService.saveServer(originalServer);
     }
@@ -58,6 +61,9 @@ public class ServerManagementServiceCloneTest {
         assertEquals(originalServer.getPassword(), cloneModel.getPassword());
         assertEquals(originalServer.getDefaultPath(), cloneModel.getDefaultPath());
         assertEquals(originalServer.isSavePassword(), cloneModel.isSavePassword());
+        assertEquals(originalServer.getAuthType(), cloneModel.getAuthType());
+        assertEquals(originalServer.getKeyPath(), cloneModel.getKeyPath());
+        assertEquals(originalServer.getKeyPassphrase(), cloneModel.getKeyPassphrase());
         assertNull(cloneModel.getLastUsed(), "Cloned server lastUsed should be reset to null");
         assertEquals(SSHServerModel.ConnectionStatus.UNKNOWN, cloneModel.getConnectionStatus());
     }

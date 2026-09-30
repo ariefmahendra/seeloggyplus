@@ -10,6 +10,7 @@ import com.seeloggyplus.service.FavoriteFolderService;
 import com.seeloggyplus.service.LocalFileService;
 import com.seeloggyplus.service.PreferenceService;
 import com.seeloggyplus.service.ServerManagementService;
+import com.seeloggyplus.service.SshConnectFlow;
 import com.seeloggyplus.service.impl.FavoriteFolderServiceImpl;
 import com.seeloggyplus.service.impl.LocalFileServiceImpl;
 import com.seeloggyplus.service.impl.PreferenceServiceImpl;
@@ -84,9 +85,17 @@ public class UnifiedFileManagerDialogController {
     private Button findInFilesButton;
 
     @FXML
-    private ListView<LocationItem> locationListView;
+    private TreeView<LocationItem> locationTree;
+    @FXML
+    private Button newGroupButton;
     @FXML
     private Button manageServersButton;
+    @FXML
+    private Button favoriteCurrentButton;
+    @FXML
+    private TitledPane favoritesPane;
+    @FXML
+    private VBox favoritesBox;
 
     @FXML
     private TableView<FileInfo> fileTable;
@@ -160,6 +169,9 @@ public class UnifiedFileManagerDialogController {
     private static final long CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
     private boolean suppressAutoRefresh = false;
     private boolean suppressSortSave = false;
+    private boolean locationTreeReady;
+    private String draggedLocationServerId;
+    private OpenAction doubleClickAction = OpenAction.OPEN;
     private String cachedFavoritesLocationId = null; // Track which location favorites are cached for
 
     private final java.util.concurrent.ExecutorService fileIoExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
@@ -190,7 +202,7 @@ public class UnifiedFileManagerDialogController {
 
     private String getLocationIdFor(LocationItem loc) {
         if (loc == null) return "";
-        return loc.server == null ? "local" : loc.server.getName();
+        return loc.getServer() == null ? "local" : loc.getServer().getName();
     }
 
     @FXML
@@ -206,8 +218,10 @@ public class UnifiedFileManagerDialogController {
         filteredFiles = new FilteredList<>(allFiles, p -> true);
 
         setupLayout();
-        setupLocationList();
+        setupLocationTree();
         setupFavoritesList();
+        doubleClickAction = preferredFileAction(preferenceService.getPreferencesByCode("file_double_click_action").orElse("OPEN"));
+        fileTable.setTooltip(new Tooltip("Double-click / Enter: " + (doubleClickAction == OpenAction.TAIL ? "Tail" : "Open/Download") + ". Folders always open."));
         setupFileTable();
         setupEventHandlers();
 
@@ -241,55 +255,476 @@ public class UnifiedFileManagerDialogController {
         // Manual refresh is available via the refresh button or Ctrl+R.
     }
 
-    private void setupLocationList() {
-        ObservableList<LocationItem> locations = FXCollections.observableArrayList();
-        locations.add(new LocationItem("Local Drive", FontAwesomeIcon.DESKTOP, null));
+    private void setupLocationTree() {
+        locationTree.setShowRoot(false);
+        locationTree.setCellFactory(tree -> createLocationCell());
+        // Selecting a node must never open it: starting a drag selects the row before
+        // the drag is detected. Connections happen on click or Enter instead.
+        locationTree.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) {
+                handleLocationClick(selectedLocationItem());
+                event.consume();
+            }
+        });
+        locationTreeReady = true;
+        locationTree.setRoot(buildLocationRoot());
+    }
 
-        List<SSHServerModel> servers = serverManagementService.getAllServers();
-        for (SSHServerModel server : servers) {
-            locations.add(new LocationItem(server.getName(), FontAwesomeIcon.SERVER, server));
+    /** Builds the WinSCP-style location tree: Local, nested group folders, ungrouped servers. */
+    private TreeItem<LocationItem> buildLocationRoot() {
+        TreeItem<LocationItem> root = new TreeItem<>(LocationItem.root());
+        root.setExpanded(true);
+        root.getChildren().add(new TreeItem<>(LocationItem.local()));
+
+        java.util.Map<String, TreeItem<LocationItem>> groupFolders = new java.util.LinkedHashMap<>();
+        for (String group : serverManagementService.getGroupNames()) {
+            ensureFolderNode(root, groupFolders, group);
         }
+        for (SSHServerModel server : serverManagementService.getAllServers()) {
+            TreeItem<LocationItem> node = new TreeItem<>(LocationItem.of(server));
+            String group = server.getGroupName();
+            if (group == null || group.isBlank()) {
+                root.getChildren().add(node);
+            } else {
+                ensureFolderNode(root, groupFolders, group).getChildren().add(node);
+            }
+        }
+        return root;
+    }
 
-        locationListView.setItems(locations);
-        locationListView.setCellFactory(param -> new ListCell<>() {
+    /** Creates (if needed) every segment of a "Parent/Child" path and returns the deepest folder. */
+    private TreeItem<LocationItem> ensureFolderNode(TreeItem<LocationItem> root,
+            java.util.Map<String, TreeItem<LocationItem>> folders, String path) {
+        TreeItem<LocationItem> parent = root;
+        StringBuilder current = new StringBuilder();
+        for (String segment : path.split("/")) {
+            if (segment.isBlank()) {
+                continue;
+            }
+            if (current.length() > 0) {
+                current.append('/');
+            }
+            current.append(segment);
+            String full = current.toString();
+            TreeItem<LocationItem> node = folders.get(full);
+            if (node == null) {
+                node = newFolderItem(full);
+                folders.put(full, node);
+                parent.getChildren().add(node);
+            }
+            parent = node;
+        }
+        return parent;
+    }
+
+    private static TreeItem<LocationItem> newFolderItem(String group) {
+        TreeItem<LocationItem> folder = new TreeItem<>(LocationItem.group(group));
+        folder.setExpanded(true);
+        return folder;
+    }
+
+    private TreeCell<LocationItem> createLocationCell() {
+        TreeCell<LocationItem> cell = new TreeCell<>() {
             @Override
             protected void updateItem(LocationItem item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setText(null);
                     setGraphic(null);
-                } else {
-                    setText(item.name);
-                    FontAwesomeIconView icon = new FontAwesomeIconView(item.icon);
-                    icon.setSize("16");
-                    setGraphic(icon);
+                    setTooltip(null);
+                    setContextMenu(null);
+                    return;
                 }
+                setText(item.getLabel());
+                FontAwesomeIconView icon = new FontAwesomeIconView(iconFor(item));
+                icon.setSize("16");
+                setGraphic(icon);
+                setTooltip(new Tooltip(item.getTooltip()));
+                setContextMenu(buildLocationContextMenu(item));
+            }
+        };
+
+        cell.setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 1) {
+                handleLocationClick(cell.isEmpty() ? null : cell.getItem());
             }
         });
 
-        locationListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                handleLocationSelected(newVal);
+        cell.setOnDragDetected(e -> {
+            if (cell.isEmpty() || cell.getItem() == null || !cell.getItem().isServer()) {
+                return;
+            }
+            draggedLocationServerId = cell.getItem().getServer().getId();
+            var board = cell.startDragAndDrop(javafx.scene.input.TransferMode.MOVE);
+            var content = new javafx.scene.input.ClipboardContent();
+            content.putString(draggedLocationServerId);
+            board.setContent(content);
+            e.consume();
+        });
+        cell.setOnDragDone(e -> draggedLocationServerId = null);
+        cell.setOnDragOver(e -> {
+            if (draggedLocationServerId != null && !cell.isEmpty() && cell.getItem() != null
+                    && !cell.getItem().isRoot()) {
+                e.acceptTransferModes(javafx.scene.input.TransferMode.MOVE);
+            }
+            e.consume();
+        });
+        cell.setOnDragEntered(e -> {
+            if (draggedLocationServerId != null && !cell.isEmpty()) {
+                cell.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("drop-target"), true);
+            }
+        });
+        cell.setOnDragExited(e -> cell.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("drop-target"), false));
+        cell.setOnDragDropped(e -> {
+            boolean ok = draggedLocationServerId != null && !cell.isEmpty() && cell.getItem() != null
+                    && !cell.getItem().isRoot();
+            if (ok) {
+                moveServerToGroup(draggedLocationServerId, groupForDropTarget(cell.getItem()));
+            }
+            e.setDropCompleted(ok);
+            e.consume();
+        });
+        return cell;
+    }
+
+    private static FontAwesomeIcon iconFor(LocationItem item) {
+        if (item.isLocal()) return FontAwesomeIcon.DESKTOP;
+        if (item.isGroup()) return FontAwesomeIcon.FOLDER;
+        return FontAwesomeIcon.SERVER;
+    }
+
+    private ContextMenu buildLocationContextMenu(LocationItem item) {
+        ContextMenu menu = new ContextMenu();
+        MenuItem newGroup = new MenuItem("New group...");
+        newGroup.setOnAction(e -> promptNewGroup(parentPathForNewGroup(item)));
+        if (item.isGroup()) {
+            MenuItem renameGroup = new MenuItem("Rename group...");
+            renameGroup.setOnAction(e -> promptRenameGroup(item.getGroupName()));
+            MenuItem deleteGroup = new MenuItem("Delete group");
+            deleteGroup.setOnAction(e -> promptDeleteGroup(item.getGroupName()));
+            menu.getItems().addAll(newGroup, renameGroup, deleteGroup);
+        } else if (item.isServer()) {
+            MenuItem moveToGroup = new MenuItem("Move to group...");
+            moveToGroup.setOnAction(e -> promptMoveServerToGroup(item.getServer()));
+            menu.getItems().addAll(moveToGroup, newGroup);
+        } else {
+            menu.getItems().add(newGroup);
+        }
+        return menu;
+    }
+
+    /** Dropping onto a folder joins it, onto a server joins its group, onto Local/root ungroups. */
+    static String groupForDropTarget(LocationItem target) {
+        if (target == null) {
+            return null;
+        }
+        if (target.isGroup()) {
+            return target.getGroupName();
+        }
+        if (target.isServer()) {
+            return target.getServer().getGroupName();
+        }
+        return null;
+    }
+
+    void createGroup(String name) {
+        serverManagementService.createGroup(name);
+        rebuildLocationTree();
+        selectNode(findGroupNode(normalizedPath(name)));
+    }
+
+    void renameGroup(String oldName, String newName) {
+        serverManagementService.renameGroup(oldName, newName);
+        rebuildLocationTree();
+        selectNode(findGroupNode(normalizedPath(newName)));
+    }
+
+    void deleteGroup(String name) {
+        serverManagementService.deleteGroup(name);
+        rebuildLocationTree();
+        selectNode(selectedLocationNode());
+    }
+
+    void moveServerToGroup(String serverId, String groupName) {
+        TreeItem<LocationItem> node = findServerNodeById(serverId);
+        SSHServerModel server = node != null && node.getValue() != null
+            ? node.getValue().getServer()
+            : serverManagementService.getServerById(serverId);
+        if (server == null) {
+            return;
+        }
+        // Dragging/moving must never open the server; the tree is only rebuilt.
+        server.setGroupName(groupName);
+        serverManagementService.saveServer(server);
+        rebuildLocationTree();
+        selectNode(findServerNodeById(serverId));
+    }
+
+    /** Opens a location on an explicit click/Enter. Selection alone (drag start) does nothing. */
+    void handleLocationClick(LocationItem location) {
+        if (location == null || !(location.isLocal() || location.isServer())
+                || isSameLocation(location, currentLocation)) {
+            return;
+        }
+        handleLocationSelected(location);
+    }
+
+    private static boolean isSameLocation(LocationItem a, LocationItem b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        if (a.isLocal() || b.isLocal()) {
+            return a.isLocal() && b.isLocal();
+        }
+        if (a.isServer() && b.isServer()) {
+            SSHServerModel sa = a.getServer();
+            SSHServerModel sb = b.getServer();
+            return sa != null && sb != null && java.util.Objects.equals(sa.getId(), sb.getId());
+        }
+        return false;
+    }
+
+    private LocationItem selectedLocationItem() {
+        TreeItem<LocationItem> item = locationTree.getSelectionModel().getSelectedItem();
+        return item == null ? null : item.getValue();
+    }
+
+    /** New groups are created inside the selected group (or the selected server's group). */
+    private static String parentPathForNewGroup(LocationItem item) {
+        if (item == null) {
+            return null;
+        }
+        if (item.isGroup()) {
+            return item.getGroupName();
+        }
+        if (item.isServer()) {
+            return item.getServer().getGroupName();
+        }
+        return null;
+    }
+
+    private static String parentPath(String path) {
+        int slash = path == null ? -1 : path.lastIndexOf('/');
+        return slash <= 0 ? null : path.substring(0, slash);
+    }
+
+    private static String leafName(String path) {
+        int slash = path == null ? -1 : path.lastIndexOf('/');
+        return slash < 0 ? path : path.substring(slash + 1);
+    }
+
+    private static String normalizedPath(String path) {
+        if (path == null) {
+            return null;
+        }
+        java.util.List<String> segments = new java.util.ArrayList<>();
+        for (String segment : path.split("/", -1)) {
+            String clean = segment.trim();
+            if (!clean.isEmpty()) {
+                segments.add(clean);
+            }
+        }
+        return segments.isEmpty() ? null : String.join("/", segments);
+    }
+
+    private void promptNewGroup() {
+        promptNewGroup(parentPathForNewGroup(selectedLocationItem()));
+    }
+
+    private void promptNewGroup(String parentPath) {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("New group");
+        dialog.setHeaderText(parentPath == null || parentPath.isBlank()
+                ? "Create a server group"
+                : "Create a group inside '" + parentPath + "'");
+        dialog.setContentText("Group name:");
+        addAppIcon(dialog);
+        dialog.showAndWait().map(String::trim).filter(name -> !name.isEmpty()).ifPresent(name -> {
+            String fullPath = parentPath == null || parentPath.isBlank() ? name : parentPath + "/" + name;
+            try {
+                createGroup(fullPath);
+            } catch (RuntimeException ex) {
+                logger.error("Failed to create server group {}", fullPath, ex);
+                showError("Group Error", "Could not create group: " + ex.getMessage());
             }
         });
     }
 
+    private void promptRenameGroup(String group) {
+        String leaf = leafName(group);
+        TextInputDialog dialog = new TextInputDialog(leaf);
+        dialog.setTitle("Rename group");
+        dialog.setHeaderText("Rename group '" + group + "'");
+        dialog.setContentText("Group name:");
+        addAppIcon(dialog);
+        dialog.showAndWait().map(String::trim).filter(name -> !name.isEmpty() && !name.equals(leaf)).ifPresent(name -> {
+            String parent = parentPath(group);
+            String fullPath = parent == null ? name : parent + "/" + name;
+            try {
+                renameGroup(group, fullPath);
+            } catch (RuntimeException ex) {
+                logger.error("Failed to rename group {} to {}", group, fullPath, ex);
+                showError("Group Error", ex.getMessage());
+            }
+        });
+    }
+
+    private void promptDeleteGroup(String group) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Delete group");
+        alert.setHeaderText("Delete group '" + group + "'?");
+        alert.setContentText("Nested groups are deleted as well. Servers become ungrouped. No server is deleted.");
+        addAppIcon(alert);
+        alert.showAndWait().filter(button -> button == ButtonType.OK).ifPresent(button -> {
+            try {
+                deleteGroup(group);
+            } catch (RuntimeException ex) {
+                logger.error("Failed to delete group {}", group, ex);
+                showError("Group Error", "Could not delete group: " + ex.getMessage());
+            }
+        });
+    }
+
+    private void promptMoveServerToGroup(SSHServerModel server) {
+        String ungrouped = "(Ungrouped)";
+        java.util.List<String> choices = new java.util.ArrayList<>();
+        choices.add(ungrouped);
+        choices.addAll(serverManagementService.getGroupNames());
+        ChoiceDialog<String> dialog = new ChoiceDialog<>(
+            server.getGroupName() != null ? server.getGroupName() : ungrouped, choices);
+        dialog.setTitle("Move to group");
+        dialog.setHeaderText("Move '" + server.getName() + "' to a group");
+        dialog.setContentText("Group:");
+        addAppIcon(dialog);
+        dialog.showAndWait().ifPresent(choice -> {
+            String target = ungrouped.equals(choice) ? null : choice;
+            if (java.util.Objects.equals(target, server.getGroupName())) {
+                return;
+            }
+            try {
+                moveServerToGroup(server.getId(), target);
+            } catch (RuntimeException ex) {
+                logger.error("Failed to move server {} to group {}", server.getId(), target, ex);
+                showError("Group Error", "Could not move server: " + ex.getMessage());
+            }
+        });
+    }
+
+    void rebuildLocationTree() {
+        LocationItem selected = selectedLocationItem();
+        String selectedServerId = selected != null && selected.isServer() ? selected.getServer().getId() : null;
+        String selectedGroup = selected != null && selected.isGroup() ? selected.getGroupName() : null;
+        boolean selectedLocal = selected != null && selected.isLocal();
+
+        locationTree.setRoot(buildLocationRoot());
+        if (selectedServerId != null) {
+            selectNode(findServerNodeById(selectedServerId));
+        } else if (selectedGroup != null) {
+            selectNode(findGroupNode(selectedGroup));
+        } else if (selectedLocal) {
+            selectNode(findLocalNode());
+        }
+    }
+
+    private void selectNode(TreeItem<LocationItem> node) {
+        if (node == null) {
+            return;
+        }
+        locationTree.getSelectionModel().select(node);
+        locationTree.scrollTo(locationTree.getRow(node));
+    }
+
+    private TreeItem<LocationItem> selectedLocationNode() {
+        if (currentLocation == null) {
+            return findLocalNode();
+        }
+        if (currentLocation.isServer() && currentLocation.getServer() != null) {
+            return findServerNodeById(currentLocation.getServer().getId());
+        }
+        return findLocalNode();
+    }
+
+    private void selectLocalLocation() {
+        TreeItem<LocationItem> local = findLocalNode();
+        if (local == null) {
+            return;
+        }
+        locationTree.getSelectionModel().select(local);
+        handleLocationClick(local.getValue());
+    }
+
+    private TreeItem<LocationItem> findLocalNode() {
+        TreeItem<LocationItem> root = locationTree.getRoot();
+        if (root == null) {
+            return null;
+        }
+        for (TreeItem<LocationItem> child : root.getChildren()) {
+            if (child.getValue() != null && child.getValue().isLocal()) {
+                return child;
+            }
+        }
+        return null;
+    }
+
+    private TreeItem<LocationItem> findGroupNode(String group) {
+        TreeItem<LocationItem> root = locationTree.getRoot();
+        return root == null || group == null ? null : findGroupNode(root, group);
+    }
+
+    private static TreeItem<LocationItem> findGroupNode(TreeItem<LocationItem> node, String group) {
+        LocationItem value = node.getValue();
+        if (value != null && value.isGroup() && group.equals(value.getGroupName())) {
+            return node;
+        }
+        for (TreeItem<LocationItem> child : node.getChildren()) {
+            TreeItem<LocationItem> found = findGroupNode(child, group);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private TreeItem<LocationItem> findServerNodeById(String id) {
+        return findServerNode(server -> id != null && id.equals(server.getId()));
+    }
+
+    private TreeItem<LocationItem> findServerNodeByName(String name) {
+        return findServerNode(server -> name != null && server.getName() != null
+                && server.getName().equalsIgnoreCase(name));
+    }
+
+    private TreeItem<LocationItem> findServerNode(java.util.function.Predicate<SSHServerModel> match) {
+        TreeItem<LocationItem> root = locationTree.getRoot();
+        return root == null ? null : findServerNode(root, match);
+    }
+
+    private static TreeItem<LocationItem> findServerNode(TreeItem<LocationItem> node,
+            java.util.function.Predicate<SSHServerModel> match) {
+        LocationItem value = node.getValue();
+        if (value != null && value.isServer() && match.test(value.getServer())) {
+            return node;
+        }
+        for (TreeItem<LocationItem> child : node.getChildren()) {
+            TreeItem<LocationItem> found = findServerNode(child, match);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
     private void setupLayout() {
         favoritesListView = new ListView<>();
-        if (locationListView.getParent() instanceof VBox leftPanel) {
-            int index = leftPanel.getChildren().indexOf(locationListView);
-            Label favoritesLabel = new Label("Favorites");
-            favoritesLabel.getStyleClass().add("section-title");
-            if (index != -1) {
-                leftPanel.getChildren().add(index + 1, new Separator());
-                leftPanel.getChildren().add(index + 2, favoritesLabel);
-                leftPanel.getChildren().add(index + 3, favoritesListView);
-            } else {
-                leftPanel.getChildren().addAll(new Separator(), favoritesLabel, favoritesListView);
-            }
-            VBox.setVgrow(locationListView, javafx.scene.layout.Priority.SOMETIMES);
+        favoritesListView.setPlaceholder(new Label("No saved folders yet."));
+        if (favoritesBox != null) {
+            favoritesBox.getChildren().add(favoritesListView);
             VBox.setVgrow(favoritesListView, javafx.scene.layout.Priority.ALWAYS);
         }
+        favoriteCurrentButton.setOnAction(e -> toggleCurrentFavorite());
+        // The server tree is the primary content of the left panel; favorites
+        // collapse into a section so an empty list never eats vertical space.
+        VBox.setVgrow(locationTree, javafx.scene.layout.Priority.ALWAYS);
     }
 
     private void setupFavoritesList() {
@@ -309,6 +744,7 @@ public class UnifiedFileManagerDialogController {
                     setGraphic(null);
                 } else {
                     setText(item.getName());
+                    setTooltip(new Tooltip(item.getPath() + "\nDouble-click to open folder"));
                     setGraphic(icon);
                 }
             }
@@ -328,7 +764,9 @@ public class UnifiedFileManagerDialogController {
             FavoriteFolder selected = favoritesListView.getSelectionModel().getSelectedItem();
             if (selected != null) {
                 favoriteFolderService.removeFavorite(selected.getId());
+                cachedFavoritesLocationId = null;
                 loadFavoritesForCurrentLocation();
+                fileTable.refresh();
             }
         });
         favContextMenu.getItems().add(removeFavMenuItem);
@@ -450,7 +888,7 @@ public class UnifiedFileManagerDialogController {
                 handleFileDoubleClick();
                 event.consume();
             } else if (event.getCode() == KeyCode.BACK_SPACE) {
-                navigateUp();
+                navigateBack();
                 event.consume();
             }
         });
@@ -487,7 +925,7 @@ public class UnifiedFileManagerDialogController {
             previewButton.setDisable(!isFileSelected);
 
             if (tailButton != null) {
-                boolean canTail = isFileSelected && newVal.getSourceType() == FileInfo.SourceType.REMOTE;
+                boolean canTail = isFileSelected;
                 tailButton.setDisable(!canTail);
             }
         });
@@ -513,6 +951,7 @@ public class UnifiedFileManagerDialogController {
             itemCountLabel.setText(filteredFiles.size() + " items");
         });
 
+        newGroupButton.setOnAction(e -> promptNewGroup());
         manageServersButton.setOnAction(e -> handleManageServers());
         if (findInFilesButton != null) {
             findInFilesButton.setOnAction(e -> handleFindInFiles());
@@ -531,11 +970,12 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void handleLocationSelected(LocationItem location) {
+        if (currentConnectTask != null) currentConnectTask.cancel(true);
+        currentConnectTask = null;
+        if (currentLoadTask != null) currentLoadTask.cancel(false);
+        currentLoadTask = null;
         if (currentPrefetchFuture != null && !currentPrefetchFuture.isDone()) {
             currentPrefetchFuture.cancel(true);
-        }
-        if (currentLoadTask != null && currentLoadTask.isRunning()) {
-            currentLoadTask.cancel(true);
         }
 
         // Disconnect from the previous session if there was one
@@ -544,10 +984,11 @@ public class UnifiedFileManagerDialogController {
             activeSshService = null;
         }
 
+        currentPath = null; // Never carry a path into another server's navigation history.
         currentLocation = location;
         updateFindInFilesState();
         if (preferenceService != null) {
-            String locId = location.server == null ? "local" : location.server.getName();
+            String locId = location.getServer() == null ? "local" : location.getServer().getName();
             preferenceService.saveOrUpdatePreferences(new Preference("file_manager_last_location", locId));
         }
         backHistory.clear();
@@ -556,7 +997,7 @@ public class UnifiedFileManagerDialogController {
         updateNavigationButtons();
         loadFavoritesForCurrentLocation();
 
-        if (location.server == null) {
+        if (location.getServer() == null) {
             // This is a local drive, no connection needed
             String lastPath = preferenceService.getPreferencesByCode(lastPathKey())
                 .filter(p -> !p.isBlank())
@@ -565,13 +1006,13 @@ public class UnifiedFileManagerDialogController {
         } else {
             // This is a remote server, create a new service and connect
             activeSshService = sshServiceFactory.get();
-            connectToRemote(location.server);
+            connectToRemote(location.getServer());
         }
     }
 
     private void connectToRemote(SSHServerModel server) {
-        String password = server.getPassword();
-        if (password == null || password.isBlank()) {
+        String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+        if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
             logger.info("Password for server {} is not saved, prompting user.", server.getName());
             suppressAutoRefresh = true; // Prevent focus-triggered refresh while dialog is open
             PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
@@ -584,7 +1025,7 @@ public class UnifiedFileManagerDialogController {
             } else {
                 logger.info("User cancelled password prompt. Aborting connection.");
                 updateStatus("Connection cancelled.");
-                locationListView.getSelectionModel().select(0); // Go back to local
+                selectLocalLocation(); // Go back to local
                 return;
             }
         }
@@ -599,12 +1040,13 @@ public class UnifiedFileManagerDialogController {
             currentConnectTask.cancel(true);
         }
 
+        final var connectingService = activeSshService;
         Task<Boolean> connectTask = new Task<>() {
             @Override
             protected Boolean call() {
-                // The activeSshService is already instantiated in handleLocationSelected
-                return activeSshService.connect(server.getHost(), server.getPort(), server.getUsername(),
-                        finalPassword);
+                boolean connected = SshConnectFlow.connect(connectingService, server, finalPassword);
+                if (isCancelled()) { connectingService.disconnect(); return false; }
+                return connected;
             }
         };
         currentConnectTask = connectTask;
@@ -622,9 +1064,13 @@ public class UnifiedFileManagerDialogController {
                 updateStatus("Connection failed");
                 progressIndicator.setVisible(false);
                 fileTable.setCursor(javafx.scene.Cursor.DEFAULT);
+                String detail = connectingService.getLastConnectError();
                 showError("Connection Error",
-                        "Could not connect to " + server.getHost() + ". Please check credentials.");
-                locationListView.getSelectionModel().select(0); // Go back to local on failure
+                        "Could not connect to " + server.getHost() + "."
+                                + (detail == null || detail.isBlank()
+                                        ? " Please check credentials."
+                                        : "\n" + detail));
+                selectLocalLocation(); // Go back to local on failure
             }
         });
 
@@ -636,30 +1082,30 @@ public class UnifiedFileManagerDialogController {
             Throwable ex = connectTask.getException();
             logger.error("SSH Connection task failed", ex);
             showError("Connection Error", "Could not connect to " + server.getHost() + ": " + ex.getMessage());
-            locationListView.getSelectionModel().select(0); // Go back to local on failure
+            selectLocalLocation(); // Go back to local on failure
         });
 
         new Thread(connectTask).start();
     }
 
     private synchronized void ensureSshConnected() throws IOException {
-        if (currentLocation == null || currentLocation.server == null) {
+        if (currentLocation == null || currentLocation.getServer() == null) {
             return;
         }
         if (activeSshService != null && activeSshService.isConnected()) {
             return;
         }
         logger.info("SSH session not active. Attempting transparent reconnection to {}...",
-                currentLocation.server.getHost());
+                currentLocation.getServer().getHost());
         if (activeSshService == null) {
             activeSshService = sshServiceFactory.get();
         }
-        SSHServerModel server = currentLocation.server;
-        String password = server.getPassword();
-        if (password == null || password.isBlank()) {
+        SSHServerModel server = currentLocation.getServer();
+        String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
+        if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
             throw new IOException("SSH session is not active and no password is saved for server: " + server.getName());
         }
-        boolean ok = activeSshService.connect(server.getHost(), server.getPort(), server.getUsername(), password);
+        boolean ok = SshConnectFlow.connect(activeSshService, server, password);
         if (!ok || !activeSshService.isConnected()) {
             throw new IOException("Failed to establish SSH connection to " + server.getHost());
         }
@@ -670,7 +1116,7 @@ public class UnifiedFileManagerDialogController {
         if (path == null) {
             return null;
         }
-        if (currentLocation != null && currentLocation.server == null) {
+        if (currentLocation != null && currentLocation.getServer() == null) {
             try {
                 return java.nio.file.Paths.get(path).toAbsolutePath().normalize().toString();
             } catch (Exception e) {
@@ -686,23 +1132,23 @@ public class UnifiedFileManagerDialogController {
     }
 
     private String lastPathKey() {
-        return currentLocation == null || currentLocation.server == null
+        return currentLocation == null || currentLocation.getServer() == null
             ? "file_manager_last_path_local"
-            : "file_manager_last_path_" + currentLocation.server.getName();
+            : "file_manager_last_path_" + currentLocation.getServer().getName();
     }
 
     private boolean isInitialFileSelectionPending = true;
 
     private String lastFileKey() {
-        return currentLocation == null || currentLocation.server == null
+        return currentLocation == null || currentLocation.getServer() == null
             ? "file_manager_last_file_local"
-            : "file_manager_last_file_" + currentLocation.server.getName();
+            : "file_manager_last_file_" + currentLocation.getServer().getName();
     }
 
     private String lastFileFolderKey() {
-        return currentLocation == null || currentLocation.server == null
+        return currentLocation == null || currentLocation.getServer() == null
             ? "file_manager_last_file_dir_local"
-            : "file_manager_last_file_dir_" + currentLocation.server.getName();
+            : "file_manager_last_file_dir_" + currentLocation.getServer().getName();
     }
 
     private void saveLastOpenedFile(FileInfo file) {
@@ -712,7 +1158,7 @@ public class UnifiedFileManagerDialogController {
                 preferenceService.saveOrUpdatePreferences(new Preference(lastFileFolderKey(), currentPath));
             }
             if (currentLocation != null) {
-                String locId = currentLocation.server == null ? "local" : currentLocation.server.getName();
+                String locId = currentLocation.getServer() == null ? "local" : currentLocation.getServer().getName();
                 preferenceService.saveOrUpdatePreferences(new Preference("file_manager_last_location", locId));
             }
         }
@@ -750,26 +1196,32 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void restoreLastLocation() {
-        int targetIndex = 0;
+        TreeItem<LocationItem> target = findLocalNode();
         if (preferenceService != null) {
             String lastLoc = preferenceService.getPreferencesByCode("file_manager_last_location").orElse("local");
             if (!"local".equalsIgnoreCase(lastLoc) && !lastLoc.isBlank()) {
-                for (int i = 0; i < locationListView.getItems().size(); i++) {
-                    LocationItem item = locationListView.getItems().get(i);
-                    if (item.server != null && item.server.getName().equalsIgnoreCase(lastLoc)) {
-                        targetIndex = i;
-                        break;
-                    }
+                TreeItem<LocationItem> serverNode = findServerNodeByName(lastLoc);
+                if (serverNode != null) {
+                    target = serverNode;
                 }
             }
         }
-        locationListView.getSelectionModel().select(targetIndex);
+        if (target == null || target.getValue() == null) {
+            return;
+        }
+        selectNode(target);
+        LocationItem item = target.getValue();
+        // Bare controllers (unit tests) have no live tree; navigate only when it is ready,
+        // so restoring never opens a connection in isolation tests.
+        if (locationTreeReady && (item.isLocal() || item.isServer())) {
+            handleLocationSelected(item);
+        }
     }
 
     private String sortKey() {
-        return currentLocation == null || currentLocation.server == null
+        return currentLocation == null || currentLocation.getServer() == null
             ? "file_manager_sort_local"
-            : "file_manager_sort_" + currentLocation.server.getName();
+            : "file_manager_sort_" + currentLocation.getServer().getName();
     }
 
     private void saveSortOrdering() {
@@ -867,7 +1319,7 @@ public class UnifiedFileManagerDialogController {
         }
 
         String parent = null;
-        if (currentLocation == null || currentLocation.server == null) {
+        if (currentLocation == null || currentLocation.getServer() == null) {
             java.io.File f = new java.io.File(path);
             parent = f.getParent();
         } else {
@@ -884,6 +1336,9 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void loadFiles(String path) {
+        // Invalidate even before a cache hit; an old network response must not overwrite this folder.
+        if (currentLoadTask != null) currentLoadTask.cancel(false);
+        currentLoadTask = null;
         if (currentPrefetchFuture != null && !currentPrefetchFuture.isDone()) {
             currentPrefetchFuture.cancel(false);
         }
@@ -902,7 +1357,7 @@ public class UnifiedFileManagerDialogController {
 
             if (!cachedEntry.isExpired()) {
                 logger.info("Cache HIT for path: {}", path);
-                updateStatus("Ready (from cache)");
+                updateStatus("Ready");
                 progressIndicator.setVisible(false);
                 fileTable.setCursor(javafx.scene.Cursor.DEFAULT);
                 scheduleSpeculativePrefetch(path, cachedEntry.getFiles());
@@ -930,7 +1385,7 @@ public class UnifiedFileManagerDialogController {
             @Override
             protected List<FileInfo> call() throws Exception {
                 List<FileInfo> files;
-                if (currentLocation.server == null) {
+                if (currentLocation.getServer() == null) {
                     files = new java.util.ArrayList<>(localFileService.listFiles(path));
                 } else {
                     if (activeSshService == null || !activeSshService.isConnected()) {
@@ -960,7 +1415,7 @@ public class UnifiedFileManagerDialogController {
                     upDir.setDirectory(true);
                     upDir.setPath(parentPath);
                     if (currentLocation != null) {
-                        upDir.setSourceType(currentLocation.server == null ? FileInfo.SourceType.LOCAL
+                        upDir.setSourceType(currentLocation.getServer() == null ? FileInfo.SourceType.LOCAL
                                 : FileInfo.SourceType.REMOTE);
                     }
                     files.add(0, upDir);
@@ -1001,7 +1456,7 @@ public class UnifiedFileManagerDialogController {
             logger.error("Error loading files for path: {}", path, ex);
 
             if (wasShowingStale) {
-                updateStatus("Ready (showing cached)");
+                updateStatus("Ready");
             } else {
                 updateStatus("Error loading files");
                 showError("Error", "Failed to load files: " + ex.getMessage());
@@ -1037,7 +1492,7 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void triggerSpeculativePrefetch(String parentPath, List<FileInfo> files) {
-        if (currentLocation == null || currentLocation.server == null) {
+        if (currentLocation == null || currentLocation.getServer() == null) {
             return;
         }
         if (activeSshService == null || !activeSshService.isConnected()) {
@@ -1123,9 +1578,15 @@ public class UnifiedFileManagerDialogController {
 
         if (selected.isDirectory()) {
             navigateTo(selected.getPath());
+        } else if (doubleClickAction == OpenAction.TAIL) {
+            handleTail();
         } else {
             handleOpen();
         }
+    }
+
+    static OpenAction preferredFileAction(String value) {
+        return "TAIL".equalsIgnoreCase(value) ? OpenAction.TAIL : OpenAction.OPEN;
     }
 
     private TableRow<?> findParentTableRow(Node node) {
@@ -1154,21 +1615,6 @@ public class UnifiedFileManagerDialogController {
             return;
         }
 
-        // Tail khusus REMOTE dulu (biar jelas)
-        if (selectedFileResult.getSourceType() != FileInfo.SourceType.REMOTE) {
-            showError("Tail Error", "Tail hanya tersedia untuk file remote (SSH).");
-            return;
-        }
-
-        if (activeSshService == null || !activeSshService.isConnected()) {
-            try {
-                ensureSshConnected();
-            } catch (IOException e) {
-                showError("Tail Error", "Koneksi SSH tidak aktif: " + e.getMessage());
-                return;
-            }
-        }
-
         openAction = OpenAction.TAIL;
         saveLastOpenedFile(selectedFileResult);
         closeDialog();
@@ -1188,12 +1634,12 @@ public class UnifiedFileManagerDialogController {
 
     void updateFindInFilesState() {
         if (findInFilesButton != null) {
-            findInFilesButton.setDisable(currentLocation == null || currentLocation.server == null);
+            findInFilesButton.setDisable(currentLocation == null || currentLocation.getServer() == null);
         }
     }
 
     private void handleFindInFiles() {
-        if (currentLocation == null || currentLocation.server == null) {
+        if (currentLocation == null || currentLocation.getServer() == null) {
             showError("Find in Files", "Select a remote server location first.");
             return;
         }
@@ -1208,7 +1654,7 @@ public class UnifiedFileManagerDialogController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RemoteLogSearchDialog.fxml"));
             Parent root = loader.load();
             RemoteLogSearchDialogController searchController = loader.getController();
-            searchController.setContext(activeSshService, currentLocation.server, currentPath);
+            searchController.setContext(activeSshService, currentLocation.getServer(), currentPath);
             searchController.setMaxTailWindow(readTailWindowSize());
 
             Stage dialog = new Stage();
@@ -1236,6 +1682,28 @@ public class UnifiedFileManagerDialogController {
             logger.error("Failed to open Find in Files dialog", e);
             showError("Find in Files", "Could not open dialog: " + e.getMessage());
         }
+    }
+
+    private void updateFavoriteButton() {
+        if (favoriteCurrentButton == null) return;
+        favoriteCurrentButton.setDisable(currentPath == null);
+        favoriteCurrentButton.setTooltip(new Tooltip(favoritePathsCache.contains(currentPath)
+                ? "Remove this folder from favorites"
+                : "Favorite this folder"));
+    }
+
+    private void toggleCurrentFavorite() {
+        if (currentPath == null) return;
+        if (favoritePathsCache.contains(currentPath)) {
+            favoritesListView.getItems().stream().filter(f -> currentPath.equals(f.getPath())).findFirst()
+                    .ifPresent(f -> favoriteFolderService.removeFavorite(f.getId()));
+        } else {
+            String name = currentPath.replace('\\', '/');
+            name = name.substring(name.lastIndexOf('/') + 1);
+            favoriteFolderService.addFavorite(name.isBlank() ? currentPath : name, currentPath, getLocationIdForCurrent());
+        }
+        cachedFavoritesLocationId = null;
+        loadFavoritesForCurrentLocation(); fileTable.refresh();
     }
 
     private void handleAddToFavorites() {
@@ -1284,6 +1752,10 @@ public class UnifiedFileManagerDialogController {
         cachedFavoritesLocationId = locationId;
 
         favoritesListView.setItems(FXCollections.observableArrayList(favorites));
+        if (favoritesPane != null) {
+            favoritesPane.setExpanded(!favorites.isEmpty());
+        }
+        updateFavoriteButton();
     }
 
     private String getLocationIdForCurrent() {
@@ -1291,7 +1763,7 @@ public class UnifiedFileManagerDialogController {
             return "";
         }
         // Use a constant for local, and server name for remote.
-        return currentLocation.server == null ? "local" : currentLocation.server.getName();
+        return currentLocation.getServer() == null ? "local" : currentLocation.getServer().getName();
     }
 
     private void closeDialog() {
@@ -1324,6 +1796,7 @@ public class UnifiedFileManagerDialogController {
             String prev = backHistory.pop();
             currentPath = prev; // Don't push to back history again
             pathField.setText(prev);
+            preferenceService.saveOrUpdatePreferences(new Preference(lastPathKey(), prev));
             loadFiles(prev);
             updateNavigationButtons();
         }
@@ -1335,6 +1808,7 @@ public class UnifiedFileManagerDialogController {
             String next = forwardHistory.pop();
             currentPath = next;
             pathField.setText(next);
+            preferenceService.saveOrUpdatePreferences(new Preference(lastPathKey(), next));
             loadFiles(next);
             updateNavigationButtons();
         }
@@ -1345,7 +1819,7 @@ public class UnifiedFileManagerDialogController {
             return;
 
         String parent = null;
-        if (currentLocation.server == null) {
+        if (currentLocation.getServer() == null) {
             // Local
             java.io.File f = new java.io.File(currentPath);
             parent = f.getParent();
@@ -1367,10 +1841,10 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void navigateHome() {
-        if (currentLocation.server == null) {
+        if (currentLocation.getServer() == null) {
             navigateTo(localFileService.getHomeDirectory());
         } else {
-            navigateTo(currentLocation.server.getDefaultPath() != null ? currentLocation.server.getDefaultPath() : "/");
+            navigateTo(currentLocation.getServer().getDefaultPath() != null ? currentLocation.getServer().getDefaultPath() : "/");
         }
     }
 
@@ -1383,10 +1857,15 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void updateNavigationButtons() {
+        backButton.setText("Back"); forwardButton.setText("Forward"); upButton.setText("Up");
+        backButton.setTooltip(new Tooltip(backHistory.isEmpty() ? "Back: no previous folder in this location" : "Back to " + backHistory.peek()));
+        forwardButton.setTooltip(new Tooltip(forwardHistory.isEmpty() ? "Forward: no next folder" : "Forward to " + forwardHistory.peek()));
+        upButton.setTooltip(new Tooltip("Up: parent folder (independent of history)"));
+        updateFavoriteButton();
         backButton.setDisable(backHistory.isEmpty());
         forwardButton.setDisable(forwardHistory.isEmpty());
         upButton.setDisable(currentLocation == null || currentPath == null || currentPath.equals("/")
-                || (currentLocation.server == null && new java.io.File(currentPath).getParent() == null));
+                || (currentLocation.getServer() == null && new java.io.File(currentPath).getParent() == null));
     }
 
     private void copySelectionToClipboard(final javafx.scene.control.TableView<?> table) {
@@ -1444,7 +1923,7 @@ public class UnifiedFileManagerDialogController {
             stage.initOwner(ownerStage); // The dialog's direct owner is the file manager
             MainController.restoreWindow(finalMainStage, wasMaximized, oldX, oldY, oldWidth, oldHeight, root, stage);
 
-            setupLocationList();
+            rebuildLocationTree();
         } catch (IOException e) {
             logger.error("Failed to open server management", e);
         }
@@ -1528,18 +2007,80 @@ public class UnifiedFileManagerDialogController {
     }
 
     public SSHServerModel getActiveServer() {
-        return currentLocation != null ? currentLocation.server : null;
+        return currentLocation != null ? currentLocation.getServer() : null;
     }
 
-    private static class LocationItem {
-        String name;
-        FontAwesomeIcon icon;
-        SSHServerModel server;
+    /** One node of the location tree: the hidden root, Local Drive, a group folder, or a server. */
+    static class LocationItem {
+        enum Kind { ROOT, LOCAL, GROUP, SERVER }
 
-        public LocationItem(String name, FontAwesomeIcon icon, SSHServerModel server) {
-            this.name = name;
-            this.icon = icon;
+        private final Kind kind;
+        private final String groupName;
+        private final SSHServerModel server;
+
+        private LocationItem(Kind kind, String groupName, SSHServerModel server) {
+            this.kind = kind;
+            this.groupName = groupName;
             this.server = server;
+        }
+
+        static LocationItem root() {
+            return new LocationItem(Kind.ROOT, null, null);
+        }
+
+        static LocationItem local() {
+            return new LocationItem(Kind.LOCAL, null, null);
+        }
+
+        static LocationItem group(String groupName) {
+            return new LocationItem(Kind.GROUP, groupName, null);
+        }
+
+        static LocationItem of(SSHServerModel server) {
+            return new LocationItem(Kind.SERVER, server == null ? null : server.getGroupName(), server);
+        }
+
+        boolean isRoot() {
+            return kind == Kind.ROOT;
+        }
+
+        boolean isLocal() {
+            return kind == Kind.LOCAL;
+        }
+
+        boolean isGroup() {
+            return kind == Kind.GROUP;
+        }
+
+        boolean isServer() {
+            return kind == Kind.SERVER;
+        }
+
+        String getGroupName() {
+            return groupName;
+        }
+
+        SSHServerModel getServer() {
+            return server;
+        }
+
+        String getLabel() {
+            return switch (kind) {
+                case LOCAL -> "Local Drive";
+                case GROUP -> leafName(groupName);
+                case SERVER -> (server.isFavorite() ? "★ " : "") + server.getName();
+                default -> "Locations";
+            };
+        }
+
+        String getTooltip() {
+            return switch (kind) {
+                case LOCAL -> "This computer";
+                case GROUP -> "Group: " + groupName;
+                case SERVER -> (groupName == null || groupName.isBlank() ? "Ungrouped" : groupName)
+                        + " / " + server.getName();
+                default -> null;
+            };
         }
     }
 

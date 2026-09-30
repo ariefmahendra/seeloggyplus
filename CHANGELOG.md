@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-30
+
+### Added
+- **SSH private-key authentication**: per-server auth method (password or private key),
+  key file picker and optional encrypted passphrase. Modern keys (ed25519, ecdsa,
+  rsa-sha2) are supported.
+- **Host-key verification (trust-on-first-use)**: an app-managed `known_hosts` file,
+  a confirmation dialog showing the key fingerprint, and a hard refusal when a saved
+  host key changes (possible MITM).
+- **Server groups in File Management**: the Locations panel is a WinSCP/MobaXterm-style
+  tree with persistent groups that can contain other groups (nested paths), New/Rename/
+  Delete actions on the folder menu, Move to group on the server menu, and drag & drop
+  with a size-stable drop indicator.
+- **Recent Files tree**: entries are grouped per server and the group can be expanded or
+  collapsed; search matches server, file name and path across all words.
+- **Windows silent launcher** (`SeeLoggyPlus.vbs`) so the packaged app starts without a
+  terminal window; `launcher.bat --console` remains for diagnostics.
+- **File double-click preference** (Open/Download or Tail) in Preferences  General.
+
+### Changed
+- Server Management is now CRUD-only: favorite, grouping and drag-to-reorder controls
+  were removed (grouping lives in File Management).
+- Locations open on click/Enter only; selecting a server (e.g. starting a drag) never
+  connects by itself.
+- Buttons and dropdown fields follow the theme tokens: readable focus/hover/pressed
+  states, no default JavaFX look, neutral dropdown selection (light in Graphite/Light),
+  and no white outline around dark-filled controls.
+- File Management's left panel is compact (icon action bar, collapsible Favorite folders)
+  and the footer no longer reports cache internals.
+- Reloading an active remote tail reconnects off the UI thread, so the window no longer
+  freezes while the SSH handshake runs.
+
+### Fixed
+- Connect failures now show the real reason (missing key file, auth failure) instead of a
+  generic "check credentials" message.
+- The Server editor form scrolls and keeps Test Connection / Cancel / Save visible in
+  every auth mode; the Browse button is compact and proportional to its field.
+- Database schema upgrades: v3 adds the `server_groups` table (backfilled from existing
+  group names) and v4 adds the auth columns, both additive and transactional with an
+  automatic backup.
+
+### Tests
+- Added `DatabaseMigrationTest`, `ServerAuthPersistenceTest`, `SshKnownHostsTest`,
+  `SshAuthConfigTest`, `SshConnectFlowTest`, `SshServiceImplErrorTest`,
+  `ServerEditDialogAuthTest`, `RemoteReloadResponsivenessTest`,
+  `ServerManagementCleanupTest`, `ServerGroupDropTest`, `TreeDropIndicatorTest`,
+  `FileManagerGroupingTest`, `FileManagerLeftPanelLayoutTest`, `RecentFilesTreeTest`,
+  `RecentFileReadabilityTest`, `DropdownConsistencyTest`, `PopupThemeTest`,
+  `ButtonThemeTest`, `FindInFilesFocusTest`, `FeedbackUiSmokeTest`,
+  `WindowsLauncherTest`, `FileDoubleClickPreferenceTest`.
+- 472 headless tests green before release.
+
 ## [0.5.1] - 2026-09-22
 
 ### Fixed
@@ -118,7 +170,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.1...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.0...HEAD
+[0.6.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.1...0.6.0
 [0.5.1]: https://github.com/ariefmahendra/seeloggyplus/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.3...0.5.0
 [0.4.3]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.2...0.4.3

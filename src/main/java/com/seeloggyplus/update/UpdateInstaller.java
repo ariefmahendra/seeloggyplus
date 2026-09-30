@@ -28,6 +28,7 @@ public class UpdateInstaller {
     private static final Set<String> ALLOWED_FILES = Set.of(
             "seeloggyplus.jar",
             "launcher.bat",
+            "seeloggyplus.vbs",
             "launcher.sh",
             "launcher.properties",
             "launcher_readme.md",

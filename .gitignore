@@ -71,8 +71,9 @@ logs/
 # Application specific
 .seeloggyplus/
 
-# Local design/planning notes (kept locally, not published)
+# Local design/planning/feedback notes (kept locally, not published)
 docs/UI_PLAN.md
+docs/FEEDBACK_*.md
 
 # jqwik property-based testing database (local cache)
 .jqwik-database

@@ -31,15 +31,149 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
     // SQL Queries
     private static final String SQL_CHECK_EXISTS = "SELECT COUNT(*) FROM ssh_servers WHERE id = ?";
     private static final String SQL_INSERT = 
-        "INSERT INTO ssh_servers(id, name, host, port, username, password, default_path, created_at, last_used, save_password) " +
-        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO ssh_servers(id, name, host, port, username, password, default_path, created_at, last_used, save_password, favorite, sort_order, group_name, auth_type, key_path, key_passphrase) " +
+        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MIN(sort_order), 0) - 1 FROM ssh_servers), ?, ?, ?, ?)";
     private static final String SQL_UPDATE = 
         "UPDATE ssh_servers SET name = ?, host = ?, port = ?, username = ?, password = ?, " +
-        "default_path = ?, save_password = ? WHERE id = ?";
+        "default_path = ?, save_password = ?, favorite = ?, group_name = ?, " +
+        "auth_type = ?, key_path = ?, key_passphrase = ? WHERE id = ?";
     private static final String SQL_DELETE = "DELETE FROM ssh_servers WHERE id = ?";
     private static final String SQL_UPDATE_LAST_USED = "UPDATE ssh_servers SET last_used = ? WHERE id = ?";
-    private static final String SQL_GET_ALL = "SELECT * FROM ssh_servers ORDER BY created_at DESC";
+    private static final String SQL_GET_ALL = "SELECT * FROM ssh_servers ORDER BY sort_order ASC, created_at DESC, id ASC";
     private static final String SQL_GET_BY_ID = "SELECT * FROM ssh_servers WHERE id = ?";
+    private static final String SQL_GET_GROUPS = "SELECT name FROM server_groups ORDER BY sort_order ASC, name ASC";
+    private static final String SQL_INSERT_GROUP = "INSERT OR IGNORE INTO server_groups(name, sort_order) "
+            + "VALUES(?, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM server_groups))";
+    private static final String SQL_RENAME_GROUP_SUBTREE =
+            "UPDATE server_groups SET name = ? || SUBSTR(name, ?) WHERE name = ? OR name LIKE ? ESCAPE '\\'";
+    private static final String SQL_RENAME_MEMBERS_SUBTREE =
+            "UPDATE ssh_servers SET group_name = ? || SUBSTR(group_name, ?) WHERE group_name = ? OR group_name LIKE ? ESCAPE '\\'";
+    private static final String SQL_DELETE_GROUP_SUBTREE =
+            "DELETE FROM server_groups WHERE name = ? OR name LIKE ? ESCAPE '\\'";
+    private static final String SQL_CLEAR_MEMBERS_SUBTREE =
+            "UPDATE ssh_servers SET group_name = NULL WHERE group_name = ? OR group_name LIKE ? ESCAPE '\\'";
+
+    /** Escapes LIKE wildcards so group names containing % or _ behave literally. */
+    private static String likePrefix(String path) {
+        return path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%";
+    }
+
+    /** Dedicated connection so a multi-statement group change commits or rolls back as a unit. */
+    private Connection openDedicatedConnection() throws SQLException {
+        return DriverManager.getConnection(DatabaseConfig.getInstance().getConnection().getMetaData().getURL());
+    }
+
+    @Override
+    public List<String> getGroupNames() {
+        List<String> names = new ArrayList<>();
+        try {
+            Connection connection = DatabaseConfig.getInstance().getConnection();
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(SQL_GET_GROUPS)) {
+                while (rs.next()) {
+                    names.add(rs.getString(1));
+                }
+            }
+            return names;
+        } catch (SQLException e) {
+            logger.error("Failed to retrieve server groups", e);
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
+    public void createGroup(String name) {
+        try (Connection c = openDedicatedConnection();
+             PreparedStatement ps = c.prepareStatement(SQL_INSERT_GROUP)) {
+            ps.setString(1, name);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            logger.error("Failed to create server group: {}", name, e);
+            throw new RuntimeException("Database error while creating server group", e);
+        }
+    }
+
+    @Override
+    public void renameGroup(String oldName, String newName) {
+        try (Connection c = openDedicatedConnection()) {
+            c.setAutoCommit(false);
+            try (PreparedStatement renameGroups = c.prepareStatement(SQL_RENAME_GROUP_SUBTREE);
+                 PreparedStatement ensure = c.prepareStatement(SQL_INSERT_GROUP);
+                 PreparedStatement renameMembers = c.prepareStatement(SQL_RENAME_MEMBERS_SUBTREE)) {
+                // Rename the whole subtree: "A" and "A/Child" both move to the new path.
+                String oldPrefix = likePrefix(oldName);
+                int suffixStart = oldName.length() + 1;
+                renameGroups.setString(1, newName);
+                renameGroups.setInt(2, suffixStart);
+                renameGroups.setString(3, oldName);
+                renameGroups.setString(4, oldPrefix);
+                renameGroups.executeUpdate();
+
+                ensure.setString(1, newName);
+                ensure.executeUpdate();
+
+                renameMembers.setString(1, newName);
+                renameMembers.setInt(2, suffixStart);
+                renameMembers.setString(3, oldName);
+                renameMembers.setString(4, oldPrefix);
+                renameMembers.executeUpdate();
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to rename server group {} to {}", oldName, newName, e);
+            throw new RuntimeException("Database error while renaming server group", e);
+        }
+    }
+
+    @Override
+    public void deleteGroup(String name) {
+        try (Connection c = openDedicatedConnection()) {
+            c.setAutoCommit(false);
+            try (PreparedStatement delete = c.prepareStatement(SQL_DELETE_GROUP_SUBTREE);
+                 PreparedStatement clearMembers = c.prepareStatement(SQL_CLEAR_MEMBERS_SUBTREE)) {
+                // Deleting a group removes its descendants; member servers survive ungrouped.
+                String prefix = likePrefix(name);
+                delete.setString(1, name);
+                delete.setString(2, prefix);
+                delete.executeUpdate();
+                clearMembers.setString(1, name);
+                clearMembers.setString(2, prefix);
+                clearMembers.executeUpdate();
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to delete server group: {}", name, e);
+            throw new RuntimeException("Database error while deleting server group", e);
+        }
+    }
+
+    @Override
+    public void reorderServers(List<String> ids) {
+        if (ids == null || ids.stream().anyMatch(java.util.Objects::isNull)
+                || new java.util.HashSet<>(ids).size() != ids.size())
+            throw new IllegalArgumentException("Server IDs must be unique and non-null");
+        // Use a dedicated connection so rollback cannot include another UI operation.
+        try (Connection c = DriverManager.getConnection(DatabaseConfig.getInstance().getConnection().getMetaData().getURL())) {
+            c.setAutoCommit(false);
+            try (PreparedStatement ps = c.prepareStatement("UPDATE ssh_servers SET sort_order = ? WHERE id = ?")) {
+                List<String> order = new ArrayList<>(ids);
+                try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery(SQL_GET_ALL)) {
+                    while (rs.next()) if (!order.contains(rs.getString("id"))) order.add(rs.getString("id"));
+                }
+                for (int i = 0; i < order.size(); i++) {
+                    ps.setInt(1, i); ps.setString(2, order.get(i));
+                    if (ps.executeUpdate() != 1) throw new SQLException("Server no longer exists: " + order.get(i));
+                }
+                c.commit();
+            } catch (SQLException e) { c.rollback(); throw e; }
+        } catch (SQLException e) { throw new IllegalStateException("Could not save server order", e); }
+    }
 
     /**
      * Save or update SSH server configuration
@@ -95,6 +229,11 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
             ps.setString(8, server.getCreatedAt() != null ? server.getCreatedAt().toString() : LocalDateTime.now().toString());
             ps.setString(9, server.getLastUsed() != null ? server.getLastUsed().toString() : null);
             ps.setBoolean(10, server.isSavePassword());
+            ps.setBoolean(11, server.isFavorite());
+            ps.setString(12, server.getGroupName());
+            ps.setString(13, server.getAuthType());
+            ps.setString(14, server.getKeyPath());
+            ps.setString(15, encryptSecret(server.getKeyPassphrase()));
             
             int affected = ps.executeUpdate();
             if (affected == 0) {
@@ -115,7 +254,12 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
             ps.setString(5, CredentialEncryptor.getInstance().encrypt(server.getPassword()));
             ps.setString(6, server.getDefaultPath());
             ps.setBoolean(7, server.isSavePassword());
-            ps.setString(8, server.getId());
+            ps.setBoolean(8, server.isFavorite());
+            ps.setString(9, server.getGroupName());
+            ps.setString(10, server.getAuthType());
+            ps.setString(11, server.getKeyPath());
+            ps.setString(12, encryptSecret(server.getKeyPassphrase()));
+            ps.setString(13, server.getId());
             
             int affected = ps.executeUpdate();
             if (affected == 0) {
@@ -247,6 +391,15 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
         SSHServerModel server = new SSHServerModel();
         
         server.setId(rs.getString("id"));
+        server.setFavorite(rs.getBoolean("favorite"));
+        server.setSortOrder(rs.getInt("sort_order"));
+        server.setGroupName(rs.getString("group_name"));
+        String authType = rs.getString("auth_type");
+        server.setAuthType(authType == null || authType.isBlank()
+                ? com.seeloggyplus.model.SSHServerModel.AUTH_PASSWORD
+                : authType);
+        server.setKeyPath(rs.getString("key_path"));
+        server.setKeyPassphrase(decryptSecret(rs.getString("key_passphrase")));
         server.setName(rs.getString("name"));
         server.setHost(rs.getString("host"));
         server.setPort(rs.getInt("port"));
@@ -285,6 +438,22 @@ public class ServerManagementRepositoryImpl implements ServerManagementRepositor
         }
         
         return server;
+    }
+
+    /** Encrypts an optional secret (null/blank stays null). */
+    private static String encryptSecret(String secret) {
+        if (secret == null || secret.isBlank()) {
+            return null;
+        }
+        return CredentialEncryptor.getInstance().encrypt(secret);
+    }
+
+    /** Decrypts an optional secret (legacy plaintext passes through). */
+    private static String decryptSecret(String secret) {
+        if (secret == null || secret.isBlank()) {
+            return null;
+        }
+        return CredentialEncryptor.getInstance().decrypt(secret);
     }
 
     /**

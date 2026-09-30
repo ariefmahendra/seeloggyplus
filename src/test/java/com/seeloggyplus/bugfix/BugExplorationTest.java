@@ -463,9 +463,9 @@ public class BugExplorationTest {
                     .filter(c -> c.getSimpleName().equals("LocationItem"))
                     .findFirst()
                     .orElseThrow();
-            java.lang.reflect.Constructor<?> ctor = locationItemClass.getConstructors()[0];
-            ctor.setAccessible(true);
-            Object localItem = ctor.newInstance("Local Drive", de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon.DESKTOP, null);
+            java.lang.reflect.Method localFactory = locationItemClass.getDeclaredMethod("local");
+            localFactory.setAccessible(true);
+            Object localItem = localFactory.invoke(null);
 
             // Ensure controller starts at local drive
             Platform.runLater(() -> {
@@ -490,7 +490,7 @@ public class BugExplorationTest {
             // This resets the location and should restore from preference.
             Platform.runLater(() -> {
                 try {
-                    Object reopenItem = ctor.newInstance("Local Drive", de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon.DESKTOP, null);
+                    Object reopenItem = localFactory.invoke(null);
                     invoke(controller, "handleLocationSelected",
                             new Class[]{locationItemClass}, reopenItem);
                 } catch (Exception e) { throw new RuntimeException(e); }

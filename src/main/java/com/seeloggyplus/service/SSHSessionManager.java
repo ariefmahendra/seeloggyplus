@@ -27,6 +27,33 @@ public interface SSHSessionManager {
     Session getSession(String host, int port, String username, String password, long ttlMillis) throws JSchException;
 
     /**
+     * Retrieves an existing valid session or creates a new one using the given
+     * authentication settings (password or private key).
+     *
+     * @param host       Remote host address.
+     * @param port       SSH port.
+     * @param username   SSH username.
+     * @param secret     password, or the key passphrase for key auth.
+     * @param ttlMillis  Time-to-live for the session in milliseconds.
+     * @param authConfig authentication method and key settings.
+     * @return An active JSch Session.
+     * @throws JSchException                 If connection fails.
+     * @throws com.seeloggyplus.ssh.HostKeyVerificationException when the host key is unknown or changed.
+     */
+    default Session getSession(String host, int port, String username, String secret, long ttlMillis,
+            com.seeloggyplus.ssh.SshAuthConfig authConfig) throws JSchException {
+        return getSession(host, port, username, secret, ttlMillis);
+    }
+
+    /**
+     * Saves the pending (unknown) host key of the last failed connection attempt
+     * into the known_hosts file. No-op when nothing is pending.
+     */
+    default void trustPendingHostKey(String host, int port) {
+        // no-op for implementations that do not verify host keys
+    }
+
+    /**
      * Closes a specific SSH session.
      *
      * @param host     Remote host address.

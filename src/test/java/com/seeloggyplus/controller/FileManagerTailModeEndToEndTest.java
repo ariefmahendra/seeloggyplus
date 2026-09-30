@@ -16,7 +16,6 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.ToggleButton;
@@ -49,7 +48,6 @@ public class FileManagerTailModeEndToEndTest {
 
     private MainController controller;
     private TabPane logTabPane;
-    private ListView<RecentFilesDto> recentFilesListView;
     private Label statusLabel;
     private ToggleButton tailButton;
     private Map<Tab, LogSession> sessionMap;
@@ -63,10 +61,6 @@ public class FileManagerTailModeEndToEndTest {
         Field tabPaneField = MainController.class.getDeclaredField("logTabPane");
         tabPaneField.setAccessible(true);
         logTabPane = (TabPane) tabPaneField.get(controller);
-
-        Field recentListField = MainController.class.getDeclaredField("recentFilesListView");
-        recentListField.setAccessible(true);
-        recentFilesListView = (ListView<RecentFilesDto>) recentListField.get(controller);
 
         Field statusLabelField = MainController.class.getDeclaredField("statusLabel");
         statusLabelField.setAccessible(true);
@@ -916,7 +910,7 @@ public class FileManagerTailModeEndToEndTest {
     // 6. UNIT: UNIFIED FILE MANAGER DIALOG CONTROLLER SELECTION & TAIL ACTION
     // =========================================================================
     @Test
-    @DisplayName("Unit: UnifiedFileManager enforces Tail for remote files and sets OpenAction.TAIL")
+    @DisplayName("Unit: UnifiedFileManager supports Tail for both local and remote files")
     public void testUnifiedFileManagerDialogSetsTailActionForRemote() throws Exception {
         UnifiedFileManagerDialogController dialogController = new UnifiedFileManagerDialogController();
 
@@ -925,7 +919,7 @@ public class FileManagerTailModeEndToEndTest {
         assertEquals(UnifiedFileManagerDialogController.OpenAction.TAIL,
                 UnifiedFileManagerDialogController.OpenAction.valueOf("TAIL"));
 
-        // 1. Local file selection rejects TAIL and keeps OPEN
+        // 1. Local file selection supports the Tail preference.
         FileInfo localFile = new FileInfo("test.log", "C:\\logs\\test.log", 1024L, false, System.currentTimeMillis(), FileInfo.SourceType.LOCAL);
         Field selectedFileField = UnifiedFileManagerDialogController.class.getDeclaredField("selectedFileResult");
         selectedFileField.setAccessible(true);
@@ -942,8 +936,8 @@ public class FileManagerTailModeEndToEndTest {
             }
         });
         WaitForAsyncUtils.waitForFxEvents();
-        assertEquals(UnifiedFileManagerDialogController.OpenAction.OPEN, dialogController.getOpenAction(),
-                "Dialog OpenAction must remain OPEN when handleTail is called on a local file");
+        assertEquals(UnifiedFileManagerDialogController.OpenAction.TAIL, dialogController.getOpenAction(),
+                "Dialog OpenAction must be TAIL for a local file, as for remote files");
 
         // 2. Remote file selection with connected SSH sets TAIL
         FileInfo remoteFile = new FileInfo("remote.log", "/var/log/remote.log", 2048L, false, System.currentTimeMillis(), FileInfo.SourceType.REMOTE);

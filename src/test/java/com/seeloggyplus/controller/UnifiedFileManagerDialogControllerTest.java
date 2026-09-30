@@ -49,6 +49,7 @@ import org.junit.jupiter.api.Disabled;
 public class UnifiedFileManagerDialogControllerTest {
 
     private UnifiedFileManagerDialogController controller;
+    private Stage stage;
     private TableView<FileInfo> fileTable;
     private TextField pathField;
     private TextField searchField;
@@ -84,6 +85,7 @@ public class UnifiedFileManagerDialogControllerTest {
 
     @Start
     public void start(Stage stage) throws Exception {
+        this.stage = stage;
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
         Parent root = loader.load();
         controller = loader.getController();
@@ -144,9 +146,14 @@ public class UnifiedFileManagerDialogControllerTest {
         // Ensure location is reset to Local Drive for test isolation
         Platform.runLater(() -> {
             try {
-                ListView<?> locationListView = getField("locationListView");
-                if (locationListView != null && locationListView.getSelectionModel().getSelectedIndex() != 0) {
-                    locationListView.getSelectionModel().select(0);
+                @SuppressWarnings("rawtypes")
+                TreeView locationTree = getField("locationTree");
+                if (locationTree != null && locationTree.getRoot() != null
+                        && !locationTree.getRoot().getChildren().isEmpty()) {
+                    Object local = locationTree.getRoot().getChildren().get(0);
+                    if (locationTree.getSelectionModel().getSelectedItem() != local) {
+                        locationTree.getSelectionModel().select(local);
+                    }
                 }
             } catch (Exception ignored) {}
         });
@@ -166,6 +173,74 @@ public class UnifiedFileManagerDialogControllerTest {
             }
         });
         WaitForAsyncUtils.waitForFxEvents();
+    }
+
+    @Test
+    void switchingLocationStartsWithEmptyHistory(FxRobot robot) throws Exception {
+        var locationClass = UnifiedFileManagerDialogController.LocationItem.class;
+        var oldLocation = UnifiedFileManagerDialogController.LocationItem.of(
+                new SSHServerModel("Old", "host", 22, "user"));
+        robot.interact(() -> {
+            try {
+                Field location = UnifiedFileManagerDialogController.class.getDeclaredField("currentLocation");
+                location.setAccessible(true); location.set(controller, oldLocation);
+                Field path = UnifiedFileManagerDialogController.class.getDeclaredField("currentPath");
+                path.setAccessible(true); path.set(controller, "/remote-only/path");
+                var method = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleLocationSelected",
+                        locationClass);
+                method.setAccessible(true);
+                Field connectionTask = UnifiedFileManagerDialogController.class.getDeclaredField("currentConnectTask");
+                connectionTask.setAccessible(true);
+                var staleTask = new javafx.concurrent.Task<Boolean>() { @Override protected Boolean call() { return true; } };
+                connectionTask.set(controller, staleTask);
+                method.invoke(controller, UnifiedFileManagerDialogController.LocationItem.local());
+                assertNull(connectionTask.get(controller));
+                assertTrue(staleTask.isCancelled());
+                java.util.Stack<String> history = getField("backHistory");
+                assertTrue(history.isEmpty(), "Remote paths must never enter local history");
+                Button back = getField("backButton");
+                assertTrue(back.isDisabled());
+            } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+            catch (Exception e) { throw new AssertionError(e); }
+        });
+    }
+
+    @Test
+    void currentFolderFavoriteCanBeAddedAndRemoved(FxRobot robot) throws Exception {
+        robot.interact(() -> {
+            try {
+                var method = UnifiedFileManagerDialogController.class.getDeclaredMethod("toggleCurrentFavorite");
+                method.setAccessible(true);
+                method.invoke(controller);
+                java.util.Set<String> cache = getField("favoritePathsCache");
+                assertTrue(cache.contains(pathField.getText()));
+                Button button = getField("favoriteCurrentButton");
+                assertNotNull(button.getTooltip());
+                assertTrue(button.getTooltip().getText().toLowerCase().contains("remove"),
+                        "favorite button tooltip must reflect the saved state");
+                method.invoke(controller);
+                assertFalse(cache.contains(pathField.getText()));
+                assertTrue(button.getTooltip().getText().toLowerCase().contains("favorite"),
+                        "favorite button tooltip must return to the add state");
+            } catch (Exception e) { throw new AssertionError(e); }
+        });
+    }
+
+    @Test
+    void doubleClickTailOpensLocalFileInTailMode(FxRobot robot) throws Exception {
+        robot.interact(() -> {
+            try {
+                Field action = UnifiedFileManagerDialogController.class.getDeclaredField("doubleClickAction");
+                action.setAccessible(true); action.set(controller, UnifiedFileManagerDialogController.OpenAction.TAIL);
+                FileInfo file = new FileInfo(); file.setName("tail.log"); file.setPath(join(HOME, "tail.log"));
+                file.setDirectory(false); file.setSourceType(FileInfo.SourceType.LOCAL);
+                ObservableList<FileInfo> files = getField("allFiles"); files.setAll(file);
+                fileTable.getSelectionModel().select(file);
+                var method = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleFileDoubleClick");
+                method.setAccessible(true); method.invoke(controller);
+                assertEquals(UnifiedFileManagerDialogController.OpenAction.TAIL, controller.getOpenAction());
+            } catch (Exception e) { throw new AssertionError(e); }
+        });
     }
 
     // --- POSITIVE SCENARIOS ---
@@ -239,8 +314,17 @@ public class UnifiedFileManagerDialogControllerTest {
 
     @Test
     public void testNavigateViaGoButton(FxRobot robot) throws Exception {
-        Platform.runLater(() -> pathField.setText(CUSTOM_DIR));
+        // Keep the toolbar wide enough that the Go button never falls into the
+        // overflow menu (the window can inherit a smaller size from earlier windows).
+        robot.interact(() -> {
+            if (stage.getWidth() < 1100) {
+                stage.setWidth(1100);
+            }
+            pathField.setText(CUSTOM_DIR);
+        });
         WaitForAsyncUtils.waitForFxEvents();
+        assertNotNull(robot.lookup("#goButton").tryQuery().orElse(null),
+                "Go button must be visible in the toolbar");
         robot.clickOn("#goButton");
         Thread.sleep(200);
         WaitForAsyncUtils.waitForFxEvents();
@@ -330,7 +414,7 @@ public class UnifiedFileManagerDialogControllerTest {
         WaitForAsyncUtils.waitForFxEvents();
         assertFalse(openButton.isDisabled());
         assertFalse(previewButton.isDisabled());
-        assertTrue(tailButton.isDisabled()); // Tail is for remote only
+        assertFalse(tailButton.isDisabled()); // Tail is available for local and remote files
     }
 
     @Test
@@ -378,6 +462,11 @@ public class UnifiedFileManagerDialogControllerTest {
         WaitForAsyncUtils.waitForFxEvents();
 
         assertEquals(1, localFileService.callCount); // Should be cached!
+
+        Label status = getField("statusLabel");
+        assertNotNull(status);
+        assertFalse(status.getText().toLowerCase(java.util.Locale.ROOT).contains("cache"),
+                "the footer must not mention cache internals");
     }
 
     @Test
@@ -494,8 +583,8 @@ public class UnifiedFileManagerDialogControllerTest {
             } catch (Exception e) {}
         });
         WaitForAsyncUtils.waitForFxEvents();
-        // openAction should still be OPEN, not TAIL because it rejected local files
-        assertEquals(UnifiedFileManagerDialogController.OpenAction.OPEN, controller.getOpenAction());
+        // Local files support the same Tail action as remote files.
+        assertEquals(UnifiedFileManagerDialogController.OpenAction.TAIL, controller.getOpenAction());
     }
 
     // --- SERVER SCENARIOS ---
@@ -510,7 +599,7 @@ public class UnifiedFileManagerDialogControllerTest {
                 m.setAccessible(true);
                 SSHServerModel s = new SSHServerModel();
                 s.setId("server1"); s.setName("Server 1"); s.setHost("test.com"); s.setUsername("user"); s.setPassword("pass");
-                Object item = locationItemClass.getConstructors()[0].newInstance("Server 1", null, s);
+                Object item = locationItemClass.getDeclaredMethod("of", SSHServerModel.class).invoke(null, s);
                 m.invoke(controller, item);
             } catch (Exception e) {}
         });
@@ -533,7 +622,7 @@ public class UnifiedFileManagerDialogControllerTest {
                 m.setAccessible(true);
                 SSHServerModel s = new SSHServerModel();
                 s.setId("server1"); s.setName("Server Fail"); s.setHost("fail.com"); s.setUsername("user"); s.setPassword("pass");
-                Object item = locationItemClass.getConstructors()[0].newInstance("Server Fail", null, s);
+                Object item = locationItemClass.getDeclaredMethod("of", SSHServerModel.class).invoke(null, s);
                 m.invoke(controller, item);
             } catch (Exception e) {}
         });
@@ -620,7 +709,7 @@ public class UnifiedFileManagerDialogControllerTest {
                 s.setUsername("user");
                 s.setPassword("pass");
                 s.setDefaultPath("/");
-                Object item = locationItemClass.getConstructors()[0].newInstance("Server 1", null, s);
+                Object item = locationItemClass.getDeclaredMethod("of", SSHServerModel.class).invoke(null, s);
                 m.invoke(controller, item);
             } catch (Exception ignored) {}
         });
@@ -667,6 +756,11 @@ public class UnifiedFileManagerDialogControllerTest {
     }
 
     class MockServerManagementService implements ServerManagementService {
+        @Override public void reorderServers(java.util.List<String> ids) { throw new UnsupportedOperationException(); }
+        @Override public List<String> getGroupNames() { return List.of(); }
+        @Override public void createGroup(String name) {}
+        @Override public void renameGroup(String oldName, String newName) {}
+        @Override public void deleteGroup(String name) {}
         @Override
         public void saveServer(SSHServerModel server) {}
         @Override

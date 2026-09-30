@@ -70,7 +70,7 @@
                     <Label text="Context:"/>
                     <ComboBox fx:id="contextSelector" prefWidth="80"/>
                 </HBox>
-                <ListView fx:id="previewList" VBox.vgrow="ALWAYS"/>
+                <ListView fx:id="previewList" styleClass="preview-list" VBox.vgrow="ALWAYS"/>
             </VBox>
         </SplitPane>
     </center>
