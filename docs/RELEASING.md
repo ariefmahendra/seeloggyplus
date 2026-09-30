@@ -43,6 +43,51 @@ Two artifacts keep the history clear:
 For the categorized notes to work, apply one of the matching **pull-request
 labels** (`feature`, `bug`, `ui`, `test`, `docs`, `build`, `chore`, …).
 
+## Release description format (mandatory)
+
+The GitHub Release body is taken **verbatim** from the `[X.Y.Z]` section in
+`CHANGELOG.md`, so that section must be end-user ready — never a one-line
+internal note.
+
+Required order inside `[X.Y.Z]`:
+
+1. short opening paragraph (optional, e.g. "First published build of the X line.");
+2. `### Added`, then `### Changed`, then `### Fixed`, then `### Tests`
+   (only the relevant sections, in this order);
+3. upgrade notes when needed.
+
+For the first published release of a feature line, summarize the main features
+under `### Added` (do not list only CI fixes). A matching
+`docs/release-notes/<version>.md` is mandatory and uses this structure:
+
+```markdown
+# SeeLoggyPlus X.Y.Z
+
+## Overview
+...
+
+## Features            (and/or ## Fixed / ## Improvements)
+- ...
+
+## Tests
+- ...
+
+## Upgrade notes
+- ...
+
+**Full changelog:** [`A.B.C...X.Y.Z`](https://github.com/ariefmahendra/seeloggyplus/compare/A.B.C...X.Y.Z)
+```
+
+If a release was already published with the wrong description, fix
+`CHANGELOG.md` and `docs/release-notes/<version>.md`, push, then either:
+
+```bash
+gh release edit X.Y.Z --notes-file docs/release-notes/X.Y.Z.md   # needs gh auth login
+```
+
+or use the GitHub API (`PATCH /repos/<owner>/<repo>/releases/<id>`) with the
+release-notes file as the body.
+
 ## Release checklist
 
 1. Ensure `dev` is green locally (the test suite is always headless):
