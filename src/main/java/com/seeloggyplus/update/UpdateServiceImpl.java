@@ -13,8 +13,12 @@ import java.util.function.Function;
  */
 public class UpdateServiceImpl implements UpdateService {
 
+    // The latest-release download endpoint resolves to the manifest attached to the
+    // newest release and is served with Cache-Control: no-cache. The gh-pages raw
+    // endpoint must not be used: it is cached for five minutes, so a release
+    // published moments ago could stay invisible to update checks.
     public static final String DEFAULT_MANIFEST_URL =
-            "https://raw.githubusercontent.com/ariefmahendra/seeloggyplus/gh-pages/update-manifest.json";
+            "https://github.com/ariefmahendra/seeloggyplus/releases/latest/download/update-manifest.json";
 
     private final String manifestUrl;
     private final Function<String, String> manifestFetcher;
