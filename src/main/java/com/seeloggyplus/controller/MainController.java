@@ -355,13 +355,12 @@ public class MainController {
 
         updateTailButtonState();
         startMemoryMonitor();
-        applyPendingRollback();
+        reconcileUpdateStartup();
         scheduleAutoUpdateCheck();
         setupUpdateMenuItems();
         if (updateStatusLabel != null) {
             updateStatusLabel.setOnMouseClicked(e -> handleUpdateIndicatorClick());
         }
-        markVersionHealthy();
         showWhatsNewIfNeeded();
 
         if (centerRoot != null && centerClip != null) {
@@ -3178,36 +3177,18 @@ public class MainController {
         }
     }
 
-    /** Reverts to the previous version when the active one never reported a healthy start. */
-    private void applyPendingRollback() {
+    /** Confirms the running update before considering a rollback to the previous version. */
+    private void reconcileUpdateStartup() {
         if (Boolean.getBoolean("seeloggyplus.disableUpdateCheck")) {
             return;
         }
         try {
             UpdateBootstrapper bootstrapper = new UpdateBootstrapper(
                     new UpdateLayout(UpdateLayout.installationRoot()));
-            if (bootstrapper.shouldRollback()) {
-                bootstrapper.rollback().ifPresent(version -> logger.warn(
-                        "Update failed to start; rolled back to version {}", version));
-            }
+            bootstrapper.confirmStartup(AppVersion.current()).ifPresent(version -> logger.warn(
+                    "Update failed to start; rolled back to version {}", version));
         } catch (Exception e) {
-            logger.debug("Update rollback check skipped: {}", e.getMessage());
-        }
-    }
-
-    /** Marks the running version as healthy so it will not be rolled back. */
-    private void markVersionHealthy() {
-        if (Boolean.getBoolean("seeloggyplus.disableUpdateCheck")) {
-            return;
-        }
-        try {
-            UpdateLayout layout = new UpdateLayout(UpdateLayout.installationRoot());
-            String version = AppVersion.current();
-            if (layout.isStaged(version)) {
-                new UpdateBootstrapper(layout).markHealthy(version);
-            }
-        } catch (Exception e) {
-            logger.debug("Update health marker skipped: {}", e.getMessage());
+            logger.debug("Update startup reconciliation skipped: {}", e.getMessage());
         }
     }
 

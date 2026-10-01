@@ -36,6 +36,28 @@ public class UpdateBootstrapper {
     }
 
     /**
+     * Reconciles update state with the version that has actually reached
+     * application startup. The running active version is healthy and must be
+     * confirmed before evaluating rollback; otherwise a freshly updated app would
+     * immediately point {@code current} back to the previous release.
+     *
+     * @return the previous version restored when a different unhealthy version was
+     *         active, or empty when no rollback was needed
+     */
+    public Optional<String> confirmStartup(String runningVersion) throws IOException {
+        Optional<String> current = layout.currentVersion();
+        if (current.filter(version -> version.equals(runningVersion)).isPresent()
+                && layout.isStaged(runningVersion)) {
+            layout.markHealthy(runningVersion);
+            return Optional.empty();
+        }
+        if (shouldRollback()) {
+            return rollback();
+        }
+        return Optional.empty();
+    }
+
+    /**
      * True when the active version is missing or has not reported a healthy start,
      * while a usable previous version exists.
      */
