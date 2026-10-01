@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-10-01
+
+Patch release that keeps a newly installed self-update active across subsequent
+launches from an older root launcher.
+
+### Fixed
+- **Self-update startup health**: a newly activated version now confirms itself as
+  healthy before rollback is evaluated. Previously, the first successful start could
+  move `current` back to the previous release before writing the health marker, so the
+  next run from the existing root `launcher.bat` reopened the old version.
+- **Legacy launcher continuity**: the unchanged, version-aware 0.5.1 root launcher now
+  continues to resolve `current` to the latest staged JAR after the update restarts.
+
+### Tests
+- Extended `UpdateBootstrapperTest` and `SelfUpdateEndToEndTest` to cover first-start
+  confirmation, preservation of the active pointer and rollback when a different
+  unhealthy version is active.
+- Verified the complete 0.5.1 upgrade path with artifacts built from the 0.5.1 tag:
+  HTTP download, checksum, stage, activate, first start, and a second launch through
+  the unchanged 0.5.1 BAT all selected the updated JAR.
+- All 496 headless tests pass, and the production startup smoke test succeeds.
+
 ## [0.6.3] - 2026-09-30
 
 Patch release that makes self-update work again from older versions.
@@ -247,7 +269,8 @@ in the CI `test` job before publishing, so 0.6.2 ships the complete 0.6 feature 
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.3...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.4...HEAD
+[0.6.4]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.3...0.6.4
 [0.6.3]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.2...0.6.3
 [0.6.2]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.0...0.6.1
