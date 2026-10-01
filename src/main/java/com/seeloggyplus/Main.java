@@ -55,7 +55,7 @@ public class Main extends Application {
         this.primaryStage = primaryStage;
         this.preferenceService = new PreferenceServiceImpl();
 
-        ensureSilentLauncher();
+        ensureLaunchers();
 
         try {
             // Restore the saved theme before building the scene
@@ -104,11 +104,18 @@ public class Main extends Application {
     }
 
     /**
-     * Recreates the Windows silent launcher when it is missing. It is intentionally
-     * not shipped in update packages (older installers reject unknown entries), so
-     * the app heals the installation root on startup. Best effort only.
+     * Heals the launch scripts in the installation root on startup:
+     * <ul>
+     *   <li>the Windows silent launcher ({@code SeeLoggyPlus.vbs}) is recreated when
+     *       missing (it is intentionally not shipped in update packages because older
+     *       installers reject unknown entries);</li>
+     *   <li>a root {@code launcher.bat} that predates the {@code javaw} launch is
+     *       replaced with the launcher staged with the active version, so it no
+     *       longer leaves a console window open.</li>
+     * </ul>
+     * Best effort only.
      */
-    private void ensureSilentLauncher() {
+    private void ensureLaunchers() {
         if (Boolean.getBoolean("seeloggyplus.dev")) {
             return;
         }
@@ -123,8 +130,11 @@ public class Main extends Application {
                     new com.seeloggyplus.update.UpdateLayout(
                             com.seeloggyplus.update.UpdateLayout.installationRoot());
             com.seeloggyplus.update.SilentLauncherInstaller.ensure(layout.root());
+            if (com.seeloggyplus.update.RootLauncherInstaller.heal(layout.root())) {
+                logger.info("Repaired the console-free launcher in {}", layout.root());
+            }
         } catch (Exception e) {
-            logger.debug("Could not ensure the silent launcher", e);
+            logger.debug("Could not ensure the launch scripts", e);
         }
     }
 

@@ -5,10 +5,25 @@ import org.junit.jupiter.api.Test;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UpdateServiceImplTest {
+
+    @Test
+    void defaultManifestUrlUsesTheUncachedLatestReleaseEndpoint() {
+        // raw.githubusercontent.com serves the manifest with Cache-Control: max-age=300,
+        // so a release published moments ago stayed invisible to update checks. The
+        // latest-release download endpoint is not cached and always resolves to the
+        // manifest attached to the newest release.
+        String url = UpdateServiceImpl.DEFAULT_MANIFEST_URL;
+        assertTrue(url.startsWith("https://github.com/"), url);
+        assertTrue(url.contains("/releases/latest/download/"), url);
+        assertTrue(url.endsWith("/update-manifest.json"), url);
+        assertFalse(url.contains("raw.githubusercontent.com"), url);
+    }
 
     private static UpdateServiceImpl serviceReturning(String manifestJson) {
         return new UpdateServiceImpl("https://example.com/manifest.json", url -> manifestJson);
