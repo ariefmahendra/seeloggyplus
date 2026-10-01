@@ -182,6 +182,41 @@ public final class AppTheme {
         }
     }
 
+    /** Stylesheets for a theme without needing a Scene (dialogs built in code). */
+    public static java.util.List<String> sceneStylesheets(Theme theme) {
+        java.util.List<String> list = new java.util.ArrayList<>();
+        addUrl(list, THEME_LIGHT_BASE);
+        addUrl(list, COMPONENTS);
+        Theme active = theme == null ? Theme.GRAPHITE : theme;
+        if (active.stylesheet() != null) {
+            addUrl(list, active.stylesheet());
+        }
+        return list;
+    }
+
+    /** Applies the theme style classes to a Parent outside a Scene (dialogs in code). */
+    public static void applyThemeState(Parent root, Theme theme) {
+        applyState(root, theme == null ? Theme.GRAPHITE : theme);
+    }
+
+    /** Removes theme-variant stylesheets, then installs the requested theme's ones. */
+    public static void refresh(Scene scene) {
+        if (scene == null) {
+            return;
+        }
+        scene.getStylesheets().removeIf(url -> url.contains("theme-dark") || url.contains("theme-light"));
+        addIfMissing(scene, THEME_LIGHT_BASE);
+        addIfMissing(scene, COMPONENTS);
+        addIfMissing(scene, theme.stylesheet());
+    }
+
+    private static void addUrl(java.util.List<String> list, String path) {
+        String url = toUrl(path);
+        if (url != null && !list.contains(url)) {
+            list.add(url);
+        }
+    }
+
     private static void addIfMissing(Scene scene, String path) {
         String url = toUrl(path);
         if (url != null && !scene.getStylesheets().contains(url)) {

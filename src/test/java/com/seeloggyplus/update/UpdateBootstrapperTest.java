@@ -89,6 +89,45 @@ class UpdateBootstrapperTest {
     }
 
     @Test
+    void confirmsTheRunningActiveVersionBeforeConsideringRollback() throws Exception {
+        Path root = Files.createTempDirectory("seeloggy-layout");
+        try {
+            UpdateLayout layout = new UpdateLayout(root);
+            stageVersion(layout, "0.5.1");
+            stageVersion(layout, "0.6.3");
+            layout.writePrevious("0.5.1");
+            layout.writeCurrent("0.6.3"); // first start: no .ok marker yet
+
+            Optional<String> rollback = new UpdateBootstrapper(layout).confirmStartup("0.6.3");
+
+            assertTrue(rollback.isEmpty(), "the version currently running must not roll itself back");
+            assertEquals(Optional.of("0.6.3"), layout.currentVersion());
+            assertTrue(layout.isHealthy("0.6.3"));
+        } finally {
+            UpdateLayout.deleteRecursively(root);
+        }
+    }
+
+    @Test
+    void rollsBackAnUnhealthyActiveVersionWhenAnotherVersionIsRunning() throws Exception {
+        Path root = Files.createTempDirectory("seeloggy-layout");
+        try {
+            UpdateLayout layout = new UpdateLayout(root);
+            stageVersion(layout, "0.5.1");
+            stageVersion(layout, "0.6.3");
+            layout.writePrevious("0.5.1");
+            layout.writeCurrent("0.6.3");
+
+            Optional<String> rollback = new UpdateBootstrapper(layout).confirmStartup("0.5.1");
+
+            assertEquals(Optional.of("0.5.1"), rollback);
+            assertEquals(Optional.of("0.5.1"), layout.currentVersion());
+        } finally {
+            UpdateLayout.deleteRecursively(root);
+        }
+    }
+
+    @Test
     void cleanupKeepsCurrentPreviousAndNewest() throws Exception {
         Path root = Files.createTempDirectory("seeloggy-layout");
         try {

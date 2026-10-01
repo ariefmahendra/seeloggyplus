@@ -131,7 +131,10 @@ class SelfUpdateEndToEndTest {
 
         UpdateBootstrapper bootstrapper = new UpdateBootstrapper(layout);
         assertTrue(bootstrapper.shouldRollback(), "a freshly activated version is unhealthy until it starts");
-        bootstrapper.markHealthy(NEW_VERSION);
+        assertTrue(bootstrapper.confirmStartup(NEW_VERSION).isEmpty(),
+                "the newly running version must be confirmed instead of rolled back");
+        assertEquals(NEW_VERSION, layout.currentVersion().orElseThrow(),
+                "confirming startup must keep the update active for future launcher runs");
         assertFalse(bootstrapper.shouldRollback(), "a healthy version must not roll back");
         assertEquals(OLD_VERSION, bootstrapper.rollback().orElseThrow());
         assertEquals(OLD_VERSION, layout.currentVersion().orElseThrow(),
