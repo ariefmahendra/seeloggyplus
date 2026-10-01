@@ -3,6 +3,7 @@ package com.seeloggyplus.controller;
 import com.seeloggyplus.util.AppTheme;
 
 import com.seeloggyplus.update.Hashing;
+import com.seeloggyplus.update.UpdateAwareness;
 import com.seeloggyplus.update.UpdateCheckResult;
 import com.seeloggyplus.update.UpdateCoordinator;
 import com.seeloggyplus.update.UpdateDownloader;
@@ -149,6 +150,34 @@ public class UpdateDialogControllerTest {
         Platform.runLater(skipButton::fire);
         WaitForAsyncUtils.waitForFxEvents();
         assertTrue(controller.isSkipped());
+    }
+
+    @Test
+    public void skipNotifiesTheListenerSoTheIndicatorHides() throws Exception {
+        java.util.concurrent.atomic.AtomicBoolean notified = new java.util.concurrent.atomic.AtomicBoolean();
+        UpdateCheckResult available = available();
+        Platform.runLater(() -> {
+            controller.setResult(available);
+            controller.setOnSkipped(() -> notified.set(true));
+            skipButton.fire();
+        });
+        WaitForAsyncUtils.waitForFxEvents();
+
+        assertTrue(notified.get(), "skipping must notify the host UI");
+    }
+
+    @Test
+    public void laterSnoozesForTheChosenDuration() throws Exception {
+        UpdateCheckResult available = available();
+        Platform.runLater(() -> {
+            controller.setResult(available);
+            controller.setSnoozeChooser(() -> Optional.of(UpdateAwareness.Snooze.EIGHT_HOURS));
+            laterButton.fire();
+        });
+        WaitForAsyncUtils.waitForFxEvents();
+
+        assertEquals(8L * 60 * 60 * 1000, controller.getSnoozeMillis(),
+                "'Remind me later' must record the snooze duration for the host UI");
     }
 
     private void waitUntil(java.util.concurrent.Callable<Boolean> condition) throws Exception {

@@ -83,6 +83,10 @@ public class MainController {
     private CheckMenuItem showLeftPanelMenuItem;
     @FXML
     private CheckMenuItem showBottomPanelMenuItem;
+    @FXML
+    private CheckMenuItem autoCheckUpdatesMenuItem;
+    @FXML
+    private CheckMenuItem autoDownloadUpdatesMenuItem;
 
     @FXML
     private MenuItem serverManagementMenuItem;
@@ -190,6 +194,8 @@ public class MainController {
     @FXML
     private Label statusLabel;
     @FXML
+    private Label updateStatusLabel;
+    @FXML
     private Label memoryStatusLabel;
     @FXML
     private ProgressBar memoryBar;
@@ -208,6 +214,20 @@ public class MainController {
     private static final Logger logger = LoggerFactory.getLogger(MainController.class);
 
     private LogFile currentLogFromDb;
+
+    /** Latest available update, kept so the status-bar indicator can reopen the dialog. */
+    private com.seeloggyplus.update.UpdateCheckResult availableUpdate;
+    /** Periodic in-session update check (update checks also run at startup). */
+    private javafx.animation.Timeline updateCheckTimeline;
+    /** Version currently being downloaded in the background, if any. */
+    private volatile String downloadingVersion;
+    /** Version staged and waiting for a restart, if any. */
+    private volatile String readyToRestartVersion;
+    private volatile boolean updateInstallRunning;
+    private Runnable updateRestartAction = com.seeloggyplus.util.UpdateRelauncher::relaunch;
+    private java.util.function.Supplier<UpdateCoordinator> updateCoordinatorFactory =
+            () -> new UpdateCoordinator(UpdateLayout.installationRoot(),
+                    UpdateDialogController.stagingDirectory());
 
     private volatile ParsingConfig currentParsingConfig;
     private File currentFile;
@@ -337,7 +357,12 @@ public class MainController {
         startMemoryMonitor();
         applyPendingRollback();
         scheduleAutoUpdateCheck();
+        setupUpdateMenuItems();
+        if (updateStatusLabel != null) {
+            updateStatusLabel.setOnMouseClicked(e -> handleUpdateIndicatorClick());
+        }
         markVersionHealthy();
+        showWhatsNewIfNeeded();
 
         if (centerRoot != null && centerClip != null) {
             centerClip.widthProperty().bind(centerRoot.widthProperty());
@@ -3190,29 +3215,41 @@ public class MainController {
         if (Boolean.getBoolean("seeloggyplus.disableUpdateCheck")) {
             return;
         }
-        Platform.runLater(() -> {
-            try {
-                boolean auto = !"false".equalsIgnoreCase(
-                        preferenceService.getPreferencesByCode(UpdatePreferences.AUTO_CHECK).orElse("true"));
-                if (!auto || "DEV".equalsIgnoreCase(AppVersion.current())) {
-                    return;
-                }
-                long now = System.currentTimeMillis();
-                long last = 0;
-                try {
-                    last = Long.parseLong(
-                            preferenceService.getPreferencesByCode(UpdatePreferences.LAST_CHECK).orElse("0"));
-                } catch (NumberFormatException ignored) {
-                    // treat as never checked
-                }
-                if (now - last < 24L * 60 * 60 * 1000) {
-                    return;
-                }
-                runUpdateCheck(false, currentUpdateChannel());
-            } catch (Exception e) {
-                logger.debug("Auto update check skipped: {}", e.getMessage());
+        // First check shortly after startup, then re-check periodically so users
+        // who keep the app open for days still learn about updates.
+        Platform.runLater(this::maybeAutoUpdateCheck);
+        updateCheckTimeline = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(javafx.util.Duration.minutes(30), e -> maybeAutoUpdateCheck()));
+        updateCheckTimeline.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        updateCheckTimeline.play();
+    }
+
+    /** Runs a check when the interval has elapsed and the user is not snoozing. */
+    private void maybeAutoUpdateCheck() {
+        try {
+            boolean auto = !"false".equalsIgnoreCase(
+                    preferenceService.getPreferencesByCode(UpdatePreferences.AUTO_CHECK).orElse("true"));
+            if (!auto || "DEV".equalsIgnoreCase(AppVersion.current())) {
+                return;
             }
-        });
+            long now = System.currentTimeMillis();
+            long last = readLongPreference(UpdatePreferences.LAST_CHECK, 0);
+            long snoozeUntil = readLongPreference(UpdatePreferences.SNOOZE_UNTIL, 0);
+            if (com.seeloggyplus.update.UpdateAwareness.isCheckDue(
+                    now, last, snoozeUntil, com.seeloggyplus.update.UpdateAwareness.CHECK_INTERVAL_MS)) {
+                runUpdateCheck(false, currentUpdateChannel());
+            }
+        } catch (Exception e) {
+            logger.debug("Auto update check skipped: {}", e.getMessage());
+        }
+    }
+
+    private long readLongPreference(String code, long fallback) {
+        try {
+            return Long.parseLong(preferenceService.getPreferencesByCode(code).orElse(String.valueOf(fallback)));
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     private void runUpdateCheck(boolean interactive, String channel) {
@@ -3234,21 +3271,199 @@ public class MainController {
                 }
             }
             Platform.runLater(() -> {
-                if (interactive) {
-                    showUpdateDialog(checkResult, channel);
-                } else if (checkResult.hasUpdate()) {
+                if (checkResult.hasUpdate() && checkResult.manifest() != null) {
                     String skip = null;
                     try {
                         skip = preferenceService.getPreferencesByCode(UpdatePreferences.skipKey(channel)).orElse(null);
                     } catch (Exception ignored) {
                         // ignore
                     }
-                    if (checkResult.manifest() != null && !checkResult.manifest().latest().equals(skip)) {
+                    if (!checkResult.manifest().latest().equals(skip)) {
+                        showUpdateIndicator(checkResult);
+                        if (!interactive) {
+                            maybeStartBackgroundUpdate(checkResult);
+                        }
+                    }
+                } else if (checkResult.status() == UpdateCheckResult.Status.UP_TO_DATE
+                        && readyToRestartVersion == null) {
+                    hideUpdateIndicator();
+                }
+
+                if (interactive) {
+                    showUpdateDialog(checkResult, channel);
+                } else if (checkResult.hasUpdate() && checkResult.manifest() != null) {
+                    String skip = null;
+                    try {
+                        skip = preferenceService.getPreferencesByCode(UpdatePreferences.skipKey(channel)).orElse(null);
+                    } catch (Exception ignored) {
+                        // ignore
+                    }
+                    long snoozeUntil = readLongPreference(UpdatePreferences.SNOOZE_UNTIL, 0);
+                    if (com.seeloggyplus.update.UpdateAwareness.shouldPopup(
+                            System.currentTimeMillis(), snoozeUntil,
+                            checkResult.manifest().latest(), skip)) {
                         showUpdateDialog(checkResult, channel);
                     }
                 }
             });
         });
+    }
+
+    /** Shows (or refreshes) the clickable update label in the status bar. */
+    void showUpdateIndicator(UpdateCheckResult result) {
+        if (result == null || result.manifest() == null) {
+            return;
+        }
+        availableUpdate = result;
+        setUpdateIndicator(com.seeloggyplus.update.UpdateAwareness.IndicatorState.AVAILABLE,
+                result.manifest().latest(), 0);
+    }
+
+    /** Renders the status-bar indicator for the given state. */
+    void setUpdateIndicator(com.seeloggyplus.update.UpdateAwareness.IndicatorState state, String version,
+            int percent) {
+        if (updateStatusLabel == null) {
+            return;
+        }
+        String text = com.seeloggyplus.update.UpdateAwareness.indicatorText(state, version, percent);
+        boolean visible = state != null
+                && state != com.seeloggyplus.update.UpdateAwareness.IndicatorState.NONE
+                && !text.isBlank();
+        updateStatusLabel.setText(text);
+        updateStatusLabel.setVisible(visible);
+        updateStatusLabel.setManaged(visible);
+    }
+
+    /** Hides the status-bar update indicator. */
+    void hideUpdateIndicator() {
+        availableUpdate = null;
+        setUpdateIndicator(com.seeloggyplus.update.UpdateAwareness.IndicatorState.NONE, null, 0);
+    }
+
+    /** Marks a staged version as ready: clicking the indicator restarts the app. */
+    void markUpdateReady(String version) {
+        readyToRestartVersion = version;
+        setUpdateIndicator(com.seeloggyplus.update.UpdateAwareness.IndicatorState.READY, version, 100);
+    }
+
+    void handleUpdateIndicatorClick() {
+        if (readyToRestartVersion != null) {
+            updateRestartAction.run();
+            return;
+        }
+        if (availableUpdate != null) {
+            showUpdateDialog(availableUpdate, currentUpdateChannel());
+        }
+    }
+
+    void setUpdateRestartAction(Runnable action) {
+        this.updateRestartAction = action != null
+                ? action : com.seeloggyplus.util.UpdateRelauncher::relaunch;
+    }
+
+    void setUpdateCoordinatorFactory(java.util.function.Supplier<UpdateCoordinator> factory) {
+        if (factory != null) {
+            this.updateCoordinatorFactory = factory;
+        }
+    }
+
+    private boolean isAutoDownloadEnabled() {
+        try {
+            return !"false".equalsIgnoreCase(
+                    preferenceService.getPreferencesByCode(UpdatePreferences.AUTO_DOWNLOAD).orElse("true"));
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    private void setupUpdateMenuItems() {
+        if (autoCheckUpdatesMenuItem != null) {
+            boolean auto = !"false".equalsIgnoreCase(
+                    preferenceService.getPreferencesByCode(UpdatePreferences.AUTO_CHECK).orElse("true"));
+            autoCheckUpdatesMenuItem.setSelected(auto);
+            autoCheckUpdatesMenuItem.setOnAction(e -> preferenceService.saveOrUpdatePreferences(
+                    new Preference(UpdatePreferences.AUTO_CHECK, String.valueOf(autoCheckUpdatesMenuItem.isSelected()))));
+        }
+        if (autoDownloadUpdatesMenuItem != null) {
+            autoDownloadUpdatesMenuItem.setSelected(isAutoDownloadEnabled());
+            autoDownloadUpdatesMenuItem.setOnAction(e -> preferenceService.saveOrUpdatePreferences(
+                    new Preference(UpdatePreferences.AUTO_DOWNLOAD,
+                            String.valueOf(autoDownloadUpdatesMenuItem.isSelected()))));
+        }
+    }
+
+    /**
+     * Downloads and stages an available update in the background so the user only
+     * has to restart. Called for automatic checks when auto-download is enabled.
+     */
+    void startBackgroundUpdate(UpdateCheckResult result) {
+        if (result == null || result.manifest() == null || !result.hasUpdate()) {
+            return;
+        }
+        String latest = result.manifest().latest();
+        if (updateInstallRunning || latest.equals(readyToRestartVersion) || latest.equals(downloadingVersion)) {
+            return;
+        }
+        UpdateAsset asset = result.manifest().assetFor(UpdateAssetKeys.preferred());
+        if (asset == null) {
+            return;
+        }
+        updateInstallRunning = true;
+        downloadingVersion = latest;
+        setUpdateIndicator(com.seeloggyplus.update.UpdateAwareness.IndicatorState.DOWNLOADING, latest, 0);
+
+        UpdateCoordinator coordinator = updateCoordinatorFactory.get();
+        Thread.ofVirtual().name("update-download").start(() -> {
+            UpdateCoordinator.InstallResult install = coordinator.install(asset, latest,
+                    (stage, done, total) -> {
+                        if ("Downloading".equals(stage) && total > 0) {
+                            int percent = (int) Math.min(100, done * 100 / total);
+                            Platform.runLater(() -> setUpdateIndicator(
+                                    com.seeloggyplus.update.UpdateAwareness.IndicatorState.DOWNLOADING,
+                                    latest, percent));
+                        }
+                    },
+                    () -> false);
+            Platform.runLater(() -> {
+                updateInstallRunning = false;
+                downloadingVersion = null;
+                if (install.success()) {
+                    markUpdateReady(latest);
+                } else {
+                    setUpdateIndicator(com.seeloggyplus.update.UpdateAwareness.IndicatorState.FAILED,
+                            latest, 0);
+                }
+            });
+        });
+    }
+
+    private void maybeStartBackgroundUpdate(UpdateCheckResult result) {
+        if (!isAutoDownloadEnabled()) {
+            return;
+        }
+        startBackgroundUpdate(result);
+    }
+
+    /** Shows the embedded release notes once per application version. */
+    private void showWhatsNewIfNeeded() {
+        if (Boolean.getBoolean("seeloggyplus.disableUpdateCheck")
+                || Boolean.getBoolean("seeloggyplus.dev")) {
+            return;
+        }
+        try {
+            String current = AppVersion.current();
+            String seen = preferenceService.getPreferencesByCode(UpdatePreferences.SEEN_VERSION).orElse(null);
+            if (!com.seeloggyplus.update.ReleaseNotes.shouldShow(current, seen)) {
+                return;
+            }
+            preferenceService.saveOrUpdatePreferences(
+                    new Preference(UpdatePreferences.SEEN_VERSION, current));
+            java.util.Optional<String> notes = com.seeloggyplus.update.ReleaseNotes.load();
+            String text = notes.map(com.seeloggyplus.update.ReleaseNotes::toPlainText).orElse("");
+            Platform.runLater(() -> com.seeloggyplus.util.WhatsNewDialog.show(current, text));
+        } catch (Exception e) {
+            logger.debug("What's New dialog skipped: {}", e.getMessage());
+        }
     }
 
     private void showUpdateDialog(UpdateCheckResult result, String channel) {
@@ -3257,6 +3472,11 @@ public class MainController {
             Parent root = loader.load();
             UpdateDialogController updateController = loader.getController();
             updateController.setResult(result);
+            updateController.setOnSkipped(this::hideUpdateIndicator);
+            if (result.manifest() != null && result.manifest().latest().equals(readyToRestartVersion)) {
+                // The background installer already staged this version.
+                updateController.markInstalled(readyToRestartVersion);
+            }
 
             Stage dialog = new Stage();
             dialog.setTitle("Software Update");
@@ -3272,6 +3492,15 @@ public class MainController {
                 try {
                     preferenceService.saveOrUpdatePreferences(
                             new Preference(UpdatePreferences.skipKey(channel), result.manifest().latest()));
+                } catch (Exception ignored) {
+                    // ignore
+                }
+                hideUpdateIndicator();
+            } else if (updateController.getSnoozeMillis() > 0) {
+                try {
+                    preferenceService.saveOrUpdatePreferences(new Preference(
+                            UpdatePreferences.SNOOZE_UNTIL,
+                            String.valueOf(System.currentTimeMillis() + updateController.getSnoozeMillis())));
                 } catch (Exception ignored) {
                     // ignore
                 }
@@ -4274,6 +4503,18 @@ public class MainController {
             stage.getIcons().add(icon);
         } catch (Exception e) {
             logger.warn("Failed to load app icon for dialog", e);
+        }
+    }
+
+    /** Shared dialog window-icon helper for non-FXML dialogs (package-visible for reuse). */
+    static void addDialogIcon(javafx.stage.Window window) {
+        try {
+            javafx.scene.image.Image icon = new javafx.scene.image.Image(
+                    java.util.Objects.requireNonNull(MainController.class.getResourceAsStream("/images/app-icon.png")));
+            ((javafx.stage.Stage) window).getIcons().add(icon);
+        } catch (Exception e) {
+            LoggerFactory.getLogger(MainController.class)
+                    .warn("Failed to load app icon for dialog", e);
         }
     }
 

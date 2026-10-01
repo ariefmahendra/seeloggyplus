@@ -77,11 +77,18 @@ def generatedVersionResources = "$buildDir/generated/version-resources"
 
 def generateVersionProperties = tasks.register('generateVersionProperties') {
     inputs.property('version', project.version.toString())
+    inputs.dir('docs/release-notes')
     outputs.dir(generatedVersionResources)
     doLast {
         def propsFile = file("${generatedVersionResources}/version.properties")
         propsFile.parentFile.mkdirs()
         propsFile.text = "version=${project.version}"
+
+        // Embed the release notes of this version so the app can show a
+        // "What's New" dialog after an update, without network access.
+        def notesFile = file("docs/release-notes/${project.version}.md")
+        def notesTarget = file("${generatedVersionResources}/release-notes.md")
+        notesTarget.setText(notesFile.exists() ? notesFile.getText('UTF-8') : '', 'UTF-8')
     }
 }
 // Ensure the properties file is generated before resources are processed

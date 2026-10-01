@@ -2,6 +2,7 @@ package com.seeloggyplus.controller;
 
 import com.seeloggyplus.update.UpdateAsset;
 import com.seeloggyplus.update.UpdateAssetKeys;
+import com.seeloggyplus.update.UpdateAwareness;
 import com.seeloggyplus.update.UpdateCheckResult;
 import com.seeloggyplus.update.UpdateCoordinator;
 import com.seeloggyplus.update.UpdateLayout;
@@ -59,7 +60,11 @@ public class UpdateDialogController {
 
     private UpdateCheckResult result;
     private boolean skipped;
+    private long snoozeMillis;
+    private Runnable onSkipped = () -> { };
     private Consumer<String> browser = UpdateDialogController::openInBrowser;
+    private java.util.function.Supplier<java.util.Optional<UpdateAwareness.Snooze>> snoozeChooser =
+            UpdateDialogController::chooseSnooze;
     private UpdateCoordinator coordinator;
     private Runnable restartAction = this::defaultRelaunch;
     private volatile boolean installing;
@@ -87,8 +92,23 @@ public class UpdateDialogController {
         this.restartAction = restartAction != null ? restartAction : this::defaultRelaunch;
     }
 
+    /** Injected for tests to simulate the snooze choice. */
+    void setSnoozeChooser(java.util.function.Supplier<java.util.Optional<UpdateAwareness.Snooze>> chooser) {
+        this.snoozeChooser = chooser != null ? chooser : UpdateDialogController::chooseSnooze;
+    }
+
+    /** Notified when the user skips this version (so the UI can hide its indicator). */
+    void setOnSkipped(Runnable onSkipped) {
+        this.onSkipped = onSkipped != null ? onSkipped : () -> { };
+    }
+
     public boolean isSkipped() {
         return skipped;
+    }
+
+    /** Snooze duration chosen via "Remind me later", or 0 when not snoozed. */
+    public long getSnoozeMillis() {
+        return snoozeMillis;
     }
 
     public boolean isInstalled() {
@@ -285,20 +305,24 @@ public class UpdateDialogController {
     }
 
     private void defaultRelaunch() {
-        try {
-            Path root = UpdateLayout.installationRoot();
-            String script = System.getProperty("os.name", "").toLowerCase().contains("win")
-                    ? "launcher.bat" : "launcher.sh";
-            Path launcher = root.resolve(script);
-            if (Files.exists(launcher)) {
-                new ProcessBuilder(launcher.toString()).directory(root.toFile()).start();
-            } else {
-                logger.warn("Launcher script not found at {}; restart manually", launcher);
-            }
-        } catch (Exception e) {
-            logger.warn("Failed to relaunch application: {}", e.getMessage());
+        com.seeloggyplus.util.UpdateRelauncher.relaunch();
+    }
+
+    /** Marks a version as already staged by the background installer. */
+    void markInstalled(String version) {
+        if (version == null || version.isBlank()) {
+            return;
         }
-        Platform.exit();
+        this.installed = true;
+        this.installedVersion = version;
+        if (statusLabel != null) {
+            statusLabel.setText("Version " + version + " installed. Restart to apply.");
+        }
+        if (downloadButton != null) {
+            downloadButton.setText("Restart Now");
+        }
+        setVisible(skipButton, false);
+        setVisible(laterButton, false);
     }
 
     @FXML
@@ -311,12 +335,28 @@ public class UpdateDialogController {
     @FXML
     private void handleSkip() {
         skipped = true;
+        onSkipped.run();
         closeDialog();
     }
 
     @FXML
     private void handleLater() {
+        snoozeChooser.get().ifPresent(choice -> snoozeMillis = UpdateAwareness.snoozeMillis(choice));
         closeDialog();
+    }
+
+    /** Default "Remind me later" chooser: 1 hour, 8 hours or tomorrow. */
+    static java.util.Optional<UpdateAwareness.Snooze> chooseSnooze() {
+        javafx.scene.control.ChoiceDialog<String> dialog = new javafx.scene.control.ChoiceDialog<>(
+                "In 8 hours", "In 1 hour", "In 8 hours", "Tomorrow");
+        dialog.setTitle("Remind me later");
+        dialog.setHeaderText("When should SeeLoggyPlus remind you about this update?");
+        dialog.setContentText("Remind me:");
+        return dialog.showAndWait().flatMap(choice -> switch (choice) {
+            case "In 1 hour" -> java.util.Optional.of(UpdateAwareness.Snooze.ONE_HOUR);
+            case "Tomorrow" -> java.util.Optional.of(UpdateAwareness.Snooze.TOMORROW);
+            default -> java.util.Optional.of(UpdateAwareness.Snooze.EIGHT_HOURS);
+        });
     }
 
     @FXML

@@ -604,6 +604,47 @@ FontAwesomeIconView.file-icon-file {
     -fx-padding: 4;
 }
 
+/* "What's New" dialog: themed surface, accent badge and notes area. */
+.whats-new-dialog {
+    -fx-background-color: -sl-surface;
+}
+
+.whats-new-dialog .header-panel {
+    -fx-background-color: -sl-surface;
+}
+
+.whats-new-badge {
+    -fx-background-color: -sl-brand;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+}
+
+.whats-new-badge .glyph-icon,
+.whats-new-badge FontAwesomeIconView {
+    -fx-fill: -sl-on-brand;
+}
+
+.whats-new-notes {
+    -fx-font-size: 12px;
+    -fx-text-fill: -sl-text;
+    -fx-control-inner-background: -sl-surface;
+    -fx-background-color: -sl-surface;
+    -fx-border-color: -sl-border;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-highlight-fill: -sl-selection-bg;
+    -fx-highlight-text-fill: -sl-text;
+}
+
+.whats-new-notes .content {
+    -fx-background-color: -sl-surface;
+}
+
+.whats-new-notes .scroll-pane,
+.whats-new-notes .viewport {
+    -fx-background-color: transparent;
+}
+
 /* Dropdown fields (ComboBox / ChoiceBox / ChoiceDialog) look like normal form
    fields in every theme: light surface with dark text on Graphite/Light, and
    only the Dark theme renders them dark. The dropdown list uses a neutral
