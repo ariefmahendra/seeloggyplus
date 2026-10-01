@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-10-01
+
+Patch release that removes the leftover console window on Windows and makes a
+fresh release visible to update checks immediately after it is published.
+
+### Fixed
+- **No more background terminal**: starting a legacy installation or choosing
+  "Restart to update" no longer leaves a `cmd` window open for the whole session.
+  The app restarts itself directly with `javaw`, and on startup it repairs an old
+  root `launcher.bat` that still ran `java.exe` in the foreground. A launcher that
+  already starts the app with `javaw` (or a customised one) is left untouched.
+- **Update check right after a release**: the default update manifest now comes from
+  `releases/latest/download/update-manifest.json` (`Cache-Control: no-cache`) instead
+  of the five-minute-cached `raw.githubusercontent.com` endpoint, so a release
+  published moments ago is detected by the first check.
+
+### Tests
+- Added `UpdateRelauncherTest` and `RootLauncherInstallerTest`, plus a test pinning
+  the uncached manifest endpoint in `UpdateServiceImplTest`.
+- All 510 headless tests pass, and the production startup smoke test succeeds.
+
 ## [0.6.4] - 2026-10-01
 
 Patch release that keeps a newly installed self-update active across subsequent
@@ -269,7 +290,8 @@ in the CI `test` job before publishing, so 0.6.2 ships the complete 0.6 feature 
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.4...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.5...HEAD
+[0.6.5]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.4...0.6.5
 [0.6.4]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.3...0.6.4
 [0.6.3]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.2...0.6.3
 [0.6.2]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.1...0.6.2
