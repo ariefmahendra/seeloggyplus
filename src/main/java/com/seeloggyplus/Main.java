@@ -1,8 +1,10 @@
 package com.seeloggyplus;
 
+import com.seeloggyplus.model.Preference;
 import com.seeloggyplus.service.PreferenceService;
-import com.seeloggyplus.util.AppTheme;
 import com.seeloggyplus.service.impl.PreferenceServiceImpl;
+import com.seeloggyplus.util.AppTheme;
+import com.seeloggyplus.util.StartupSplash;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Rectangle2D;
@@ -14,8 +16,8 @@ import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import com.seeloggyplus.model.Preference;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -48,25 +50,47 @@ public class Main extends Application {
     }
 
     private PreferenceService preferenceService;
+    private final Map<String, String> startupPreferences = new HashMap<>();
+    private Exception startupFailure;
     private Stage primaryStage;
+
+    /** JavaFX invokes init() on the launcher thread, before starting the UI. */
+    @Override
+    public void init() {
+        try {
+            updateStartupStatus("Preparing workspace...");
+            ensureLaunchers();
+            preferenceService = new PreferenceServiceImpl();
+            updateStartupStatus("Loading preferences...");
+            for (Preference preference : preferenceService.getListPreferences()) {
+                startupPreferences.put(preference.getCode(), preference.getValue());
+            }
+        } catch (Exception e) {
+            // Report preparation failures in start(), where a visible error dialog
+            // is possible even when launched with javaw and no console.
+            startupFailure = e;
+        }
+    }
 
     @Override
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
-        this.preferenceService = new PreferenceServiceImpl();
-
-        ensureLaunchers();
 
         try {
+            if (startupFailure != null) {
+                throw startupFailure;
+            }
             // Restore the saved theme before building the scene
-            AppTheme.setTheme(preferenceService.getPreferencesByCode("app_theme")
+            AppTheme.setTheme(getStartupPreference("app_theme")
                     .map(AppTheme.Theme::fromPreference)
                     .orElse(AppTheme.Theme.GRAPHITE));
 
             // Load main view
+            updateStartupStatus("Loading interface...");
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
             Parent root = loader.load();
 
+            updateStartupStatus("Opening main window...");
             // Create scene (themed; stylesheets at scene level so menus/popups inherit them)
             Scene scene = AppTheme.scene(root);
 
@@ -92,13 +116,14 @@ public class Main extends Application {
             });
 
             primaryStage.show();
+            StartupSplash.close();
             logger.info("SeeLoggyPlus application started successfully");
 
             // Initialize Dev Hot Reloader for live CSS & layout reloading
             com.seeloggyplus.util.DevHotReloader.init(primaryStage, scene);
 
-        } catch (IOException e) {
-            logger.error("Failed to load main view", e);
+        } catch (Exception e) {
+            logger.error("Failed to start application", e);
             showErrorAndExit("Failed to start application: " + e.getMessage());
         }
     }
@@ -148,7 +173,7 @@ public class Main extends Application {
         double windowWidth = getPreferenceAsDouble("window_width").orElse(1000.0);
         double windowHeight = getPreferenceAsDouble("window_height").orElse(800.0);
 
-        boolean maximized = preferenceService.getPreferencesByCode("window_maximized")
+        boolean maximized = getStartupPreference("window_maximized")
                 .filter(Predicate.not(String::isBlank))
                 .map(Boolean::parseBoolean)
                 .orElse(false);
@@ -177,7 +202,7 @@ public class Main extends Application {
      * Helper for robust get preference as double data type
      */
     private Optional<Double> getPreferenceAsDouble(String code) {
-        return preferenceService.getPreferencesByCode(code)
+        return getStartupPreference(code)
                 .filter(Predicate.not(String::isBlank))
                 .flatMap(s -> {
                     try {
@@ -186,6 +211,14 @@ public class Main extends Application {
                         return Optional.empty();
                     }
                 });
+    }
+
+    void updateStartupStatus(String message) {
+        StartupSplash.showStatus(message);
+    }
+
+    private Optional<String> getStartupPreference(String code) {
+        return Optional.ofNullable(startupPreferences.get(code));
     }
 
     /**
@@ -234,6 +267,7 @@ public class Main extends Application {
      * Show error dialog and exit
      */
     private void showErrorAndExit(String message) {
+        StartupSplash.close();
         javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
                 javafx.scene.control.Alert.AlertType.ERROR);
         alert.setTitle("Application Error");
@@ -252,6 +286,7 @@ public class Main extends Application {
     }
 
     public static void main(String[] args) {
+        StartupSplash.showStatus("Starting SeeLoggyPlus...");
         System.setProperty("logback.configurationFile", "logback.xml");
 
         logger.info("Starting SeeLoggyPlus application v{}", VERSION);

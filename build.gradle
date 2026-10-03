@@ -95,6 +95,173 @@ def generateVersionProperties = tasks.register('generateVersionProperties') {
 processResources.dependsOn generateVersionProperties
 sourceSets.main.resources.srcDir(generatedVersionResources)
 
+// A native animated splash appears before Main/JavaFX are loaded, including javaw
+// launches through the VBS shortcut. Keep the GIF inside the JAR so existing
+// installers and blue/green update layouts need no extra package entries.
+def generatedSplashResources = layout.buildDirectory.dir('generated/splash-resources')
+def generateStartupSplash = tasks.register('generateStartupSplash') {
+    inputs.file('src/main/resources/style/theme.css')
+    inputs.file('src/main/resources/images/app-icon.png')
+    inputs.property('version', project.version.toString())
+    outputs.dir(generatedSplashResources)
+    doLast {
+        // Remove assets from earlier generator versions, including the static PNG.
+        delete generatedSplashResources
+        def css = file('src/main/resources/style/theme.css').getText('UTF-8')
+        def color = { String token ->
+            def match = css =~ /${java.util.regex.Pattern.quote(token)}\s*:\s*(#[0-9a-fA-F]{6})/
+            if (!match.find()) throw new GradleException("Missing splash theme token: ${token}")
+            java.awt.Color.decode(match.group(1))
+        }
+        def image = new java.awt.image.BufferedImage(480, 230, java.awt.image.BufferedImage.TYPE_INT_RGB)
+        def graphics = image.createGraphics()
+        try {
+            graphics.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
+            graphics.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+            graphics.setColor(color('-sl-chrome'))
+            graphics.fillRect(0, 0, image.width, image.height)
+            graphics.setColor(color('-sl-accent-text'))
+            graphics.fillRect(0, 0, image.width, 3)
+            def icon = javax.imageio.ImageIO.read(file('src/main/resources/images/app-icon.png'))
+            graphics.drawImage(icon, 32, 32, 64, 64, null)
+            graphics.setColor(color('-sl-chrome-text'))
+            graphics.setFont(new java.awt.Font('Segoe UI', java.awt.Font.BOLD, 30))
+            graphics.drawString('SeeLoggyPlus', 120, 64)
+            graphics.setFont(new java.awt.Font('Segoe UI', java.awt.Font.PLAIN, 13))
+            graphics.drawString('Local & SSH log viewer', 120, 87)
+            graphics.setFont(new java.awt.Font('Segoe UI', java.awt.Font.BOLD, 15))
+            graphics.drawString('Starting SeeLoggyPlus...', 32, 145)
+            graphics.setFont(new java.awt.Font('Segoe UI', java.awt.Font.PLAIN, 13))
+            graphics.drawString('Starting Java...', 32, 171)
+            graphics.setColor(color('-sl-chrome-text-muted'))
+            graphics.setFont(new java.awt.Font('Segoe UI', java.awt.Font.PLAIN, 11))
+            graphics.drawString("v${project.version}".toString(), 32, 212)
+            graphics.setColor(color('-sl-chrome-hover'))
+            graphics.fillRoundRect(32, 185, 416, 6, 6, 6)
+            graphics.setColor(color('-sl-accent-text'))
+            graphics.fillRoundRect(32, 185, 96, 6, 6, 6)
+        } finally {
+            graphics.dispose()
+        }
+        // GIF palette quantization can shift even flat token colours by a channel
+        // value. Derive one adaptive palette, then preserve the exact theme tokens
+        // for every frame and for the opaque runtime status overlay.
+        def paletteBytes = new java.io.ByteArrayOutputStream()
+        javax.imageio.ImageIO.write(image, 'gif', paletteBytes)
+        def indexed = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(paletteBytes.toByteArray()))
+        def model = indexed.getColorModel()
+        byte[] reds = new byte[model.mapSize], greens = new byte[model.mapSize], blues = new byte[model.mapSize]
+        model.getReds(reds)
+        model.getGreens(greens)
+        model.getBlues(blues)
+        ['-sl-chrome', '-sl-chrome-text', '-sl-chrome-text-muted', '-sl-chrome-hover', '-sl-accent-text'].each { token ->
+            def value = color(token)
+            int nearest = (0..<model.mapSize).min { int index ->
+                int r = (reds[index] & 0xff) - value.red
+                int g = (greens[index] & 0xff) - value.green
+                int b = (blues[index] & 0xff) - value.blue
+                r * r + g * g + b * b
+            }
+            reds[nearest] = (byte) value.red
+            greens[nearest] = (byte) value.green
+            blues[nearest] = (byte) value.blue
+        }
+        def gifPalette = new java.awt.image.IndexColorModel(8, model.mapSize, reds, greens, blues)
+        def target = generatedSplashResources.get().file('images/startup-splash.gif').asFile
+        target.parentFile.mkdirs()
+        def writer = javax.imageio.ImageIO.getImageWritersByFormatName('gif').next()
+        def output = javax.imageio.ImageIO.createImageOutputStream(target)
+        def paletteIndexes = new HashMap<Integer, Byte>()
+        try {
+            writer.setOutput(output)
+            writer.prepareWriteSequence(null)
+            // Native GIF playback continues even while FXMLLoader occupies the FX
+            // thread. One 1.2-second loop, without an application animation thread.
+            int frames = 24
+            for (int i = 0; i < frames; i++) {
+                def rendered = new java.awt.image.BufferedImage(480, 230, java.awt.image.BufferedImage.TYPE_INT_RGB)
+                def frameGraphics = rendered.createGraphics()
+                try {
+                    frameGraphics.drawImage(image, 0, 0, null)
+                    frameGraphics.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
+                    frameGraphics.setColor(color('-sl-chrome'))
+                    frameGraphics.fillRect(32, 184, 416, 9)
+                    frameGraphics.setColor(color('-sl-chrome-hover'))
+                    frameGraphics.fillRoundRect(32, 185, 416, 6, 6, 6)
+                    int position = 32 + Math.round(320 * (1 - Math.cos(2 * Math.PI * i / frames)) / 2)
+                    frameGraphics.setColor(color('-sl-accent-text'))
+                    frameGraphics.fillRoundRect(position, 185, 96, 6, 6, 6)
+                } finally {
+                    frameGraphics.dispose()
+                }
+                // Explicit palette lookup avoids Java2D's indexed-image dithering
+                // and keeps both flat colours and antialiased edges consistent.
+                def frame = new java.awt.image.BufferedImage(480, 230, java.awt.image.BufferedImage.TYPE_BYTE_INDEXED, gifPalette)
+                int[] pixels = rendered.getRGB(0, 0, 480, 230, null, 0, 480)
+                byte[] indexes = new byte[pixels.length]
+                for (int pixel = 0; pixel < pixels.length; pixel++) {
+                    int rgb = pixels[pixel]
+                    Byte index = paletteIndexes.get(rgb)
+                    if (index == null) {
+                        index = ((byte[]) gifPalette.getDataElements(rgb, null))[0]
+                        paletteIndexes.put(rgb, index)
+                    }
+                    indexes[pixel] = index
+                }
+                frame.raster.setDataElements(0, 0, 480, 230, indexes)
+                def metadata = writer.getDefaultImageMetadata(javax.imageio.ImageTypeSpecifier.createFromRenderedImage(frame), null)
+                def tree = metadata.getAsTree('javax_imageio_gif_image_1.0')
+                def control = tree.getElementsByTagName('GraphicControlExtension').item(0)
+                // Supply the palette explicitly: default GIF metadata may contain
+                // the web palette rather than the image's custom indexed colours.
+                def table = tree.getElementsByTagName('LocalColorTable').item(0)
+                if (table == null) {
+                    table = new javax.imageio.metadata.IIOMetadataNode('LocalColorTable')
+                    tree.insertBefore(table, control)
+                }
+                while (table.hasChildNodes()) table.removeChild(table.firstChild)
+                table.setAttribute('sizeOfLocalColorTable', model.mapSize.toString())
+                table.setAttribute('sortFlag', 'FALSE')
+                for (int index = 0; index < model.mapSize; index++) {
+                    def entry = new javax.imageio.metadata.IIOMetadataNode('ColorTableEntry')
+                    entry.setAttribute('index', index.toString())
+                    entry.setAttribute('red', (reds[index] & 0xff).toString())
+                    entry.setAttribute('green', (greens[index] & 0xff).toString())
+                    entry.setAttribute('blue', (blues[index] & 0xff).toString())
+                    table.appendChild(entry)
+                }
+                control.setAttribute('disposalMethod', 'none')
+                control.setAttribute('delayTime', '5') // GIF delays are hundredths of a second.
+                if (i == 0) {
+                    def extensions = new javax.imageio.metadata.IIOMetadataNode('ApplicationExtensions')
+                    def loop = new javax.imageio.metadata.IIOMetadataNode('ApplicationExtension')
+                    loop.setAttribute('applicationID', 'NETSCAPE')
+                    loop.setAttribute('authenticationCode', '2.0')
+                    loop.setUserObject([1, 0, 0] as byte[]) // Repeat until the main window appears.
+                    extensions.appendChild(loop)
+                    tree.appendChild(extensions)
+                }
+                metadata.setFromTree('javax_imageio_gif_image_1.0', tree)
+                writer.writeToSequence(new javax.imageio.IIOImage(frame, null, metadata), null)
+            }
+            writer.endWriteSequence()
+        } finally {
+            writer.dispose()
+            output.close()
+        }
+        // Runtime status overlays use the exact same token colours as the image.
+        def hex = { java.awt.Color value -> String.format('#%06x', value.getRGB() & 0xffffff) }
+        def palette = generatedSplashResources.get().file('images/startup-splash.properties').asFile
+        palette.setText("-sl-chrome=${hex(color('-sl-chrome'))}\n-sl-chrome-text=${hex(color('-sl-chrome-text'))}\n", 'UTF-8')
+    }
+}
+processResources.dependsOn generateStartupSplash
+sourceSets.main.resources.srcDir(generatedSplashResources)
+
+jar {
+    manifest { attributes 'SplashScreen-Image': 'images/startup-splash.gif' }
+}
+
 test {
     useJUnitPlatform()
     // The UI test suite builds many JavaFX scenes/stages; give the test JVM headroom.
@@ -136,6 +303,8 @@ tasks.register('runDev', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'com.seeloggyplus.Launcher'
     systemProperty 'seeloggyplus.dev', 'true'
+    dependsOn generateStartupSplash
+    jvmArgs "-splash:${generatedSplashResources.get().file('images/startup-splash.gif').asFile.absolutePath}"
     // Optional local update simulation:
     //   ./gradlew runDev -PupdateManifestUrl=http://localhost:8000/update-manifest.json
     if (project.hasProperty('updateManifestUrl')) {
@@ -154,7 +323,8 @@ tasks.register('fatJar', Jar) {
     archiveClassifier = 'all'
     archiveFileName = "seeloggyplus-all.jar"
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    manifest { attributes 'Main-Class': 'com.seeloggyplus.Launcher' }
+    manifest { attributes 'Main-Class': 'com.seeloggyplus.Launcher',
+                          'SplashScreen-Image': 'images/startup-splash.gif' }
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
 }
