@@ -92,6 +92,35 @@ class CompactActionButtonsTest {
         });
     }
 
+    @Test
+    void recentPanelActionsMatchToolbarDensity(FxRobot robot) {
+        robot.interact(() -> {
+            var panel = main.lookup("#leftPanel");
+            var split = (javafx.scene.control.SplitPane) main.lookup("#horizontalSplitPane");
+            if (!split.getItems().contains(panel)) {
+                split.getItems().add(0, panel);
+            }
+            panel.setVisible(true);
+            panel.setManaged(true);
+            for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                AppTheme.setTheme(theme);
+                main.applyCss();
+                main.layout();
+                ButtonBase reference = button(main, "refreshButton");
+                for (String id : new String[]{"pinLeftPanelButton", "clearRecentButton"}) {
+                    ButtonBase action = button(main, id);
+                    assertEquals(reference.getPadding(), action.getPadding(), id + " should match toolbar padding");
+                    assertTrue(action.getHeight() <= reference.getHeight() + 2, id + " should match toolbar height");
+                }
+                var tree = assertInstanceOf(javafx.scene.layout.Region.class, main.lookup("#recentFilesTreeView"));
+                ButtonBase clear = button(main, "clearRecentButton");
+                assertTrue(clear.getWidth() <= tree.getWidth() - 10,
+                        "Clear Recent Files must hug its label instead of stretching across the panel (clear="
+                                + clear.getWidth() + ", tree=" + tree.getWidth() + ")");
+            }
+        });
+    }
+
     private static ButtonBase button(Parent root, String id) {
         return assertInstanceOf(ButtonBase.class, root.lookup("#" + id));
     }
