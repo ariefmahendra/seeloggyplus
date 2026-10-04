@@ -108,9 +108,8 @@ public class RecentFileTreeCell extends TreeCell<RecentFileTreeCell.RecentNode> 
             return;
         }
         if (item.isServer()) {
-            int count = getTreeItem() == null ? 0 : getTreeItem().getChildren().size();
-            setText(item.getServerName() + "  (" + count + ")");
-            setTooltip(new Tooltip(item.getServerName() + " — " + count + " recent file(s)"));
+            setText(item.getServerName());
+            setTooltip(new Tooltip(item.getServerName()));
             setGraphic(null);
             return;
         }

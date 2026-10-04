@@ -406,9 +406,54 @@
     -fx-background-color: -sl-text-faint;
 }
 
+/* Remote log-location errors: readable explanation and optional diagnostic details. */
+.remote-path-error,
+.ssh-connection-feedback {
+    -fx-background-color: -sl-surface;
+}
+
+/* Log tabs share the available width; truncate names rather than shrinking text. */
+.log-tab-pane > .tab-header-area > .headers-region > .tab .tab-label {
+    -fx-text-fill: -sl-text-secondary;
+    -fx-text-overrun: ellipsis;
+}
+
+.remote-path-error .header-panel,
+.ssh-connection-feedback .header-panel {
+    -fx-background-color: -sl-surface-alt;
+}
+
+.remote-path-error .label,
+.ssh-connection-feedback .label {
+    -fx-text-fill: -sl-text;
+}
+
+.remote-path-error .details-button,
+.ssh-connection-feedback .details-button {
+    -fx-text-fill: -sl-text-secondary;
+}
+
+.remote-path-error .text-area,
+.ssh-connection-feedback .text-area {
+    -fx-text-fill: -sl-text;
+    -fx-control-inner-background: -sl-surface;
+}
+
+.remote-path-error .text-area .content,
+.ssh-connection-feedback .text-area .content {
+    -fx-background-color: -sl-surface;
+}
+
 /* ============================================
    Button hierarchy
    ============================================ */
+.compact-actions .button,
+.compact-actions .toggle-button,
+.unified-file-manager-dialog .button,
+.unified-file-manager-dialog .toggle-button {
+    -fx-padding: 4 7;
+}
+
 .btn-secondary {
     -fx-background-color: -sl-surface-alt;
     -fx-text-fill: -sl-text;
@@ -752,9 +797,49 @@ FontAwesomeIconView.file-icon-file {
    Uses background layers (no border) so the cell keeps exactly the same size
    while dragging: an accent bar on the left plus a soft fill for the row. */
 .tree-cell:drop-target {
-    -fx-background-color: -sl-accent, -sl-brand-soft;
+    -fx-background-color: -sl-info, -sl-brand-soft;
     -fx-background-insets: 0, 0 0 0 3;
     -fx-background-radius: 0;
+}
+
+.tree-cell:drop-before {
+    -fx-background-color: -sl-info, -sl-surface;
+    -fx-background-insets: 0, 2 0 0 0;
+    -fx-background-radius: 0;
+}
+
+.tree-cell:drop-after {
+    -fx-background-color: -sl-info, -sl-surface;
+    -fx-background-insets: 0, 0 0 2 0;
+    -fx-background-radius: 0;
+}
+
+.tree-cell:drop-ungroup,
+.locations-container:drop-ungroup {
+    -fx-background-color: -sl-info, -sl-surface;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 0;
+}
+
+.tree-cell:drop-before:filled,
+.tree-cell:drop-after:filled,
+.tree-cell:drop-target:filled,
+.tree-cell:drop-ungroup:filled {
+    -fx-text-fill: -sl-text;
+}
+
+.tree-cell:drop-before:filled .glyph-icon,
+.tree-cell:drop-after:filled .glyph-icon,
+.tree-cell:drop-target:filled .glyph-icon,
+.tree-cell:drop-ungroup:filled .glyph-icon {
+    -fx-fill: -sl-text;
+}
+
+.location-drop-hint {
+    -fx-background-color: -sl-chrome;
+    -fx-text-fill: -sl-chrome-text;
+    -fx-padding: 4 7;
+    -fx-background-radius: 3;
 }
 
 .app-toolbar .check-box {

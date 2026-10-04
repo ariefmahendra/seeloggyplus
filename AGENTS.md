@@ -20,8 +20,10 @@ MUST run all Gradle commands through the wrapper with `--no-daemon` on Windows
 
 | Goal | Command |
 | --- | --- |
-| Build | `.\gradlew.bat --no-daemon build` |
-| Full tests (headless, always) | `.\gradlew.bat --no-daemon test` |
+| Release build (includes checks) | `.\gradlew.bat --no-daemon build` |
+| Feature compilation | `.\gradlew.bat --no-daemon classes testClasses` |
+| Build artifacts without running tests | `.\gradlew.bat --no-daemon assemble` |
+| Full tests (release or explicit request; always headless) | `.\gradlew.bat --no-daemon test` |
 | Selected tests | `.\gradlew.bat --no-daemon test --tests "com.seeloggyplus.controller.FooTest"` (repeat `--tests`) |
 | Dev app (+ hot reload, sets `seeloggyplus.dev`) | `.\gradlew.bat --no-daemon runDev` |
 | Packages/manifests | `fatJar`, `packagePortableNoJre`, `packagePortableWithJre`, `packagePlatform`, `generatePlatformManifest`, `mergeManifests`, `buildUpdateArtifacts` |
@@ -42,17 +44,26 @@ them windowed or optional.
 
 1. Write the feature/bug tests FIRST (tests exist before or with the code change).
 2. Iterate running only the related test classes (see Selected tests in §1). MUST NOT
-   run the full suite repeatedly while iterating.
-3. When the feature tests pass and the change is final, run the full suite once:
-   `test`, then `build` (both `--no-daemon`).
-4. MUST finish the reply with the TEST SUMMARY block printed by the `testSummary` task
-   (Total/Passed/Failed/Skipped/Result + failing test names). Remove neither the task
-   nor its `finalizedBy 'testSummary'` wiring.
-5. UI/theme changes MUST include the matching contrast/size tests: `ButtonThemeTest`,
-   `PopupThemeTest`, `TreeDropIndicatorTest`, `FileManagerLeftPanelLayoutTest`,
-   `IconContrastTest`, `LabelContrastTest`.
-6. MUST keep `SelfUpdateEndToEndTest` green (see §9).
-7. MUST NOT make tests pass by disabling/deleting tests, lowering contrast thresholds,
+   run the full suite during routine feature work. Repeat tests only after a change,
+   failure, or unresolved concern justifies it.
+3. Once related tests and required smoke checks pass, report the feature ready for
+   user validation. Do not automatically expand validation to the full regression
+   suite, including after a feature is completed or committed.
+4. Run the full suite ONLY when the user explicitly requests it or requests release
+   preparation. For a release, run `test`, then `build` (both `--no-daemon`) and
+   follow §10. During feature work, MUST NOT invoke `build` or `check` in a way that
+   implicitly runs the full suite; use `classes`/`testClasses`, `assemble`, or the
+   required packaging task instead.
+5. MUST finish the reply with the TEST SUMMARY block printed by the `testSummary` task
+   (Total/Passed/Failed/Skipped/Result + failing test names). State which related
+   classes were run; a selected-test summary must not be presented as a full-suite
+   result. Remove neither the task nor its `finalizedBy 'testSummary'` wiring.
+6. UI/theme changes MUST include contrast/size tests covering the affected components.
+   Choose the relevant classes, such as `ButtonThemeTest`, `PopupThemeTest`,
+   `TreeDropIndicatorTest`, `FileManagerLeftPanelLayoutTest`, `IconContrastTest`,
+   and `LabelContrastTest`; do not automatically run unrelated UI regression classes.
+7. MUST keep `SelfUpdateEndToEndTest` green; run it for changes covered by §9.
+8. MUST NOT make tests pass by disabling/deleting tests, lowering contrast thresholds,
    or encoding the bug into assertions.
 
 ## 3. Smoke test (MUST after UI/startup-affecting changes)
@@ -111,7 +122,7 @@ them windowed or optional.
 
 - The change that removes usage MUST also delete now-unused files
   (classes/services/FXML/CSS/scripts/tests). Prove no references first, then run the
-  related tests and the full suite.
+  related tests. Full-suite validation follows §2 (release or explicit request only).
 - NEVER commit: `docs/UI_PLAN.md`, `docs/FEEDBACK_*.md`, `.jqwik-database`, `bin/`,
   `build/`, `logs/`, `.data/`, `launcher.properties`.
 - Check `git status` before committing: relevant files only; no logs, build artifacts,

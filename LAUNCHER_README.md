@@ -4,6 +4,8 @@ Double-click `SeeLoggyPlus.vbs` (or create a shortcut to it). It launches the ap
 
 For diagnostics run `launcher.bat --console`. Directly double-clicking a `.bat` can briefly show Windows cmd; use the `.vbs` entry point for a fully hidden launch. Java is selected from launcher.properties, bundled JRE, JAVA_HOME, then PATH.
 
+During startup, a splash with the application logo, an animated loading bar, and the current startup phase appears while JavaFX and the workspace are being prepared. The bar keeps moving while the interface loads; it does not show a time-based percentage. The splash closes as soon as the main window appears, without adding a waiting period. It is embedded in the JAR, so existing VBS shortcuts and updated installations use it automatically.
+
 # SeeLoggy+ Launcher Scripts
 
 ## Purpose

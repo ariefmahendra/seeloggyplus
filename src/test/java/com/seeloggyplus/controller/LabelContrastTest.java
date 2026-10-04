@@ -67,6 +67,56 @@ class LabelContrastTest {
         });
     }
 
+    @Test
+    void remotePathErrorLabelsContrastInEveryTheme() {
+        onFxThread(() -> {
+            for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                AppTheme.setTheme(theme);
+                var alert = MainController.createRemotePathError("C:\\Users\\user\\Temp\\app.log");
+                try {
+                    alert.show();
+                    Parent root = alert.getDialogPane();
+                    root.applyCss();
+                    root.layout();
+                    assertLabelNodesContrast("remote-path-error [" + theme + "]", root, theme == AppTheme.Theme.DARK);
+                    alert.getDialogPane().setExpanded(true);
+                    root.applyCss();
+                    root.layout();
+                    assertLabelNodesContrast("remote-path-error expanded [" + theme + "]", root, theme == AppTheme.Theme.DARK);
+                } finally {
+                    alert.close();
+                }
+            }
+        });
+    }
+
+    @Test
+    void sshConnectionFeedbackIsReadableAndCompactInEveryTheme() {
+        onFxThread(() -> {
+            for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                AppTheme.setTheme(theme);
+                var server = new com.seeloggyplus.model.SSHServerModel("Test", "127.0.0.1", 22, "test-user");
+                var alert = com.seeloggyplus.util.SshConnectionFeedback.createAlert(
+                        "Auth fail for methods 'publickey,gssapi-keyex,gssapi-with-mic,password'", server);
+                try {
+                    alert.show();
+                    var pane = alert.getDialogPane();
+                    pane.applyCss();
+                    pane.layout();
+                    assertTrue(pane.getWidth() <= 600);
+                    assertTrue(pane.getHeight() <= 420);
+                    assertLabelNodesContrast("ssh-connection-feedback [" + theme + "]", pane, theme == AppTheme.Theme.DARK);
+                    pane.setExpanded(true);
+                    pane.applyCss();
+                    pane.layout();
+                    assertLabelNodesContrast("ssh-connection-feedback expanded [" + theme + "]", pane, theme == AppTheme.Theme.DARK);
+                } finally {
+                    alert.close();
+                }
+            }
+        });
+    }
+
     private void assertLabelsContrast(String fxml, boolean dark) {
         try {
             AppTheme.setDark(dark);
@@ -78,25 +128,26 @@ class LabelContrastTest {
             root.layout();
 
             String mode = dark ? "dark" : "light";
-            for (Node node : root.lookupAll(".label")) {
-                if (!(node instanceof Label label)) {
-                    continue;
-                }
-                if (label.getText() == null || label.getText().isBlank()) {
-                    continue;
-                }
-                Color fg = label.getTextFill() instanceof Color c ? c : null;
-                if (fg == null) {
-                    continue;
-                }
-                Color bg = effectiveBackground(label, dark);
-                double ratio = contrast(fg, bg);
-                assertTrue(ratio >= MIN_TEXT_CONTRAST,
-                        String.format("%s [%s] label '%s' contrast too low: %.2f:1 (fg=%s bg=%s, classes=%s)",
-                                fxml, mode, label.getText(), ratio, fg, bg, label.getStyleClass()));
-            }
+            assertLabelNodesContrast(fxml + " [" + mode + "]", root, dark);
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private static void assertLabelNodesContrast(String context, Parent root, boolean dark) {
+        for (Node node : root.lookupAll(".label")) {
+            if (!(node instanceof Label label) || label.getText() == null || label.getText().isBlank()) {
+                continue;
+            }
+            Color fg = label.getTextFill() instanceof Color c ? c : null;
+            if (fg == null) {
+                continue;
+            }
+            Color bg = effectiveBackground(label, dark);
+            double ratio = contrast(fg, bg);
+            assertTrue(ratio >= MIN_TEXT_CONTRAST,
+                    String.format("%s label '%s' contrast too low: %.2f:1 (fg=%s bg=%s, classes=%s)",
+                            context, label.getText(), ratio, fg, bg, label.getStyleClass()));
         }
     }
 

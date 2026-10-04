@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-04
+
+Feature release that adds an animated startup splash, adaptive log tabs and
+drag-and-drop server organization, and makes every error dialog explain what
+happened in plain language.
+
+### Added
+- **Animated startup splash**: logo, version and an animated progress bar with the
+  current startup phase, shown before JavaFX loads — including `javaw` launches
+  through the Windows VBS shortcut. It closes as soon as the main window appears,
+  with no artificial waiting; database and preference preparation now run off the
+  UI thread.
+- **Adaptive log tabs**: tab headers shrink proportionally as more tabs are opened
+  and grow back when tabs close or the window widens (Notepad++-style). Text stays
+  readable, long names are ellipsised, and tooltips/overflow keep the full name.
+- **Server reordering in Locations**: drag a server between rows to reorder it
+  (inside a group or ungrouped); the order is saved and survives rebuilds.
+  Dedicated indicators show reordering (line above/below the row) versus group
+  membership (area highlight), with a hint describing the drop.
+- **New group anywhere**: right-click any empty space, heading or favorites area in
+  Locations to create a group at the top level.
+- **Contact in About**: the maintainer email is shown as a clickable mail link that
+  follows the active theme.
+
+### Changed
+- The Tail toolbar button now uses a terminal icon; Detail Clear and Close use
+  distinct eraser/X icons.
+- Detail panel, File Manager and Recent Log Files buttons share the compact density
+  of the main toolbar; "Clear Recent Files" no longer stretches across the panel.
+- Recent Log Files group headers show only the source name (no per-server count).
+- Reopening a file (from Recent, a reused File Manager tab, or re-enabling Tail)
+  updates its last-opened time in the database and moves it to the top of its group
+  while keeping the highlight; ordinary tab switching no longer rewrites history.
+- README refreshed: Java 21, GitHub URLs, `runDev`, the real packaging tasks,
+  running the packaged app, menus/shortcuts and current features.
+- Splash tagline now matches the README headline ("A Fast, Modern & Intelligent
+  Log Viewer").
+
+### Fixed
+- **Clear Log View**: the toolbar Clear button now empties the active tab's canvas —
+  it stops tailing, releases the session's reader/index/buffers and clears the
+  Detail panel and status bar — while keeping the tab open so Reload (Ctrl+R) or
+  Tail restores the same file.
+- **Remote files named `seeloggyplus-...`** are no longer rejected as local copies
+  just because of their name; they can be tailed and reopened normally.
+- **Human-readable error dialogs**: invalid or missing server locations explain how
+  to pick the original file; SSH login failures explain username/password or
+  private key/passphrase depending on the configured method; timeouts, refused
+  connections, unknown hosts, unreadable keys and changed server identity get
+  specific guidance, with the raw error under Details.
+- File Manager returns to the local location immediately when a connection fails,
+  without waiting for the error dialog to be closed.
+- Toolbar toggle icons keep readable contrast while pressed in the Light theme.
+
+### Tests
+- All 571 headless tests pass, and the production startup smoke test succeeds.
+- New coverage: splash (image, looping animation, tagline/README consistency),
+  adaptive tabs, About contact link, compact button density, Locations reordering
+  and drop indicators, New Group context menus, Recent ordering, Clear-active-tab,
+  remote path validation and SSH connection feedback.
+
 ## [0.6.5] - 2026-10-01
 
 Patch release that removes the leftover console window on Windows and makes a
@@ -290,7 +351,8 @@ in the CI `test` job before publishing, so 0.6.2 ships the complete 0.6 feature 
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.5...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.7.0...HEAD
+[0.7.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.5...0.7.0
 [0.6.5]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.4...0.6.5
 [0.6.4]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.3...0.6.4
 [0.6.3]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.2...0.6.3

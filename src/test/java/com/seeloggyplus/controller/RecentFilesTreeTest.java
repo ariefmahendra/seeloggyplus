@@ -118,6 +118,37 @@ class RecentFilesTreeTest {
     }
 
     @Test
+    @DisplayName("group headers and tooltips show only source names, regardless of the number of logs")
+    void groupHeadersDoNotShowLogCounts() {
+        class TestCell extends RecentFileTreeCell {
+            TestCell() { super(() -> null); }
+            void render(TreeItem<RecentNode> group) {
+                updateTreeItem(group);
+                updateItem(group.getValue(), false);
+            }
+        }
+        runFx(() -> {
+            allRecentFiles.setAll(
+                    remote("Production", "id-p", "application.log", "/srv/application.log"),
+                    remote("Production", "id-p", "error.log", "/srv/error.log"),
+                    remote("Production (Copy)", "id-copy", "copy.log", "/srv/copy.log"),
+                    local("local.log", "C:\\logs\\local.log"));
+            controller.rebuildRecentTree();
+            TestCell cell = new TestCell();
+            for (TreeItem<RecentFileTreeCell.RecentNode> group : recentFilesTreeView.getRoot().getChildren()) {
+                String source = group.getValue().getServerName();
+                cell.render(group);
+                assertEquals(source, cell.getText(), "The header should display the full source name without a count");
+                assertEquals(source, cell.getTooltip().getText(), "Hovering should not add the removed count");
+                group.getChildren().clear();
+                cell.render(group);
+                assertEquals(source, cell.getText(), "Changes to the number of logs must not change the header");
+                assertEquals(source, cell.getTooltip().getText());
+            }
+        });
+    }
+
+    @Test
     @DisplayName("server groups are expanded by default and can be collapsed")
     void groupsExpandAndCollapse() {
         runFx(() -> {

@@ -6,6 +6,7 @@ import com.seeloggyplus.service.LogParser;
 import com.seeloggyplus.service.SSHService;
 import com.seeloggyplus.ssh.HostKeyVerificationException;
 import com.seeloggyplus.ssh.SshAuthConfig;
+import com.seeloggyplus.util.RemoteLogPaths;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -202,17 +203,17 @@ public class SSHServiceImpl implements SSHService {
     public void tailFile(String remotePath, int lines, Consumer<String> logConsumer, Consumer<String> errorConsumer) {
         if (remotePath == null || remotePath.isBlank()) {
             if (errorConsumer != null) {
-                errorConsumer.accept("Remote path cannot be empty");
+                errorConsumer.accept(RemoteLogPaths.MISSING_LOCATION_MESSAGE);
             }
             return;
         }
 
         // Edge case: Windows local path mistakenly passed to remote SSH server
-        if (remotePath.matches("^[A-Za-z]:[\\\\/].*") || remotePath.contains("\\")) {
+        if (RemoteLogPaths.isWindowsLocalPath(remotePath)) {
             String err = "Invalid remote path: Windows local path cannot be tailed on remote SSH server: " + remotePath;
             logger.error(err);
             if (errorConsumer != null) {
-                errorConsumer.accept(err);
+                errorConsumer.accept(RemoteLogPaths.LOCAL_LOCATION_MESSAGE);
             }
             return;
         }

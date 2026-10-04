@@ -99,7 +99,7 @@
                 </Button>
                 <ToggleButton fx:id="tailButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="EYE" size="12" />
+                        <FontAwesomeIconView glyphName="TERMINAL" size="12" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Tail (Enable Tail Mode)" />
@@ -135,7 +135,7 @@
                         <Insets bottom="5" left="5" right="5" top="5" />
                     </padding>
 
-                    <HBox spacing="5">
+                    <HBox alignment="CENTER_LEFT" spacing="5" styleClass="compact-actions">
                         <Label prefHeight="18.0" prefWidth="294.0" text="Recent Log Files" HBox.hgrow="ALWAYS" styleClass="panel-title" />
                         <Separator prefWidth="200.0" HBox.hgrow="ALWAYS" />
                         <Button fx:id="pinLeftPanelButton">
@@ -151,11 +151,13 @@
                     <TextField fx:id="recentFilesFilterField" promptText="Filter recent logs..." />
                     <TreeView fx:id="recentFilesTreeView" VBox.vgrow="ALWAYS" showRoot="false" />
 
-                    <Button fx:id="clearRecentButton" maxWidth="Infinity" text="Clear Recent Files">
-                        <graphic>
-                            <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
-                        </graphic>
-                    </Button>
+                    <HBox alignment="CENTER_LEFT" styleClass="compact-actions">
+                        <Button fx:id="clearRecentButton" text="Clear Recent Files">
+                            <graphic>
+                                <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
+                            </graphic>
+                        </Button>
+                    </HBox>
                 </VBox>
 
                 <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
@@ -174,7 +176,7 @@
                                 </Button>
                             </VBox>
 
-                            <TabPane fx:id="logTabPane" tabClosingPolicy="ALL_TABS" tabDragPolicy="REORDER" visible="false" managed="false" />
+                            <TabPane fx:id="logTabPane" styleClass="log-tab-pane" tabClosingPolicy="ALL_TABS" tabDragPolicy="REORDER" visible="false" managed="false" />
                         </StackPane>
                     </VBox>
 
@@ -187,7 +189,7 @@
                         <HBox alignment="CENTER_LEFT" spacing="10">
                             <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS" styleClass="panel-title" />
 
-                            <HBox alignment="CENTER_LEFT" spacing="5">
+                            <HBox alignment="CENTER_LEFT" spacing="5" styleClass="compact-actions">
                                 <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
                                     <graphic>
                                         <FontAwesomeIconView glyphName="INDENT" size="12" />
@@ -214,10 +216,10 @@
                                 </Button>
                                 <Button fx:id="clearDetailButton">
                                     <graphic>
-                                        <FontAwesomeIconView glyphName="CLOSE" size="12" />
+                                        <FontAwesomeIconView glyphName="ERASER" size="12" />
                                     </graphic>
                                     <tooltip>
-                                        <Tooltip text="Clear" />
+                                        <Tooltip text="Clear Detail Content" />
                                     </tooltip>
                                 </Button>
                                 <Separator orientation="VERTICAL" />

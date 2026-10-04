@@ -4,6 +4,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.*?>
 <VBox alignment="TOP_CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="420.0" spacing="12.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.AboutDialogController">
@@ -37,6 +38,23 @@
          </children>
       </TextFlow>
       <Separator prefWidth="200.0" />
+      <HBox alignment="CENTER" spacing="6.0">
+         <children>
+            <Label text="Contact:" styleClass="about-contact-label">
+               <font>
+                  <Font size="11.0" />
+               </font>
+            </Label>
+            <Hyperlink fx:id="contactLink" mnemonicParsing="false" styleClass="about-contact" text="mahend.arief@gmail.com">
+               <font>
+                  <Font size="11.0" />
+               </font>
+               <tooltip>
+                  <Tooltip text="Send feedback or questions to mahend.arief@gmail.com" />
+               </tooltip>
+            </Hyperlink>
+         </children>
+      </HBox>
       <Label text="© 2025–2026 SeeLoggyPlus" styleClass="about-copyright">
          <font>
             <Font size="11.0" />

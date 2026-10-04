@@ -9,6 +9,7 @@ import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -98,6 +99,63 @@ class TreeDropIndicatorTest {
             assertEquals(heightBefore, cell.getHeight(), 0.01,
                     "clearing the highlight must not resize the cell either");
         });
+    }
+
+    @Test
+    void reorderAndMembershipIndicatorsAreDistinctAndDoNotResizeRowsInAnyTheme() {
+        onFxThread(() -> {
+            TreeView<String> tree = new TreeView<>();
+            TreeItem<String> root = new TreeItem<>("root");
+            root.getChildren().add(new TreeItem<>("server-1"));
+            root.setExpanded(true);
+            tree.setRoot(root);
+            tree.setShowRoot(false);
+            VBox box = new VBox(tree);
+            stage.setScene(AppTheme.scene(box));
+            stage.setWidth(360);
+            stage.setHeight(260);
+            stage.show();
+            box.applyCss();
+            box.layout();
+            TreeCell<?> cell = (TreeCell<?>) tree.lookup(".tree-cell");
+            assertNotNull(cell);
+            for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                AppTheme.setTheme(theme);
+                box.applyCss();
+                box.layout();
+                double height = cell.getHeight();
+                double preferred = cell.prefHeight(-1);
+                for (String state : new String[]{"drop-before", "drop-after", "drop-target", "drop-ungroup"}) {
+                    PseudoClass pseudo = PseudoClass.getPseudoClass(state);
+                    cell.pseudoClassStateChanged(pseudo, true);
+                    box.applyCss();
+                    box.layout();
+                    assertEquals(height, cell.getHeight(), 0.01, "Drag feedback must not shift row positions");
+                    assertEquals(preferred, cell.prefHeight(-1), 0.01);
+                    var fills = cell.getBackground().getFills();
+                    assertEquals(2, fills.size());
+                    if (state.equals("drop-before")) assertTrue(fills.get(1).getInsets().getTop() > 0);
+                    if (state.equals("drop-after")) assertTrue(fills.get(1).getInsets().getBottom() > 0);
+                    Color line = (Color) fills.get(0).getFill();
+                    Color surface = (Color) fills.get(1).getFill();
+                    assertTrue(contrast(line, surface) >= 3, "Drop indicators must remain visible in " + theme);
+                    cell.pseudoClassStateChanged(pseudo, false);
+                }
+            }
+        });
+    }
+
+    private static double contrast(Color a, Color b) {
+        double first = luminance(a), second = luminance(b);
+        return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+    }
+
+    private static double luminance(Color color) {
+        return 0.2126 * channel(color.getRed()) + 0.7152 * channel(color.getGreen()) + 0.0722 * channel(color.getBlue());
+    }
+
+    private static double channel(double value) {
+        return value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
     }
 
     private static void onFxThread(Runnable action) {

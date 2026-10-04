@@ -69,8 +69,11 @@ public class StreamModeEdgeCasesTest {
                 errorMessage::set);
 
         assertNotNull(errorMessage.get(), "Error consumer must receive an error for Windows path");
-        assertTrue(errorMessage.get().contains("Windows local path cannot be tailed on remote SSH server"),
-                "Error message should clearly state that Windows paths cannot be tailed on remote server");
+        assertTrue(errorMessage.get().contains("this computer"));
+        assertTrue(errorMessage.get().contains("File Manager"));
+        assertTrue(errorMessage.get().contains("original file"));
+        assertTrue(errorMessage.get().contains("Tail"));
+        assertFalse(errorMessage.get().contains(windowsTempPath), "Raw locations belong in diagnostic details or logs");
         assertFalse(logConsumed.get(), "Log consumer must NOT receive anything");
     }
 
@@ -114,17 +117,17 @@ public class StreamModeEdgeCasesTest {
         AtomicReference<String> emptyErr = new AtomicReference<>();
         sshService.tailFile("", 100, l -> {}, emptyErr::set);
         assertNotNull(emptyErr.get());
-        assertTrue(emptyErr.get().contains("empty"));
+        assertTrue(emptyErr.get().contains("location on the server is missing"));
 
         AtomicReference<String> nullErr = new AtomicReference<>();
         sshService.tailFile(null, 100, l -> {}, nullErr::set);
         assertNotNull(nullErr.get());
-        assertTrue(nullErr.get().contains("empty"));
+        assertTrue(nullErr.get().contains("location on the server is missing"));
 
         AtomicReference<String> blankErr = new AtomicReference<>();
         sshService.tailFile("   ", 100, l -> {}, blankErr::set);
         assertNotNull(blankErr.get());
-        assertTrue(blankErr.get().contains("empty"));
+        assertTrue(blankErr.get().contains("location on the server is missing"));
     }
 
     @Test
