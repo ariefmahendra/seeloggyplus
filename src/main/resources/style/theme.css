@@ -416,6 +416,25 @@
     -fx-fill: -sl-text-secondary;
 }
 
+/* Contact mail link: follows the theme info tone instead of the default link blue. */
+.about-contact-label {
+    -fx-text-fill: -sl-text-secondary;
+}
+
+.about-contact {
+    -fx-text-fill: -sl-info;
+    -fx-underline: true;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.about-contact:hover,
+.about-contact:focused,
+.about-contact:visited {
+    -fx-text-fill: -sl-info;
+}
+
 /* ============================================================
    Icons
    Default icon color follows the theme text color so icons stay
