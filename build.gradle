@@ -128,7 +128,7 @@ def generateStartupSplash = tasks.register('generateStartupSplash') {
             graphics.setFont(new java.awt.Font('Segoe UI', java.awt.Font.BOLD, 30))
             graphics.drawString('SeeLoggyPlus', 120, 64)
             graphics.setFont(new java.awt.Font('Segoe UI', java.awt.Font.PLAIN, 13))
-            graphics.drawString('Local & SSH log viewer', 120, 87)
+            graphics.drawString('A Fast, Modern & Intelligent Log Viewer', 120, 87)
             graphics.setFont(new java.awt.Font('Segoe UI', java.awt.Font.BOLD, 15))
             graphics.drawString('Starting SeeLoggyPlus...', 32, 145)
             graphics.setFont(new java.awt.Font('Segoe UI', java.awt.Font.PLAIN, 13))

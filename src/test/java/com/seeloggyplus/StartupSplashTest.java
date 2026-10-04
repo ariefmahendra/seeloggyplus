@@ -103,6 +103,25 @@ class StartupSplashTest {
         assertFalse(build.contains("startup-splash.png"), "The retired static splash must not be generated or launched");
     }
 
+    @Test
+    void splashTaglineMatchesTheReadmeHeadline() throws Exception {
+        String readme = Files.readString(Path.of("README.md"));
+        String headline = readme.lines()
+                .filter(line -> line.startsWith("# "))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("README.md must start with a level-1 headline"))
+                .replaceFirst("^#\\s+", "");
+        int dash = headline.indexOf('—');
+        String tagline = dash >= 0 ? headline.substring(dash + 1).trim() : headline;
+        assertFalse(tagline.isBlank(), "the README headline must carry the product tagline");
+
+        String build = Files.readString(Path.of("build.gradle"));
+        assertTrue(build.contains("graphics.drawString('" + tagline + "'"),
+                "The splash tagline must match the README headline exactly, expected: " + tagline);
+        assertFalse(build.contains("Local & SSH log viewer"),
+                "The old splash tagline must not survive next to the README wording");
+    }
+
     private static Color token(String css, String name) {
         var matcher = Pattern.compile(Pattern.quote(name) + "\\s*:\\s*(#[0-9a-fA-F]{6})").matcher(css);
         assertTrue(matcher.find(), "Missing theme token " + name);
