@@ -10,6 +10,7 @@ import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
+import javafx.beans.binding.Bindings;
 import javafx.scene.Cursor;
 import javafx.util.Duration;
 
@@ -67,6 +68,11 @@ public class MainController {
     /** Tab-header horizontal-scroll throttling (one tab per gesture). */
     private static final double TAB_HEADER_SCROLL_THRESHOLD = 30;
     private static final long TAB_HEADER_SCROLL_COOLDOWN_MS = 260;
+    private static final double MIN_LOG_TAB_CONTENT_WIDTH = 60;
+    private static final double MAX_LOG_TAB_CONTENT_WIDTH = 220;
+    // JavaFX's tab width properties exclude the 10px horizontal padding on each side.
+    private static final double LOG_TAB_HORIZONTAL_PADDING = 20;
+    private static final double LOG_TAB_OVERFLOW_RESERVE = 40;
     private double tabHeaderScrollAccumulator = 0;
     private long lastTabHeaderSwitchAt = 0;
 
@@ -761,6 +767,7 @@ public class MainController {
         }
 
         if (logTabPane != null) {
+            setupAdaptiveLogTabs();
             logTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
                 onTabSelected(oldTab, newTab);
             });
@@ -2224,6 +2231,7 @@ public class MainController {
                 if (logTabPane != null) {
                     logTabPane.getSelectionModel().select(entry.getKey());
                 }
+                markRecentOpened(s);
                 if (sshService != null) {
                     sshService.disconnect();
                 }
@@ -2393,6 +2401,7 @@ public class MainController {
                         if (startTail && !s.isTailModeEnabled()) {
                             enableTail();
                         }
+                        if (updateRecentFilesList) markRecentOpened(s);
                         return;
                     }
                 } catch (IOException ignored) {
@@ -2403,6 +2412,7 @@ public class MainController {
                         if (startTail && !s.isTailModeEnabled()) {
                             enableTail();
                         }
+                        if (updateRecentFilesList) markRecentOpened(s);
                         return;
                     }
                 }
@@ -2657,14 +2667,18 @@ public class MainController {
 
         if (logFile.isRemote()) {
             String filePath = logFile.getFilePath();
-            if (filePath != null && (filePath.matches("^[A-Za-z]:[\\\\/].*") || filePath.contains("\\") || filePath.contains("seeloggyplus-"))) {
+            if (filePath == null || filePath.isBlank()) {
+                validateRemoteTailPath(filePath);
+                return;
+            }
+            if (RemoteLogPaths.isWindowsLocalPath(filePath)) {
                 logger.warn("Recent remote file has local temp path stored: {}", filePath);
                 File localCopy = new File(filePath);
                 if (localCopy.exists()) {
                     openLocalLogFile(localCopy, false);
                     return;
                 } else {
-                    showError("File Not Found", "The temporary file no longer exists: " + filePath);
+                    showRemotePathError(filePath);
                     return;
                 }
             }
@@ -2685,6 +2699,7 @@ public class MainController {
                     if (logTabPane != null) {
                         logTabPane.getSelectionModel().select(entry.getKey());
                     }
+                    markRecentOpened(s);
                     return;
                 }
             }
@@ -2696,7 +2711,7 @@ public class MainController {
             // mode we must reconnect and stream, even if a downloaded copy is cached.
             if (!tailMode && cachedDownload != null && cachedDownload.isFile()) {
                 logger.info("Opening cached remote download from Recent: {}", cachedDownload.getAbsolutePath());
-                openLocalLogFile(cachedDownload, logFile.getName(), cachedServer, logFile.getFilePath(), false);
+                openLocalLogFile(cachedDownload, logFile.getName(), cachedServer, logFile.getFilePath(), true);
                 return;
             }
 
@@ -2805,6 +2820,7 @@ public class MainController {
                             if (logTabPane != null) {
                                 logTabPane.getSelectionModel().select(entry.getKey());
                             }
+                            markRecentOpened(s);
                             return;
                         }
                     } catch (IOException ignored) {
@@ -2812,6 +2828,7 @@ public class MainController {
                             if (logTabPane != null) {
                                 logTabPane.getSelectionModel().select(entry.getKey());
                             }
+                            markRecentOpened(s);
                             return;
                         }
                     }
@@ -2820,7 +2837,7 @@ public class MainController {
 
             logger.info("Opening recent file: {} with RAW config (tail={})", file.getName(), tailMode);
             resetFilters();
-            openLocalLogFile(file, false, tailMode);
+            openLocalLogFile(file, true, tailMode);
         }
     }
 
@@ -3119,6 +3136,19 @@ public class MainController {
     private void refreshRecentFilesList() {
         allRecentFiles.setAll(recentFileService.findAll());
         rebuildRecentTree();
+    }
+
+    /** An explicit reopen updates history; ordinary tab selection only updates highlighting. */
+    private void markRecentOpened(LogSession session) {
+        if (session == null || session.getLogFileRecord() == null || session.getLogFileRecord().getId() == null) return;
+        LogFile file = session.getLogFileRecord();
+        RecentFile recent = recentFileService.findByFileId(file.getId()).orElseGet(() ->
+                new RecentFile(UUID.randomUUID().toString(), file.getId(), null, null));
+        recent.setLastOpened(LocalDateTime.now());
+        recent.setMode(session.isTailModeEnabled() ? RecentFile.MODE_TAIL : RecentFile.MODE_OPEN);
+        recentFileService.save(file, recent);
+        refreshRecentFilesList();
+        selectRecentFileForSession(session);
     }
 
     private void handleAbout() {
@@ -3645,6 +3675,10 @@ public class MainController {
     private void startRemoteTailInternal() {
         if (currentSession != null && currentSession.getSessionType() == LogSession.SessionType.REMOTE) {
             final LogSession targetSession = currentSession;
+            if (!validateRemoteTailPath(targetSession.getRemotePath())) {
+                disableTail(targetSession, false);
+                return;
+            }
             targetSession.setTailModeEnabled(true);
             targetSession.getLiveTailList().clear();
             synchronized (targetSession.getTailBuffer()) {
@@ -3755,15 +3789,7 @@ public class MainController {
         String remotePath = (currentSession != null && currentSession.getRemotePath() != null)
                 ? currentSession.getRemotePath()
                 : (currentLogFromDb != null ? currentLogFromDb.getFilePath() : null);
-        if (remotePath == null || remotePath.isEmpty()) {
-            showError("Error", "Remote path is missing");
-            disableTail();
-            return;
-        }
-
-        if (remotePath.matches("^[A-Za-z]:[\\\\/].*") || remotePath.contains("\\") || remotePath.contains("seeloggyplus-")) {
-            logger.error("Attempted to start remote tail with local Windows/temp path: {}", remotePath);
-            showError("Invalid Remote Path", "This file is a local or temporary copy and cannot be streamed from remote SSH server: " + remotePath);
+        if (!validateRemoteTailPath(remotePath)) {
             disableTail();
             return;
         }
@@ -3893,13 +3919,7 @@ public class MainController {
 
     private void startRemoteTail(String remotePath, SSHServiceImpl sshService, SSHServerModel server,
             int tailLines, int tailJumpIndex) {
-        if (remotePath == null || remotePath.isBlank()) {
-            showError("Invalid Remote Path", "Remote path cannot be empty.");
-            return;
-        }
-        if (remotePath.matches("^[A-Za-z]:[\\\\/].*") || remotePath.contains("\\") || remotePath.contains("seeloggyplus-")) {
-            logger.error("Attempted to start remote tail with Windows/local temp path: {}", remotePath);
-            showError("Invalid Remote Path", "Windows local path cannot be streamed via remote SSH: " + remotePath);
+        if (!validateRemoteTailPath(remotePath)) {
             return;
         }
 
@@ -3913,6 +3933,7 @@ public class MainController {
                 if (logTabPane != null) {
                     logTabPane.getSelectionModel().select(entry.getKey());
                 }
+                markRecentOpened(s);
                 return;
             }
         }
@@ -3965,6 +3986,29 @@ public class MainController {
                 }));
     }
 
+    private void setupAdaptiveLogTabs() {
+        logTabPane.setMinWidth(0);
+        var width = Bindings.createDoubleBinding(() -> {
+            int count = Math.max(1, logTabPane.getTabs().size());
+            double available = Math.max(0, logTabPane.getWidth() - LOG_TAB_OVERFLOW_RESERVE);
+            double content = Math.floor(available / count) - LOG_TAB_HORIZONTAL_PADDING;
+            return Math.max(MIN_LOG_TAB_CONTENT_WIDTH, Math.min(MAX_LOG_TAB_CONTENT_WIDTH, content));
+        }, logTabPane.widthProperty(), logTabPane.getTabs());
+        logTabPane.tabMinWidthProperty().bind(width);
+        logTabPane.tabMaxWidthProperty().bind(width);
+    }
+
+    private boolean validateRemoteTailPath(String remotePath) {
+        boolean missing = remotePath == null || remotePath.isBlank();
+        if (!missing && !RemoteLogPaths.isWindowsLocalPath(remotePath)) {
+            return true;
+        }
+        logger.warn("Remote tail rejected: {}; location={}",
+                missing ? "missing server location" : "Windows-style local location", remotePath);
+        showRemotePathError(remotePath);
+        return false;
+    }
+
     private LogFile saveRemoteTailToRecent(String remotePath, SSHServerModel server) {
         try {
             ParsingConfig parsingConfig = ParsingConfig.createRawConfig(); // Internal default
@@ -3994,40 +4038,18 @@ public class MainController {
                 logger.info("Updated existing LogFile for remote tail: id={}, serverId={}, path={}", logFile.getId(), serverId, remotePath);
             }
 
-            Optional<RecentFile> existingRecentOpt = recentFileService.findByFileId(logFile.getId());
-            boolean createdNewRecent;
-
-            if (existingRecentOpt.isEmpty()) {
-                RecentFile recent = new RecentFile();
-                recent.setFileId(logFile.getId());
-                recent.setLastOpened(LocalDateTime.now());
-                recent.setMode(RecentFile.MODE_TAIL);
-
-                recentFileService.save(logFile, recent);
-                createdNewRecent = true;
-
-                logger.info("Created new RecentFile for remote tail: fileId={}, serverId={}", logFile.getId(), serverId);
-            } else {
-                createdNewRecent = false;
-                // Persist the mode so double-clicking this Recent entry streams it again,
-                // but keep the original lastOpened so the list order does not jump.
-                RecentFile existingRecent = existingRecentOpt.get();
-                existingRecent.setMode(RecentFile.MODE_TAIL);
-                recentFileService.save(logFile, existingRecent);
-                logger.info("Remote tail for existing recent fileId={}, NOT updating lastOpened (no re-sort)",
-                        logFile.getId());
-            }
+            RecentFile recent = recentFileService.findByFileId(logFile.getId()).orElseGet(RecentFile::new);
+            recent.setFileId(logFile.getId());
+            recent.setLastOpened(LocalDateTime.now());
+            recent.setMode(RecentFile.MODE_TAIL);
+            recentFileService.save(logFile, recent);
 
             this.currentLogFromDb = logFile;
             this.monitoringRemotePath = remotePath;
 
             final String fServerId = serverId;
             Platform.runLater(() -> {
-                if (createdNewRecent) {
-                    refreshRecentFilesList();
-                } else {
-                    recentFilesTreeView.refresh();
-                }
+                refreshRecentFilesList();
                 selectRecentFile(remotePath, fServerId, true);
             });
             return logFile;
@@ -4431,6 +4453,33 @@ public class MainController {
             alert.setContentText(message);
             showAndWaitAndRestore(alert);
         });
+    }
+
+    private void showRemotePathError(String remotePath) {
+        Platform.runLater(() -> showAndWaitAndRestore(createRemotePathError(remotePath)));
+    }
+
+    static Alert createRemotePathError(String remotePath) {
+        boolean missing = remotePath == null || remotePath.isBlank();
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Unable to monitor log");
+        alert.setHeaderText("Unable to monitor log from server");
+        alert.setContentText(missing ? RemoteLogPaths.MISSING_LOCATION_MESSAGE : RemoteLogPaths.LOCAL_LOCATION_MESSAGE);
+
+        TextArea details = new TextArea("File location: " + (missing ? "Not saved" : remotePath)
+                + "\nReason: " + (missing ? "Missing server location" : "Windows-style local location"));
+        details.setEditable(false);
+        details.setWrapText(true);
+        details.setPrefColumnCount(48);
+        details.setPrefRowCount(3);
+        DialogPane pane = alert.getDialogPane();
+        pane.setExpandableContent(details);
+        pane.setPrefWidth(520);
+        pane.getStyleClass().add("remote-path-error");
+        pane.getStylesheets().setAll(AppTheme.sceneStylesheets(AppTheme.getTheme()));
+        AppTheme.applyThemeState(pane, AppTheme.getTheme());
+        alert.setOnShown(event -> addDialogIcon(pane.getScene().getWindow()));
+        return alert;
     }
 
     private void showInfo(String title, String message) {

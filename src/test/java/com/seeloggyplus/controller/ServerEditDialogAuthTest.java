@@ -2,6 +2,8 @@ package com.seeloggyplus.controller;
 
 import com.seeloggyplus.model.SSHServerModel;
 import com.seeloggyplus.util.AppTheme;
+import com.seeloggyplus.util.SshConnectionFeedback;
+import com.seeloggyplus.service.impl.SSHServiceImpl;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
@@ -9,14 +11,22 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.control.DialogPane;
+import javafx.scene.control.TextArea;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
+import org.testfx.api.FxRobot;
+import javafx.stage.Window;
+import java.util.ArrayList;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -72,12 +82,62 @@ class ServerEditDialogAuthTest {
     @Test
     @DisplayName("test-connection failure keeps the real reason visible")
     void testFailureMessageKeepsDetail() {
-        assertEquals("Failed to connect. Please check your credentials.",
-                ServerEditDialogController.formatTestFailure(null));
-        assertEquals("Failed to connect. Please check your credentials.",
-                ServerEditDialogController.formatTestFailure("   "));
-        assertTrue(ServerEditDialogController.formatTestFailure("invalid privatekey")
-                .contains("invalid privatekey"));
+        var feedback = SshConnectionFeedback.describe("invalid privatekey", true);
+        assertEquals("invalid privatekey", feedback.detail());
+        assertTrue(feedback.message().contains("private key file"));
+        assertFalse(feedback.message().contains("invalid privatekey"));
+    }
+
+    @AfterEach
+    void dismissResultDialogs(FxRobot robot) {
+        robot.interact(() -> {
+            for (Window window : new ArrayList<>(Window.getWindows())) {
+                if (window.getScene() != null && window.getScene().getRoot().lookup(".dialog-pane") instanceof DialogPane) {
+                    window.hide();
+                }
+            }
+            AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+        });
+    }
+
+    @Test
+    void authenticationTestFailureShowsReadableMessageAndExpandableDetails(FxRobot robot) throws Exception {
+        String raw = "Auth fail for methods 'publickey,gssapi-keyex,gssapi-with-mic,password'";
+        var field = ServerEditDialogController.class.getDeclaredField("sshService");
+        field.setAccessible(true);
+        field.set(controller, new SSHServiceImpl() {
+            @Override
+            public boolean connect(String host, int port, String username, String password) { return false; }
+            @Override
+            public String getLastConnectError() { return raw; }
+        });
+        robot.interact(() -> {
+            ((TextField) root.lookup("#hostField")).setText("127.0.0.1");
+            ((TextField) root.lookup("#usernameField")).setText("test-user");
+            ((PasswordField) root.lookup("#passwordField")).setText("test-secret-not-for-display");
+            ((Button) root.lookup("#testButton")).fire();
+        });
+        AtomicReference<DialogPane> result = new AtomicReference<>();
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> WaitForAsyncUtils.asyncFx(() -> {
+            for (Window window : Window.getWindows()) {
+                if (window.getScene() != null && window.getScene().getRoot().lookup(".dialog-pane") instanceof DialogPane pane
+                        && "Unable to sign in to server".equals(pane.getHeaderText())) {
+                    result.set(pane);
+                    return true;
+                }
+            }
+            return false;
+        }).get());
+        robot.interact(() -> {
+            DialogPane pane = result.get();
+            assertTrue(pane.getContentText().contains("username and password"));
+            assertFalse(pane.getContentText().contains("gssapi"));
+            TextArea details = assertInstanceOf(TextArea.class, pane.getExpandableContent());
+            assertTrue(details.getText().contains(raw));
+            assertFalse(details.getText().contains("test-secret-not-for-display"));
+            assertFalse(details.isEditable());
+            assertFalse(pane.isExpanded());
+        });
     }
 
     @Test

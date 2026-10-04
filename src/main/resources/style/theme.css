@@ -222,6 +222,8 @@
 .app-toolbar .button:pressed FontAwesomeIconView,
 .app-toolbar .toggle-button:hover .glyph-icon,
 .app-toolbar .toggle-button:hover FontAwesomeIconView,
+.app-toolbar .toggle-button:pressed .glyph-icon,
+.app-toolbar .toggle-button:pressed FontAwesomeIconView,
 .app-toolbar .toggle-button:selected .glyph-icon,
 .app-toolbar .toggle-button:selected FontAwesomeIconView {
     -fx-fill: -sl-accent-text;

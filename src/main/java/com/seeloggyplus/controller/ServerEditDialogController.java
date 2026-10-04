@@ -223,24 +223,20 @@ public class ServerEditDialogController {
             progress.close();
             boolean success = task.getValue();
             
-            Alert result = new Alert(success ? Alert.AlertType.INFORMATION : Alert.AlertType.ERROR);
-            result.setTitle("Test Result");
-            result.setHeaderText(success ? "Connection Successful" : "Connection Failed");
-            result.setContentText(success ?
-                "Successfully connected to the server!" :
-                formatTestFailure(sshService.getLastConnectError()));
+            Alert result;
+            if (success) {
+                result = new Alert(Alert.AlertType.INFORMATION);
+                result.setTitle("Test Result");
+                result.setHeaderText("Connection Successful");
+                result.setContentText("Successfully connected to the server!");
+            } else {
+                result = com.seeloggyplus.util.SshConnectionFeedback.createAlert(sshService.getLastConnectError(), testServer);
+            }
+            if (hostField.getScene() != null) result.initOwner(hostField.getScene().getWindow());
             result.showAndWait();
         });
 
         new Thread(task).start();
-    }
-
-    /** Failure text for the Test Connection dialog; keeps the real reason visible. */
-    static String formatTestFailure(String detail) {
-        if (detail == null || detail.isBlank()) {
-            return "Failed to connect. Please check your credentials.";
-        }
-        return "Failed to connect:\n" + detail;
     }
 
     private void handleSave() {

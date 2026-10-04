@@ -77,4 +77,36 @@ class ServerGroupDropTest {
         assertEquals("web-1", srv.getServer().getName());
         assertEquals("Production / web-1", srv.getTooltip());
     }
+
+    @Test
+    void sameGroupServerRowsReorderAccordingToPointerHalf() {
+        var target = UnifiedFileManagerDialogController.LocationItem.of(server("web-1", "Production"));
+        assertEquals(UnifiedFileManagerDialogController.DropPlacement.BEFORE,
+                UnifiedFileManagerDialogController.dropPlacement(target, "Production", 8, 24));
+        assertEquals(UnifiedFileManagerDialogController.DropPlacement.AFTER,
+                UnifiedFileManagerDialogController.dropPlacement(target, "Production", 16, 24));
+    }
+
+    @Test
+    void crossGroupEdgesReorderAndCenterJoinsTheGroup() {
+        var target = UnifiedFileManagerDialogController.LocationItem.of(server("web-1", "Production"));
+        assertEquals(UnifiedFileManagerDialogController.DropPlacement.BEFORE,
+                UnifiedFileManagerDialogController.dropPlacement(target, "Staging", 2, 24));
+        assertEquals(UnifiedFileManagerDialogController.DropPlacement.AFTER,
+                UnifiedFileManagerDialogController.dropPlacement(target, "Staging", 22, 24));
+        assertEquals(UnifiedFileManagerDialogController.DropPlacement.INTO_GROUP,
+                UnifiedFileManagerDialogController.dropPlacement(target, "Staging", 12, 24));
+    }
+
+    @Test
+    void folderAndUngroupedTargetsHaveDistinctMembershipActions() {
+        assertEquals(UnifiedFileManagerDialogController.DropPlacement.INTO_GROUP,
+                UnifiedFileManagerDialogController.dropPlacement(
+                        UnifiedFileManagerDialogController.LocationItem.group("Production"), "Staging", 12, 24));
+        assertEquals(UnifiedFileManagerDialogController.DropPlacement.UNGROUP,
+                UnifiedFileManagerDialogController.dropPlacement(
+                        UnifiedFileManagerDialogController.LocationItem.local(), "Staging", 12, 24));
+        assertEquals(UnifiedFileManagerDialogController.DropPlacement.UNGROUP,
+                UnifiedFileManagerDialogController.dropPlacement(null, "Staging", 12, 24));
+    }
 }

@@ -99,7 +99,7 @@
                 </Button>
                 <ToggleButton fx:id="tailButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="EYE" size="12" />
+                        <FontAwesomeIconView glyphName="TERMINAL" size="12" />
                     </graphic>
                     <tooltip>
                         <Tooltip text="Tail (Enable Tail Mode)" />
@@ -174,7 +174,7 @@
                                 </Button>
                             </VBox>
 
-                            <TabPane fx:id="logTabPane" tabClosingPolicy="ALL_TABS" tabDragPolicy="REORDER" visible="false" managed="false" />
+                            <TabPane fx:id="logTabPane" styleClass="log-tab-pane" tabClosingPolicy="ALL_TABS" tabDragPolicy="REORDER" visible="false" managed="false" />
                         </StackPane>
                     </VBox>
 
@@ -187,7 +187,7 @@
                         <HBox alignment="CENTER_LEFT" spacing="10">
                             <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS" styleClass="panel-title" />
 
-                            <HBox alignment="CENTER_LEFT" spacing="5">
+                            <HBox alignment="CENTER_LEFT" spacing="5" styleClass="compact-actions">
                                 <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
                                     <graphic>
                                         <FontAwesomeIconView glyphName="INDENT" size="12" />
@@ -214,10 +214,10 @@
                                 </Button>
                                 <Button fx:id="clearDetailButton">
                                     <graphic>
-                                        <FontAwesomeIconView glyphName="CLOSE" size="12" />
+                                        <FontAwesomeIconView glyphName="ERASER" size="12" />
                                     </graphic>
                                     <tooltip>
-                                        <Tooltip text="Clear" />
+                                        <Tooltip text="Clear Detail Content" />
                                     </tooltip>
                                 </Button>
                                 <Separator orientation="VERTICAL" />

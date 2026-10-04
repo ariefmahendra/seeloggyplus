@@ -6,6 +6,16 @@ import com.seeloggyplus.service.impl.ServerManagementServiceImpl;
 import com.seeloggyplus.util.AppTheme;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
+import javafx.scene.Node;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.DialogPane;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Label;
+import javafx.scene.input.ContextMenuEvent;
+import javafx.event.Event;
+import javafx.stage.Window;
+import javafx.application.Platform;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.stage.Stage;
@@ -22,6 +32,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -373,5 +384,142 @@ class FileManagerGroupingTest {
                 UnifiedFileManagerDialogController.LocationItem.local()));
         assertNull(UnifiedFileManagerDialogController.groupForDropTarget(
                 UnifiedFileManagerDialogController.LocationItem.root()));
+    }
+
+    @Test
+    void serverReorderingPersistsAtRootWithoutOpeningAConnection() throws Exception {
+        SSHServerModel a = createServer(unique("A"), null);
+        SSHServerModel b = createServer(unique("B"), null);
+        SSHServerModel c = createServer(unique("C"), null);
+        serverService.reorderServers(List.of(a.getId(), b.getId(), c.getId()));
+        runFx(controller::rebuildLocationTree);
+        Object locationBefore = currentLocation();
+
+        runFx(() -> controller.reorderServer(c.getId(), a.getId(), false));
+        awaitOrder(null, List.of(c.getId(), a.getId(), b.getId()));
+        assertEquals(List.of(c.getId(), a.getId(), b.getId()), savedOrder(a, b, c));
+        assertSame(locationBefore, currentLocation(), "Reordering must not connect to or navigate into a server");
+        assertEquals(c.getId(), locationTree.getSelectionModel().getSelectedItem().getValue().getServer().getId());
+        runFx(controller::rebuildLocationTree);
+        assertEquals(List.of(c.getId(), a.getId(), b.getId()), treeOrder(null, List.of(c.getId(), a.getId(), b.getId())));
+    }
+
+    @Test
+    void reorderingInsideAGroupPreservesOtherGroups() throws Exception {
+        String group = unique("OrderGroup");
+        String other = unique("OtherGroup");
+        createGroup(group);
+        createGroup(other);
+        SSHServerModel a = createServer(unique("A"), group);
+        SSHServerModel b = createServer(unique("B"), group);
+        SSHServerModel c = createServer(unique("C"), group);
+        SSHServerModel x = createServer(unique("X"), other);
+        SSHServerModel y = createServer(unique("Y"), other);
+        serverService.reorderServers(List.of(a.getId(), x.getId(), b.getId(), y.getId(), c.getId()));
+        runFx(controller::rebuildLocationTree);
+
+        runFx(() -> controller.reorderServer(a.getId(), c.getId(), true));
+        awaitOrder(group, List.of(b.getId(), c.getId(), a.getId()));
+        assertEquals(List.of(x.getId(), y.getId()), savedOrder(x, y));
+        assertEquals(group, serverService.getServerById(a.getId()).getGroupName());
+        assertEquals(List.of(b.getId(), c.getId(), a.getId()), savedOrder(a, b, c));
+    }
+
+    @Test
+    void droppingBetweenServersInAnotherGroupMovesAndOrdersTheServer() throws Exception {
+        String group = unique("TargetGroup");
+        createGroup(group);
+        SSHServerModel source = createServer(unique("Source"), null);
+        SSHServerModel a = createServer(unique("A"), group);
+        SSHServerModel b = createServer(unique("B"), group);
+        serverService.reorderServers(List.of(source.getId(), a.getId(), b.getId()));
+        runFx(controller::rebuildLocationTree);
+
+        runFx(() -> controller.reorderServer(source.getId(), b.getId(), false));
+        awaitOrder(group, List.of(a.getId(), source.getId(), b.getId()));
+        assertEquals(group, serverService.getServerById(source.getId()).getGroupName());
+        assertNull(serverNodeByRoot(source.getId()));
+        assertEquals(List.of(a.getId(), source.getId(), b.getId()), savedOrder(source, a, b));
+    }
+
+    @Test
+    void newGroupIsAvailableOnContainerAndHeadingWithoutUsingTheSelectedGroup() {
+        String group = unique("SelectedGroup");
+        createGroup(group);
+        runFx(() -> locationTree.getSelectionModel().select(groupNode(group)));
+        runFx(() -> {
+            Parent root = stage.getScene().getRoot();
+            Node container = root.lookup("#locationsContainer");
+            assertNotNull(container);
+            assertNotNull(locationTree.getContextMenu(), "Empty tree space needs a New group context menu");
+            Node heading = root.lookupAll(".label").stream()
+                    .filter(node -> node instanceof Label label && "Locations".equals(label.getText())).findFirst().orElseThrow();
+            var point = heading.localToScreen(5, 5);
+            Event.fireEvent(heading, new ContextMenuEvent(ContextMenuEvent.CONTEXT_MENU_REQUESTED,
+                    5, 5, point.getX(), point.getY(), false, null));
+        });
+        final ContextMenu[] menu = new ContextMenu[1];
+        runFx(() -> {
+            menu[0] = Window.getWindows().stream().filter(window -> window instanceof ContextMenu && window.isShowing())
+                    .map(window -> (ContextMenu) window).findFirst().orElseThrow();
+            assertTrue(menu[0].getItems().stream().anyMatch(item -> "New group...".equals(item.getText())));
+        });
+        Platform.runLater(() -> {
+            menu[0].hide();
+            menu[0].getItems().stream().filter(item -> "New group...".equals(item.getText())).findFirst().orElseThrow().fire();
+        });
+        WaitForAsyncUtils.waitForFxEvents();
+        runFx(() -> {
+            DialogPane pane = Window.getWindows().stream().filter(window -> window.getScene() != null)
+                    .map(window -> window.getScene().getRoot().lookup(".dialog-pane"))
+                    .filter(DialogPane.class::isInstance).map(DialogPane.class::cast).findFirst().orElseThrow();
+            assertEquals("Create a server group", pane.getHeaderText(), "Blank/container context should create at root, not inside the selected group");
+            ((Button) pane.lookupButton(ButtonType.CANCEL)).fire();
+        });
+    }
+
+    @Test
+    void favoriteAreaAlsoOffersNewGroupWithoutRemovingItsOwnActions() throws Exception {
+        Field field = UnifiedFileManagerDialogController.class.getDeclaredField("favoritesListView");
+        field.setAccessible(true);
+        var list = (javafx.scene.control.ListView<?>) field.get(controller);
+        runFx(() -> {
+            assertTrue(list.getContextMenu().getItems().stream().anyMatch(item -> "New group...".equals(item.getText())));
+            assertTrue(list.getContextMenu().getItems().stream().anyMatch(item -> "Remove Favorite".equals(item.getText())));
+        });
+    }
+
+    @Test
+    void reorderingPreservesUnrelatedCollapsedFolders() throws Exception {
+        String group = unique("OrderGroup");
+        String collapsed = unique("CollapsedGroup");
+        createGroup(group);
+        createGroup(collapsed);
+        SSHServerModel a = createServer(unique("A"), group);
+        SSHServerModel b = createServer(unique("B"), group);
+        serverService.reorderServers(List.of(a.getId(), b.getId()));
+        runFx(() -> {
+            controller.rebuildLocationTree();
+            groupNode(collapsed).setExpanded(false);
+            controller.reorderServer(a.getId(), b.getId(), true);
+        });
+        awaitOrder(group, List.of(b.getId(), a.getId()));
+        assertFalse(groupNode(collapsed).isExpanded(), "Moving a server must not unexpectedly expand other folders");
+    }
+
+    private List<String> savedOrder(SSHServerModel... servers) {
+        var ids = java.util.Arrays.stream(servers).map(SSHServerModel::getId).toList();
+        return serverService.getAllServers().stream().map(SSHServerModel::getId).filter(ids::contains).toList();
+    }
+
+    private List<String> treeOrder(String group, List<String> ids) {
+        TreeItem<UnifiedFileManagerDialogController.LocationItem> parent = group == null ? locationTree.getRoot() : groupNode(group);
+        return parent.getChildren().stream().map(TreeItem::getValue).filter(item -> item != null && item.isServer())
+                .map(item -> item.getServer().getId()).filter(ids::contains).toList();
+    }
+
+    private void awaitOrder(String group, List<String> ids) throws Exception {
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS,
+                () -> WaitForAsyncUtils.asyncFx(() -> treeOrder(group, ids).equals(ids)).get());
     }
 }

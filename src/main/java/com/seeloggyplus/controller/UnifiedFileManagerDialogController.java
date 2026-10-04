@@ -87,6 +87,10 @@ public class UnifiedFileManagerDialogController {
     @FXML
     private TreeView<LocationItem> locationTree;
     @FXML
+    private VBox locationsContainer;
+    @FXML
+    private Label locationDropHint;
+    @FXML
     private Button newGroupButton;
     @FXML
     private Button manageServersButton;
@@ -171,6 +175,7 @@ public class UnifiedFileManagerDialogController {
     private boolean suppressSortSave = false;
     private boolean locationTreeReady;
     private String draggedLocationServerId;
+    private String draggedLocationGroup;
     private OpenAction doubleClickAction = OpenAction.OPEN;
     private String cachedFavoritesLocationId = null; // Track which location favorites are cached for
 
@@ -187,6 +192,11 @@ public class UnifiedFileManagerDialogController {
     });
 
     private java.util.concurrent.Future<?> currentPrefetchFuture = null;
+    private final java.util.concurrent.ExecutorService locationMutationExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "FileManager-Locations");
+        t.setDaemon(true);
+        return t;
+    });
     private final java.util.concurrent.atomic.AtomicInteger prefetchGeneration = new java.util.concurrent.atomic.AtomicInteger(0);
     private javafx.animation.PauseTransition prefetchDebounce = null;
 
@@ -258,6 +268,32 @@ public class UnifiedFileManagerDialogController {
     private void setupLocationTree() {
         locationTree.setShowRoot(false);
         locationTree.setCellFactory(tree -> createLocationCell());
+        locationTree.setContextMenu(buildLocationContextMenu(LocationItem.root()));
+        if (locationsContainer != null) {
+            ContextMenu rootMenu = buildLocationContextMenu(LocationItem.root());
+            locationsContainer.setOnContextMenuRequested(event -> {
+                rootMenu.show(locationsContainer, event.getScreenX(), event.getScreenY());
+                event.consume();
+            });
+            locationsContainer.setOnDragOver(event -> {
+                if (draggedLocationServerId == null) return;
+                event.acceptTransferModes(javafx.scene.input.TransferMode.MOVE);
+                locationsContainer.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("drop-ungroup"), true);
+                showLocationDropHint(draggedLocationGroup == null ? "Move to end of ungrouped servers" : "Move out of group");
+                event.consume();
+            });
+            locationsContainer.setOnDragExited(event -> {
+                locationsContainer.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("drop-ungroup"), false);
+                if (locationDropHint != null) locationDropHint.setVisible(false);
+            });
+            locationsContainer.setOnDragDropped(event -> {
+                boolean accepted = draggedLocationServerId != null;
+                if (accepted) queueLocationPlacement(draggedLocationServerId, null, null, false);
+                clearLocationDropFeedback();
+                event.setDropCompleted(accepted);
+                event.consume();
+            });
+        }
         // Selecting a node must never open it: starting a drag selects the row before
         // the drag is detected. Connections happen on click or Enter instead.
         locationTree.setOnKeyPressed(event -> {
@@ -328,6 +364,7 @@ public class UnifiedFileManagerDialogController {
             @Override
             protected void updateItem(LocationItem item, boolean empty) {
                 super.updateItem(item, empty);
+                clearCellDropFeedback(this);
                 if (empty || item == null) {
                     setText(null);
                     setGraphic(null);
@@ -345,7 +382,7 @@ public class UnifiedFileManagerDialogController {
         };
 
         cell.setOnMouseClicked(e -> {
-            if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 1) {
+            if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 1 && e.isStillSincePress()) {
                 handleLocationClick(cell.isEmpty() ? null : cell.getItem());
             }
         });
@@ -355,36 +392,152 @@ public class UnifiedFileManagerDialogController {
                 return;
             }
             draggedLocationServerId = cell.getItem().getServer().getId();
+            draggedLocationGroup = normalizedPath(cell.getItem().getServer().getGroupName());
             var board = cell.startDragAndDrop(javafx.scene.input.TransferMode.MOVE);
             var content = new javafx.scene.input.ClipboardContent();
             content.putString(draggedLocationServerId);
             board.setContent(content);
             e.consume();
         });
-        cell.setOnDragDone(e -> draggedLocationServerId = null);
+        cell.setOnDragDone(e -> {
+            draggedLocationServerId = null;
+            draggedLocationGroup = null;
+            clearLocationDropFeedback();
+        });
         cell.setOnDragOver(e -> {
-            if (draggedLocationServerId != null && !cell.isEmpty() && cell.getItem() != null
-                    && !cell.getItem().isRoot()) {
-                e.acceptTransferModes(javafx.scene.input.TransferMode.MOVE);
+            clearCellDropFeedback(cell);
+            if (draggedLocationServerId == null || cell.isEmpty() || cell.getItem() == null) return;
+            LocationItem target = cell.getItem();
+            if (target.isServer() && java.util.Objects.equals(draggedLocationServerId, target.getServer().getId())) {
+                e.consume();
+                return;
             }
+            DropPlacement placement = dropPlacement(target, draggedLocationGroup, e.getY(), cell.getHeight());
+            e.acceptTransferModes(javafx.scene.input.TransferMode.MOVE);
+            cell.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass(pseudoClassFor(placement)), true);
+            String action = switch (placement) {
+                case BEFORE -> "Move before " + target.getLabel();
+                case AFTER -> "Move after " + target.getLabel();
+                case INTO_GROUP -> "Move into " + groupForDropTarget(target);
+                case UNGROUP -> "Move out of group";
+            };
+            showLocationDropHint(action);
+            if (locationsContainer != null) locationsContainer.pseudoClassStateChanged(
+                    javafx.css.PseudoClass.getPseudoClass("drop-ungroup"), false);
             e.consume();
         });
-        cell.setOnDragEntered(e -> {
-            if (draggedLocationServerId != null && !cell.isEmpty()) {
-                cell.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("drop-target"), true);
-            }
-        });
-        cell.setOnDragExited(e -> cell.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("drop-target"), false));
+        cell.setOnDragExited(e -> clearCellDropFeedback(cell));
         cell.setOnDragDropped(e -> {
-            boolean ok = draggedLocationServerId != null && !cell.isEmpty() && cell.getItem() != null
-                    && !cell.getItem().isRoot();
-            if (ok) {
-                moveServerToGroup(draggedLocationServerId, groupForDropTarget(cell.getItem()));
+            if (cell.isEmpty() || cell.getItem() == null) return;
+            LocationItem target = cell.getItem();
+            boolean accepted = draggedLocationServerId != null && !(target.isServer()
+                    && java.util.Objects.equals(draggedLocationServerId, target.getServer().getId()));
+            if (accepted) {
+                DropPlacement placement = dropPlacement(target, draggedLocationGroup, e.getY(), cell.getHeight());
+                if (placement == DropPlacement.BEFORE || placement == DropPlacement.AFTER) {
+                    reorderServer(draggedLocationServerId, target.getServer().getId(), placement == DropPlacement.AFTER);
+                } else {
+                    queueLocationPlacement(draggedLocationServerId, null, groupForDropTarget(target), false);
+                }
             }
-            e.setDropCompleted(ok);
+            clearLocationDropFeedback();
+            e.setDropCompleted(accepted);
             e.consume();
         });
         return cell;
+    }
+
+    enum DropPlacement { BEFORE, AFTER, INTO_GROUP, UNGROUP }
+
+    static DropPlacement dropPlacement(LocationItem target, String sourceGroup, double y, double height) {
+        if (target == null || target.isRoot() || target.isLocal()) return DropPlacement.UNGROUP;
+        if (target.isGroup()) return DropPlacement.INTO_GROUP;
+        double fraction = height > 0 ? y / height : 0.5;
+        if (fraction < 0.25) return DropPlacement.BEFORE;
+        if (fraction > 0.75) return DropPlacement.AFTER;
+        if (java.util.Objects.equals(normalizedPath(sourceGroup), normalizedPath(target.getServer().getGroupName()))) {
+            return fraction < 0.5 ? DropPlacement.BEFORE : DropPlacement.AFTER;
+        }
+        return normalizedPath(target.getServer().getGroupName()) == null ? DropPlacement.UNGROUP : DropPlacement.INTO_GROUP;
+    }
+
+    private static String pseudoClassFor(DropPlacement placement) {
+        return switch (placement) {
+            case BEFORE -> "drop-before";
+            case AFTER -> "drop-after";
+            case INTO_GROUP -> "drop-target";
+            case UNGROUP -> "drop-ungroup";
+        };
+    }
+
+    private static void clearCellDropFeedback(TreeCell<?> cell) {
+        for (String name : new String[]{"drop-before", "drop-after", "drop-target", "drop-ungroup"}) {
+            cell.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass(name), false);
+        }
+    }
+
+    private void showLocationDropHint(String message) {
+        if (locationDropHint != null) {
+            locationDropHint.setText(message);
+            locationDropHint.setVisible(true);
+        }
+    }
+
+    private void clearLocationDropFeedback() {
+        if (locationDropHint != null) locationDropHint.setVisible(false);
+        if (locationsContainer != null) locationsContainer.pseudoClassStateChanged(
+                javafx.css.PseudoClass.getPseudoClass("drop-ungroup"), false);
+        for (Node node : locationTree.lookupAll(".tree-cell")) {
+            if (node instanceof TreeCell<?> cell) clearCellDropFeedback(cell);
+        }
+    }
+
+    void reorderServer(String serverId, String targetId, boolean after) {
+        if (java.util.Objects.equals(serverId, targetId)) return;
+        queueLocationPlacement(serverId, targetId, null, after);
+    }
+
+    private void queueLocationPlacement(String serverId, String targetId, String group, boolean after) {
+        Task<Boolean> task = new Task<>() {
+            @Override protected Boolean call() {
+                return persistLocationPlacement(serverId, targetId, group, after);
+            }
+        };
+        task.setOnSucceeded(event -> {
+            if (task.getValue()) {
+                rebuildLocationTree();
+                selectNode(findServerNodeById(serverId));
+            }
+        });
+        task.setOnFailed(event -> {
+            logger.error("Could not move/reorder location server {}", serverId, task.getException());
+            rebuildLocationTree();
+            showError("Unable to move server", "The server position could not be saved. Please try again.");
+        });
+        locationMutationExecutor.execute(task);
+    }
+
+    private boolean persistLocationPlacement(String serverId, String targetId, String requestedGroup, boolean after) {
+        List<SSHServerModel> servers = serverManagementService.getAllServers();
+        SSHServerModel source = servers.stream().filter(server -> java.util.Objects.equals(serverId, server.getId())).findFirst().orElse(null);
+        SSHServerModel target = targetId == null ? null : servers.stream()
+                .filter(server -> targetId.equals(server.getId())).findFirst().orElse(null);
+        if (source == null || (targetId != null && target == null)) return false;
+        String group = normalizedPath(target == null ? requestedGroup : target.getGroupName());
+        if (!java.util.Objects.equals(normalizedPath(source.getGroupName()), group)) {
+            source.setGroupName(group);
+            serverManagementService.saveServer(source);
+        }
+        List<String> siblings = servers.stream().filter(server -> java.util.Objects.equals(normalizedPath(server.getGroupName()), group))
+                .map(SSHServerModel::getId).collect(Collectors.toCollection(java.util.ArrayList::new));
+        siblings.remove(serverId);
+        int position = targetId == null ? siblings.size() : siblings.indexOf(targetId) + (after ? 1 : 0);
+        siblings.add(position, serverId);
+        var ordered = siblings.iterator();
+        List<String> allIds = servers.stream().map(server -> java.util.Objects.equals(normalizedPath(server.getGroupName()), group)
+                ? ordered.next() : server.getId()).toList();
+        serverManagementService.reorderServers(allIds);
+        return true;
     }
 
     private static FontAwesomeIcon iconFor(LocationItem item) {
@@ -611,12 +764,15 @@ public class UnifiedFileManagerDialogController {
     }
 
     void rebuildLocationTree() {
+        java.util.Map<String, Boolean> expansion = new java.util.HashMap<>();
+        rememberGroupExpansion(locationTree.getRoot(), expansion);
         LocationItem selected = selectedLocationItem();
         String selectedServerId = selected != null && selected.isServer() ? selected.getServer().getId() : null;
         String selectedGroup = selected != null && selected.isGroup() ? selected.getGroupName() : null;
         boolean selectedLocal = selected != null && selected.isLocal();
 
         locationTree.setRoot(buildLocationRoot());
+        restoreGroupExpansion(locationTree.getRoot(), expansion);
         if (selectedServerId != null) {
             selectNode(findServerNodeById(selectedServerId));
         } else if (selectedGroup != null) {
@@ -630,8 +786,24 @@ public class UnifiedFileManagerDialogController {
         if (node == null) {
             return;
         }
+        for (TreeItem<LocationItem> parent = node.getParent(); parent != null; parent = parent.getParent()) {
+            parent.setExpanded(true);
+        }
         locationTree.getSelectionModel().select(node);
         locationTree.scrollTo(locationTree.getRow(node));
+    }
+
+    private static void rememberGroupExpansion(TreeItem<LocationItem> node, java.util.Map<String, Boolean> states) {
+        if (node == null) return;
+        if (node.getValue() != null && node.getValue().isGroup()) states.put(node.getValue().getGroupName(), node.isExpanded());
+        node.getChildren().forEach(child -> rememberGroupExpansion(child, states));
+    }
+
+    private static void restoreGroupExpansion(TreeItem<LocationItem> node, java.util.Map<String, Boolean> states) {
+        if (node.getValue() != null && node.getValue().isGroup() && states.containsKey(node.getValue().getGroupName())) {
+            node.setExpanded(states.get(node.getValue().getGroupName()));
+        }
+        node.getChildren().forEach(child -> restoreGroupExpansion(child, states));
     }
 
     private TreeItem<LocationItem> selectedLocationNode() {
@@ -759,6 +931,8 @@ public class UnifiedFileManagerDialogController {
             }
         });
         ContextMenu favContextMenu = new ContextMenu();
+        MenuItem newGroup = new MenuItem("New group...");
+        newGroup.setOnAction(event -> promptNewGroup(null));
         MenuItem removeFavMenuItem = new MenuItem("Remove Favorite");
         removeFavMenuItem.setOnAction(e -> {
             FavoriteFolder selected = favoritesListView.getSelectionModel().getSelectedItem();
@@ -769,7 +943,7 @@ public class UnifiedFileManagerDialogController {
                 fileTable.refresh();
             }
         });
-        favContextMenu.getItems().add(removeFavMenuItem);
+        favContextMenu.getItems().addAll(newGroup, new SeparatorMenuItem(), removeFavMenuItem);
         favoritesListView.setContextMenu(favContextMenu);
     }
 
@@ -1065,11 +1239,7 @@ public class UnifiedFileManagerDialogController {
                 progressIndicator.setVisible(false);
                 fileTable.setCursor(javafx.scene.Cursor.DEFAULT);
                 String detail = connectingService.getLastConnectError();
-                showError("Connection Error",
-                        "Could not connect to " + server.getHost() + "."
-                                + (detail == null || detail.isBlank()
-                                        ? " Please check credentials."
-                                        : "\n" + detail));
+                showConnectionError(server, detail);
                 selectLocalLocation(); // Go back to local on failure
             }
         });
@@ -1081,7 +1251,7 @@ public class UnifiedFileManagerDialogController {
             fileTable.setCursor(javafx.scene.Cursor.DEFAULT);
             Throwable ex = connectTask.getException();
             logger.error("SSH Connection task failed", ex);
-            showError("Connection Error", "Could not connect to " + server.getHost() + ": " + ex.getMessage());
+            showConnectionError(server, ex != null ? ex.getMessage() : connectingService.getLastConnectError());
             selectLocalLocation(); // Go back to local on failure
         });
 
@@ -1775,6 +1945,7 @@ public class UnifiedFileManagerDialogController {
         }
         fileIoExecutor.shutdown();
         prefetchExecutor.shutdown();
+        locationMutationExecutor.shutdown();
 
         // Ensure any active connection is terminated when the dialog closes, unless we
         // selected a file to open
@@ -1979,6 +2150,18 @@ public class UnifiedFileManagerDialogController {
             addAppIcon(alert);
             alert.setTitle(title);
             alert.setContentText(content);
+            alert.showAndWait();
+        });
+    }
+
+    private void showConnectionError(SSHServerModel server, String detail) {
+        Platform.runLater(() -> {
+            suppressAutoRefresh = true;
+            Alert alert = com.seeloggyplus.util.SshConnectionFeedback.createAlert(detail, server);
+            addAppIcon(alert);
+            if (cancelButton != null && cancelButton.getScene() != null) {
+                alert.initOwner(cancelButton.getScene().getWindow());
+            }
             alert.showAndWait();
         });
     }

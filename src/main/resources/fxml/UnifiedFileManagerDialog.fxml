@@ -7,7 +7,7 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.controller.UnifiedFileManagerDialogController"
-            prefWidth="900" prefHeight="600">
+            prefWidth="900" prefHeight="600" styleClass="unified-file-manager-dialog">
     
     <!-- Top: Navigation & Search -->
     <top>
@@ -15,7 +15,7 @@
             <ToolBar styleClass="app-toolbar">
                 <Button fx:id="backButton" disable="true">
                     <graphic>
-                        <FontAwesomeIconView glyphName="ARROW_LEFT" size="14"/>
+                        <FontAwesomeIconView glyphName="ARROW_LEFT" size="12"/>
                     </graphic>
                     <tooltip>
                         <Tooltip text="Back"/>
@@ -24,7 +24,7 @@
                 
                 <Button fx:id="forwardButton" disable="true">
                     <graphic>
-                        <FontAwesomeIconView glyphName="ARROW_RIGHT" size="14"/>
+                        <FontAwesomeIconView glyphName="ARROW_RIGHT" size="12"/>
                     </graphic>
                     <tooltip>
                         <Tooltip text="Forward"/>
@@ -33,7 +33,7 @@
                 
                 <Button fx:id="upButton" disable="true">
                     <graphic>
-                        <FontAwesomeIconView glyphName="ARROW_UP" size="14"/>
+                        <FontAwesomeIconView glyphName="ARROW_UP" size="12"/>
                     </graphic>
                     <tooltip>
                         <Tooltip text="Up to parent directory"/>
@@ -44,7 +44,7 @@
                 
                 <Button fx:id="homeButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="HOME" size="14"/>
+                        <FontAwesomeIconView glyphName="HOME" size="12"/>
                     </graphic>
                     <tooltip>
                         <Tooltip text="Home directory"/>
@@ -53,7 +53,7 @@
                 
                 <Button fx:id="refreshButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="REFRESH" size="14"/>
+                        <FontAwesomeIconView glyphName="REFRESH" size="12"/>
                     </graphic>
                     <tooltip>
                         <Tooltip text="Refresh"/>
@@ -88,7 +88,7 @@
     <center>
         <SplitPane dividerPositions="0.25">
             <!-- Left: Locations -->
-            <VBox spacing="5">
+            <VBox fx:id="locationsContainer" styleClass="locations-container" spacing="5">
                 <padding>
                     <Insets top="10" right="5" bottom="10" left="10"/>
                 </padding>
@@ -96,7 +96,7 @@
                 <HBox spacing="4" alignment="CENTER_LEFT">
                     <Button fx:id="newGroupButton">
                         <graphic>
-                            <FontAwesomeIconView glyphName="FOLDER_OPEN" size="14"/>
+                            <FontAwesomeIconView glyphName="FOLDER_OPEN" size="12"/>
                         </graphic>
                         <tooltip>
                             <Tooltip text="New group (inside the selected group)"/>
@@ -104,7 +104,7 @@
                     </Button>
                     <Button fx:id="favoriteCurrentButton">
                         <graphic>
-                            <FontAwesomeIconView glyphName="STAR" size="14"/>
+                            <FontAwesomeIconView glyphName="STAR" size="12"/>
                         </graphic>
                         <tooltip>
                             <Tooltip text="Favorite this folder"/>
@@ -113,14 +113,18 @@
                     <Region HBox.hgrow="ALWAYS"/>
                     <Button fx:id="manageServersButton">
                         <graphic>
-                            <FontAwesomeIconView glyphName="COG" size="14"/>
+                            <FontAwesomeIconView glyphName="COG" size="12"/>
                         </graphic>
                         <tooltip>
                             <Tooltip text="Manage Servers"/>
                         </tooltip>
                     </Button>
                 </HBox>
-                <TreeView fx:id="locationTree" VBox.vgrow="ALWAYS" showRoot="false"/>
+                <StackPane VBox.vgrow="ALWAYS">
+                    <TreeView fx:id="locationTree" showRoot="false"/>
+                    <Label fx:id="locationDropHint" styleClass="location-drop-hint" visible="false"
+                           mouseTransparent="true" wrapText="true" maxWidth="Infinity" StackPane.alignment="BOTTOM_CENTER"/>
+                </StackPane>
                 <TitledPane fx:id="favoritesPane" text="Favorite folders" expanded="false" maxHeight="220">
                     <content>
                         <VBox fx:id="favoritesBox" spacing="4"/>
@@ -172,22 +176,22 @@
                 </padding>
                 <Button text="Cancel" fx:id="cancelButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="TIMES"/>
+                        <FontAwesomeIconView glyphName="TIMES" size="12"/>
                     </graphic>
                 </Button>
                 <Button text="Preview" fx:id="previewButton" disable="true">
                     <graphic>
-                        <FontAwesomeIconView glyphName="EYE"/>
+                        <FontAwesomeIconView glyphName="EYE" size="12"/>
                     </graphic>
                 </Button>
                 <Button text="Tail" fx:id="tailButton" disable="true" onAction="#handleTail">
                     <graphic>
-                        <FontAwesomeIconView glyphName="TERMINAL"/>
+                        <FontAwesomeIconView glyphName="TERMINAL" size="12"/>
                     </graphic>
                 </Button>
                 <Button text="Open" fx:id="openButton" defaultButton="true" disable="true">
                     <graphic>
-                        <FontAwesomeIconView glyphName="CHECK"/>
+                        <FontAwesomeIconView glyphName="CHECK" size="12"/>
                     </graphic>
                 </Button>
             </HBox>
