@@ -1966,21 +1966,74 @@ public class MainController {
     @FXML
     public void handleClearLog() {
         logger.info("User requested to clear log view");
-        if (tailModeEnabled) {
-            disableTail();
+        if (currentSession != null) {
+            clearSessionLogView(currentSession);
+        } else {
+            if (tailModeEnabled) {
+                disableTail();
+            }
+            cleanupFileResources();
         }
-        cleanupFileResources();
         currentFile = null;
         currentLogFromDb = null;
         currentParsingConfig = null;
         clearSearch();
         clearDetail();
         updateTailButtonState();
-        recentFilesTreeView.getSelectionModel().clearSelection();
+        if (recentFilesTreeView != null) {
+            recentFilesTreeView.getSelectionModel().clearSelection();
+        }
         if (followTailButton != null) {
             Platform.runLater(() -> followTailButton.setSelected(false));
         }
         logger.info("Log view cleared");
+    }
+
+    /**
+     * Empties the visible log of a session without closing its tab, so the user can
+     * Reload (Ctrl+R) or restart Tail on the same file afterwards. The session's own
+     * reader/index/buffers must be released; cleaning only controller-level fields
+     * left the active tab's canvas unchanged.
+     */
+    private void clearSessionLogView(LogSession session) {
+        if (session.isTailModeEnabled()) {
+            disableTail(session, true);
+        }
+        MappedFileReader reader = session.getReader();
+        if (reader != null) {
+            reader.close();
+        }
+        session.setReader(null);
+        session.setIndex(null);
+        session.setTotalEntries(0);
+
+        session.getLiveTailList().clear();
+        synchronized (session.getTailBuffer()) {
+            session.getTailBuffer().clear();
+        }
+        session.setRemoteTailLineCounter(0);
+        session.setTailSearchScannedUpTo(0);
+        session.setCurrentTailSearchPattern(null);
+        session.setCurrentTailFilterPredicate(null);
+        session.setFilteredIndexes(null);
+        session.setCurrentMatchIndex(-1);
+        session.setSelectedLine(-1);
+        session.setSelectedLineContent(null);
+
+        CanvasLogViewer viewer = session.getCanvasLogViewer();
+        if (viewer != null) {
+            viewer.resetView();
+            viewer.clearSearchHighlight();
+            viewer.setTailBuffer(session.getLiveTailList());
+        }
+
+        if (session == currentSession) {
+            mappedFileReader = null;
+            lineOffsetIndex = null;
+            filteredIndexes = null;
+            totalEntries = 0;
+            updateBottomBarLineCount(session);
+        }
     }
 
     private void setupBottomPanel() {
