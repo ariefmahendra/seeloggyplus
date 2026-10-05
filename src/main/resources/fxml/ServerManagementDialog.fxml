@@ -6,7 +6,7 @@
 <?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
 
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.seeloggyplus.controller.ServerManagementDialogController"
+            fx:controller="com.seeloggyplus.features.servers.presentation.ServerManagementDialogController"
             prefWidth="1050" prefHeight="650">
     
     <!-- Top Toolbar -->

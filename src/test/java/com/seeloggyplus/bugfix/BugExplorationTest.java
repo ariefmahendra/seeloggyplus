@@ -1,13 +1,12 @@
 package com.seeloggyplus.bugfix;
 
-import com.seeloggyplus.util.AppTheme;
+import com.seeloggyplus.shared.ui.AppTheme;
 
-import com.seeloggyplus.model.FileInfo;
-import com.seeloggyplus.model.Preference;
-import com.seeloggyplus.model.SSHServerModel;
-import com.seeloggyplus.service.LocalFileService;
-import com.seeloggyplus.service.PreferenceService;
-import com.seeloggyplus.service.ServerManagementService;
+import com.seeloggyplus.shared.model.FileInfo;
+import com.seeloggyplus.shared.model.Preference;
+import com.seeloggyplus.shared.model.SSHServerModel;
+import com.seeloggyplus.features.files.application.LocalFileService;
+import com.seeloggyplus.shared.settings.PreferenceService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -31,6 +30,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogController;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.regex.Pattern;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 
 /**
  * Bug Condition Exploration Tests — Task 1 (BEFORE any fix)
@@ -96,11 +103,11 @@ public class BugExplorationTest {
             // serverTable.refresh() IS called after filterServers() in loadServers().
             // On unfixed code this FAILS because the call is absent.
 
-            java.io.File implFile = new java.io.File(
-                "src/main/java/com/seeloggyplus/controller/ServerManagementDialogController.java");
+            File implFile = new File(
+                "src/main/java/com/seeloggyplus/features/servers/presentation/ServerManagementDialogController.java");
             assertTrue(implFile.exists(), "ServerManagementDialogController.java must exist");
 
-            String content = java.nio.file.Files.readString(implFile.toPath());
+            String content = Files.readString(implFile.toPath());
 
             // Find loadServers() method
             int loadIdx = content.indexOf("private void loadServers()");
@@ -178,16 +185,16 @@ public class BugExplorationTest {
             // SortedList gets the defaultSort comparator (equivalent to table comparator being null
             // → map(c -> c != null ? c : defaultSort) → defaultSort applied)
             ObservableList<FileInfo> allFiles = FXCollections.observableArrayList(input);
-            javafx.collections.transformation.FilteredList<FileInfo> filteredFiles =
-                    new javafx.collections.transformation.FilteredList<>(allFiles, p -> true);
-            javafx.collections.transformation.SortedList<FileInfo> sortedData =
-                    new javafx.collections.transformation.SortedList<>(filteredFiles);
+            FilteredList<FileInfo> filteredFiles =
+                    new FilteredList<>(allFiles, p -> true);
+            SortedList<FileInfo> sortedData =
+                    new SortedList<>(filteredFiles);
             // FIXED: fallback comparator — directories first, then modified desc, tie-break name asc
             // ponytail: in production this is bound via fileTable.comparatorProperty().map(c -> c != null ? c : defaultSort)
             // Here we directly set defaultSort (equivalent: table comparator is null → fallback kicks in)
             Comparator<FileInfo> defaultSort = Comparator
                     .comparing((FileInfo f) -> f.getName().equals("..") ? 0 : (f.isDirectory() ? 1 : 2))
-                    .thenComparing(f -> f.getModified() != null ? f.getModified() : java.time.LocalDateTime.MIN,
+                    .thenComparing(f -> f.getModified() != null ? f.getModified() : LocalDateTime.MIN,
                                    Comparator.reverseOrder())
                     .thenComparing(f -> f.getName().toLowerCase());
             sortedData.setComparator(defaultSort);
@@ -238,10 +245,10 @@ public class BugExplorationTest {
         @Test
         @DisplayName("build.gradle fatJar task must declare dependsOn processResources")
         public void fatJarMustDependOnProcessResources() throws Exception {
-            java.io.File buildGradle = new java.io.File("build.gradle");
+            File buildGradle = new File("build.gradle");
             assertTrue(buildGradle.exists(), "build.gradle must exist at project root");
 
-            String content = java.nio.file.Files.readString(buildGradle.toPath());
+            String content = Files.readString(buildGradle.toPath());
 
             // Extract the fatJar task block
             // Find 'tasks.register(\'fatJar'' and scan until matching closing brace
@@ -275,11 +282,11 @@ public class BugExplorationTest {
         @Test
         @DisplayName("AboutDialogController must not have its own static VERSION initializer (DRY violation)")
         public void aboutDialogControllerMustNotDuplicateVersionReader() throws Exception {
-            java.io.File aboutController = new java.io.File(
-                "src/main/java/com/seeloggyplus/controller/AboutDialogController.java");
+            File aboutController = new File(
+                "src/main/java/com/seeloggyplus/app/AboutDialogController.java");
             assertTrue(aboutController.exists(), "AboutDialogController.java must exist");
 
-            String content = java.nio.file.Files.readString(aboutController.toPath());
+            String content = Files.readString(aboutController.toPath());
 
             // On unfixed code: has private static final String VERSION + static initializer
             boolean hasDuplicateVersionField = content.contains("private static final String VERSION");
@@ -324,11 +331,11 @@ public class BugExplorationTest {
             //
             // Direct approach: read the source code to confirm the bug exists.
             // This is the correct exploration test for a method that would hang forever.
-            java.io.File implFile = new java.io.File(
-                "src/main/java/com/seeloggyplus/service/impl/SSHServiceImpl.java");
+            File implFile = new File(
+                "src/main/java/com/seeloggyplus/features/ssh/infrastructure/SSHServiceImpl.java");
             assertTrue(implFile.exists(), "SSHServiceImpl.java must exist");
 
-            String content = java.nio.file.Files.readString(implFile.toPath());
+            String content = Files.readString(implFile.toPath());
 
             // Find downloadFileConcurrent method body
             int methodIdx = content.indexOf("boolean downloadFileConcurrent(");
@@ -339,21 +346,30 @@ public class BugExplorationTest {
 
             // Assert expected CORRECT behavior — these assertions FAIL on unfixed code:
 
-            // Bug A: channel.connect() inside the concurrent block MUST have a timeout.
-            // Fixed: channel.connect(30_000). Unfixed: channel.connect() — no arg = hang.
-            boolean connectHasTimeout = content.substring(methodIdx, methodEnd)
-                    .contains("channel.connect(30_000)");
+            // Bug A: the concurrent download path MUST open SFTP channels with a timeout.
+            // The transfer itself is delegated to downloadFileResumable(), which connects
+            // with channel.connect(30_000); no untimed channel.connect() may remain.
+            String concurrentBody = content.substring(methodIdx, methodEnd);
+            int resumableIdx = content.indexOf("boolean downloadFileResumable(");
+            String resumableBody = resumableIdx >= 0
+                    ? content.substring(resumableIdx, findMethodEnd(content, resumableIdx))
+                    : "";
+            boolean connectHasTimeout = concurrentBody.contains("channel.connect(30_000)")
+                    || resumableBody.contains("channel.connect(30_000)");
             assertTrue(connectHasTimeout,
                 "BUG 5 CONFIRMED: channel.connect() is called without a 30-second timeout " +
-                "inside downloadFileConcurrent(). Counter-example: isBugCondition_B5 = true — " +
+                "inside the concurrent download path. Counter-example: isBugCondition_B5 = true — " +
                 "with threadCount=2 on a server allowing max 1 concurrent SFTP channel, " +
                 "channel.connect() for thread-2 blocks indefinitely. " +
                 "Fix requires: channel.connect(30_000)."
             );
+            assertFalse(Pattern.compile("channel\\.connect\\(\\s*\\)")
+                            .matcher(concurrentBody).find(),
+                "downloadFileConcurrent() must not call channel.connect() without a timeout");
 
             // Bug B: latch.await() MUST have a timeout argument.
             // Fixed: latch.await(timeoutSec, TimeUnit.SECONDS). Unfixed: latch.await() — hangs.
-            boolean latchNoArg = content.substring(methodIdx, methodEnd).contains("latch.await()");
+            boolean latchNoArg = concurrentBody.contains("latch.await()");
             int latchIdx = content.indexOf("latch.await()", methodIdx);
             assertFalse(latchNoArg,
                 "BUG 5 CONFIRMED: latch.await() is called without a timeout inside " +
@@ -406,7 +422,7 @@ public class BugExplorationTest {
     @DisplayName("Bug 6 — File manager does not restore last directory")
     class Bug6NoLastDirectory {
 
-        private com.seeloggyplus.controller.UnifiedFileManagerDialogController controller;
+        private UnifiedFileManagerDialogController controller;
         private TextField pathField;
 
         @Start
@@ -463,7 +479,7 @@ public class BugExplorationTest {
                     .filter(c -> c.getSimpleName().equals("LocationItem"))
                     .findFirst()
                     .orElseThrow();
-            java.lang.reflect.Method localFactory = locationItemClass.getDeclaredMethod("local");
+            Method localFactory = locationItemClass.getDeclaredMethod("local");
             localFactory.setAccessible(true);
             Object localItem = localFactory.invoke(null);
 
@@ -503,7 +519,7 @@ public class BugExplorationTest {
             // ponytail: normalize LAST_DIR for comparison — on Windows, /tmp/test-dir becomes D:\tmp\test-dir
             String normalizedLastDir;
             try {
-                normalizedLastDir = java.nio.file.Paths.get(LAST_DIR).toAbsolutePath().normalize().toString();
+                normalizedLastDir = Paths.get(LAST_DIR).toAbsolutePath().normalize().toString();
             } catch (Exception e) {
                 normalizedLastDir = LAST_DIR;
             }

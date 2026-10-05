@@ -1,0 +1,202 @@
+package com.seeloggyplus.features.preview.presentation;
+
+import com.seeloggyplus.shared.model.FileInfo;
+import com.seeloggyplus.shared.ssh.SSHService;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
+import javafx.fxml.FXML;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.seeloggyplus.shared.settings.PreferenceService;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+
+/**
+ * Controller for the Log Preview Dialog.
+ * Shows the raw content of a log file, line by line.
+ */
+public class LogPreviewDialogController {
+
+    private static final Logger logger = LoggerFactory.getLogger(LogPreviewDialogController.class);
+    private int previewLineLimit = 500;
+    private PreferenceService preferenceService;
+
+    @FXML
+    private Label fileNameLabel;
+    @FXML
+    private ListView<LogLine> logListView;
+    @FXML
+    private ProgressIndicator progressIndicator;
+    @FXML
+    private Button closeButton;
+
+    private final ObservableList<LogLine> logLines = FXCollections.observableArrayList();
+
+    @FXML
+    public void initialize() {
+        logListView.setItems(logLines);
+        logListView.setCellFactory(lv -> new LogLineCell());
+
+        // Enable selection and copy-paste
+        logListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        logListView.setOnKeyPressed(event -> {
+            if (new KeyCodeCombination(KeyCode.C,
+                    KeyCombination.CONTROL_DOWN).match(event)) {
+                copySelectionToClipboard();
+                event.consume();
+            }
+        });
+
+        closeButton.setOnAction(e -> closeDialog());
+    }
+
+    public void setPreferenceService(PreferenceService service) {
+        this.preferenceService = service;
+        loadPreferences();
+    }
+
+    private void loadPreferences() {
+        // Line limit
+        String limitStr = preferenceService.getPreferencesByCode("lp_line_limit").orElse("500");
+        try {
+            this.previewLineLimit = Integer.parseInt(limitStr);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid preview line limit preference: {}", limitStr);
+        }
+
+        // Font settings
+        String fontFamily = preferenceService.getPreferencesByCode("app_font_family").orElse("Consolas");
+        String fontSizeStr = preferenceService.getPreferencesByCode("app_font_size").orElse("12");
+        int fontSize = 12;
+        try {
+            fontSize = Integer.parseInt(fontSizeStr);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid font size preference: {}", fontSizeStr);
+        }
+
+        String fontStyle = String.format("-fx-font-family: '%s'; -fx-font-size: %dpx;", fontFamily, fontSize);
+        logListView.setStyle(fontStyle);
+    }
+
+    /**
+     * Loads a preview of the file content (local or remote) into the list,
+     * limited to the first previewLineLimit lines.
+     */
+    public void loadFile(FileInfo fileInfo, SSHService sshService) {
+        fileNameLabel.setText(String.format("Preview: %s (first %d lines)", fileInfo.getPath(), previewLineLimit));
+        progressIndicator.setVisible(true);
+
+        Task<List<String>> loadTask = new Task<>() {
+            @Override
+            protected List<String> call() throws Exception {
+                if (fileInfo.getSourceType() == FileInfo.SourceType.REMOTE) {
+                    if (sshService == null || !sshService.isConnected()) {
+                        throw new IOException("SSH service is not connected.");
+                    }
+                    return sshService.readFileLines(fileInfo.getPath(), previewLineLimit);
+                } else {
+                    List<String> lines = new ArrayList<>();
+                    try (BufferedReader reader = new BufferedReader(new FileReader(fileInfo.getPath()))) {
+                        String line;
+                        int count = 0;
+                        while ((line = reader.readLine()) != null && count < previewLineLimit) {
+                            lines.add(line);
+                            count++;
+                        }
+                    }
+                    return lines;
+                }
+            }
+        };
+
+        loadTask.setOnSucceeded(e -> {
+            List<String> lines = loadTask.getValue();
+            List<LogLine> convertedLines = new ArrayList<>();
+            long lineNum = 1;
+            for (String line : lines) {
+                convertedLines.add(new LogLine(lineNum++, line));
+            }
+            logLines.setAll(convertedLines);
+            progressIndicator.setVisible(false);
+        });
+
+        loadTask.setOnFailed(e -> {
+            progressIndicator.setVisible(false);
+            Throwable ex = loadTask.getException();
+            logger.error("Failed to load file for preview: {}", ex.getMessage(), ex);
+            logLines.clear();
+            logLines.add(new LogLine(1L, "ERROR: Could not load file."));
+            logLines.add(new LogLine(2L, ex.getMessage()));
+        });
+
+        new Thread(loadTask).start();
+    }
+
+    private void copySelectionToClipboard() {
+        final StringBuilder clipboardString = new StringBuilder();
+        for (LogLine line : logListView.getSelectionModel().getSelectedItems()) {
+            if (line != null) {
+                clipboardString.append(line.getLineNumber()).append("\t").append(line.getContent()).append("\n");
+            }
+        }
+
+        final ClipboardContent content = new ClipboardContent();
+        content.putString(clipboardString.toString());
+        Clipboard.getSystemClipboard().setContent(content);
+    }
+
+    private void closeDialog() {
+        Stage stage = (Stage) closeButton.getScene().getWindow();
+        stage.close();
+    }
+
+    /**
+     * Helper class to represent a line in the log file.
+     */
+    public static class LogLine {
+        private final long lineNumber;
+        private final String content;
+
+        public LogLine(long lineNumber, String content) {
+            this.lineNumber = lineNumber;
+            this.content = content;
+        }
+
+        public long getLineNumber() {
+            return lineNumber;
+        }
+
+        public String getContent() {
+            return content;
+        }
+    }
+
+    /**
+     * ListCell implementation for LogLine.
+     */
+    private static class LogLineCell extends ListCell<LogLine> {
+        @Override
+        protected void updateItem(LogLine item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null) {
+                setText(null);
+            } else {
+                setText(String.format("%d | %s", item.getLineNumber(), item.getContent()));
+            }
+        }
+    }
+}

@@ -7,7 +7,7 @@
 
 <BorderPane fx:id="rootPane"
             xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.seeloggyplus.controller.RemoteLogSearchDialogController"
+            fx:controller="com.seeloggyplus.features.search.presentation.RemoteLogSearchDialogController"
             prefWidth="960" prefHeight="640">
 
     <!-- Top: Search Form -->

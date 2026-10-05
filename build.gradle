@@ -293,7 +293,7 @@ test {
 }
 
 application {
-    mainClass = 'com.seeloggyplus.Main'
+    mainClass = 'com.seeloggyplus.app.Main'
     applicationName = 'SeeloggyPlus'
 }
 
@@ -301,7 +301,7 @@ tasks.register('runDev', JavaExec) {
     group = 'application'
     description = 'Runs the SeeLoggyPlus JavaFX Desktop app in Development mode with Hot Reload enabled'
     classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'com.seeloggyplus.Launcher'
+    mainClass = 'com.seeloggyplus.app.Launcher'
     systemProperty 'seeloggyplus.dev', 'true'
     dependsOn generateStartupSplash
     jvmArgs "-splash:${generatedSplashResources.get().file('images/startup-splash.gif').asFile.absolutePath}"
@@ -323,7 +323,7 @@ tasks.register('fatJar', Jar) {
     archiveClassifier = 'all'
     archiveFileName = "seeloggyplus-all.jar"
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    manifest { attributes 'Main-Class': 'com.seeloggyplus.Launcher',
+    manifest { attributes 'Main-Class': 'com.seeloggyplus.app.Launcher',
                           'SplashScreen-Image': 'images/startup-splash.gif' }
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
@@ -405,7 +405,7 @@ tasks.register('generatePlatformManifest', JavaExec) {
 
     dependsOn 'packagePlatform'
     classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'com.seeloggyplus.update.ManifestGeneratorCli'
+    mainClass = 'com.seeloggyplus.features.update.infrastructure.ManifestGeneratorCli'
 
     doFirst {
         def noJre = file("${buildDir}/distributions/seeloggyplus-Portable-${buildPlatform}.zip")
@@ -438,7 +438,7 @@ tasks.register('mergeManifests', JavaExec) {
     description = 'Merge per-platform manifests into a single update-manifest.json'
 
     classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'com.seeloggyplus.update.ManifestMergeCli'
+    mainClass = 'com.seeloggyplus.features.update.infrastructure.ManifestMergeCli'
 
     doFirst {
         def inputs = fileTree("${buildDir}/distributions") {

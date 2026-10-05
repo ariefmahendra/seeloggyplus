@@ -6,7 +6,7 @@
 <?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
 
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.seeloggyplus.controller.UnifiedFileManagerDialogController"
+            fx:controller="com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogController"
             prefWidth="900" prefHeight="600" styleClass="unified-file-manager-dialog">
     
     <!-- Top: Navigation & Search -->

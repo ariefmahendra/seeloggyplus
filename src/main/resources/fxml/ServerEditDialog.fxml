@@ -6,7 +6,7 @@
 <?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
 
 <VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="com.seeloggyplus.controller.ServerEditDialogController"
+      fx:controller="com.seeloggyplus.features.servers.presentation.ServerEditDialogController"
       prefWidth="500" prefHeight="560" spacing="12">
 
     <padding>

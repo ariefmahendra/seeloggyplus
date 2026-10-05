@@ -10,7 +10,7 @@
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.seeloggyplus.controller.LogPreviewDialogController"
+            fx:controller="com.seeloggyplus.features.preview.presentation.LogPreviewDialogController"
             prefWidth="700" prefHeight="500">
 
     <top>

@@ -1,9 +1,9 @@
 package com.seeloggyplus.bugfix;
 
-import com.seeloggyplus.model.FileInfo;
-import com.seeloggyplus.model.Preference;
-import com.seeloggyplus.model.SSHServerModel;
-import com.seeloggyplus.service.PreferenceService;
+import com.seeloggyplus.shared.model.FileInfo;
+import com.seeloggyplus.shared.model.Preference;
+import com.seeloggyplus.shared.model.SSHServerModel;
+import com.seeloggyplus.shared.settings.PreferenceService;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -17,6 +17,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 
 /**
  * Bug Preservation Property Tests — Task 2 (BEFORE any fix, on UNFIXED code).
@@ -313,15 +317,15 @@ public class BugPreservationTest {
             // Replicate the version-reading logic from AboutDialogController (unfixed code)
             // When version.properties is absent, the static block defaults to "DEV"
             String version = "DEV";
-            try (java.io.InputStream input = getClass().getResourceAsStream("/version.properties.NONEXISTENT")) {
-                java.util.Properties prop = new java.util.Properties();
+            try (InputStream input = getClass().getResourceAsStream("/version.properties.NONEXISTENT")) {
+                Properties prop = new Properties();
                 if (input == null) {
                     // resource not found — fallback preserved
                 } else {
                     prop.load(input);
                     version = prop.getProperty("version", version);
                 }
-            } catch (java.io.IOException ex) {
+            } catch (IOException ex) {
                 // error path — fallback preserved
             }
             assertEquals("DEV", version,
@@ -338,7 +342,7 @@ public class BugPreservationTest {
                 {"VERSION", "1.0.0"},   // wrong case
             };
             for (String[] pairs : propertiesSets) {
-                java.util.Properties props = new java.util.Properties();
+                Properties props = new Properties();
                 for (int i = 0; i + 1 < pairs.length; i += 2) {
                     props.setProperty(pairs[i], pairs[i + 1]);
                 }
@@ -351,10 +355,10 @@ public class BugPreservationTest {
         @Test
         @DisplayName("3.8 build.gradle processResources already dependsOn generateVersionProperties")
         void buildGradleProcessResourcesDependsOnGenerateVersionProperties() throws Exception {
-            java.io.File buildGradle = new java.io.File("build.gradle");
+            File buildGradle = new File("build.gradle");
             assertTrue(buildGradle.exists(), "build.gradle must exist at project root");
 
-            String content = java.nio.file.Files.readString(buildGradle.toPath());
+            String content = Files.readString(buildGradle.toPath());
 
             // The existing chain: processResources.dependsOn generateVersionProperties
             // This must not be removed by the Bug 4 fix — it's what makes ./gradlew build work
@@ -395,10 +399,10 @@ public class BugPreservationTest {
 
         @BeforeEach
         void readMethod() throws Exception {
-            java.io.File implFile = new java.io.File(
-                "src/main/java/com/seeloggyplus/service/impl/SSHServiceImpl.java");
+            File implFile = new File(
+                "src/main/java/com/seeloggyplus/features/ssh/infrastructure/SSHServiceImpl.java");
             assertTrue(implFile.exists(), "SSHServiceImpl.java must exist");
-            String content = java.nio.file.Files.readString(implFile.toPath());
+            String content = Files.readString(implFile.toPath());
 
             int methodIdx = content.indexOf("boolean downloadFileConcurrent(");
             if (methodIdx == -1) methodIdx = content.indexOf("public boolean downloadFileConcurrent(");
@@ -495,10 +499,10 @@ public class BugPreservationTest {
             // including Home button navigation. Per tasks.md notes: "Home button naturally saves the
             // home path — this is acceptable per the spec notes."
             // This test verifies the post-fix source code has saveOrUpdatePreferences in navigateTo().
-            java.io.File implFile = new java.io.File(
-                "src/main/java/com/seeloggyplus/controller/UnifiedFileManagerDialogController.java");
+            File implFile = new File(
+                "src/main/java/com/seeloggyplus/features/files/presentation/UnifiedFileManagerDialogController.java");
             assertTrue(implFile.exists(), "UnifiedFileManagerDialogController.java must exist");
-            String content = java.nio.file.Files.readString(implFile.toPath());
+            String content = Files.readString(implFile.toPath());
 
             // Find navigateTo() method body
             int methodIdx = content.indexOf("private void navigateTo(String path)");

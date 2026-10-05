@@ -1,0 +1,206 @@
+package com.seeloggyplus.features.update.infrastructure;
+
+import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
+import java.net.URI;
+import java.nio.file.Paths;
+
+/**
+ * Blue/green installation layout:
+ * <pre>
+ * root/
+ *   current            -> active version (text)
+ *   current.previous   -> version to roll back to (text)
+ *   versions/&lt;v&gt;/seeloggyplus.jar
+ *   versions/&lt;v&gt;/.ok   -> health marker written after a successful start
+ * </pre>
+ * The running jar is never overwritten; a new version lives in its own directory.
+ */
+public final class UpdateLayout {
+
+    public static final String CURRENT_FILE = "current";
+    public static final String PREVIOUS_FILE = "current.previous";
+    public static final String VERSIONS_DIR = "versions";
+    public static final String HEALTH_MARKER = ".ok";
+    public static final String APP_JAR_NAME = "seeloggyplus.jar";
+
+    private final Path root;
+
+    public UpdateLayout(Path root) {
+        this.root = root;
+    }
+
+    /** Directory that contains the running application (jar or classes folder). */
+    public static Path installationRoot() {
+        String override = System.getProperty("seeloggyplus.installRoot");
+        if (override != null && !override.isBlank()) {
+            return Paths.get(override);
+        }
+        try {
+            URI uri = UpdateLayout.class.getProtectionDomain().getCodeSource().getLocation().toURI();
+            Path location = Paths.get(uri);
+            Path dir = Files.isDirectory(location) ? location : location.getParent();
+            return resolveLayoutRoot(dir);
+        } catch (Exception e) {
+            return Paths.get(System.getProperty("user.dir"));
+        }
+    }
+
+    /**
+     * Maps the directory the running jar/classes live in to the actual installation
+     * root. In the blue/green layout the launcher runs {@code versions/&lt;v&gt;/seeloggyplus.jar},
+     * so that directory is folded back up to the root that owns {@code current} and
+     * {@code versions/} — instead of treating the version folder itself as the root.
+     */
+    static Path resolveLayoutRoot(Path location) {
+        if (location == null) {
+            return Paths.get(System.getProperty("user.dir"));
+        }
+        Path parent = location.getParent();
+        if (parent != null && VERSIONS_DIR.equals(String.valueOf(parent.getFileName()))) {
+            Path root = parent.getParent();
+            if (root != null) {
+                return root;
+            }
+        }
+        return location;
+    }
+
+    public Path root() {
+        return root;
+    }
+
+    public Path versionsRoot() {
+        return root.resolve(VERSIONS_DIR);
+    }
+
+    public Path versionDir(String version) {
+        return versionsRoot().resolve(version);
+    }
+
+    public Path jarFor(String version) {
+        return versionDir(version).resolve(APP_JAR_NAME);
+    }
+
+    public Path healthMarker(String version) {
+        return versionDir(version).resolve(HEALTH_MARKER);
+    }
+
+    public Optional<String> currentVersion() throws IOException {
+        return readValue(root.resolve(CURRENT_FILE));
+    }
+
+    public Optional<String> previousVersion() throws IOException {
+        return readValue(root.resolve(PREVIOUS_FILE));
+    }
+
+    public void writeCurrent(String version) throws IOException {
+        writeAtomic(root.resolve(CURRENT_FILE), version);
+    }
+
+    public void writePrevious(String version) throws IOException {
+        writeAtomic(root.resolve(PREVIOUS_FILE), version);
+    }
+
+    public boolean isStaged(String version) {
+        return version != null && Files.isRegularFile(jarFor(version));
+    }
+
+    public void markHealthy(String version) throws IOException {
+        Path marker = healthMarker(version);
+        Files.createDirectories(marker.getParent());
+        Files.writeString(marker, "ok");
+    }
+
+    public boolean isHealthy(String version) {
+        return version != null && Files.exists(healthMarker(version));
+    }
+
+    public List<String> listVersions() throws IOException {
+        if (!Files.isDirectory(versionsRoot())) {
+            return List.of();
+        }
+        try (Stream<Path> entries = Files.list(versionsRoot())) {
+            List<String> versions = new ArrayList<>();
+            entries.filter(Files::isDirectory)
+                    .map(path -> path.getFileName().toString())
+                    .filter(name -> !name.contains(".staging-"))
+                    .forEach(versions::add);
+            versions.sort(Comparator.naturalOrder());
+            return versions;
+        }
+    }
+
+    /**
+     * Deletes old version directories, always keeping the current version, the
+     * previous version and the {@code keep} newest ones.
+     */
+    public int cleanup(int keep) throws IOException {
+        String current = currentVersion().orElse(null);
+        String previous = previousVersion().orElse(null);
+        List<String> versions = listVersions();
+        int removed = 0;
+        List<String> newest = new ArrayList<>(versions);
+        newest.sort(Comparator.reverseOrder());
+        List<String> protectedVersions = new ArrayList<>();
+        if (current != null) {
+            protectedVersions.add(current);
+        }
+        if (previous != null) {
+            protectedVersions.add(previous);
+        }
+        for (int i = 0; i < Math.min(keep, newest.size()); i++) {
+            protectedVersions.add(newest.get(i));
+        }
+        for (String version : versions) {
+            if (protectedVersions.contains(version)) {
+                continue;
+            }
+            deleteRecursively(versionDir(version));
+            removed++;
+        }
+        return removed;
+    }
+
+    private Optional<String> readValue(Path file) throws IOException {
+        if (!Files.isRegularFile(file)) {
+            return Optional.empty();
+        }
+        String value = Files.readString(file).trim();
+        return value.isEmpty() ? Optional.empty() : Optional.of(value);
+    }
+
+    private static void writeAtomic(Path file, String value) throws IOException {
+        Files.createDirectories(file.getParent());
+        Path temp = file.resolveSibling(file.getFileName() + ".new");
+        Files.writeString(temp, value);
+        try {
+            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    static void deleteRecursively(Path path) throws IOException {
+        if (path == null || !Files.exists(path)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(path)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException ignored) {
+                    // best effort
+                }
+            });
+        }
+    }
+}

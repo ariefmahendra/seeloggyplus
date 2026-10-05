@@ -6,8 +6,8 @@ applies_to: "**"
 # SeeLoggyPlus — Agent Rules
 
 JavaFX 21 desktop log viewer for local and SSH files. Single Gradle project.
-Entrypoints: `com.seeloggyplus.Main` (JavaFX `Application`) and
-`com.seeloggyplus.Launcher` (fat jar / `runDev`). Full release checklist:
+Entrypoints: `com.seeloggyplus.app.Main` (JavaFX `Application`) and
+`com.seeloggyplus.app.Launcher` (fat jar / `runDev`). Full release checklist:
 `docs/RELEASING.md`.
 
 Rule strength: **MUST** = never skip; **SHOULD** = default, deviate only with a
@@ -24,7 +24,7 @@ MUST run all Gradle commands through the wrapper with `--no-daemon` on Windows
 | Feature compilation | `.\gradlew.bat --no-daemon classes testClasses` |
 | Build artifacts without running tests | `.\gradlew.bat --no-daemon assemble` |
 | Full tests (release or explicit request; always headless) | `.\gradlew.bat --no-daemon test` |
-| Selected tests | `.\gradlew.bat --no-daemon test --tests "com.seeloggyplus.controller.FooTest"` (repeat `--tests`) |
+| Selected tests | `.\gradlew.bat --no-daemon test --tests "com.seeloggyplus.app.FooTest"` (repeat `--tests`) |
 | Dev app (+ hot reload, sets `seeloggyplus.dev`) | `.\gradlew.bat --no-daemon runDev` |
 | Packages/manifests | `fatJar`, `packagePortableNoJre`, `packagePortableWithJre`, `packagePlatform`, `generatePlatformManifest`, `mergeManifests`, `buildUpdateArtifacts` |
 
@@ -71,7 +71,7 @@ them windowed or optional.
 1. Launch detached (never foreground):
    `Start-Process cmd.exe -ArgumentList '/c','gradlew.bat --no-daemon runDev > run-dev.log 2>&1' -WindowStyle Hidden`
 2. Always stop: `powershell -ExecutionPolicy Bypass -File scripts/stop-app.ps1`
-   (the `runDev` process is `com.seeloggyplus.Main`; do not match only `Launcher`).
+   (the `runDev` process is `com.seeloggyplus.app.Main`; do not match only `Launcher`).
 3. Delete the log file afterwards; logs must not survive at the repo root.
 
 ## 4. Test-JVM isolation (WHY tests behave differently)
@@ -85,9 +85,22 @@ them windowed or optional.
 
 ## 5. Architecture
 
-- Packages: `controller` (FXML controllers), `service`+`service.impl`,
-  `repository`+`repository.impl`, `model`, `ui` (`canvas`, `search`, `cell`),
-  `update` (self-update), `config` (DB + migrator), `util`.
+- Packages: `app` (entrypoints + shell/FXML controllers), `shared.model`,
+  `shared.dto`, `shared.logs` (log I/O, parsing, parsing config, log file
+  persistence), `shared.settings`, `shared.servers`, `shared.tail`,
+  `shared.database` (config + migrator only), `shared.util`, `shared.ssh`,
+  `shared.ui` (+`shared.ui.canvas`), `shared.session`, and
+  `features.<name>.{domain,application,infrastructure,presentation}` (for example
+  `features.search`, `features.settings`, `features.servers`, `features.update`,
+  `features.recent`, `features.ssh`).
+- Ports in `shared`, implementations in features: `shared.settings.PreferenceService`
+  is a port implemented by `features.settings.infrastructure.PreferenceServiceImpl`;
+  the server registry contract is `shared.servers.ServerCatalog`, implemented by
+  `features.servers.infrastructure.ServerManagementServiceImpl` and extended by
+  `features.servers.application.ServerManagementService`; the SSH ports
+  (`shared.ssh.SSHService`, `shared.ssh.SSHSessionManager`,
+  `shared.ssh.SSHServiceFactory`) are implemented by
+  `features.ssh.infrastructure.{SSHServiceImpl,SSHSessionManagerImpl}`.
 - Data dir = system property `seeloggyplus.dataDir` (default `.data`):
   SQLite `seeloggyplus.db`, `.keystore`, `known_hosts` (SSH trust-on-first-use),
   `updates/` staging.
@@ -133,7 +146,7 @@ them windowed or optional.
 Applies when changing the `update` package, packaging tasks, launchers, or the install
 layout. Self-update breakage strands users on old versions.
 
-1. `com.seeloggyplus.update.SelfUpdateEndToEndTest` stays green: real package through
+1. `com.seeloggyplus.features.update.infrastructure.SelfUpdateEndToEndTest` stays green: real package through
    download → stage → activate → health → rollback; a failed download leaves the
    installation untouched.
 2. Package entries must stay installable by OLD installers: the E2E pins them to the

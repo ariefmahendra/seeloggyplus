@@ -1,7 +1,7 @@
 # Stops any running SeeLoggyPlus application instance.
 #
-# `gradlew runDev` launches the app as com.seeloggyplus.Main (sometimes
-# com.seeloggyplus.Launcher) and, on Windows, that process keeps file locks on
+# `gradlew runDev` launches the app as com.seeloggyplus.app.Main (sometimes
+# com.seeloggyplus.app.Launcher) and, on Windows, that process keeps file locks on
 # build/resources/main. If `gradlew test` / `gradlew build` fails with
 # "Failed to clean up stale outputs", run this script (and `gradlew --stop`
 # if needed), then retry the build.
@@ -12,7 +12,7 @@ $ErrorActionPreference = 'SilentlyContinue'
 
 $targets = Get-CimInstance Win32_Process -Filter "Name='java.exe' OR Name='javaw.exe'" |
     Where-Object {
-        $_.CommandLine -match 'com\.seeloggyplus\.(Main|Launcher)' -and
+        $_.CommandLine -match 'com\.seeloggyplus\.app\.(Main|Launcher)' -and
         $_.CommandLine -notmatch 'GradleDaemon|gradle-launcher|GradleWrapperMain'
     }
 
@@ -29,7 +29,7 @@ foreach ($process in $targets) {
 Start-Sleep -Seconds 2
 
 $remaining = Get-CimInstance Win32_Process -Filter "Name='java.exe' OR Name='javaw.exe'" |
-    Where-Object { $_.CommandLine -match 'com\.seeloggyplus\.(Main|Launcher)' }
+    Where-Object { $_.CommandLine -match 'com\.seeloggyplus\.app\.(Main|Launcher)' }
 
 if ($remaining) {
     Write-Warning "Some SeeLoggyPlus processes could not be stopped."

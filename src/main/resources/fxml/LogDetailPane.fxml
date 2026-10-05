@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import de.jensd.fx.glyphs.fontawesome.*?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<VBox fx:id="bottomPanel" minHeight="80" prefHeight="180" spacing="5" xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.seeloggyplus.features.detail.presentation.LogDetailPaneController">
+    <padding>
+        <Insets bottom="5" left="5" right="5" top="5" />
+    </padding>
+
+    <HBox alignment="CENTER_LEFT" spacing="10">
+        <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS" styleClass="panel-title" />
+
+        <HBox alignment="CENTER_LEFT" spacing="5" styleClass="compact-actions">
+            <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
+                <graphic>
+                    <FontAwesomeIconView glyphName="INDENT" size="12" />
+                </graphic>
+                <tooltip>
+                    <Tooltip text="Auto-Prettify JSON" />
+                </tooltip>
+            </ToggleButton>
+            <ToggleButton fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
+                <graphic>
+                    <FontAwesomeIconView glyphName="CODE" size="12" />
+                </graphic>
+                <tooltip>
+                    <Tooltip text="Auto-Prettify XML" />
+                </tooltip>
+            </ToggleButton>
+            <Button fx:id="copyButton">
+                <graphic>
+                    <FontAwesomeIconView glyphName="COPY" size="12" />
+                </graphic>
+                <tooltip>
+                    <Tooltip text="Copy" />
+                </tooltip>
+            </Button>
+            <Button fx:id="clearDetailButton">
+                <graphic>
+                    <FontAwesomeIconView glyphName="ERASER" size="12" />
+                </graphic>
+                <tooltip>
+                    <Tooltip text="Clear Detail Content" />
+                </tooltip>
+            </Button>
+            <Separator orientation="VERTICAL" />
+            <Button fx:id="pinBottomPanelButton">
+                <graphic>
+                    <FontAwesomeIconView glyphName="TIMES" size="12" />
+                </graphic>
+                <tooltip>
+                    <Tooltip text="Close Detail Panel (Ctrl+J)" />
+                </tooltip>
+            </Button>
+        </HBox>
+    </HBox>
+
+    <StackPane fx:id="detailContainer" VBox.vgrow="ALWAYS" styleClass="detail-container">
+        <padding>
+            <Insets />
+        </padding>
+    </StackPane>
+</VBox>

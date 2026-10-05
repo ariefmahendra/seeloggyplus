@@ -6,7 +6,7 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 <?import javafx.scene.shape.Rectangle?>
-<BorderPane minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.controller.MainController">
+<BorderPane minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.app.MainController">
     <top>
         <VBox>
             <MenuBar fx:id="menuBar" styleClass="app-menubar">
@@ -87,7 +87,7 @@
                         <Tooltip text="Clear All Filters" />
                     </tooltip>
                 </Button>
-                <com.seeloggyplus.ui.search.SearchNavigator fx:id="searchNavigator" />
+                <com.seeloggyplus.features.search.presentation.SearchNavigator fx:id="searchNavigator" />
                 <Separator orientation="VERTICAL" />
                 <Button fx:id="refreshButton">
                     <graphic>
@@ -130,35 +130,7 @@
     <center>
         <StackPane fx:id="centerRoot">
             <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
-                <VBox fx:id="leftPanel" minWidth="200" prefWidth="250" spacing="5">
-                    <padding>
-                        <Insets bottom="5" left="5" right="5" top="5" />
-                    </padding>
-
-                    <HBox alignment="CENTER_LEFT" spacing="5" styleClass="compact-actions">
-                        <Label prefHeight="18.0" prefWidth="294.0" text="Recent Log Files" HBox.hgrow="ALWAYS" styleClass="panel-title" />
-                        <Separator prefWidth="200.0" HBox.hgrow="ALWAYS" />
-                        <Button fx:id="pinLeftPanelButton">
-                            <graphic>
-                                <FontAwesomeIconView glyphName="TIMES" size="12" />
-                            </graphic>
-                            <tooltip>
-                                <Tooltip text="Close Panel (Ctrl+B)" />
-                            </tooltip>
-                        </Button>
-                    </HBox>
-
-                    <TextField fx:id="recentFilesFilterField" promptText="Filter recent logs..." />
-                    <TreeView fx:id="recentFilesTreeView" VBox.vgrow="ALWAYS" showRoot="false" />
-
-                    <HBox alignment="CENTER_LEFT" styleClass="compact-actions">
-                        <Button fx:id="clearRecentButton" text="Clear Recent Files">
-                            <graphic>
-                                <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
-                            </graphic>
-                        </Button>
-                    </HBox>
-                </VBox>
+                <fx:include fx:id="recentPanel" source="RecentFilesPanel.fxml" />
 
                 <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
                     <!-- Center Panel: Log Table / Tabs -->
@@ -180,66 +152,7 @@
                         </StackPane>
                     </VBox>
 
-                    <!-- Bottom Panel: Log Detail -->
-                    <VBox fx:id="bottomPanel" minHeight="80" prefHeight="180" spacing="5">
-                        <padding>
-                            <Insets bottom="5" left="5" right="5" top="5" />
-                        </padding>
-
-                        <HBox alignment="CENTER_LEFT" spacing="10">
-                            <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS" styleClass="panel-title" />
-
-                            <HBox alignment="CENTER_LEFT" spacing="5" styleClass="compact-actions">
-                                <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
-                                    <graphic>
-                                        <FontAwesomeIconView glyphName="INDENT" size="12" />
-                                    </graphic>
-                                    <tooltip>
-                                        <Tooltip text="Auto-Prettify JSON" />
-                                    </tooltip>
-                                </ToggleButton>
-                                <ToggleButton fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
-                                    <graphic>
-                                        <FontAwesomeIconView glyphName="CODE" size="12" />
-                                    </graphic>
-                                    <tooltip>
-                                        <Tooltip text="Auto-Prettify XML" />
-                                    </tooltip>
-                                </ToggleButton>
-                                <Button fx:id="copyButton">
-                                    <graphic>
-                                        <FontAwesomeIconView glyphName="COPY" size="12" />
-                                    </graphic>
-                                    <tooltip>
-                                        <Tooltip text="Copy" />
-                                    </tooltip>
-                                </Button>
-                                <Button fx:id="clearDetailButton">
-                                    <graphic>
-                                        <FontAwesomeIconView glyphName="ERASER" size="12" />
-                                    </graphic>
-                                    <tooltip>
-                                        <Tooltip text="Clear Detail Content" />
-                                    </tooltip>
-                                </Button>
-                                <Separator orientation="VERTICAL" />
-                                <Button fx:id="pinBottomPanelButton">
-                                    <graphic>
-                                        <FontAwesomeIconView glyphName="TIMES" size="12" />
-                                    </graphic>
-                                    <tooltip>
-                                        <Tooltip text="Close Detail Panel (Ctrl+J)" />
-                                    </tooltip>
-                                </Button>
-                            </HBox>
-                        </HBox>
-                        
-                        <StackPane fx:id="detailContainer" VBox.vgrow="ALWAYS" styleClass="detail-container">
-                             <padding>
-                                 <Insets/>
-                             </padding>
-                        </StackPane>
-                    </VBox>
+                    <fx:include fx:id="detailPane" source="LogDetailPane.fxml" />
                 </SplitPane>
             </SplitPane>
 
