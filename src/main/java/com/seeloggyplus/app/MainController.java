@@ -6,9 +6,8 @@ import com.seeloggyplus.shared.ui.canvas.CanvasLogViewer;
 import com.seeloggyplus.shared.session.LogSession;
 import com.seeloggyplus.shared.session.TabSessionManager;
 import com.seeloggyplus.shared.ui.AppTheme;
-import com.seeloggyplus.shared.logs.LogFileServiceImpl;
-import com.seeloggyplus.shared.logs.LogParserServiceImpl;
-import com.seeloggyplus.shared.logs.ParsingConfigServiceImpl;
+import com.seeloggyplus.app.composition.LogServices;
+import com.seeloggyplus.shared.progress.ProgressCallback;
 import com.seeloggyplus.features.settings.infrastructure.PreferenceServiceImpl;
 import com.seeloggyplus.features.ssh.infrastructure.SSHServiceImpl;
 import com.seeloggyplus.features.servers.infrastructure.ServerManagementServiceImpl;
@@ -34,13 +33,12 @@ import com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogCont
 import com.seeloggyplus.features.preview.presentation.LogPreviewDialogController;
 import com.seeloggyplus.features.search.presentation.RemoteLogSearchDialogController;
 import com.seeloggyplus.shared.model.*;
-import com.seeloggyplus.shared.logs.LogFileService;
-import com.seeloggyplus.shared.logs.LogParser;
-import com.seeloggyplus.shared.logs.ParsingConfigService;
+import com.seeloggyplus.shared.logs.port.LogFileService;
+import com.seeloggyplus.shared.logs.port.LogParser;
+import com.seeloggyplus.shared.logs.port.ParsingConfigService;
 import com.seeloggyplus.shared.settings.PreferenceService;
 import com.seeloggyplus.shared.ssh.SSHService;
 import com.seeloggyplus.shared.ssh.SSHServiceFactory;
-import com.seeloggyplus.features.servers.application.ServerManagementService;
 import com.seeloggyplus.features.servers.presentation.ServerManagementDialogController;
 import com.seeloggyplus.shared.servers.ServerCatalog;
 import com.seeloggyplus.shared.tail.TailService;
@@ -50,7 +48,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
@@ -63,8 +60,6 @@ import javafx.geometry.Side;
 import javafx.application.Platform;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import javafx.collections.FXCollections;
-import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -77,7 +72,6 @@ import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import java.util.regex.Matcher;
 import java.util.Collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,20 +90,29 @@ import javafx.scene.shape.Rectangle;
 import javafx.stage.Window;
 
 public class MainController {
+
+    private final LogServices suppliedLogServices;
+
+    public MainController() {
+        suppliedLogServices = null;
+    }
+
+    public MainController(LogServices logServices) {
+        suppliedLogServices = java.util.Objects.requireNonNull(logServices);
+    }
+
     private boolean sceneKeyNavInstalled = false;
 
-    /** Tab-header horizontal-scroll throttling (one tab per gesture). */
     private static final double TAB_HEADER_SCROLL_THRESHOLD = 30;
     private static final long TAB_HEADER_SCROLL_COOLDOWN_MS = 260;
     private static final double MIN_LOG_TAB_CONTENT_WIDTH = 60;
     private static final double MAX_LOG_TAB_CONTENT_WIDTH = 220;
-    // JavaFX's tab width properties exclude the 10px horizontal padding on each side.
+
     private static final double LOG_TAB_HORIZONTAL_PADDING = 20;
     private static final double LOG_TAB_OVERFLOW_RESERVE = 40;
     private double tabHeaderScrollAccumulator = 0;
     private long lastTabHeaderSwitchAt = 0;
 
-    // FXML Components - MenuBar
     @FXML
     private MenuBar menuBar;
     @FXML
@@ -136,18 +139,14 @@ public class MainController {
     @FXML
     private MenuItem preferencesMenuItem;
 
-    // FXML Components - Main Layout
     @FXML
     private SplitPane horizontalSplitPane;
     @FXML
     private SplitPane verticalSplitPane;
 
-    // FXML Components - Left Panel (Recent Files)
     private VBox leftPanel;
     @FXML
     private RecentFilesPanelController recentPanelController;
-
-    // FXML Components - Center Panel (Log Table)
 
     @FXML
     private TextField searchField;
@@ -175,7 +174,6 @@ public class MainController {
 
     private final TabSessionManager tabSessionManager = new TabSessionManager();
 
-    // Root of the center area (clipped to avoid painting over top/bottom bars)
     @FXML
     private StackPane centerRoot;
     @FXML
@@ -187,7 +185,6 @@ public class MainController {
     @FXML
     private Button clearLogButton;
 
-    // FXML Components - Bottom Panel (Log Detail)
     private VBox detailPane;
     @FXML
     private LogDetailPaneController detailPaneController;
@@ -199,7 +196,6 @@ public class MainController {
     @FXML
     private SearchNavigator searchNavigator;
 
-    // Layout State Variables
     private double lastVerticalDividerPos = 0.7;
     private double lastHorizontalDividerPos = 0.2;
 
@@ -212,7 +208,6 @@ public class MainController {
     @FXML
     private ProgressBar memoryBar;
 
-    // Services and Data
     private ParsingConfigService parsingConfigService;
     private RecentFileService recentFileService;
     private LogParser logParserService;
@@ -221,7 +216,6 @@ public class MainController {
     private PreferenceService preferenceService;
     private final SSHServiceFactory sshServiceFactory = SSHServiceImpl::new;
 
-    // Tail Service
     private TailService tailService;
 
     private static final Logger logger = LoggerFactory.getLogger(MainController.class);
@@ -234,18 +228,13 @@ public class MainController {
     private File currentFile;
     private boolean isLeftPanelPinned = true;
 
-    /**
-     * Snapshot of the last opened session (local or remote) so that
-     * "clear → refresh" can reload it.  Replaced atomically whenever a
-     * new file/tail is opened; never partially mutated.
-     */
     private static class LastSession {
         enum Type { LOCAL, REMOTE }
         final Type type;
-        final File localFile;            // non-null for LOCAL
-        final String remotePath;         // non-null for REMOTE
-        final LogFile logFromDb;         // non-null for REMOTE
-        final SSHService sshService;     // non-null for REMOTE
+        final File localFile;
+        final String remotePath;
+        final LogFile logFromDb;
+        final SSHService sshService;
 
         static LastSession local(File file) {
             return new LastSession(Type.LOCAL, file, null, null, null);
@@ -265,7 +254,7 @@ public class MainController {
     private final AtomicLong downloadGeneration = new AtomicLong();
     private static final int MAX_TAIL_BUFFER_SIZE = 5000;
     private int sshDownloadThreads = 4;
-    private String sshDownloadDirectory = ""; // Custom download dir, empty = system temp
+    private String sshDownloadDirectory = "";
     private int tailWindowSize = 20000;
     private boolean tailModeEnabled = false;
     private SSHService activeTailSshService;
@@ -275,16 +264,15 @@ public class MainController {
     private String monitoringRemotePath;
     private final Map<String, File> downloadedRemoteFiles = new ConcurrentHashMap<>();
 
-    // state
     private final AtomicBoolean tailFlushScheduled = new AtomicBoolean(
             false);
     private boolean tailColumnsAutoResized = false;
-    private boolean isProgrammaticUpdate = false; // Prevent listener loops
+    private boolean isProgrammaticUpdate = false;
 
     private Predicate<LogEntry> currentTailFilterPredicate = null;
-    private Pattern currentTailSearchPattern = null; // Compiled pattern for incremental tail search
+    private Pattern currentTailSearchPattern = null;
     private Predicate<String> currentTailSearchPredicate = null;
-    private int tailSearchScannedUpTo = 0; // liveTailList index up to which search has been performed
+    private int tailSearchScannedUpTo = 0;
     private boolean isSkippingFilterTrigger = false;
 
     private int totalEntries = 0;
@@ -304,23 +292,23 @@ public class MainController {
     private SearchResultPanel searchResultPanel;
     private SplitPane searchSplitPane;
 
-    // Persistent buffer for live tailing (CanvasLogViewer reads this)
     private List<LogEntry> liveTailList = Collections.synchronizedList(new ArrayList<>());
 
     @FXML
     private ToggleButton followTailButton;
 
-    private final LinkedList<LogEntry> tailBuffer = new LinkedList<>(); // Temp transfer buffer
+    private final LinkedList<LogEntry> tailBuffer = new LinkedList<>();
 
     @FXML
     public void initialize() {
         logger.info("Initializing MainController");
 
-        parsingConfigService = new ParsingConfigServiceImpl();
+        LogServices logServices = suppliedLogServices != null ? suppliedLogServices : LogServices.createDefault();
+        parsingConfigService = logServices.parsingConfigs();
         recentFileService = new RecentConfigServiceImpl();
         preferenceService = new PreferenceServiceImpl();
-        logParserService = new LogParserServiceImpl();
-        logFileService = new LogFileServiceImpl();
+        logParserService = logServices.parser();
+        logFileService = logServices.files();
         serverManagementService = new ServerManagementServiceImpl();
         tailService = new TailServiceImpl();
 
@@ -331,7 +319,6 @@ public class MainController {
         setupKeyboardShortcuts();
         setupSearchFieldAutoCompletion();
 
-        // Helper to update style based on state
         configureToggleStyle(toggleLeftPanelButton);
         configureToggleStyle(toggleBottomPanelButton);
         configureToggleStyle(tailButton);
@@ -339,7 +326,6 @@ public class MainController {
         configureToggleStyle(regexCheckBox);
         configureToggleStyle(caseSensitiveCheckBox);
 
-        // Bind Toolbar Toggles to Actions
         if (toggleLeftPanelButton != null) {
             toggleLeftPanelButton.setOnAction(e -> toggleLeftPanel());
         }
@@ -394,7 +380,7 @@ public class MainController {
         }
     }
 
-    private PauseTransition loadingDelay; // Delay before showing loading overlay to avoid flicker
+    private PauseTransition loadingDelay;
 
     private void showLoading(String message) {
         if (loadingOverlay == null) return;
@@ -404,10 +390,8 @@ public class MainController {
             loadingProgress.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
         }
 
-        // If overlay is already visible (long operation with progress updates), just update text
         if (loadingOverlay.isVisible()) return;
 
-        // Delay showing the overlay to avoid flicker on fast operations
         if (loadingDelay == null) {
             loadingDelay = new PauseTransition(Duration.millis(350));
             loadingDelay.setOnFinished(e -> {
@@ -419,7 +403,6 @@ public class MainController {
     }
 
     private void hideLoading() {
-        // Cancel pending show — operation finished before delay elapsed
         if (loadingDelay != null) {
             loadingDelay.stop();
         }
@@ -531,7 +514,6 @@ public class MainController {
                 lastHorizontalDividerPos = horizontalSplitPane.getDividerPositions()[0];
             }
 
-            // Pure native JavaFX: panel is completely closed
             horizontalSplitPane.getItems().remove(leftPanel);
             leftPanel.setVisible(false);
             leftPanel.setManaged(false);
@@ -546,9 +528,6 @@ public class MainController {
         }
     }
 
-    /**
-     * Updates the status bar line counter with accurate line metrics for the session.
-     */
     void updateBottomBarLineCount(LogSession session) {
         if (statusLabel == null) return;
         if (session == null || session.getCanvasLogViewer() == null) {
@@ -585,8 +564,6 @@ public class MainController {
                 onTabSelected(oldTab, newTab);
             });
 
-            // Scene-level fallback so the arrow keys move the log viewer even
-            // when focus is not on the canvas (e.g. on the tab pane or a pane).
             if (menuBar != null) {
                 menuBar.sceneProperty().addListener((obs, oldScene, newScene) -> {
                     if (newScene != null && !sceneKeyNavInstalled) {
@@ -596,8 +573,6 @@ public class MainController {
                 });
             }
 
-            // Intercept UP/DOWN/PAGE_UP/PAGE_DOWN/HOME/END keys so TabPane never changes tabs on arrow keys,
-            // and instead routes line scrolling/navigation directly to the log canvas viewer.
             logTabPane.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
                 KeyCode code = event.getCode();
                 if (code == KeyCode.UP || code == KeyCode.DOWN || code == KeyCode.PAGE_UP || code == KeyCode.PAGE_DOWN
@@ -610,9 +585,6 @@ public class MainController {
                 }
             });
 
-            // Horizontal scroll (or Shift+wheel) over the tab header moves the
-            // selected tab left/right. Deliberately throttled so a single gesture
-            // moves exactly one tab (trackpads emit many small scroll events).
             logTabPane.addEventFilter(ScrollEvent.SCROLL, event -> {
                 if (!isInTabHeaderArea(event.getTarget())) {
                     return;
@@ -680,7 +652,6 @@ public class MainController {
             });
         }
 
-        // Search Result Panel — shown to the right of the log viewer when search is active
         searchResultPanel = new SearchResultPanel();
         searchResultPanel.setOnLineSelected((listIndex, globalLine, content) -> {
             if (canvasLogViewer != null) {
@@ -688,21 +659,20 @@ public class MainController {
                 canvasLogViewer.selectLine(globalLine);
             }
             displayLogDetailFromCanvas(globalLine, content);
-            // Sync navigator status with panel click
+
             if (filteredIndexes != null && searchNavigator != null) {
                 currentMatchIndex = listIndex + 1;
                 searchNavigator.updateStatus(listIndex + 1, filteredIndexes.size());
             }
         });
 
-        // Wrap logContainer + searchResultPanel in a horizontal SplitPane
         VBox logParent = (VBox) logContainer.getParent();
         int logIdx = logParent.getChildren().indexOf(logContainer);
         SplitPane searchSplit = new SplitPane();
         searchSplit.setOrientation(Orientation.HORIZONTAL);
         searchSplit.setMinSize(0, 0);
         searchSplit.getItems().add(logContainer);
-        // searchResultPanel is added/removed dynamically when search results appear/clear
+
         VBox.setVgrow(searchSplit, Priority.ALWAYS);
         logParent.getChildren().set(logIdx, searchSplit);
         logParent.setMinHeight(0);
@@ -716,7 +686,6 @@ public class MainController {
                     && (regexCheckBox != null && regexCheckBox.isSelected() == lastAppliedRegex)
                     && (caseSensitiveCheckBox != null && caseSensitiveCheckBox.isSelected() == lastAppliedCaseSensitive);
             if (querySame && filteredIndexes != null && !filteredIndexes.isEmpty()) {
-                // Results already showing for this exact query — Enter navigates to next match
                 navigateNextMatch();
             } else {
                 performSearch();
@@ -731,7 +700,6 @@ public class MainController {
             }
         });
 
-        // Incremental search: debounce 300ms after typing
         searchDebounce = new PauseTransition(Duration.millis(300));
         searchDebounce.setOnFinished(evt -> performSearch());
         searchField.textProperty().addListener((obs, oldText, newText) -> {
@@ -742,7 +710,7 @@ public class MainController {
                 searchDebounce.playFromStart();
             } else {
                 searchDebounce.stop();
-                // Only clear if there was actually a previous search
+
                 if (oldText != null && !oldText.isEmpty()) {
                     clearSearch();
                 }
@@ -793,11 +761,6 @@ public class MainController {
         ToggleStyleSupport.configure(button);
     }
 
-    /**
-     * Global (scene-level) navigation: route Up/Down/PageUp/PageDown/Home/End to the
-     * active log viewer, unless a text input, list/table or the detail text area has
-     * focus (those need the arrow keys for their own caret/selection).
-     */
     private void handleGlobalLogNavigation(KeyEvent event) {
         if (event.isConsumed()) {
             return;
@@ -832,7 +795,6 @@ public class MainController {
                 || node.getStyleClass().contains("styled-text-area");
     }
 
-    /** True when the scroll target is inside the tab header (not the log content). */
     private boolean isInTabHeaderArea(Object target) {
         if (!(target instanceof Node node)) {
             return false;
@@ -887,7 +849,6 @@ public class MainController {
         }
 
         if (tailModeEnabled) {
-            // TAIL MODE: Filtered lines + Highlight
             String highlightPattern = searchText;
             boolean highlightIsRegex = isRegex;
 
@@ -904,7 +865,6 @@ public class MainController {
             final String finalHighlightPattern = highlightPattern;
             final boolean finalHighlightIsRegex = highlightIsRegex;
 
-            // Compile the search pattern for matching against tail buffer lines
             final Pattern matchPattern;
             try {
                 int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
@@ -917,7 +877,7 @@ public class MainController {
 
             if (canvasLogViewer != null) {
                 canvasLogViewer.setSearchHighlight(finalHighlightPattern, finalHighlightIsRegex, caseSensitive);
-                // Pause follow-tail so user can navigate search results
+
                 if (canvasLogViewer.isFollowTail()) {
                     canvasLogViewer.setFollowTail(false);
                 }
@@ -941,7 +901,6 @@ public class MainController {
                 searchPredicate = createBooleanSearchPredicate(searchText, caseSensitive);
             }
 
-            // Offload file and tail scanning to background worker to eliminate UI freeze
             SEARCH_POOL.submit(() -> {
                 IntArrayList results = new IntArrayList();
                 if (reader != null && index != null && tailOffset > 0) {
@@ -1015,7 +974,6 @@ public class MainController {
                 });
             });
 
-            // Update the predicate for completeness
             try {
                 currentTailFilterPredicate = buildSearchPredicate(searchText, isRegex, caseSensitive);
             } catch (Exception ex) {
@@ -1027,7 +985,6 @@ public class MainController {
 
         showLoading("Searching...");
 
-        // Cancel any in-flight search task to prevent stale results overwriting
         if (currentSearchTask != null && currentSearchTask.isRunning()) {
             currentSearchTask.cancel(true);
         }
@@ -1063,7 +1020,6 @@ public class MainController {
                 try {
                     List<Future<IntArrayList>> futures = new ArrayList<>();
 
-                    // Submit chunk tasks
                     for (int start = 0; start < total; start += chunkSize) {
                         final int chunkStart = start;
                         final int chunkEnd = Math.min(start + chunkSize, total);
@@ -1075,7 +1031,6 @@ public class MainController {
                                 if (isCancelled())
                                     break;
 
-                                // Zero-allocation search using CharSequence matcher
                                 Predicate<CharSequence> matcher;
                                 if (pattern != null) {
                                     matcher = cs -> pattern.matcher(cs).find();
@@ -1092,14 +1047,12 @@ public class MainController {
                         }));
                     }
 
-                    // Collect results with progress
                     IntArrayList allMatches = new IntArrayList();
                     int completedChunks = 0;
 
                     for (var future : futures) {
                         IntArrayList chunkResult = future.get();
 
-                        // Merge sorted (chunks are already in order)
                         for (int i = 0; i < chunkResult.size(); i++) {
                             allMatches.add(chunkResult.get(i));
                         }
@@ -1112,17 +1065,14 @@ public class MainController {
                     }
 
                     return allMatches;
-
                 } catch (Exception e) {
                     logger.error("Parallel search error", e);
                     return new IntArrayList();
                 }
-                // Note: SEARCH_POOL is shared, do NOT shut down
             }
         };
 
         task.setOnSucceeded(e -> {
-            // Discard stale results — a newer search was already started
             if (thisGeneration != searchGeneration) {
                 logger.info("Discarding stale search results (gen {} vs current {})", thisGeneration, searchGeneration);
                 return;
@@ -1142,7 +1092,6 @@ public class MainController {
                 tabSessionManager.getActive().setCaseSensitive(caseSensitive);
             }
 
-            // Enhanced Highlight Logic for Boolean Search
             String highlightPattern = searchText;
             boolean highlightIsRegex = isRegex;
 
@@ -1213,20 +1162,19 @@ public class MainController {
     }
 
     private void navigateNextMatch() {
-        // Unified navigation using filteredIndexes for both local and tail mode
         if (filteredIndexes == null || filteredIndexes.size() == 0) return;
         int total = filteredIndexes.size();
 
         if (currentMatchIndex < 0) currentMatchIndex = 0;
-        int nextIdx = currentMatchIndex; // 0-based index into filteredIndexes
-        if (nextIdx >= total) nextIdx = 0; // wrap
+        int nextIdx = currentMatchIndex;
+        if (nextIdx >= total) nextIdx = 0;
 
         int globalLine = filteredIndexes.get(nextIdx);
         if (canvasLogViewer != null) {
             canvasLogViewer.jumpToLine(globalLine);
             canvasLogViewer.selectLine(globalLine);
         }
-        currentMatchIndex = nextIdx + 1; // advance for next call
+        currentMatchIndex = nextIdx + 1;
         if (tabSessionManager.getActive() != null) {
             tabSessionManager.getActive().setCurrentMatchIndex(currentMatchIndex);
         }
@@ -1241,12 +1189,11 @@ public class MainController {
     }
 
     private void navigatePreviousMatch() {
-        // Unified navigation using filteredIndexes for both local and tail mode
         if (filteredIndexes == null || filteredIndexes.size() == 0) return;
         int total = filteredIndexes.size();
 
-        int prevIdx = currentMatchIndex - 2; // currentMatchIndex is 1-based "next to visit"
-        if (prevIdx < 0) prevIdx = total - 1; // wrap
+        int prevIdx = currentMatchIndex - 2;
+        if (prevIdx < 0) prevIdx = total - 1;
 
         int globalLine = filteredIndexes.get(prevIdx);
         if (canvasLogViewer != null) {
@@ -1275,7 +1222,7 @@ public class MainController {
         currentTailSearchPredicate = null;
         tailSearchScannedUpTo = 0;
         lastAppliedSearchQuery = null;
-        // Invalidate any in-flight search tasks
+
         searchGeneration++;
         if (currentSearchTask != null && currentSearchTask.isRunning()) {
             currentSearchTask.cancel(true);
@@ -1290,7 +1237,7 @@ public class MainController {
         if (canvasLogViewer != null) {
             canvasLogViewer.clearFilter();
             canvasLogViewer.clearSearchHighlight();
-            // Restore follow-tail when clearing search in tail mode
+
             if (tailModeEnabled && !canvasLogViewer.isFollowTail()) {
                 canvasLogViewer.setFollowTail(true);
             }
@@ -1328,7 +1275,7 @@ public class MainController {
 
     private void showSearchResultPanel(IntArrayList matches, Pattern highlightPattern) {
         if (searchResultPanel == null || searchSplitPane == null) return;
-        // Set resolver so panel can lazily fetch line content
+
         searchResultPanel.setLineContentResolver(idx -> {
             if (mappedFileReader != null && lineOffsetIndex != null && idx < lineOffsetIndex.getLineCount()) {
                 return mappedFileReader.readLine(lineOffsetIndex, idx);
@@ -1349,21 +1296,16 @@ public class MainController {
         searchSplitPane.getItems().remove(searchResultPanel);
     }
 
-    /**
-     * Show search result panel for tail mode. Uses liveTailList as the content source.
-     */
     private void showSearchResultPanelForTail(IntArrayList matches, Pattern highlightPattern) {
         if (searchResultPanel == null || searchSplitPane == null) return;
-        // Resolver: idx can be a file line (< tailOffset) or tail buffer line (>= tailOffset).
+
         long tailOffset = canvasLogViewer != null ? canvasLogViewer.getFileLineCount() : 0;
         searchResultPanel.setLineContentResolver(idx -> {
             if (idx < tailOffset) {
-                // File line
                 if (mappedFileReader != null && lineOffsetIndex != null && idx < lineOffsetIndex.getLineCount()) {
                     return mappedFileReader.readLine(lineOffsetIndex, idx);
                 }
             } else {
-                // Tail buffer line
                 int bufferIdx = (int) (idx - tailOffset);
                 if (bufferIdx >= 0 && bufferIdx < liveTailList.size()) {
                     LogEntry entry = liveTailList.get(bufferIdx);
@@ -1381,10 +1323,6 @@ public class MainController {
         }
     }
 
-    /**
-     * Release mmap, index and filter resources.
-     * Call before loading new file, on clear, or on cancel.
-     */
     private void deleteCancelledDownloadFiles(File file) {
         for (int attempt = 0; attempt < 5; attempt++) {
             try {
@@ -1588,13 +1526,11 @@ public class MainController {
             }
         }
 
-        // 1. Active remote tail — just restart it
         if (tailModeEnabled && monitoringRemotePath != null && activeTailSshService != null) {
             reloadActiveRemoteTail();
             return;
         }
 
-        // 2. Active local file — reload it
         if (currentFile != null) {
             logger.info("Reloading local file '{}'.", currentFile.getName());
             showLoading("Reloading file...");
@@ -1602,7 +1538,6 @@ public class MainController {
             return;
         }
 
-        // 3. Nothing active — try to restore from lastSession
         if (lastSession == null) {
             logger.warn("Reload triggered but no active file or tail session.");
             return;
@@ -1638,8 +1573,6 @@ public class MainController {
         }
         showLoading("Reloading remote tail...");
 
-        // Reconnect off the UI thread: SSH handshakes can take many seconds and
-        // previously froze the whole window (Not Responding) during reload.
         final SSHService service = activeTailSshService;
         final String remotePath = monitoringRemotePath;
         Thread.ofVirtual().name("tail-reload").start(() -> {
@@ -1715,7 +1648,6 @@ public class MainController {
         new Thread(connectTask).start();
     }
 
-
     @FXML
     public void handleClearLog() {
         logger.info("User requested to clear log view");
@@ -1740,12 +1672,6 @@ public class MainController {
         logger.info("Log view cleared");
     }
 
-    /**
-     * Empties the visible log of a session without closing its tab, so the user can
-     * Reload (Ctrl+R) or restart Tail on the same file afterwards. The session's own
-     * reader/index/buffers must be released; cleaning only controller-level fields
-     * left the active tab's canvas unchanged.
-     */
     private void clearSessionLogView(LogSession session) {
         if (session.isTailModeEnabled()) {
             disableTail(session, true);
@@ -1833,7 +1759,6 @@ public class MainController {
                 lastVerticalDividerPos = verticalSplitPane.getDividerPositions()[0];
             }
 
-            // Pure native JavaFX: panel is completely closed
             verticalSplitPane.getItems().remove(detailPane);
             detailPane.setVisible(false);
             detailPane.setManaged(false);
@@ -2063,10 +1988,6 @@ public class MainController {
 
     private void openRemoteLogFile(String remotePath, String remoteFileName, SSHService sshService,
             SSHServerModel sshServer, int targetLine) {
-        // Never create a second tab (and never re-download) for a remote file that is
-        // already open, whether it is currently streaming (REMOTE) or was downloaded
-        // (LOCAL). Re-downloading while a tail is active used to fail with an SSH
-        // channel error; reuse the existing tab instead.
         for (Map.Entry<Tab, LogSession> entry : tabSessionManager.sessions().entrySet()) {
             LogSession s = entry.getValue();
             boolean sameRemoteStream = s.getSessionType() == LogSession.SessionType.REMOTE
@@ -2124,7 +2045,7 @@ public class MainController {
                         localTmpFile.getAbsolutePath());
                 boolean success = sshService.downloadFileConcurrent(remotePath, localTmpFile.getAbsolutePath(),
                         sshDownloadThreads,
-                        new LogParser.ProgressCallback() {
+                        new ProgressCallback() {
                             @Override
                             public void onProgress(double progress, long bytesProcessed, long totalBytes) {
                                 if (generation != downloadGeneration.get() || isCancelled()) return;
@@ -2244,7 +2165,6 @@ public class MainController {
             return;
         }
 
-        // Check if file is already open in an existing tab
         for (Map.Entry<Tab, LogSession> entry : tabSessionManager.sessions().entrySet()) {
             LogSession s = entry.getValue();
             if (s.getSessionType() == LogSession.SessionType.LOCAL && s.getLocalFile() != null) {
@@ -2336,7 +2256,7 @@ public class MainController {
 
     private LogFile getOrCreateLogFile(File file, String displayName, SSHServerModel remoteServer, String remotePath) {
         try {
-            ParsingConfig parsingConfig = ParsingConfig.createRawConfig(); // Internal default
+            ParsingConfig parsingConfig = ParsingConfig.createRawConfig();
             String serverId = remoteServer != null ? remoteServer.getId() : null;
             boolean isRemote = remoteServer != null;
 
@@ -2483,10 +2403,6 @@ public class MainController {
         detailPaneController.setAutoPrettify(autoPrettifyJson, autoPrettifyXml);
     }
 
-    /**
-     * Whether a Recent entry should be reopened in live tail mode. Entries saved
-     * before the mode column existed return {@code null}/OPEN and open normally.
-     */
     static boolean isTailModeRecent(RecentFilesDto recentFile) {
         return recentFile != null && RecentFile.MODE_TAIL.equalsIgnoreCase(recentFile.openMode());
     }
@@ -2494,8 +2410,7 @@ public class MainController {
     private void handleRecentFileSelected(RecentFilesDto recentFile) {
         if (recentFile == null || recentFile.logFile() == null) return;
         LogFile logFile = recentFile.logFile();
-        // Reopen the file the way it was last viewed: TAIL streams again, otherwise
-        // fall back to a normal OPEN (download for remote files).
+
         boolean tailMode = isTailModeRecent(recentFile);
 
         if (logFile.isRemote()) {
@@ -2516,7 +2431,6 @@ public class MainController {
                 }
             }
 
-            // Check if already open in a tab
             for (Map.Entry<Tab, LogSession> entry : tabSessionManager.sessions().entrySet()) {
                 LogSession s = entry.getValue();
                 boolean sameRemoteFile = logFile.getFilePath().equals(s.getRemotePath())
@@ -2540,8 +2454,7 @@ public class MainController {
             SSHServerModel cachedServer = logFile.getSshServerID() == null ? null
                     : serverManagementService.getServerById(logFile.getSshServerID());
             File cachedDownload = downloadedRemoteFiles.get(remoteDownloadKey(logFile.getFilePath(), logFile.getSshServerID()));
-            // A cached download is only a valid shortcut for normal OPEN mode. In TAIL
-            // mode we must reconnect and stream, even if a downloaded copy is cached.
+
             if (!tailMode && cachedDownload != null && cachedDownload.isFile()) {
                 logger.info("Opening cached remote download from Recent: {}", cachedDownload.getAbsolutePath());
                 openLocalLogFile(cachedDownload, logFile.getName(), cachedServer, logFile.getFilePath(), true);
@@ -2566,8 +2479,6 @@ public class MainController {
 
                     final CompletableFuture<String> passwordFuture = new CompletableFuture<>();
                     if (server.usesKeyAuth()) {
-                        // Key authentication: the passphrase (or null for an unencrypted key) is
-                        // stored with the server, no interactive prompt needed.
                         passwordFuture.complete(server.getKeyPassphrase());
                     } else {
                         Platform.runLater(() -> {
@@ -2624,19 +2535,16 @@ public class MainController {
                         openRemoteLogFile(logFile.getFilePath(), logFile.getName(), sshService, server);
                     }
                 }
-
             });
 
             connectTask.setOnFailed(e -> {
                 Throwable ex = connectTask.getException();
                 logger.error("Failed to connect to SSH server for recent file", ex);
                 showError("Connection Error", ex.getMessage());
-
             });
 
             currentLoadingTask = connectTask;
             Thread.ofVirtual().start(connectTask);
-
         } else {
             File file = new File(logFile.getFilePath());
             if (!file.exists()) {
@@ -2644,7 +2552,6 @@ public class MainController {
                 return;
             }
 
-            // Check if already open in a tab
             for (Map.Entry<Tab, LogSession> entry : tabSessionManager.sessions().entrySet()) {
                 LogSession s = entry.getValue();
                 if (s.getSessionType() == LogSession.SessionType.LOCAL && s.getLocalFile() != null) {
@@ -2747,12 +2654,10 @@ public class MainController {
 
     private void handleHelpContents() {
         try {
-            // Look for help files relative to the application directory
             File appDir = new File(System.getProperty("user.dir"));
             File helpFile = new File(appDir, "help/index.html");
 
             if (!helpFile.exists()) {
-                // Fallback: try extracting from resources to temp
                 URL helpUrl = getClass().getResource("/help/index.html");
                 if (helpUrl != null) {
                     Desktop.getDesktop().browse(helpUrl.toURI());
@@ -2834,7 +2739,6 @@ public class MainController {
                 isProgrammaticUpdate = false;
             }
         }
-        // Style handled by listener
 
         if (tabSessionManager.getActive() != null) {
             boolean isStreamMode = (tabSessionManager.getActive().getSessionType() == LogSession.SessionType.REMOTE && tabSessionManager.getActive().getReader() == null);
@@ -2844,14 +2748,12 @@ public class MainController {
             }
             tabSessionManager.getActive().setTailSearchScannedUpTo(0);
             if (isStreamMode) {
-                // Requirement 1: Clear previous stream entries when switching to tail mode
                 if (tabSessionManager.getActive().getCanvasLogViewer() != null) {
                     tabSessionManager.getActive().getCanvasLogViewer().resetView();
                     tabSessionManager.getActive().getCanvasLogViewer().setTailBuffer(tabSessionManager.getActive().getLiveTailList());
                     tabSessionManager.getActive().getCanvasLogViewer().refreshTail();
                 }
             } else {
-                // Local or indexed file: preserve static file reader, attach live tail buffer
                 if (tabSessionManager.getActive().getCanvasLogViewer() != null) {
                     tabSessionManager.getActive().getCanvasLogViewer().setTailBuffer(tabSessionManager.getActive().getLiveTailList());
                     tabSessionManager.getActive().getCanvasLogViewer().refreshTail();
@@ -3017,7 +2919,6 @@ public class MainController {
             return;
         }
 
-        // Logic to get the secret (saved password/passphrase or prompt)
         String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
         if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
             PasswordPromptDialog prompt = new PasswordPromptDialog(
@@ -3046,8 +2947,7 @@ public class MainController {
             protected void succeeded() {
                 hideLoading();
                 if (getValue()) {
-                    // Assuming we have parsing config setup
-                    startRemoteTail(remotePath, sshService, server); // Removed currentParsingConfig
+                    startRemoteTail(remotePath, sshService, server);
                 } else {
                     hideLoading();
                     showError("Connection Failed", "Could not connect to " + server.getHost());
@@ -3069,11 +2969,6 @@ public class MainController {
         disableTail(false);
     }
 
-    /**
-     * Disable tail mode. If {@code skipReindex} is true, the current file will NOT
-     * be re-indexed (useful when a different file is about to be loaded immediately
-     * after, avoiding a race between two async loadFileWithParallelParsing tasks).
-     */
     private void disableTail(boolean skipReindex) {
         if (tabSessionManager.getActive() != null) {
             disableTail(tabSessionManager.getActive(), skipReindex);
@@ -3101,7 +2996,7 @@ public class MainController {
         synchronized (session.getTailBuffer()) {
             session.getTailBuffer().clear();
         }
-        // Do NOT clear liveTailList here so that logs remain visible and navigable!
+
         session.getTailFlushScheduled().set(false);
         session.setCurrentTailSearchPattern(null);
         session.setTailSearchScannedUpTo(0);
@@ -3123,7 +3018,6 @@ public class MainController {
             }
         }
 
-        // For local files: re-index so new lines appended during tail are visible
         if (!skipReindex && session.getSessionType() == LogSession.SessionType.LOCAL
                 && session.getLocalFile() != null && session.getLocalFile().exists()) {
             logger.info("Re-indexing local file after tail: {}", session.getLocalFile().getName());
@@ -3146,7 +3040,6 @@ public class MainController {
             return;
         }
 
-        // Check if this remote tail session is already open in an existing tab
         for (Map.Entry<Tab, LogSession> entry : tabSessionManager.sessions().entrySet()) {
             LogSession s = entry.getValue();
             if (s.getSessionType() == LogSession.SessionType.REMOTE &&
@@ -3234,7 +3127,7 @@ public class MainController {
 
     private LogFile saveRemoteTailToRecent(String remotePath, SSHServerModel server) {
         try {
-            ParsingConfig parsingConfig = ParsingConfig.createRawConfig(); // Internal default
+            ParsingConfig parsingConfig = ParsingConfig.createRawConfig();
             String fileName = new File(remotePath).getName();
             String serverId = server != null ? server.getId() : null;
             LogFile logFile = logFileService.getLogFileByPathNameAndServer(fileName, remotePath, serverId, true);
@@ -3256,7 +3149,7 @@ public class MainController {
                 logFile.setSshServerID(serverId);
                 logFile.setParsingConfigurationID(parsingConfig.getId());
                 logFile.setModified(String.valueOf(System.currentTimeMillis()));
-                logFile.setSize("-"); // Reset size for tail
+                logFile.setSize("-");
                 logFileService.updateLogFile(logFile);
                 logger.info("Updated existing LogFile for remote tail: id={}, serverId={}, path={}", logFile.getId(), serverId, remotePath);
             }
@@ -3459,7 +3352,6 @@ public class MainController {
         Platform.runLater(() -> {
             session.getTailFlushScheduled().set(false);
 
-            // Guard: don't flush if tail mode was disabled while this was queued
             if (!session.isTailModeEnabled() || session.isClosed()) {
                 synchronized (session.getTailBuffer()) {
                     session.getTailBuffer().clear();
@@ -3480,7 +3372,6 @@ public class MainController {
                 int oldSize = session.getLiveTailList().size();
                 session.getLiveTailList().addAll(toAdd);
 
-                // Limit Logic here
                 int trimmed = 0;
                 if (session.getLiveTailList().size() > 50000) {
                     trimmed = session.getLiveTailList().size() - 50000;
@@ -3490,7 +3381,6 @@ public class MainController {
                 if (session.isActive()) {
                     session.getCanvasLogViewer().refreshTail();
 
-                    // Apply a pending tail jump once enough lines have arrived (Find in Files -> Tail).
                     int pendingJump = session.getPendingTailJumpIndex();
                     if (pendingJump >= 0) {
                         if (trimmed > 0) {
@@ -3508,11 +3398,9 @@ public class MainController {
                         }
                     }
 
-                    // Incremental search: scan new lines and append results to the result panel
                     if (session == tabSessionManager.getActive() && currentTailSearchPattern != null && filteredIndexes != null) {
                         long tailOffset = canvasLogViewer != null ? canvasLogViewer.getFileLineCount() : 0;
 
-                        // If buffer was trimmed, adjust existing filteredIndexes in-place
                         if (trimmed > 0) {
                             int removedMatchCount = 0;
                             int writeIdx = 0;
@@ -3524,7 +3412,7 @@ public class MainController {
                                     removedMatchCount++;
                                 }
                             }
-                            // Remove trailing entries that were compacted
+
                             while (filteredIndexes.size() > writeIdx) {
                                 filteredIndexes.removeLast();
                             }
@@ -3534,7 +3422,6 @@ public class MainController {
                             }
                         }
 
-                        // Scan ONLY lines that haven't been scanned yet
                         IntArrayList newMatches = new IntArrayList();
                         Predicate<String> pred = currentTailSearchPredicate != null ? currentTailSearchPredicate
                                 : (currentTailSearchPattern != null ? (s -> currentTailSearchPattern.matcher(s).find()) : null);
@@ -3568,7 +3455,6 @@ public class MainController {
                         updateBottomBarLineCount(session);
                     }
                 } else {
-                    // DORMANT BACKGROUND TAB: Do not render canvas, just update unread badge!
                     session.addUnreadTailLines(toAdd.size());
                     updateTabBadge(session);
                 }
@@ -3594,7 +3480,6 @@ public class MainController {
     }
 
     private void cleanupTempFiles() {
-        // Scan both system temp dir and custom download dir
         Set<String> dirsToClean = new LinkedHashSet<>();
         dirsToClean.add(System.getProperty("java.io.tmpdir"));
         if (sshDownloadDirectory != null && !sshDownloadDirectory.isBlank()) {
@@ -3748,7 +3633,6 @@ public class MainController {
         }
     }
 
-    /** Shared dialog window-icon helper for non-FXML dialogs (package-visible for reuse). */
     static void addDialogIcon(Window window) {
         try {
             Image icon = new Image(
@@ -3816,8 +3700,6 @@ public class MainController {
                 canvasLogViewer.refreshTail();
             }
 
-            // If the file is already loaded in the viewer, skip initial context load
-            // to avoid duplicating lines that are already displayed from the file index.
             boolean needsContext = (mappedFileReader == null || lineOffsetIndex == null);
 
             logger.info("Starting local tail (TailService) for: {} (loadContext={})", file.getAbsolutePath(),
@@ -3827,7 +3709,6 @@ public class MainController {
                     this::handleTailLineBackground,
                     ex -> {
                         if (ex instanceof InterruptedException) {
-                            // Normal shutdown, ignore
                             return;
                         }
                         if (ex instanceof FileNotFoundException) {
@@ -3919,8 +3800,6 @@ public class MainController {
             tailService.stopTail();
         }
     }
-
-    // ==================== Tab Management & Lifecycle ====================
 
     private Tab createTabForSession(LogSession session) {
         Tab tab = new Tab();

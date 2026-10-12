@@ -18,14 +18,6 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Guards the package layout:
- * <pre>
- * com.seeloggyplus.app
- * com.seeloggyplus.shared.{model,dto,logs,settings,servers,tail,ssh,database,session,ui,util}
- * com.seeloggyplus.features.&lt;name&gt;.{domain,application,infrastructure,presentation}
- * </pre>
- */
 class ArchitectureBoundaryTest {
 
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
@@ -35,11 +27,12 @@ class ArchitectureBoundaryTest {
     private static final String SHARED = "com.seeloggyplus.shared";
     private static final String FEATURES = "com.seeloggyplus.features";
 
-    /** Shared packages that must stay free of JavaFX so they can run headless. */
     private static final List<String> HEADLESS_PACKAGES = List.of(
             "com.seeloggyplus.shared.model",
             "com.seeloggyplus.shared.dto",
             "com.seeloggyplus.shared.logs",
+            "com.seeloggyplus.shared.logs.port",
+            "com.seeloggyplus.shared.progress",
             "com.seeloggyplus.shared.settings",
             "com.seeloggyplus.shared.servers",
             "com.seeloggyplus.shared.tail",
@@ -87,8 +80,6 @@ class ArchitectureBoundaryTest {
     @Test
     @DisplayName("app may depend on anything in the project")
     void appLayerIsUnrestricted() {
-        // The composition root wires shared services and feature controllers together,
-        // so it deliberately has no import restrictions.
         assertTrue(sources.stream().anyMatch(file -> file.in(APP)),
                 "expected application classes in " + APP);
     }
@@ -169,6 +160,62 @@ class ArchitectureBoundaryTest {
     void headlessLayersDoNotImportJavaFx() {
         List<String> violations = collectImports(HEADLESS_PACKAGES, "javafx");
         assertNoViolations(violations, "headless layers must not import JavaFX");
+    }
+
+    @Test
+    @DisplayName("shared logs contains only public ports, not feature implementations")
+    void sharedLogsContainsOnlyPorts() {
+        List<String> violations = new ArrayList<>();
+        for (SourceFile file : sources) {
+            if (!file.in(SHARED + ".logs")) continue;
+            if (!file.in(SHARED + ".logs.port")
+                    || file.file().getFileName().toString().endsWith("Impl.java")
+                    || file.file().getFileName().toString().contains("Repository")) {
+                violations.add(file.file().toString());
+            }
+        }
+        violations.addAll(collectImports(List.of(SHARED + ".logs"), "java.sql"));
+        violations.addAll(collectImports(List.of(SHARED + ".logs"), SHARED + ".database"));
+        assertNoViolations(violations, "log implementations and repository ports belong to features.logs");
+    }
+
+    @Test
+    @DisplayName("log application services do not depend on technical adapters")
+    void logApplicationIsIndependentOfAdapters() {
+        String application = FEATURES + ".logs.application";
+        List<String> violations = new ArrayList<>();
+        for (String adapter : List.of(FEATURES + ".logs.infrastructure", "java.sql", "io.krakens",
+                "javafx", SHARED + ".database.DatabaseConfig")) {
+            violations.addAll(collectImports(List.of(application), adapter));
+        }
+        assertTrue(sources.stream().anyMatch(file -> file.in(application)),
+                "log use cases must live in features.logs.application");
+        assertNoViolations(violations, "log application must use injected ports rather than adapters");
+    }
+
+    @Test
+    @DisplayName("only the composition root wires log implementations")
+    void logImplementationsAreWiredInCompositionRoot() {
+        List<String> violations = new ArrayList<>();
+        for (SourceFile file : sources) {
+            if (file.in(FEATURES + ".logs") || file.in(APP + ".composition")) continue;
+            for (String imported : file.imports()) {
+                if (imported.startsWith(FEATURES + ".logs.")) {
+                    violations.add(file.file() + " imports " + imported);
+                }
+            }
+        }
+        assertNoViolations(violations, "consumers must depend on shared log ports, not log implementations");
+    }
+
+    @Test
+    @DisplayName("runtime log ignore rule does not hide Java log packages")
+    void logPackagesAreNotHiddenByGitIgnore() throws IOException {
+        String ignoreRules = Files.readString(Path.of(".gitignore"));
+        assertTrue(ignoreRules.lines().noneMatch(line -> line.strip().equals("logs/")),
+                "anchor the runtime logs directory to /logs/ so Java log packages are not ignored");
+        assertTrue(ignoreRules.lines().anyMatch(line -> line.strip().equals("/logs/")),
+                "runtime logs must remain ignored");
     }
 
     private static String featureOf(String packageName) {

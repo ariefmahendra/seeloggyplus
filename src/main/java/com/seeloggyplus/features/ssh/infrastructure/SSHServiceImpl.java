@@ -2,7 +2,7 @@ package com.seeloggyplus.features.ssh.infrastructure;
 
 import com.jcraft.jsch.*;
 import com.seeloggyplus.shared.dto.RemoteFileInfo;
-import com.seeloggyplus.shared.logs.LogParser;
+import com.seeloggyplus.shared.progress.ProgressCallback;
 import com.seeloggyplus.shared.ssh.SSHService;
 import com.seeloggyplus.shared.ssh.HostKeyVerificationException;
 import com.seeloggyplus.shared.ssh.SshAuthConfig;
@@ -31,12 +31,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
-/**
- * Implementation of {@link SSHService} using JSch library.
- * <p>
- * Handles secure shell connections, file transfers (SFTP), and remote command
- * executions.
- */
 public class SSHServiceImpl implements SSHService {
 
     private static final Logger logger = LoggerFactory.getLogger(SSHServiceImpl.class);
@@ -57,16 +51,13 @@ public class SSHServiceImpl implements SSHService {
     private Session currentSession;
     private ChannelSftp reusableSftpChannel;
     private final Object sftpLock = new Object();
-    private volatile Boolean sftpAvailable = null; // null = not tested, true/false = tested
+    private volatile Boolean sftpAvailable = null;
     private ChannelExec activeTailChannel;
     private final AtomicBoolean isTailing = new AtomicBoolean(false);
     private final AtomicBoolean downloadCancelled = new AtomicBoolean(false);
     private volatile ChannelExec activeCommandChannel;
     private final ExecutorService tailExecutor = Executors.newSingleThreadExecutor();
 
-    /**
-     * Default constructor.
-     */
     public SSHServiceImpl() {
     }
 
@@ -88,7 +79,6 @@ public class SSHServiceImpl implements SSHService {
             lastConnectError = null;
             return this.currentSession.isConnected();
         } catch (HostKeyVerificationException e) {
-            // Propagate so the UI can ask the user to trust the host key.
             lastConnectError = e.getMessage();
             throw e;
         } catch (JSchException e) {
@@ -118,10 +108,8 @@ public class SSHServiceImpl implements SSHService {
         downloadCancelled.set(true);
         stopTailing();
         closeSftpChannel();
-        sftpAvailable = null; // Reset for next connection
-        // Do not force-close the underlying SSH session in SSHSessionManager.
-        // The session is pooled and managed with TTL by SSHSessionManagerImpl,
-        // allowing instant reconnection when browsing or reopening dialogs.
+        sftpAvailable = null;
+
         this.currentSession = null;
     }
 
@@ -176,10 +164,6 @@ public class SSHServiceImpl implements SSHService {
         }
     }
 
-    /**
-     * Cancels the currently running {@link #executeCommand(String)} by disconnecting its channel.
-     * Safe to call when no command is running.
-     */
     @Override
     public void cancelActiveCommand() {
         ChannelExec channel = activeCommandChannel;
@@ -191,7 +175,6 @@ public class SSHServiceImpl implements SSHService {
     private Session getSessionOrThrow() throws IOException {
         if (isConnected()) {
             try {
-                // Refresh TTL
                 SSHSessionManagerImpl.getInstance().getSession(host, port, username, password, DEFAULT_TTL);
             } catch (JSchException ignored) {
             }
@@ -212,7 +195,6 @@ public class SSHServiceImpl implements SSHService {
             return;
         }
 
-        // Edge case: Windows local path mistakenly passed to remote SSH server
         if (RemoteLogPaths.isWindowsLocalPath(remotePath)) {
             String err = "Invalid remote path: Windows local path cannot be tailed on remote SSH server: " + remotePath;
             logger.error(err);
@@ -234,10 +216,8 @@ public class SSHServiceImpl implements SSHService {
                     channel = (ChannelExec) session.openChannel("exec");
                     activeTailChannel = channel;
 
-                    // Force PTY allocation to prevent output buffering on some servers
                     channel.setPty(true);
 
-                    // Add -s 0.2 to force check every 200ms (bypassing broken inotify on WSL)
                     String command = String.format("tail -n %d -F -s 0.2 %s", lines, escapeShellArgument(remotePath));
                     channel.setCommand(command);
 
@@ -259,7 +239,6 @@ public class SSHServiceImpl implements SSHService {
                         for (int i = 0; i < bytesRead; i++) {
                             byte b = buffer[i];
                             if (b == '\n') {
-                                // Flush line
                                 String l = lineBuffer.toString(StandardCharsets.UTF_8);
                                 if (isTailFatalError(l)) {
                                     logger.error("SSH Tail fatal error detected: {}", l);
@@ -299,7 +278,6 @@ public class SSHServiceImpl implements SSHService {
                             errorReported = true;
                         }
                     }
-
                 } catch (Exception e) {
                     if (isTailing.get()) {
                         logger.error("Tail error", e);
@@ -312,7 +290,6 @@ public class SSHServiceImpl implements SSHService {
                     cleanupTailChannel();
                 }
             });
-
         } catch (IOException e) {
             if (errorConsumer != null) {
                 errorConsumer.accept("Init Error: " + e.getMessage());
@@ -374,11 +351,22 @@ public class SSHServiceImpl implements SSHService {
 
     @Override
     public List<RemoteFileInfo> listFiles(String remotePath) throws IOException {
-        // If SFTP already known to be unavailable, go straight to exec
+        try {
+            return listFilesOnce(remotePath);
+        } catch (IOException e) {
+            if (!isSessionDownError(e) || !recoverSession()) {
+                throw e;
+            }
+            logger.warn("SSH session was stale; retrying listFiles for {}", remotePath);
+            return listFilesOnce(remotePath);
+        }
+    }
+
+    List<RemoteFileInfo> listFilesOnce(String remotePath) throws IOException {
         if (Boolean.FALSE.equals(sftpAvailable)) {
             return listFilesExec(remotePath);
         }
-        // Try SFTP first, fallback to exec-based ls
+
         try {
             List<RemoteFileInfo> result = listFilesSftp(remotePath);
             sftpAvailable = true;
@@ -387,6 +375,41 @@ public class SSHServiceImpl implements SSHService {
             logger.warn("SFTP listFiles failed for {}, falling back to exec: {}", remotePath, e.getMessage());
             return listFilesExec(remotePath);
         }
+    }
+
+    boolean recoverSession() {
+        logger.info("Reconnecting stale SSH session for {}@{}:{}", username, host, port);
+        try {
+            SSHSessionManagerImpl.getInstance().closeSession(host, port, username);
+        } catch (RuntimeException e) {
+            logger.debug("Closing the stale SSH session failed: {}", e.getMessage());
+        }
+        closeSftpChannel();
+        sftpAvailable = null;
+        currentSession = null;
+        if (password == null) {
+            return false;
+        }
+        return connect(host, port, username, password);
+    }
+
+    static boolean isSessionDownError(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null) {
+                String lower = message.toLowerCase(Locale.ROOT);
+                if (lower.contains("channel is not opened")
+                        || lower.contains("session is down")
+                        || lower.contains("socket is closed")
+                        || lower.contains("broken pipe")
+                        || lower.contains("connection reset")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private List<RemoteFileInfo> listFilesSftp(String remotePath) throws IOException {
@@ -398,7 +421,6 @@ public class SSHServiceImpl implements SSHService {
                 Vector<ChannelSftp.LsEntry> res = sftpChannel.ls(remotePath);
                 entries = res;
             } catch (SftpException e) {
-                // If path doesn't end with slash, retry with slash (common for symlinks / directories in SFTP)
                 if (!remotePath.endsWith("/")) {
                     try {
                         @SuppressWarnings("unchecked")
@@ -434,8 +456,7 @@ public class SSHServiceImpl implements SSHService {
         ChannelExec channel = null;
         try {
             channel = (ChannelExec) session.openChannel("exec");
-            // WinSCP-style: clear locale, use ls --full-time for precise timestamps
-            // Fallback chain: ls --full-time → ls -la
+
             String escapedPath = escapeShellArgument(remotePath);
             String cmd = "unset LANG LC_ALL LC_TIME LC_MESSAGES 2>/dev/null; "
                     + "LANG=C LC_ALL=C; export LANG LC_ALL; "
@@ -463,33 +484,23 @@ public class SSHServiceImpl implements SSHService {
         }
     }
 
-
-
     RemoteFileInfo parseLsLine(String line, String parentPath) {
-        // Skip total line and empty lines
         if (line.startsWith("total ") || line.isBlank()) return null;
-
-        // ls -la format:       drwxr-xr-x 2 root root 4096 Jan 01 12:00 dirname
-        // ls --full-time:      drwxr-xr-x 2 root root 4096 2026-01-15 10:30:45.000000000 +0700 dirname
-        // symlink:             lrwxrwxrwx 1 root root   11 Jan 01 12:00 link -> target
 
         String[] parts = line.split("\\s+");
         if (parts.length < 9) return null;
 
         String permissions = parts[0];
-        // parts[1] = link count, parts[2] = owner, parts[3] = group
+
         String sizeStr = parts[4];
 
-        // Detect --full-time format (date looks like 2026-01-15)
         String name;
         long modifiedTime = 0;
 
         if (parts.length >= 10 && parts[5].matches("\\d{4}-\\d{2}-\\d{2}")) {
-            // --full-time format: ... size 2026-01-15 10:30:45.xxx +0700 name
-            // Timestamp parts: parts[5]=date, parts[6]=time, parts[7]=timezone
             try {
                 String dateTimeStr = parts[5] + " " + parts[6];
-                // Truncate nanoseconds if present
+
                 if (dateTimeStr.contains(".")) {
                     dateTimeStr = dateTimeStr.substring(0, dateTimeStr.indexOf('.'));
                 }
@@ -498,23 +509,18 @@ public class SSHServiceImpl implements SSHService {
                 modifiedTime = ldt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
             } catch (Exception ignored) {
             }
-            // Name starts after timezone at index 8 (timezone at 7)
-            // Check if parts[7] looks like a timezone (+0700, -0500, +0000)
+
             int nameStart = parts[7].matches("[+-]\\d{4}") ? 8 : 7;
             name = joinFrom(parts, nameStart);
         } else {
-            // Standard ls -la: ... size Mon DD HH:MM name  OR  ... size Mon DD YYYY name
-            // parts[5]=month, parts[6]=day, parts[7]=time/year
             try {
                 if (parts[7].contains(":")) {
-                    // "Jan 15 10:30" — current year
                     LocalDateTime ldt = MonthDay.parse(parts[5] + " " + parts[6],
                             DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH))
                             .atYear(Year.now().getValue())
                             .atTime(LocalTime.parse(parts[7]));
                     modifiedTime = ldt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 } else {
-                    // "Jan 15 2025" — year specified
                     String monthDayYear = parts[5] + " " + parts[6] + " " + parts[7];
                     LocalDate ld = LocalDate.parse(monthDayYear,
                             DateTimeFormatter.ofPattern("MMM d yyyy", Locale.ENGLISH));
@@ -522,11 +528,10 @@ public class SSHServiceImpl implements SSHService {
                 }
             } catch (Exception ignored) {
             }
-            // Name starts at index 8
+
             name = joinFrom(parts, 8);
         }
 
-        // Handle symlinks: "link -> target" — extract just the link name
         if (name.contains(" -> ")) {
             name = name.substring(0, name.indexOf(" -> "));
         }
@@ -560,7 +565,7 @@ public class SSHServiceImpl implements SSHService {
     private void reconnectSession() throws IOException {
         logger.info("Forcing SSH session reconnect for {}@{}:{}", username, host, port);
         closeSftpChannel();
-        sftpAvailable = null; // Reset for re-detection
+        sftpAvailable = null;
         SSHSessionManagerImpl.getInstance().closeSession(host, port, username);
         this.currentSession = null;
         if (password != null && connect(host, port, username, password)) {
@@ -575,7 +580,7 @@ public class SSHServiceImpl implements SSHService {
                 return reusableSftpChannel;
             }
             Session session = getSessionOrThrow();
-            // Attempt with reasonable timeout (5s) — avoid false negatives on busy servers
+
             try {
                 ChannelSftp ch = (ChannelSftp) session.openChannel("sftp");
                 ch.connect(5000);
@@ -638,7 +643,6 @@ public class SSHServiceImpl implements SSHService {
             }
 
             return lines;
-
         } catch (JSchException e) {
             throw new IOException("SSH execution failed: " + e.getMessage(), e);
         } finally {
@@ -689,7 +693,6 @@ public class SSHServiceImpl implements SSHService {
             }
 
             return lines;
-
         } catch (JSchException e) {
             throw new IOException("SSH execution failed: " + e.getMessage(), e);
         } finally {
@@ -709,7 +712,6 @@ public class SSHServiceImpl implements SSHService {
             return false;
         }
 
-        // Try SFTP if available
         if (!Boolean.FALSE.equals(sftpAvailable)) {
             try {
                 ChannelSftp sftpChannel = getSftpChannel();
@@ -724,7 +726,6 @@ public class SSHServiceImpl implements SSHService {
             }
         }
 
-        // Fallback: exec cat > local file
         ChannelExec channel = null;
         try {
             channel = (ChannelExec) session.openChannel("exec");
@@ -749,7 +750,7 @@ public class SSHServiceImpl implements SSHService {
     }
 
     private boolean downloadFileResumable(String remotePath, String localPath, long fileSize,
-            LogParser.ProgressCallback progressCallback) {
+            ProgressCallback progressCallback) {
         return ResumableDownload.download(new ResumableDownload.Source() {
             @Override
             public long size() {
@@ -787,7 +788,7 @@ public class SSHServiceImpl implements SSHService {
 
     @Override
     public boolean downloadFileConcurrent(String remotePath, String localPath, int threadCount,
-            LogParser.ProgressCallback progressCallback) {
+            ProgressCallback progressCallback) {
         downloadCancelled.set(false);
         boolean acquired = false;
         try {
@@ -803,7 +804,6 @@ public class SSHServiceImpl implements SSHService {
                 return downloadFile(remotePath, localPath);
             }
 
-            // WinSCP-style transfer: one resumable SFTP stream, then atomic publish.
             return downloadFileResumable(remotePath, localPath, fileSize, progressCallback);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -816,7 +816,6 @@ public class SSHServiceImpl implements SSHService {
             if (acquired) DOWNLOAD_SLOTS.release();
         }
     }
-
 
     private long getFileSize(String remotePath) throws IOException {
         if (Boolean.FALSE.equals(sftpAvailable)) {

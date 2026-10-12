@@ -1,18 +1,25 @@
-package com.seeloggyplus.shared.logs;
+package com.seeloggyplus.features.logs.infrastructure.io;
 
+import com.seeloggyplus.shared.logs.port.LogParser;
 import com.seeloggyplus.shared.model.LogEntry;
 import com.seeloggyplus.shared.model.ParsingConfig;
-import com.seeloggyplus.shared.logs.LogParser;
+import com.seeloggyplus.shared.progress.ProgressCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,43 +27,27 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
-/**
- * High-performance implementation of {@link LogParser}.
- * <p>
- * Features:
- * <ul>
- * <li>Parallel chunk processing using Virtual Threads (Java 21).</li>
- * <li>Optimized regex matching and pre-compilation.</li>
- * <li>Streaming support for IndexerService to minimize RAM usage.</li>
- * <li>Robust error handling and progress reporting.</li>
- * </ul>
- */
 public class LogParserServiceImpl implements LogParser {
 
     private static final Logger logger = LoggerFactory.getLogger(LogParserServiceImpl.class);
     private static final int MAX_THREADS = Runtime.getRuntime().availableProcessors();
     private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public List<LogEntry> parseFileParallel(File file, ParsingConfig config, ProgressCallback callback) throws IOException {
+    public List<LogEntry> parseFileParallel(File file, ParsingConfig config, ProgressCallback callback)
+            throws IOException {
         if (!file.exists() || !file.canRead()) {
             throw new IOException("File does not exist or cannot be read: " + file.getAbsolutePath());
         }
-
         long fileSize = file.length();
         List<ChunkInfo> chunkInfos = calculateChunkBoundaries(file);
         List<Future<List<LogEntry>>> futures = new ArrayList<>();
         AtomicLong bytesProcessed = new AtomicLong(0);
-
         for (ChunkInfo chunk : chunkInfos) {
             futures.add(executorService.submit(() -> {
                 List<LogEntry> chunkEntries = processChunk(file, chunk);
                 long chunkSize = chunk.endByte() - chunk.startByte();
                 long totalProcessed = bytesProcessed.addAndGet(chunkSize);
-
                 if (callback != null) {
                     double progress = (double) totalProcessed / fileSize;
                     callback.onProgress(progress, totalProcessed, fileSize);
@@ -64,7 +55,6 @@ public class LogParserServiceImpl implements LogParser {
                 return chunkEntries;
             }));
         }
-
         List<LogEntry> combinedEntries = new ArrayList<>();
         for (Future<List<LogEntry>> future : futures) {
             try {
@@ -78,30 +68,21 @@ public class LogParserServiceImpl implements LogParser {
                 logger.error("Error processing a file chunk", e);
             }
         }
-
         if (callback != null) {
             callback.onComplete(combinedEntries.size());
         }
-
         logger.info("Read {} lines in parallel from file: {}", combinedEntries.size(), file.getName());
         return combinedEntries;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public LogEntry parseLine(String line, long lineNumber) {
         return new LogEntry(lineNumber, line);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public TestResult testParsing(String sampleLog, ParsingConfig config) {
         TestResult result = new TestResult();
-        // Return dummy success since parsing is disabled
         result.setSuccess(true);
         result.setMessage("Parsing is disabled. Treating as raw text.");
         Map<String, String> fields = new HashMap<>();
@@ -110,17 +91,12 @@ public class LogParserServiceImpl implements LogParser {
         return result;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public List<LogEntry> search(List<LogEntry> entries, String searchText, boolean isRegex, boolean caseSensitive) {
         if (searchText == null || searchText.trim().isEmpty()) {
             return new ArrayList<>(entries);
         }
-
         List<LogEntry> results = new ArrayList<>(Math.min(entries.size() / 10, 1000));
-
         if (isRegex) {
             Pattern pattern;
             try {
@@ -130,16 +106,13 @@ public class LogParserServiceImpl implements LogParser {
                 logger.error("Invalid regex pattern: {}", e.getMessage());
                 return new ArrayList<>();
             }
-
             for (LogEntry entry : entries) {
-                // Search in raw log
                 if (pattern.matcher(entry.getRawLog()).find()) {
                     results.add(entry);
                 }
             }
         } else {
             final String searchFor = caseSensitive ? searchText : searchText.toLowerCase();
-
             for (LogEntry entry : entries) {
                 String rawLog = entry.getRawLog();
                 if (caseSensitive) {
@@ -159,14 +132,12 @@ public class LogParserServiceImpl implements LogParser {
     private List<LogEntry> processChunk(File file, ChunkInfo chunkInfo) {
         List<LogEntry> entries = new ArrayList<>();
         long currentLineNumber = chunkInfo.startLineNumber();
-
         try (FileInputStream fis = new FileInputStream(file); FileChannel channel = fis.getChannel()) {
             channel.position(chunkInfo.startByte());
             CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPLACE)
                     .onUnmappableCharacter(CodingErrorAction.REPLACE);
             BufferedReader reader = new BufferedReader(Channels.newReader(channel, decoder, -1));
-
             String line;
             long linesRead = 0;
             while (linesRead < chunkInfo.lineCount() && (line = reader.readLine()) != null) {
@@ -184,15 +155,12 @@ public class LogParserServiceImpl implements LogParser {
     private List<ChunkInfo> calculateChunkBoundaries(File file) throws IOException {
         List<ChunkInfo> chunks = new ArrayList<>();
         long fileSize = file.length();
-        // Use a minimum chunk size to establish a baseline
         long targetChunkSize = Math.max(1024 * 1024, fileSize / MAX_THREADS);
-
         long currentByte = 0;
         long currentLine = 1;
         long chunkStartByte = 0;
         long chunkStartLine = 1;
         long nextSplitTarget = targetChunkSize;
-
         try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file))) {
             int b;
             while ((b = bis.read()) != -1) {
@@ -208,14 +176,11 @@ public class LogParserServiceImpl implements LogParser {
                     }
                 }
             }
-
-            // Final chunk
             if (currentByte > chunkStartByte) {
                 chunks.add(
                         new ChunkInfo(chunkStartByte, currentByte, chunkStartLine, currentLine - chunkStartLine + 1));
             }
         }
-
         if (chunks.isEmpty() && fileSize > 0) {
             chunks.add(new ChunkInfo(0, fileSize, 1, 0));
         }

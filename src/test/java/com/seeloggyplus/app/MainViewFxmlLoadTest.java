@@ -1,5 +1,6 @@
 package com.seeloggyplus.app;
 
+import com.seeloggyplus.app.composition.LogServices;
 import com.seeloggyplus.shared.session.LogSession;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -56,6 +57,30 @@ public class MainViewFxmlLoadTest {
         assertNotNull(tabPane);
         assertEquals(TabPane.TabClosingPolicy.ALL_TABS, tabPane.getTabClosingPolicy());
         assertEquals(TabPane.TabDragPolicy.REORDER, tabPane.getTabDragPolicy());
+    }
+
+    @Test
+    public void testMainControllerKeepsInjectedLogServicesDuringFxmlInitialization() throws Exception {
+        LogServices services = LogServices.createDefault();
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
+        MainController injected = new MainController(services);
+        loader.setControllerFactory(type -> {
+            if (type == MainController.class)
+                return injected;
+            try {
+                return type.getDeclaredConstructor().newInstance();
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        assertNotNull(loader.load());
+        assertSame(injected, loader.getController());
+        for (var entry : java.util.Map.of("logFileService", services.files(),
+                "parsingConfigService", services.parsingConfigs(), "logParserService", services.parser()).entrySet()) {
+            Field field = MainController.class.getDeclaredField(entry.getKey());
+            field.setAccessible(true);
+            assertSame(entry.getValue(), field.get(injected), "FXML initialization must retain injected ports");
+        }
     }
 
     @Test
@@ -164,7 +189,6 @@ public class MainViewFxmlLoadTest {
 
         assertEquals(-1, viewer.getSelectedIndex());
 
-        // Press DOWN arrow
         KeyEvent downEvent = new KeyEvent(
                 KeyEvent.KEY_PRESSED, "", "", KeyCode.DOWN, false, false, false, false);
         viewer.handleKeyNavigation(downEvent);
@@ -172,7 +196,6 @@ public class MainViewFxmlLoadTest {
         assertEquals(0, viewer.getSelectedIndex(), "First DOWN arrow selects line 0");
         assertTrue(downEvent.isConsumed(), "Arrow key event must be consumed so it does not switch tabs");
 
-        // Press DOWN arrow again
         KeyEvent downEvent2 = new KeyEvent(
                 KeyEvent.KEY_PRESSED, "", "", KeyCode.DOWN, false, false, false, false);
         viewer.handleKeyNavigation(downEvent2);
@@ -180,7 +203,6 @@ public class MainViewFxmlLoadTest {
         assertEquals(1, viewer.getSelectedIndex(), "Second DOWN arrow selects line 1");
         assertTrue(downEvent2.isConsumed());
 
-        // Press UP arrow
         KeyEvent upEvent = new KeyEvent(
                 KeyEvent.KEY_PRESSED, "", "", KeyCode.UP, false, false, false, false);
         viewer.handleKeyNavigation(upEvent);
@@ -202,7 +224,6 @@ public class MainViewFxmlLoadTest {
 
         assertEquals(tab1, tabPane.getSelectionModel().getSelectedItem());
 
-        // Fire DOWN key event on TabPane
         KeyEvent downEvent = new KeyEvent(
                 tabPane, tabPane, KeyEvent.KEY_PRESSED, "", "",
                 KeyCode.DOWN, false, false, false, false);
@@ -211,7 +232,6 @@ public class MainViewFxmlLoadTest {
         assertTrue(downEvent.isConsumed(), "TabPane event filter must consume DOWN key event");
         assertEquals(tab1, tabPane.getSelectionModel().getSelectedItem(), "TabPane must NOT switch tabs on DOWN arrow key");
 
-        // Fire UP key event on TabPane
         KeyEvent upEvent = new KeyEvent(
                 tabPane, tabPane, KeyEvent.KEY_PRESSED, "", "",
                 KeyCode.UP, false, false, false, false);
@@ -234,7 +254,6 @@ public class MainViewFxmlLoadTest {
         onActiveSessionChangedMethod.setAccessible(true);
         onActiveSessionChangedMethod.invoke(controller, session);
 
-        // Ensure currentParsingConfig can be null
         Field cfgField = MainController.class.getDeclaredField("currentParsingConfig");
         cfgField.setAccessible(true);
         cfgField.set(controller, null);
@@ -245,7 +264,6 @@ public class MainViewFxmlLoadTest {
 
         assertNotNull(cfgField.get(controller), "enableTail should auto-fallback to RAW parsing config instead of throwing error");
 
-        // Cleanup tail service
         Method disableTailMethod = MainController.class.getDeclaredMethod("disableTail", boolean.class);
         disableTailMethod.setAccessible(true);
         disableTailMethod.invoke(controller, true);

@@ -1,23 +1,21 @@
 package com.seeloggyplus.app;
 
+import com.seeloggyplus.shared.progress.ProgressCallback;
 import com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogController;
 import com.seeloggyplus.shared.ui.AppTheme;
 
 import com.seeloggyplus.shared.model.FileInfo;
 import com.seeloggyplus.features.recent.domain.RecentFilesDto;
-import com.seeloggyplus.shared.model.LogEntry;
 import com.seeloggyplus.shared.model.LogFile;
 import com.seeloggyplus.shared.session.LogSession;
 import com.seeloggyplus.shared.session.TabSessionManager;
 import com.seeloggyplus.shared.model.SSHServerModel;
-import com.seeloggyplus.shared.logs.LogParser;
 import com.seeloggyplus.features.ssh.infrastructure.SSHServiceImpl;
 import com.seeloggyplus.shared.ssh.SSHService;
 import com.seeloggyplus.shared.ui.canvas.CanvasLogViewer;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -44,12 +42,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javafx.scene.layout.Region;
 
-/**
- * End-to-End & Unit Tests:
- * Verifies opening files in TAIL mode from the Unified File Manager (both remote and local),
- * validating why previously tail contents did not appear on canvas (order of resetView vs setTailBuffer,
- * inactive session state, and local async race conditions), and assuring robust edge case handling.
- */
 @ExtendWith(ApplicationExtension.class)
 public class FileManagerTailModeEndToEndTest {
 
@@ -85,7 +77,6 @@ public class FileManagerTailModeEndToEndTest {
         stage.show();
     }
 
-    // --- MOCK SSH SERVICE ---
     private static class MockTailSSHService extends SSHServiceImpl {
         Consumer<String> lineConsumer;
         Consumer<String> errorConsumer;
@@ -114,7 +105,7 @@ public class FileManagerTailModeEndToEndTest {
 
         @Override
         public boolean downloadFileConcurrent(String remotePath, String localPath, int threadCount,
-                                              LogParser.ProgressCallback progressCallback) {
+                                              ProgressCallback progressCallback) {
             try {
                 downloadCount++;
                 downloadStarted.countDown();
@@ -154,9 +145,6 @@ public class FileManagerTailModeEndToEndTest {
         return tab;
     }
 
-    // =========================================================================
-    // REGRESSION: CHANGING AN OPEN FILE TO TAIL REUSES ITS TAB
-    // =========================================================================
     @Test
     @DisplayName("Regression Local Tail: opening an existing local file then enabling tail reuses the same tab and file")
     public void testLocalOpenFileThenTail_ReusesExistingTab() throws Exception {
@@ -641,9 +629,6 @@ public class FileManagerTailModeEndToEndTest {
         WaitForAsyncUtils.waitForFxEvents();
     }
 
-    // =========================================================================
-    // 1. E2E: REMOTE FILE OPENED IN TAIL MODE FROM FILE MANAGER
-    // =========================================================================
     @Test
     @DisplayName("E2E Remote Tail: Opening remote file in TAIL mode binds buffer, activates session, and displays streamed lines")
     public void testRemoteTailModeFromFileManager_DisplaysLogsImmediatelyOnCanvas() throws Exception {
@@ -653,7 +638,6 @@ public class FileManagerTailModeEndToEndTest {
 
         Platform.runLater(() -> {
             try {
-                // Call startRemoteTail as MainController does when FileManager returns OpenAction.TAIL
                 Method startRemoteTailMethod = MainController.class.getDeclaredMethod(
                         "startRemoteTail", String.class, SSHService.class, SSHServerModel.class);
                 startRemoteTailMethod.setAccessible(true);
@@ -665,7 +649,6 @@ public class FileManagerTailModeEndToEndTest {
 
         WaitForAsyncUtils.waitForFxEvents();
 
-        // 1. Verify tab created and active
         assertEquals(1, logTabPane.getTabs().size(), "One tab should be created for the remote tail session");
         Tab activeTab = logTabPane.getSelectionModel().getSelectedItem();
         assertNotNull(activeTab, "Active tab must be selected");
@@ -679,7 +662,6 @@ public class FileManagerTailModeEndToEndTest {
         CanvasLogViewer viewer = session.getCanvasLogViewer();
         assertNotNull(viewer, "CanvasLogViewer must be initialized");
 
-        // 2. Stream lines from SSH tailer
         assertNotNull(mockSsh.lineConsumer, "SSH tailFile must have registered lineConsumer");
         Platform.runLater(() -> {
             mockSsh.lineConsumer.accept("2026-09-19 10:00:00 [INFO] Starting application backend...");
@@ -689,13 +671,11 @@ public class FileManagerTailModeEndToEndTest {
 
         WaitForAsyncUtils.waitForFxEvents();
 
-        // 3. Verify lines appear on canvas viewer (Crucial: Previously 0 due to resetView() wiping tailBuffer)
         assertEquals(3, session.getLiveTailList().size(), "Live tail list should contain 3 entries");
         assertEquals(3, viewer.getTotalLines(), "Canvas viewer totalLines MUST be 3 (not 0) when tailing remote file");
         assertEquals(3, viewer.getEffectiveLineCount(), "Canvas viewer effectiveLineCount must equal incoming tail lines");
         assertTrue(statusLabel.getText().contains("/ 3"), "Status label bottom bar should reflect actual line count (/ 3)");
 
-        // 4. Stream additional line to verify ongoing real-time updates
         Platform.runLater(() -> {
             mockSsh.lineConsumer.accept("2026-09-19 10:00:03 [INFO] Incoming HTTP GET /api/v1/health 200 OK");
         });
@@ -705,9 +685,6 @@ public class FileManagerTailModeEndToEndTest {
         assertTrue(statusLabel.getText().contains("/ 4"), "Status label should update to show (/ 4)");
     }
 
-    // =========================================================================
-    // 2. E2E: LOCAL FILE OPENED IN TAIL MODE FROM FILE MANAGER
-    // =========================================================================
     @Test
     @DisplayName("E2E Local Tail: Opening local file in TAIL mode indexes file then immediately enables tail without race conditions")
     public void testLocalTailModeFromFileManager_IndexesAndTailsCorrectly() throws Exception {
@@ -717,7 +694,6 @@ public class FileManagerTailModeEndToEndTest {
 
         Platform.runLater(() -> {
             try {
-                // Call openLocalLogFile with startTail = true (invoked when action == OpenAction.TAIL)
                 Method openLocalMethod = MainController.class.getDeclaredMethod(
                         "openLocalLogFile", File.class, boolean.class, boolean.class);
                 openLocalMethod.setAccessible(true);
@@ -727,7 +703,6 @@ public class FileManagerTailModeEndToEndTest {
             }
         });
 
-        // Wait for virtual thread indexing and platform runLater events to complete
         Thread.sleep(600);
         WaitForAsyncUtils.waitForFxEvents();
 
@@ -739,11 +714,9 @@ public class FileManagerTailModeEndToEndTest {
         CanvasLogViewer viewer = session.getCanvasLogViewer();
         assertNotNull(viewer);
 
-        // Initial 3 lines from file must be present
         assertTrue(viewer.getTotalLines() >= 3, "Viewer must display at least the initial 3 file lines");
         assertTrue(session.isTailModeEnabled(), "Tail mode must be engaged for the local file");
 
-        // Simulate new lines arriving via tail service
         Platform.runLater(() -> {
             try {
                 Method handleTailLine = MainController.class.getDeclaredMethod("handleTailLineBackground", LogSession.class, String.class);
@@ -759,9 +732,6 @@ public class FileManagerTailModeEndToEndTest {
         assertEquals(4, viewer.getTotalLines(), "Canvas viewer must show 4 total lines (3 file lines + 1 tail line)");
     }
 
-    // =========================================================================
-    // 3. EDGE CASE: OPENING TAIL ON AN ALREADY OPEN FILE
-    // =========================================================================
     @Test
     @DisplayName("Edge Case: Opening tail on an already opened tab selects tab and engages tail without duplicating")
     public void testOpenTailOnAlreadyOpenFile_FocusesExistingTabAndEnablesTail() throws Exception {
@@ -769,7 +739,6 @@ public class FileManagerTailModeEndToEndTest {
         SSHServerModel server = createMockServer("srv-1", "Prod-Server");
         MockTailSSHService mockSsh = new MockTailSSHService();
 
-        // 1. Open remote file first
         Platform.runLater(() -> {
             try {
                 Method startRemoteTailMethod = MainController.class.getDeclaredMethod(
@@ -785,7 +754,6 @@ public class FileManagerTailModeEndToEndTest {
         int initialTabCount = logTabPane.getTabs().size();
         assertEquals(1, initialTabCount);
 
-        // 2. Simulate user opening file manager again and selecting same remote file with TAIL
         Platform.runLater(() -> {
             try {
                 Method startRemoteTailMethod = MainController.class.getDeclaredMethod(
@@ -805,9 +773,6 @@ public class FileManagerTailModeEndToEndTest {
         assertEquals(remotePath, session.getRemotePath());
     }
 
-    // =========================================================================
-    // 4. EDGE CASE: REMOTE TAIL SSH ERROR DISENGAGES TAIL GRACEFULLY
-    // =========================================================================
     @Test
     @DisplayName("Edge Case: Remote tail SSH error disengages tail cleanly without throwing unhandled exceptions")
     public void testRemoteTailError_DisengagesTailCleanly() throws Exception {
@@ -831,25 +796,19 @@ public class FileManagerTailModeEndToEndTest {
         LogSession session = sessionMap.get(activeTab);
         assertTrue(session.isTailModeEnabled());
 
-        // Trigger fatal SSH error (e.g. file not found on remote system)
         assertNotNull(mockSsh.errorConsumer);
         Platform.runLater(() -> {
             mockSsh.errorConsumer.accept("tail: cannot open '/var/log/missing.log' for reading: No such file or directory");
         });
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Tail should be disabled safely
         assertFalse(session.isTailModeEnabled(), "Session tailModeEnabled should be false after error");
         assertFalse(tailButton.isSelected(), "Toolbar tail button should be unselected after error");
     }
 
-    // =========================================================================
-    // 5. EDGE CASE: INACTIVE DORMANT TAB ACCUMULATES UNREAD, THEN RENDERS ON FOCUS
-    // =========================================================================
     @Test
     @DisplayName("Edge Case: Dormant tab accumulates unread lines, renders immediately when switched to active")
     public void testDormantTabTailBufferingAndActivationRender() throws Exception {
-        // Tab 1: Remote tail
         String remotePath1 = "/var/log/app1.log";
         SSHServerModel server = createMockServer("srv-1", "Prod-Server");
         MockTailSSHService mockSsh1 = new MockTailSSHService();
@@ -869,7 +828,6 @@ public class FileManagerTailModeEndToEndTest {
         Tab tab1 = logTabPane.getTabs().get(0);
         LogSession session1 = sessionMap.get(tab1);
 
-        // Tab 2: Remote tail (this becomes active)
         String remotePath2 = "/var/log/app2.log";
         MockTailSSHService mockSsh2 = new MockTailSSHService();
         Platform.runLater(() -> {
@@ -887,22 +845,18 @@ public class FileManagerTailModeEndToEndTest {
         Tab tab2 = logTabPane.getTabs().get(1);
         LogSession session2 = sessionMap.get(tab2);
 
-        // Session 1 is now in background (inactive)
         assertFalse(session1.isActive(), "Tab 1 must be inactive while Tab 2 is selected");
         assertTrue(session2.isActive(), "Tab 2 must be active");
 
-        // Send lines to Tab 1 (dormant)
         Platform.runLater(() -> {
             mockSsh1.lineConsumer.accept("Background Line 1");
             mockSsh1.lineConsumer.accept("Background Line 2");
         });
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Background session buffered lines and incremented unread count
         assertEquals(2, session1.getLiveTailList().size(), "Live tail list should receive background lines");
         assertEquals(2, session1.getUnreadTailLines(), "Unread tail lines counter must increment");
 
-        // Now switch back to Tab 1
         Platform.runLater(() -> {
             logTabPane.getSelectionModel().select(tab1);
         });
@@ -913,20 +867,15 @@ public class FileManagerTailModeEndToEndTest {
         assertEquals(2, session1.getCanvasLogViewer().getTotalLines(), "Canvas viewer on Tab 1 must render the 2 lines");
     }
 
-    // =========================================================================
-    // 6. UNIT: UNIFIED FILE MANAGER DIALOG CONTROLLER SELECTION & TAIL ACTION
-    // =========================================================================
     @Test
     @DisplayName("Unit: UnifiedFileManager supports Tail for both local and remote files")
     public void testUnifiedFileManagerDialogSetsTailActionForRemote() throws Exception {
         UnifiedFileManagerDialogController dialogController = new UnifiedFileManagerDialogController();
 
-        // Verify OpenAction enum contains OPEN, TAIL
         assertEquals(2, UnifiedFileManagerDialogController.OpenAction.values().length);
         assertEquals(UnifiedFileManagerDialogController.OpenAction.TAIL,
                 UnifiedFileManagerDialogController.OpenAction.valueOf("TAIL"));
 
-        // 1. Local file selection supports the Tail preference.
         FileInfo localFile = new FileInfo("test.log", "C:\\logs\\test.log", 1024L, false, System.currentTimeMillis(), FileInfo.SourceType.LOCAL);
         Field selectedFileField = UnifiedFileManagerDialogController.class.getDeclaredField("selectedFileResult");
         selectedFileField.setAccessible(true);
@@ -946,7 +895,6 @@ public class FileManagerTailModeEndToEndTest {
         assertEquals(UnifiedFileManagerDialogController.OpenAction.TAIL, dialogController.getOpenAction(),
                 "Dialog OpenAction must be TAIL for a local file, as for remote files");
 
-        // 2. Remote file selection with connected SSH sets TAIL
         FileInfo remoteFile = new FileInfo("remote.log", "/var/log/remote.log", 2048L, false, System.currentTimeMillis(), FileInfo.SourceType.REMOTE);
         selectedFileField.set(dialogController, remoteFile);
         Field sshServiceField = UnifiedFileManagerDialogController.class.getDeclaredField("activeSshService");

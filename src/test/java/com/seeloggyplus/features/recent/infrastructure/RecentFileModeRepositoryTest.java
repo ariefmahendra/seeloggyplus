@@ -2,10 +2,8 @@ package com.seeloggyplus.features.recent.infrastructure;
 
 import com.seeloggyplus.shared.model.LogFile;
 import com.seeloggyplus.features.recent.domain.RecentFile;
-import com.seeloggyplus.shared.logs.LogFileRepositoryImpl;
-import com.seeloggyplus.features.recent.infrastructure.RecentFileRepositoryImpl;
-import com.seeloggyplus.shared.logs.LogFileService;
-import com.seeloggyplus.shared.logs.LogFileServiceImpl;
+import com.seeloggyplus.app.composition.LogServices;
+import com.seeloggyplus.shared.logs.port.LogFileService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,10 +15,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Verifies the {@code recent_files.mode} persistence added so the Recent list can
- * reopen a file in the same mode (OPEN or TAIL) it was last used.
- */
 class RecentFileModeRepositoryTest {
 
     private RecentFileRepository recentFileRepository;
@@ -30,7 +24,7 @@ class RecentFileModeRepositoryTest {
     @BeforeEach
     void setUp() throws Exception {
         recentFileRepository = new RecentFileRepositoryImpl();
-        logFileService = new LogFileServiceImpl(new LogFileRepositoryImpl());
+        logFileService = LogServices.createDefault().files();
 
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         logFile = new LogFile();

@@ -3,7 +3,7 @@ package com.seeloggyplus.features.recent.presentation;
 import com.seeloggyplus.features.recent.domain.RecentFilesDto;
 import com.seeloggyplus.shared.model.LogFile;
 import com.seeloggyplus.features.recent.domain.RecentFile;
-import com.seeloggyplus.shared.logs.LogFileService;
+import com.seeloggyplus.shared.logs.port.LogFileService;
 import com.seeloggyplus.features.recent.application.RecentFileService;
 import com.seeloggyplus.shared.session.LogSession;
 import com.seeloggyplus.shared.session.TabSessionManager;

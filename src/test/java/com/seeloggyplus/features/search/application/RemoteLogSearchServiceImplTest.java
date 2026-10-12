@@ -1,9 +1,9 @@
 package com.seeloggyplus.features.search.application;
 
+import com.seeloggyplus.shared.progress.ProgressCallback;
 import com.seeloggyplus.shared.dto.RemoteFileInfo;
 import com.seeloggyplus.shared.model.PreviewLine;
 import com.seeloggyplus.features.search.domain.RemoteLogSearchMatch;
-import com.seeloggyplus.shared.logs.LogParser;
 import com.seeloggyplus.shared.ssh.SSHService;
 import org.junit.jupiter.api.Test;
 
@@ -16,10 +16,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RemoteLogSearchServiceImplTest {
-
-    // -------------------------------------------------------------------------
-    // Search
-    // -------------------------------------------------------------------------
 
     @Test
     void searchParsesMatchesEscapesQueryAndCapsResults() throws Exception {
@@ -96,10 +92,6 @@ class RemoteLogSearchServiceImplTest {
         assertTrue(results.isEmpty());
     }
 
-    // -------------------------------------------------------------------------
-    // Preview
-    // -------------------------------------------------------------------------
-
     @Test
     void previewBuildsRangeCommandAndMarksTargetLine() throws Exception {
         RecordingSsh ssh = new RecordingSsh("12799:connect\n12803:reset\n12804:request timeout\n12805:retry\n");
@@ -153,10 +145,6 @@ class RemoteLogSearchServiceImplTest {
                 () -> service.preview(null, "/a.log", 1, 1, 1));
     }
 
-    // -------------------------------------------------------------------------
-    // Line count
-    // -------------------------------------------------------------------------
-
     @Test
     void lineCountParsesWcOutput() throws Exception {
         RecordingSsh ssh = new RecordingSsh("  12345\n");
@@ -180,10 +168,6 @@ class RemoteLogSearchServiceImplTest {
         assertEquals(-1, service.lineCount(null, "/a.log"));
         assertEquals(-1, service.lineCount(new RecordingSsh("1"), ""));
     }
-
-    // -------------------------------------------------------------------------
-    // Test double
-    // -------------------------------------------------------------------------
 
     private static class RecordingSsh implements SSHService {
         private final String output;
@@ -257,7 +241,7 @@ class RemoteLogSearchServiceImplTest {
 
         @Override
         public boolean downloadFileConcurrent(String remotePath, String localPath, int threadCount,
-                LogParser.ProgressCallback progressCallback) {
+                ProgressCallback progressCallback) {
             return false;
         }
     }

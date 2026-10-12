@@ -1,5 +1,6 @@
 package com.seeloggyplus.app;
 
+import com.seeloggyplus.shared.progress.ProgressCallback;
 import com.seeloggyplus.features.recent.presentation.RecentFilesPanelController;
 
 import com.seeloggyplus.features.recent.domain.RecentFilesDto;
@@ -8,7 +9,6 @@ import com.seeloggyplus.shared.session.LogSession;
 import com.seeloggyplus.shared.session.TabSessionManager;
 import com.seeloggyplus.features.recent.domain.RecentFile;
 import com.seeloggyplus.shared.model.SSHServerModel;
-import com.seeloggyplus.shared.logs.LogParser;
 import com.seeloggyplus.features.ssh.infrastructure.SSHServiceImpl;
 import com.seeloggyplus.shared.ssh.SSHService;
 import com.seeloggyplus.shared.ui.AppTheme;
@@ -34,16 +34,6 @@ import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Regression tests for the Recent-list open-mode defect:
- *
- * <ul>
- *   <li>A Recent entry that was last opened in TAIL mode must stream again, not
- *       silently switch to download/OPEN mode.</li>
- *   <li>Opening a remote file that is already streaming must reuse the existing
- *       tab instead of starting a conflicting download (which surfaced as an error).</li>
- * </ul>
- */
 @ExtendWith(ApplicationExtension.class)
 class RecentFileOpenModeTest {
 
@@ -70,10 +60,6 @@ class RecentFileOpenModeTest {
         stage.show();
     }
 
-    // -------------------------------------------------------------------------
-    // Mode detection
-    // -------------------------------------------------------------------------
-
     @Test
     @DisplayName("isTailModeRecent() is true only for entries persisted with TAIL mode")
     void tailModeDetection() {
@@ -88,10 +74,6 @@ class RecentFileOpenModeTest {
                 new RecentFilesDto(logFile, null, "s")), "3-arg (legacy) must default to OPEN");
         assertFalse(RecentFilesPanelController.isTailModeRecent(null));
     }
-
-    // -------------------------------------------------------------------------
-    // Local file: Recent mode decides whether tail is engaged
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("Recent local entry with mode TAIL reopens in tail mode")
@@ -129,7 +111,7 @@ class RecentFileOpenModeTest {
         logFile.setFilePath(file.getAbsolutePath());
         logFile.setRemote(false);
 
-        RecentFilesDto dto = new RecentFilesDto(logFile, null, null); // defaults to OPEN
+        RecentFilesDto dto = new RecentFilesDto(logFile, null, null);
         onFx(() -> invoke("handleRecentFileSelected", new Class<?>[]{RecentFilesDto.class}, dto));
         Thread.sleep(700);
         WaitForAsyncUtils.waitForFxEvents();
@@ -140,10 +122,6 @@ class RecentFileOpenModeTest {
         assertNotNull(session);
         assertFalse(session.isTailModeEnabled(), "OPEN recent entry must not enable tail");
     }
-
-    // -------------------------------------------------------------------------
-    // Remote file: opening an already-streaming file must reuse the tab
-    // -------------------------------------------------------------------------
 
     @Test
     @DisplayName("Opening a remote file already in tail mode reuses the tab and does not download")
@@ -166,7 +144,6 @@ class RecentFileOpenModeTest {
         LogSession tailSession = sessionMap.get(tailTab);
         assertTrue(tailSession.isTailModeEnabled());
 
-        // User now tries to OPEN the same remote file (e.g. from the file manager).
         assertDoesNotThrow(() -> onFx(() -> invoke("openRemoteLogFile",
                 new Class<?>[]{String.class, String.class, SSHService.class, SSHServerModel.class, int.class},
                 remotePath, "reuse.log", openSsh, server, 0)));
@@ -176,8 +153,6 @@ class RecentFileOpenModeTest {
         assertSame(tailTab, logTabPane.getSelectionModel().getSelectedItem());
         assertEquals(0, openSsh.downloadCount, "opening an already-streaming file must not download");
     }
-
-    // -------------------------------------------------------------------------
 
     private void onFx(Runnable action) {
         Platform.runLater(action);
@@ -194,7 +169,6 @@ class RecentFileOpenModeTest {
         }
     }
 
-    /** Minimal SSH double: never touches the network. */
     private static class MockSSH extends SSHServiceImpl {
         volatile int downloadCount;
         Consumer<String> lineConsumer;
@@ -217,7 +191,7 @@ class RecentFileOpenModeTest {
 
         @Override
         public boolean downloadFileConcurrent(String remotePath, String localPath, int threadCount,
-                                              LogParser.ProgressCallback progressCallback) {
+                                              ProgressCallback progressCallback) {
             downloadCount++;
             try {
                 Files.writeString(new File(localPath).toPath(), "downloaded\n");

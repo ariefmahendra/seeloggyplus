@@ -2,7 +2,7 @@ package com.seeloggyplus.features.recent.presentation;
 
 import com.seeloggyplus.features.recent.domain.RecentFilesDto;
 import com.seeloggyplus.shared.model.LogFile;
-import com.seeloggyplus.shared.logs.LogFileServiceImpl;
+import com.seeloggyplus.app.composition.LogServices;
 import com.seeloggyplus.features.recent.infrastructure.RecentConfigServiceImpl;
 import com.seeloggyplus.shared.session.TabSessionManager;
 import com.seeloggyplus.shared.ui.AppTheme;
@@ -48,7 +48,7 @@ class RecentFilesTreeTest {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RecentFilesPanel.fxml"));
         Parent root = loader.load();
         panel = loader.getController();
-        panel.start(new RecentConfigServiceImpl(), new LogFileServiceImpl(), new TabSessionManager(),
+        panel.start(new RecentConfigServiceImpl(), LogServices.createDefault().files(), new TabSessionManager(),
                 new NoopHost());
         stage.setScene(AppTheme.scene(root));
         stage.show();

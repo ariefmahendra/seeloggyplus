@@ -1,48 +1,27 @@
-package com.seeloggyplus.shared.logs;
+package com.seeloggyplus.features.logs.application;
 
+import com.seeloggyplus.features.logs.application.port.LogFileRepository;
 import com.seeloggyplus.shared.database.FatalDatabaseException;
 import com.seeloggyplus.shared.database.NotFoundException;
+import com.seeloggyplus.shared.logs.port.LogFileService;
 import com.seeloggyplus.shared.model.LogFile;
-import com.seeloggyplus.shared.logs.LogFileRepository;
-import com.seeloggyplus.shared.logs.LogFileRepositoryImpl;
-import com.seeloggyplus.shared.logs.LogFileService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.util.UUID;
 
-/**
- * Implementation of {@link LogFileService}.
- * <p>
- * Manages the lifecycle of {@link LogFile} entities, including validation
- * and error handling before delegating to the persistence layer.
- */
 @RequiredArgsConstructor
 public class LogFileServiceImpl implements LogFileService {
 
     private static final Logger logger = LoggerFactory.getLogger(LogFileServiceImpl.class);
     private final LogFileRepository logFileRepository;
 
-    /**
-     * Default constructor for manual instantiation.
-     * Initializes with the default repository implementation.
-     */
-    public LogFileServiceImpl() {
-        this(new LogFileRepositoryImpl());
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void insertLogFile(LogFile logFile) {
         validateLogFile(logFile);
-
         if (logFile.getId() == null || logFile.getId().trim().isEmpty()) {
             logFile.setId(UUID.randomUUID().toString());
         }
-
         try {
             logFileRepository.insert(logFile);
             logger.info("Successfully inserted log file: {} with id: {}", logFile.getName(), logFile.getId());
@@ -52,16 +31,12 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public LogFile getLogFileById(String id) {
         if (id == null || id.trim().isEmpty()) {
             logger.error("Cannot get log file with null or empty id");
             throw new IllegalArgumentException("LogFile id cannot be null or empty");
         }
-
         try {
             return logFileRepository.findById(id);
         } catch (NotFoundException ex) {
@@ -73,16 +48,12 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void deleteLogFileById(String id) {
         if (id == null || id.trim().isEmpty()) {
             logger.error("Cannot delete log file with null or empty id");
             throw new IllegalArgumentException("LogFile id cannot be null or empty");
         }
-
         try {
             logFileRepository.deleteById(id);
             logger.info("Successfully deleted log file with id: {}", id);
@@ -95,9 +66,6 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void updateLogFile(LogFile logFile) {
         if (logFile == null) {
@@ -108,7 +76,6 @@ public class LogFileServiceImpl implements LogFileService {
             logger.error("Cannot update log file with null or empty id");
             throw new IllegalArgumentException("LogFile id cannot be null or empty");
         }
-
         try {
             logFileRepository.update(logFile);
             logger.info("Successfully updated log file: {}", logFile.getName());
@@ -121,9 +88,6 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public LogFile getLogFileByPathAndName(String name, String filePath) {
         if (name == null || name.trim().isEmpty()) {
@@ -134,7 +98,6 @@ public class LogFileServiceImpl implements LogFileService {
             logger.error("Cannot get log file with null or empty file path");
             throw new IllegalArgumentException("LogFile path cannot be null or empty");
         }
-
         try {
             return logFileRepository.findByPathAndName(filePath, name);
         } catch (NotFoundException ex) {
@@ -146,9 +109,6 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public LogFile getLogFileByPathNameAndServer(String name, String filePath, String sshServerId, boolean isRemote) {
         if (name == null || name.trim().isEmpty()) {
@@ -159,11 +119,11 @@ public class LogFileServiceImpl implements LogFileService {
             logger.error("Cannot get log file with null or empty file path");
             throw new IllegalArgumentException("LogFile path cannot be null or empty");
         }
-
         try {
             return logFileRepository.findByPathNameAndServer(filePath, name, sshServerId, isRemote);
         } catch (NotFoundException ex) {
-            logger.debug("Log file not found by path: {}, name: {}, serverId: {}, isRemote: {}", filePath, name, sshServerId, isRemote);
+            logger.debug("Log file not found by path: {}, name: {}, serverId: {}, isRemote: {}", filePath, name,
+                    sshServerId, isRemote);
             return null;
         } catch (FatalDatabaseException ex) {
             logger.error("Database error when getting log file by path/name/server", ex);
@@ -171,9 +131,6 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void deleteAllLogFiles() {
         try {
@@ -185,16 +142,12 @@ public class LogFileServiceImpl implements LogFileService {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void updateParsingConfigIdForLogFiles(String parsingConfigId, String logFileId) {
         if (logFileId == null || logFileId.trim().isEmpty()) {
             logger.error("Cannot update parsing config id for log file with null or empty id");
             throw new IllegalArgumentException("LogFile id cannot be null or empty");
         }
-
         try {
             logFileRepository.updateParsingConfigId(parsingConfigId, logFileId);
             logger.info("Successfully updated parsing config id for log file id: {}", logFileId);

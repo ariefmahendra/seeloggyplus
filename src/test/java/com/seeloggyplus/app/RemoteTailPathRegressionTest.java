@@ -1,12 +1,12 @@
 package com.seeloggyplus.app;
 
+import com.seeloggyplus.shared.progress.ProgressCallback;
 import com.seeloggyplus.features.recent.domain.RecentFilesDto;
 import com.seeloggyplus.shared.model.LogFile;
 import com.seeloggyplus.shared.session.LogSession;
 import com.seeloggyplus.shared.session.TabSessionManager;
 import com.seeloggyplus.features.recent.domain.RecentFile;
 import com.seeloggyplus.shared.model.SSHServerModel;
-import com.seeloggyplus.shared.logs.LogParser;
 import com.seeloggyplus.features.ssh.infrastructure.SSHServiceImpl;
 import com.seeloggyplus.shared.ssh.SSHService;
 import com.seeloggyplus.shared.ui.AppTheme;
@@ -362,7 +362,7 @@ class RemoteTailPathRegressionTest {
 
         @Override
         public boolean downloadFileConcurrent(String remotePath, String localPath, int threads,
-                                              LogParser.ProgressCallback callback) {
+                                              ProgressCallback callback) {
             downloadCalls++;
             try {
                 Files.writeString(Path.of(localPath), "downloaded line\n");

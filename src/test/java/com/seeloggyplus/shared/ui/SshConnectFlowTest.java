@@ -1,8 +1,8 @@
 package com.seeloggyplus.shared.ui;
 
+import com.seeloggyplus.shared.progress.ProgressCallback;
 import com.seeloggyplus.shared.dto.RemoteFileInfo;
 import com.seeloggyplus.shared.model.SSHServerModel;
-import com.seeloggyplus.shared.logs.LogParser;
 import com.seeloggyplus.shared.ssh.SSHService;
 import com.seeloggyplus.shared.ssh.HostKeyVerificationException;
 import com.seeloggyplus.shared.ssh.SshAuthConfig;
@@ -17,11 +17,6 @@ import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Connect flow rules: the server's auth method is applied, an unknown host key
- * is only trusted after explicit confirmation (then retried), and a changed key
- * is always refused.
- */
 class SshConnectFlowTest {
 
     private static final String FINGERPRINT = "SHA256:abc123";
@@ -145,7 +140,6 @@ class SshConnectFlowTest {
         assertFalse(asked.get());
     }
 
-    /** Minimal fake that simulates host-key failures. */
     private static class FakeSshService implements SSHService {
         SshAuthConfig lastAuth;
         HostKeyVerificationException toThrow;
@@ -176,16 +170,12 @@ class SshConnectFlowTest {
         }
 
         @Override public void disconnect() { }
-
         @Override public void cancelActiveCommand() { }
-
         @Override public boolean isConnected() { return false; }
-
         @Override public void tailFile(String remotePath, int lines, Consumer<String> logConsumer,
                 Consumer<String> errorConsumer) { }
 
         @Override public void stopTailing() { }
-
         @Override public String readFile(String remotePath) throws IOException {
             throw new UnsupportedOperationException();
         }
@@ -211,7 +201,7 @@ class SshConnectFlowTest {
         }
 
         @Override public boolean downloadFileConcurrent(String remotePath, String localPath, int threadCount,
-                LogParser.ProgressCallback progressCallback) {
+                ProgressCallback progressCallback) {
             throw new UnsupportedOperationException();
         }
     }

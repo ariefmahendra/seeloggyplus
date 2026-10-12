@@ -8,7 +8,8 @@ import com.seeloggyplus.shared.session.LogSession;
 import com.seeloggyplus.shared.session.TabSessionManager;
 import com.seeloggyplus.features.recent.domain.RecentFile;
 import com.seeloggyplus.shared.model.SSHServerModel;
-import com.seeloggyplus.shared.logs.LogFileServiceImpl;
+import com.seeloggyplus.app.composition.LogServices;
+import com.seeloggyplus.shared.logs.port.LogFileService;
 import com.seeloggyplus.features.recent.infrastructure.RecentConfigServiceImpl;
 import com.seeloggyplus.features.servers.infrastructure.ServerManagementServiceImpl;
 import com.seeloggyplus.features.ssh.infrastructure.SSHServiceImpl;
@@ -51,7 +52,7 @@ class RecentFilesOrderingTest {
     private TreeView<RecentFileTreeCell.RecentNode> tree;
     private Map<Tab, LogSession> sessions;
     private final RecentConfigServiceImpl recentService = new RecentConfigServiceImpl();
-    private final LogFileServiceImpl fileService = new LogFileServiceImpl();
+    private final LogFileService fileService = LogServices.createDefault().files();
     private final ServerManagementServiceImpl serverService = new ServerManagementServiceImpl();
     private final List<LogFile> files = new ArrayList<>();
     private SSHServerModel server;
