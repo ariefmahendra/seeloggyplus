@@ -6,6 +6,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToggleButton;
 import javafx.stage.Stage;
+import javafx.scene.input.Clipboard;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,10 @@ class LogDetailPaneControllerTest extends ApplicationTest {
 
     @AfterEach
     void resetPanel() {
-        onFxThread(() -> controller.clear());
+        onFxThread(() -> {
+            controller.setAutoPrettify(false, false);
+            controller.clear();
+        });
     }
 
     @Test
@@ -82,9 +86,99 @@ class LogDetailPaneControllerTest extends ApplicationTest {
         assertEquals(List.of("main_auto_prettify_json=true", "main_auto_prettify_xml=true"), changes);
     }
 
+    @Test
+    @DisplayName("Auto-prettify JSON formats inline JSON on show")
+    void autoPrettifyJsonFormatsInlineJson() {
+        onFxThread(() -> {
+            controller.setAutoPrettify(true, false);
+            controller.show(0, "{\"level\":\"INFO\",\"message\":\"ready\"}");
+        });
+
+        String text = controller.getCodeArea().getText();
+        assertTrue(text.contains("\n"), "inline JSON must be prettified into multiple lines");
+        assertTrue(text.contains("\"level\""));
+    }
+
+    @Test
+    @DisplayName("Auto-prettify XML formats inline XML on show")
+    void autoPrettifyXmlFormatsInlineXml() {
+        onFxThread(() -> {
+            controller.setAutoPrettify(false, true);
+            controller.show(0, "<root><entry>1</entry></root>");
+        });
+
+        String text = controller.getCodeArea().getText();
+        assertTrue(text.contains("\n"), "inline XML must be prettified into multiple lines");
+        assertTrue(text.contains("<root>"));
+    }
+
+    @Test
+    @DisplayName("Turning auto-prettify off restores the raw line")
+    void turningPrettifyOffRestoresRawText() {
+        String raw = "{\"a\":1}";
+        onFxThread(() -> {
+            controller.setAutoPrettify(true, false);
+            controller.show(0, raw);
+        });
+        assertTrue(controller.getCodeArea().getText().contains("\n"));
+
+        onFxThread(() -> toggle("prettifyJsonButton").setSelected(false));
+
+        assertEquals(raw, controller.getCodeArea().getText());
+    }
+
+    @Test
+    @DisplayName("show() ignores null content and keeps the previous line")
+    void showIgnoresNullContent() {
+        onFxThread(() -> controller.show(4, "kept"));
+        onFxThread(() -> controller.show(9, null));
+
+        assertEquals("Line 5", label("detailLabel").getText());
+        assertEquals("kept", controller.getCodeArea().getText());
+    }
+
+    @Test
+    @DisplayName("The clear button empties the pane without a shell callback")
+    void clearButtonEmptiesThePane() {
+        onFxThread(() -> {
+            controller.show(0, "payload");
+            button("clearDetailButton").fire();
+        });
+
+        assertEquals("Log Detail", label("detailLabel").getText());
+        assertTrue(controller.getCodeArea().getText().isEmpty());
+    }
+
+    @Test
+    @DisplayName("The copy button copies the rendered content")
+    void copyButtonCopiesRenderedContent() {
+        onFxThread(() -> {
+            controller.show(0, "copy-me");
+            button("copyButton").fire();
+        });
+
+        assertEquals("copy-me", clipboardText());
+    }
+
+    @Test
+    @DisplayName("Font style is applied to the rendered code area")
+    void fontStyleIsApplied() {
+        onFxThread(() -> controller.setFontStyle("-fx-font-size: 17px;"));
+
+        assertTrue(controller.getCodeArea().getStyle().contains("17px"));
+    }
+
     private void onFxThread(Runnable action) {
         WaitForAsyncUtils.asyncFx(action);
         WaitForAsyncUtils.waitForFxEvents();
+    }
+
+    private String clipboardText() {
+        try {
+            return WaitForAsyncUtils.asyncFx(() -> Clipboard.getSystemClipboard().getString()).get();
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
     }
 
     private Label label(String id) {
