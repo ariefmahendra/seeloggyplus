@@ -12,14 +12,8 @@ import javafx.scene.control.ButtonType;
 import java.util.concurrent.FutureTask;
 import java.util.function.Supplier;
 
-/**
- * Shared connect flow: applies the server's authentication method and handles
- * host-key trust-on-first-use. When the host key is unknown the user is asked to
- * accept and save the fingerprint; changed keys are always refused.
- */
 public final class SshConnectFlow {
 
-    /** UI hook, injectable for tests. */
     public interface HostKeyConfirmer {
         boolean confirmUnknownHostKey(HostKeyVerificationException problem);
 

@@ -11,7 +11,6 @@ import com.seeloggyplus.shared.util.FxTextHighlighter;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -41,10 +40,6 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 
-/**
- * E2E tests for the Remote Log Search dialog: match results, lazy preview,
- * context selection, open-at-line, copy, validation and cancellation.
- */
 @ExtendWith(ApplicationExtension.class)
 public class RemoteLogSearchDialogControllerTest {
 
@@ -69,8 +64,7 @@ public class RemoteLogSearchDialogControllerTest {
         Parent root = loader.load();
         controller = loader.getController();
         stage.setScene(AppTheme.scene(root));
-        // Explicit size so the split-pane preview area always has height to
-        // render its cells (the shared headless stage can be resized by other tests).
+
         stage.setWidth(1100);
         stage.setHeight(760);
         stage.show();
@@ -178,8 +172,7 @@ public class RemoteLogSearchDialogControllerTest {
     private void selectFirstMatchAndWaitForPreview() throws Exception {
         Platform.runLater(() -> resultTable.getSelectionModel().select(0));
         waitUntil(() -> !previewList.getItems().isEmpty());
-        // The preview cell graphics are built lazily; wait until at least one
-        // cell rendered its content before tests inspect/highlight them.
+
         waitUntil(this::previewCellRendered);
     }
 

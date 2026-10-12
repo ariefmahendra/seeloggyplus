@@ -4,7 +4,6 @@ import javafx.application.Platform;
 import javafx.scene.Parent;
 import javafx.stage.Stage;
 
-/** Shared window/dialog restoration helper used after modal dialogs close. */
 public final class DialogWindowSupport {
 
     private DialogWindowSupport() {

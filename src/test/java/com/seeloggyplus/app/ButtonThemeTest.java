@@ -35,11 +35,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Paint;
 
-/**
- * Every button follows the active theme (no default JavaFX/Modena look):
- * a themed surface, readable text and the same border radius. Primary
- * buttons keep the brand accent with readable text.
- */
 @ExtendWith(ApplicationExtension.class)
 class ButtonThemeTest {
 
@@ -73,7 +68,6 @@ class ButtonThemeTest {
                 WaitForAsyncUtils.waitForFxEvents();
                 String mode = theme.name();
 
-                // One solid fill means our rule replaced Modena's layered gradients.
                 Background background = dialogButton.getBackground();
                 assertNotNull(background, mode + ": button background must be themed");
                 assertEquals(1, background.getFills().size(),
@@ -87,7 +81,6 @@ class ButtonThemeTest {
                         mode + ": button text must be readable on its surface");
                 assertTrue(text.getOpacity() > 0.9, mode + ": button text must be opaque");
 
-                // Toggle buttons share the same base look when not selected.
                 Background toggleBg = toggle.getBackground();
                 assertNotNull(toggleBg, mode + ": toggle background must be themed");
                 assertEquals(1, toggleBg.getFills().size(),
@@ -120,7 +113,6 @@ class ButtonThemeTest {
                 assertTrue(contrast(text, background) >= 4.5,
                         theme + ": primary button text must be readable on the accent");
 
-                // Not the plain surface look (primary is a saturated dark/brand tone).
                 assertTrue(luminance(background) < 0.6,
                         theme + ": primary button must not use the plain light surface");
             }

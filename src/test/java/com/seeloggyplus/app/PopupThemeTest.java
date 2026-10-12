@@ -25,11 +25,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Regression for the dropdown (ComboBox/ChoiceBox popup) colours: in the light
- * Graphite and Light themes the popup surface must stay light with dark text,
- * instead of falling back to a dark Modena/default rendering.
- */
 @ExtendWith(ApplicationExtension.class)
 class PopupThemeTest {
 

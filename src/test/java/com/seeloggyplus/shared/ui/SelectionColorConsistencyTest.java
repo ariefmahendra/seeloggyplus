@@ -8,7 +8,6 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.Paint;
 import javafx.scene.shape.Shape;
 import javafx.stage.Stage;
 import org.fxmisc.richtext.StyleClassedTextArea;
@@ -27,11 +26,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 import javafx.scene.Parent;
 
-/**
- * Text selection highlight must be consistent across the canvas log, the search
- * result panel, the RichTextFX detail panel and JavaFX text controls, in both
- * light and dark mode.
- */
 @ExtendWith(ApplicationExtension.class)
 class SelectionColorConsistencyTest {
 

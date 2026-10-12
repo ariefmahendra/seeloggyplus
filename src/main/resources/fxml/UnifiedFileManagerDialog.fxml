@@ -8,8 +8,8 @@
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogController"
             prefWidth="900" prefHeight="600" styleClass="unified-file-manager-dialog">
-    
-    <!-- Top: Navigation & Search -->
+
+
     <top>
         <VBox>
             <ToolBar styleClass="app-toolbar">
@@ -21,7 +21,7 @@
                         <Tooltip text="Back"/>
                     </tooltip>
                 </Button>
-                
+
                 <Button fx:id="forwardButton" disable="true">
                     <graphic>
                         <FontAwesomeIconView glyphName="ARROW_RIGHT" size="12"/>
@@ -30,7 +30,7 @@
                         <Tooltip text="Forward"/>
                     </tooltip>
                 </Button>
-                
+
                 <Button fx:id="upButton" disable="true">
                     <graphic>
                         <FontAwesomeIconView glyphName="ARROW_UP" size="12"/>
@@ -39,9 +39,9 @@
                         <Tooltip text="Up to parent directory"/>
                     </tooltip>
                 </Button>
-                
+
                 <Separator orientation="VERTICAL"/>
-                
+
                 <Button fx:id="homeButton">
                     <graphic>
                         <FontAwesomeIconView glyphName="HOME" size="12"/>
@@ -50,7 +50,7 @@
                         <Tooltip text="Home directory"/>
                     </tooltip>
                 </Button>
-                
+
                 <Button fx:id="refreshButton">
                     <graphic>
                         <FontAwesomeIconView glyphName="REFRESH" size="12"/>
@@ -59,15 +59,15 @@
                         <Tooltip text="Refresh"/>
                     </tooltip>
                 </Button>
-                
+
                 <Separator orientation="VERTICAL"/>
-                
+
                 <Label text="Path:"/>
                 <TextField fx:id="pathField" HBox.hgrow="ALWAYS" promptText="/"/>
                 <Button fx:id="goButton" text="Go"/>
-                
+
                 <Separator orientation="VERTICAL"/>
-                
+
                 <TextField fx:id="searchField" promptText="Search files..." prefWidth="200"/>
 
                 <Separator orientation="VERTICAL"/>
@@ -83,11 +83,11 @@
             </ToolBar>
         </VBox>
     </top>
-    
-    <!-- Center: Split Pane (Locations | Files) -->
+
+
     <center>
         <SplitPane dividerPositions="0.25">
-            <!-- Left: Locations -->
+
             <VBox fx:id="locationsContainer" styleClass="locations-container" spacing="5">
                 <padding>
                     <Insets top="10" right="5" bottom="10" left="10"/>
@@ -131,8 +131,8 @@
                     </content>
                 </TitledPane>
             </VBox>
-            
-            <!-- Right: File Browser -->
+
+
             <VBox>
                 <TableView fx:id="fileTable" VBox.vgrow="ALWAYS">
                     <columns>
@@ -154,8 +154,8 @@
             </VBox>
         </SplitPane>
     </center>
-    
-    <!-- Bottom: Status & Actions -->
+
+
     <bottom>
         <VBox>
             <Separator/>
@@ -169,7 +169,7 @@
                 <Separator orientation="VERTICAL"/>
                 <ProgressIndicator fx:id="progressIndicator" visible="false" prefWidth="20" prefHeight="20"/>
             </HBox>
-            
+
             <HBox spacing="10" alignment="CENTER_RIGHT">
                 <padding>
                     <Insets top="10" right="10" bottom="10" left="10"/>
@@ -197,5 +197,5 @@
             </HBox>
         </VBox>
     </bottom>
-    
+
 </BorderPane>

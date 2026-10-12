@@ -22,10 +22,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Verifies the search result panel and navigator adopt theme style classes and
- * follow the light/dark palette (Phase 6 / 7 compatibility).
- */
 @ExtendWith(ApplicationExtension.class)
 class SearchPanelThemeTest {
 

@@ -8,20 +8,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Parsed update manifest. Example:
- * <pre>
- * {
- *   "channel": "stable",
- *   "latest": "0.3.0",
- *   "minSupported": "0.2.0",
- *   "releaseNotesUrl": "https://...",
- *   "assets": {
- *     "portable-nojre": { "url": "https://...zip", "size": 48123456, "sha256": "ab12..." }
- *   }
- * }
- * </pre>
- */
 public record UpdateManifest(
         String channel,
         String latest,
@@ -30,7 +16,6 @@ public record UpdateManifest(
         String publishedAt,
         Map<String, UpdateAsset> assets,
         String signature) {
-
     public static UpdateManifest parse(String json) throws UpdateException {
         if (json == null || json.isBlank()) {
             throw new UpdateException("Manifest is empty");

@@ -12,8 +12,6 @@ import com.seeloggyplus.shared.ssh.SSHService;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
-import javafx.scene.control.Tab;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,15 +29,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit and Integration tests for Stream / Tail Mode Edge Cases:
- * 1. Windows local/temp path erroneously passed to remote tail/stream
- *    (e.g. "tail: cannot open 'C:\Users\MYBOOK~1\AppData\Local\Temp\seeloggyplus-1789783538265-setup_ssl_keystore.sh' for reading: No such file or directory").
- * 2. Detection of fatal remote tail errors (file not found, cannot watch, permission denied).
- * 3. Handling of empty or blank remote paths.
- * 4. Preservation of genuine remote path when downloading and opening remote files.
- * 5. Safe handling of recent files containing temporary paths.
- */
 @ExtendWith(ApplicationExtension.class)
 @DisplayName("Stream / Tail Mode Edge Case Tests")
 public class StreamModeEdgeCasesTest {
@@ -82,22 +71,18 @@ public class StreamModeEdgeCasesTest {
     @Test
     @DisplayName("Edge Case 2: Detection of fatal tail error messages from remote shell")
     public void testTailFatalErrorPatternDetection() {
-        // Fatal: File not found error from Linux tail
         assertTrue(SSHServiceImpl.isTailFatalError(
                 "tail: cannot open 'C:\\Users\\MYBOOK~1\\AppData\\Local\\Temp\\seeloggyplus-1789783538265-setup_ssl_keystore.sh' for reading: No such file or directory"));
 
         assertTrue(SSHServiceImpl.isTailFatalError(
                 "tail: cannot open '/var/log/non_existent.log' for reading: No such file or directory"));
 
-        // Fatal: Cannot watch error
         assertTrue(SSHServiceImpl.isTailFatalError(
                 "tail: cannot watch '/var/log/syslog': No such file or directory"));
 
-        // Fatal: Permission denied
         assertTrue(SSHServiceImpl.isTailFatalError(
                 "tail: /var/log/auth.log: Permission denied"));
 
-        // Normal log lines that should NOT be considered tail fatal errors
         assertFalse(SSHServiceImpl.isTailFatalError(
                 "2026-09-19 10:00:00 [INFO] Starting service setup_ssl_keystore.sh"));
 
@@ -184,7 +169,6 @@ public class StreamModeEdgeCasesTest {
 
         Platform.runLater(() -> {
             try {
-                // Pass invalid Windows path
                 startRemoteTailMethod.invoke(controller,
                         "C:\\Users\\MYBOOK~1\\AppData\\Local\\Temp\\seeloggyplus-1789783538265-setup_ssl_keystore.sh",
                         null, null);
@@ -194,7 +178,6 @@ public class StreamModeEdgeCasesTest {
         });
 
         WaitForAsyncUtils.waitForFxEvents();
-        // Since it's rejected, no active remote tail session or crash should occur
     }
 
     @Test
@@ -212,7 +195,7 @@ public class StreamModeEdgeCasesTest {
             try {
                 Method handleRecent = MainController.class.getDeclaredMethod("handleRecentFileSelected", RecentFilesDto.class);
                 handleRecent.setAccessible(true);
-                // Must not throw exception or attempt to connect to SSH with the Windows temp path
+
                 handleRecent.invoke(controller, dto);
             } catch (Exception e) {
                 throw new RuntimeException(e);

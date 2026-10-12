@@ -14,16 +14,11 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Trust-on-first-use known_hosts behaviour: unknown hosts are surfaced, trusted
- * keys persist across reloads, and a different key for a known host is refused.
- */
 class SshKnownHostsTest {
 
     @TempDir
     Path tempDir;
 
-    /** A valid SSH public key blob (JSch parses the bytes, so they must be real). */
     private static byte[] newKeyBlob() throws Exception {
         JSch jsch = new JSch();
         KeyPair pair = KeyPair.genKeyPair(jsch, KeyPair.RSA, 2048);
@@ -46,7 +41,6 @@ class SshKnownHostsTest {
 
         SshKnownHosts.trust(repository, first);
 
-        // Reload from disk to prove the key was persisted in OpenSSH format.
         JSch reloadedJsch = new JSch();
         HostKeyRepository reloaded = SshKnownHosts.load(reloadedJsch, file);
         assertEquals(HostKeyRepository.OK, SshKnownHosts.check(reloaded, host, first),

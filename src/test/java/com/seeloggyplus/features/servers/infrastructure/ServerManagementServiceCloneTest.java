@@ -100,7 +100,6 @@ public class ServerManagementServiceCloneTest {
             assertNotEquals(originalServer.getId(), persistedClone.getId());
             assertEquals(originalServer.getName() + " (Copy)", persistedClone.getName());
 
-            // Retrieve from DB to verify persistence
             SSHServerModel retrieved = serverService.getServerById(persistedClone.getId());
             assertNotNull(retrieved, "Cloned server must be stored in database");
             assertEquals(persistedClone.getName(), retrieved.getName());
@@ -110,7 +109,6 @@ public class ServerManagementServiceCloneTest {
             assertEquals(originalServer.getDefaultPath(), retrieved.getDefaultPath());
             assertEquals(originalServer.isSavePassword(), retrieved.isSavePassword());
         } finally {
-            // Clean up cloned server
             if (persistedClone != null && persistedClone.getId() != null) {
                 try {
                     serverService.deleteServer(persistedClone.getId());

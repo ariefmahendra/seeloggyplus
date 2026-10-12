@@ -23,11 +23,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Verifies the newly added fully-light theme: the chrome (toolbar / menus /
- * status bar) is light too, unlike the default graphite theme whose chrome is
- * dark. This is the "some people like an all-light UI" feedback item.
- */
 @ExtendWith(ApplicationExtension.class)
 class LightThemeTest {
 

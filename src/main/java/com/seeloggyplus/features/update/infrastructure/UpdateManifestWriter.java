@@ -5,7 +5,6 @@ import com.google.gson.JsonObject;
 
 import java.util.List;
 
-/** Builds the {@code update-manifest.json} published by CI. */
 public final class UpdateManifestWriter {
 
     public record AssetInfo(String key, String url, long size, String sha256) {

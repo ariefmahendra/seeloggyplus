@@ -6,7 +6,6 @@ import com.seeloggyplus.features.update.domain.UpdateAwareness;
 import com.seeloggyplus.features.update.domain.UpdateCheckResult;
 import com.seeloggyplus.features.update.infrastructure.UpdateCoordinator;
 import com.seeloggyplus.features.update.infrastructure.UpdateLayout;
-import com.seeloggyplus.features.update.application.UpdateService;
 import com.seeloggyplus.shared.util.AppPaths;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -20,7 +19,6 @@ import org.slf4j.LoggerFactory;
 
 import java.awt.Desktop;
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -31,10 +29,6 @@ import java.util.function.Supplier;
 import javafx.scene.Node;
 import javafx.scene.control.ChoiceDialog;
 
-/**
- * Shows the result of an update check and lets the user open the download or
- * release notes. Actual in-app download/install lands in a later phase.
- */
 public class UpdateDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(UpdateDialogController.class);
@@ -83,27 +77,22 @@ public class UpdateDialogController {
         applyResult();
     }
 
-    /** Injected for tests to avoid opening a real browser. */
     void setBrowser(Consumer<String> browser) {
         this.browser = browser != null ? browser : UpdateDialogController::openInBrowser;
     }
 
-    /** Injected for tests to use temp directories and an offline downloader. */
     void setCoordinator(UpdateCoordinator coordinator) {
         this.coordinator = coordinator;
     }
 
-    /** Injected for tests to observe the restart request. */
     void setRestartAction(Runnable restartAction) {
         this.restartAction = restartAction != null ? restartAction : this::defaultRelaunch;
     }
 
-    /** Injected for tests to simulate the snooze choice. */
     void setSnoozeChooser(Supplier<Optional<UpdateAwareness.Snooze>> chooser) {
         this.snoozeChooser = chooser != null ? chooser : UpdateDialogController::chooseSnooze;
     }
 
-    /** Notified when the user skips this version (so the UI can hide its indicator). */
     void setOnSkipped(Runnable onSkipped) {
         this.onSkipped = onSkipped != null ? onSkipped : () -> { };
     }
@@ -112,7 +101,6 @@ public class UpdateDialogController {
         return skipped;
     }
 
-    /** Snooze duration chosen via "Remind me later", or 0 when not snoozed. */
     public long getSnoozeMillis() {
         return snoozeMillis;
     }
@@ -301,11 +289,6 @@ public class UpdateDialogController {
         return coordinator;
     }
 
-    /**
-     * Directory used to download/stage updates. It lives inside the application data
-     * directory (the same folder that already holds the database) instead of the
-     * system temp directory.
-     */
     static Path stagingDirectory() {
         return AppPaths.dataDir().resolve("updates");
     }
@@ -314,7 +297,6 @@ public class UpdateDialogController {
         UpdateRelauncher.relaunch();
     }
 
-    /** Marks a version as already staged by the background installer. */
     void markInstalled(String version) {
         if (version == null || version.isBlank()) {
             return;
@@ -351,7 +333,6 @@ public class UpdateDialogController {
         closeDialog();
     }
 
-    /** Default "Remind me later" chooser: 1 hour, 8 hours or tomorrow. */
     static Optional<UpdateAwareness.Snooze> chooseSnooze() {
         ChoiceDialog<String> dialog = new ChoiceDialog<>(
                 "In 8 hours", "In 1 hour", "In 8 hours", "Tomorrow");

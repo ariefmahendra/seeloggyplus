@@ -13,17 +13,6 @@ import java.util.stream.Stream;
 import java.net.URI;
 import java.nio.file.Paths;
 
-/**
- * Blue/green installation layout:
- * <pre>
- * root/
- *   current            -> active version (text)
- *   current.previous   -> version to roll back to (text)
- *   versions/&lt;v&gt;/seeloggyplus.jar
- *   versions/&lt;v&gt;/.ok   -> health marker written after a successful start
- * </pre>
- * The running jar is never overwritten; a new version lives in its own directory.
- */
 public final class UpdateLayout {
 
     public static final String CURRENT_FILE = "current";
@@ -38,7 +27,6 @@ public final class UpdateLayout {
         this.root = root;
     }
 
-    /** Directory that contains the running application (jar or classes folder). */
     public static Path installationRoot() {
         String override = System.getProperty("seeloggyplus.installRoot");
         if (override != null && !override.isBlank()) {
@@ -54,12 +42,6 @@ public final class UpdateLayout {
         }
     }
 
-    /**
-     * Maps the directory the running jar/classes live in to the actual installation
-     * root. In the blue/green layout the launcher runs {@code versions/&lt;v&gt;/seeloggyplus.jar},
-     * so that directory is folded back up to the root that owns {@code current} and
-     * {@code versions/} — instead of treating the version folder itself as the root.
-     */
     static Path resolveLayoutRoot(Path location) {
         if (location == null) {
             return Paths.get(System.getProperty("user.dir"));
@@ -139,10 +121,6 @@ public final class UpdateLayout {
         }
     }
 
-    /**
-     * Deletes old version directories, always keeping the current version, the
-     * previous version and the {@code keep} newest ones.
-     */
     public int cleanup(int keep) throws IOException {
         String current = currentVersion().orElse(null);
         String previous = previousVersion().orElse(null);
@@ -198,7 +176,6 @@ public final class UpdateLayout {
                 try {
                     Files.deleteIfExists(p);
                 } catch (IOException ignored) {
-                    // best effort
                 }
             });
         }

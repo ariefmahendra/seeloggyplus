@@ -12,19 +12,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.security.NoSuchAlgorithmException;
 
-/**
- * AES-256-GCM encryption for stored credentials.
- * <p>
- * Key is generated once on first use and stored in {@code .data/.keystore} alongside the DB.
- * Encrypted values are Base64-encoded with a {@code ENC:} prefix so plaintext legacy values
- * can be detected and migrated transparently.
- */
 public class CredentialEncryptor {
 
     private static final Logger logger = LoggerFactory.getLogger(CredentialEncryptor.class);
@@ -48,10 +40,6 @@ public class CredentialEncryptor {
         return instance;
     }
 
-    /**
-     * Encrypt a plaintext credential. Returns Base64 string prefixed with "ENC:".
-     * Returns null if input is null or blank.
-     */
     public String encrypt(String plaintext) {
         if (plaintext == null || plaintext.isBlank()) return plaintext;
         try {
@@ -62,7 +50,6 @@ public class CredentialEncryptor {
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, new GCMParameterSpec(GCM_TAG_BITS, iv));
             byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
 
-            // Prepend IV to ciphertext: [12 bytes IV][ciphertext+tag]
             byte[] combined = new byte[iv.length + ciphertext.length];
             System.arraycopy(iv, 0, combined, 0, iv.length);
             System.arraycopy(ciphertext, 0, combined, iv.length, ciphertext.length);
@@ -74,14 +61,9 @@ public class CredentialEncryptor {
         }
     }
 
-    /**
-     * Decrypt an encrypted credential string.
-     * If the value does NOT have the "ENC:" prefix, it's treated as legacy plaintext and returned as-is.
-     */
     public String decrypt(String stored) {
         if (stored == null || stored.isBlank()) return stored;
         if (!stored.startsWith(PREFIX)) {
-            // Legacy plaintext — return as-is (caller should re-encrypt on next save)
             return stored;
         }
         try {
@@ -102,14 +84,9 @@ public class CredentialEncryptor {
         }
     }
 
-    /**
-     * Check if a stored value is already encrypted.
-     */
     public boolean isEncrypted(String stored) {
         return stored != null && stored.startsWith(PREFIX);
     }
-
-    // -------------------------------------------------------------------------
 
     private static SecretKey loadOrCreateKey() {
         Path keyPath = AppPaths.dataFile(".keystore");
@@ -120,20 +97,16 @@ public class CredentialEncryptor {
                 return new SecretKeySpec(keyBytes, "AES");
             }
 
-            // Generate new key
             KeyGenerator keyGen = KeyGenerator.getInstance("AES");
             keyGen.init(AES_KEY_BITS, new SecureRandom());
             SecretKey key = keyGen.generateKey();
 
-            // Save to file
             Files.createDirectories(keyPath.getParent());
             Files.writeString(keyPath, Base64.getEncoder().encodeToString(key.getEncoded()));
 
-            // Restrict permissions on Unix
             try {
                 Files.setPosixFilePermissions(keyPath, PosixFilePermissions.fromString("rw-------"));
             } catch (UnsupportedOperationException ignored) {
-                // Windows — no POSIX permissions, acceptable for desktop app
             }
 
             logger.info("Generated new encryption key at {}", keyPath.toAbsolutePath());

@@ -12,7 +12,6 @@ class UpdateAwarenessTest {
     @Test
     @DisplayName("a check is due only after the interval and when not snoozed")
     void checkDueRules() {
-        // Comfortably after the interval, so "last = 0" means "never checked".
         long now = 1_000_000_000L;
 
         assertFalse(UpdateAwareness.isCheckDue(now, now - HOUR, 0, UpdateAwareness.CHECK_INTERVAL_MS),

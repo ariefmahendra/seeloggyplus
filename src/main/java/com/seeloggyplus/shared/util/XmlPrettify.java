@@ -11,26 +11,16 @@ import java.io.StringWriter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Service for prettifying and formatting XML strings using dom4j.
- * Provides robust XML validation, formatting, extraction, and minification.
- */
 public class XmlPrettify {
 
     private static final Logger logger = LoggerFactory.getLogger(XmlPrettify.class);
 
     private static final Pattern TAG_START_PATTERN = Pattern.compile("<([a-zA-Z_][a-zA-Z0-9._:-]*)");
 
-    /**
-     * Prettify XML string with default 2-space indentation.
-     */
     public static String prettify(String xml) {
         return prettify(xml, 2);
     }
 
-    /**
-     * Prettify XML with custom indentation.
-     */
     public static String prettify(String xml, int indent) {
         if (xml == null || xml.trim().isEmpty()) {
             return xml;
@@ -57,9 +47,6 @@ public class XmlPrettify {
         }
     }
 
-    /**
-     * Minify XML string (remove unnecessary whitespace).
-     */
     public static String minify(String xml) {
         if (xml == null || xml.trim().isEmpty()) {
             return xml;
@@ -84,9 +71,6 @@ public class XmlPrettify {
         }
     }
 
-    /**
-     * Validate if string is valid XML.
-     */
     public static boolean isValidXml(String xml) {
         if (xml == null || xml.trim().isEmpty()) {
             return false;
@@ -100,25 +84,15 @@ public class XmlPrettify {
         }
     }
 
-    /**
-     * Extract the first valid XML block from text.
-     */
     public static String extractXml(String text) {
         XmlRegion region = findFirstXmlRegion(text, 0);
         return region != null ? region.xmlText : null;
     }
 
-    /**
-     * Check if text contains valid XML.
-     */
     public static boolean containsXml(String text) {
         return extractXml(text) != null;
     }
 
-    /**
-     * Format and prettify all XML blocks found within a log message,
-     * preserving surrounding log prefixes, timestamps, and suffixes.
-     */
     public static String prettifyFromLog(String logMessage) {
         if (logMessage == null || logMessage.trim().isEmpty()) {
             return logMessage;
@@ -149,9 +123,6 @@ public class XmlPrettify {
         return sb.toString();
     }
 
-    /**
-     * Get XML validation error message, or null if valid.
-     */
     public static String getValidationError(String xml) {
         if (xml == null || xml.trim().isEmpty()) {
             return "XML string is empty";
@@ -182,7 +153,6 @@ public class XmlPrettify {
             return null;
         }
 
-        // Check if there is an XML declaration <?xml
         int xmlDeclStart = text.indexOf("<?xml", searchFrom);
         if (xmlDeclStart >= 0) {
             int declEnd = text.indexOf("?>", xmlDeclStart);
@@ -199,7 +169,6 @@ public class XmlPrettify {
             }
         }
 
-        // Search for any starting tag
         Matcher m = TAG_START_PATTERN.matcher(text);
         int pos = searchFrom;
         while (m.find(pos)) {

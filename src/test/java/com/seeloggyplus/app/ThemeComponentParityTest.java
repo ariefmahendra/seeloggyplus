@@ -34,13 +34,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 import javafx.scene.layout.Pane;
 
-/**
- * Verifies that every themeable component follows the SELECTED theme.
- *
- * <p>This is the regression guard for the "light theme still shows graphite
- * active/focus colours" defect: the expected colours are derived from the theme
- * the app is currently on, for each of the three themes.
- */
 @ExtendWith(ApplicationExtension.class)
 class ThemeComponentParityTest {
 
@@ -108,8 +101,6 @@ class ThemeComponentParityTest {
     @DisplayName("Toolbar interactive states (selected / hover) use the theme accent")
     void toolbarInteractiveStatesFollowTheme() {
         onFx(() -> {
-            // Dedicated (side-effect free) toggle so the real Tail button's listener
-            // cannot reset the selection while we assert the colours.
             FontAwesomeIconView icon = new FontAwesomeIconView();
             ToggleButton toggle = new ToggleButton();
             toggle.setGraphic(icon);
@@ -119,7 +110,6 @@ class ThemeComponentParityTest {
             apply();
 
             forAllThemes((theme, palette) -> {
-                // Selected state
                 toggle.setSelected(true);
                 apply();
                 assertEquals(palette.accent(), backgroundFill(toggle),
@@ -240,8 +230,6 @@ class ThemeComponentParityTest {
             ((Pane) root).getChildren().remove(holder);
         });
     }
-
-    // -------------------------------------------------------------------------
 
     @FunctionalInterface
     private interface ThemeCheck {

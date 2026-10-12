@@ -7,11 +7,6 @@ import java.sql.Connection;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Tests must not touch the developer's real {@code .data} database (which holds
- * the recent-files list). The test JVM points {@code seeloggyplus.dataDir} at an
- * isolated directory; this verifies the database is created there.
- */
 class DatabaseConfigTest {
 
     @Test

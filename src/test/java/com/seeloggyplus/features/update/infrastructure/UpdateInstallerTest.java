@@ -1,5 +1,4 @@
 package com.seeloggyplus.features.update.infrastructure;
-
 
 import com.seeloggyplus.features.update.domain.UpdateException;
 import org.junit.jupiter.api.Test;
@@ -13,7 +12,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,13 +27,11 @@ class UpdateInstallerTest {
                 try {
                     Files.deleteIfExists(p);
                 } catch (IOException ignored) {
-                    // best effort
                 }
             });
         }
     }
 
-    /** Creates a zip with the given entry names and simple content. */
     private static Path createZip(Path dir, String[] entryNames, byte[] jarContent) throws IOException {
         Path zip = dir.resolve("update-" + System.nanoTime() + ".zip");
         try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
@@ -112,9 +108,6 @@ class UpdateInstallerTest {
     void doesNotSearchRecursivelyForTheJar() throws Exception {
         Path work = Files.createTempDirectory("seeloggy-stage");
         try {
-            // The jar is nested below the wrapper. The installer must rely on the
-            // known package layout (jar directly inside the version directory) and
-            // reject this instead of walking the tree to find it.
             Path zip = createZip(work, new String[] {
                     "SeeloggyPlus/nested/seeloggyplus.jar"
             }, "jar-bytes".getBytes());

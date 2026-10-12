@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 public class PreferenceRepositoryImpl implements PreferenceRepository {
+
     private static final Logger logger = LoggerFactory.getLogger(PreferenceRepositoryImpl.class);
     private final Connection connection = DatabaseConfig.getInstance().getConnection();
 

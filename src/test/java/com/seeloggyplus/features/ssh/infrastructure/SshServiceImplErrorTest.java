@@ -6,11 +6,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * The real SSH service must remember why a connect attempt failed so the UI can
- * show the actual reason (e.g. a missing/unsupported private key) instead of a
- * generic "check credentials" message.
- */
 class SshServiceImplErrorTest {
 
     @Test
@@ -18,7 +13,6 @@ class SshServiceImplErrorTest {
     void connectionFailureExposesReason() {
         SSHServiceImpl ssh = new SSHServiceImpl();
 
-        // Port 1 has no SSH server; the connect must fail fast and report why.
         assertFalse(ssh.connect("127.0.0.1", 1, "user", "pw"));
         assertNotNull(ssh.getLastConnectError(), "a failed connect must expose a reason");
         assertFalse(ssh.getLastConnectError().isBlank());

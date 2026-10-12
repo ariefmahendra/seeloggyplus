@@ -5,13 +5,11 @@ import com.seeloggyplus.shared.ui.AppTheme;
 import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
-import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.layout.StackPane;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -30,13 +28,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Developer Hot Reloader for JavaFX Desktop GUI.
- * <p>
- * Automatically watches CSS files (such as components.css) and FXML files.
- * Upon saving changes in your editor/IDE, the running JavaFX Stage immediately
- * updates its styling and layout without closing or reopening the desktop window.
- */
 public class DevHotReloader {
 
     private static final Logger logger = LoggerFactory.getLogger(DevHotReloader.class);
@@ -55,9 +46,6 @@ public class DevHotReloader {
     private static long lastFxmlModified = 0;
     private static final List<File> createdTempFiles = new ArrayList<>();
 
-    /**
-     * Checks whether the application is running in a local development environment.
-     */
     public static boolean isDevMode() {
         if (Boolean.getBoolean("seeloggyplus.dev")) {
             return true;
@@ -66,9 +54,6 @@ public class DevHotReloader {
         return cssFile.exists() && cssFile.isFile();
     }
 
-    /**
-     * Initializes hot reload listeners and file watchers for the given Stage & Scene.
-     */
     public static void init(Stage stage, Scene scene) {
         if (!isDevMode()) {
             logger.info("DevHotReloader: Production environment detected. Hot reload disabled.");
@@ -77,7 +62,6 @@ public class DevHotReloader {
 
         logger.info("DevHotReloader: Development environment detected. Initializing Desktop GUI Hot Reload...");
 
-        // 1. Initial timestamp recording
         lastCssModified = latestCssModified();
 
         File fxmlFile = new File(FXML_SOURCE_PATH);
@@ -85,15 +69,13 @@ public class DevHotReloader {
             lastFxmlModified = fxmlFile.lastModified();
         }
 
-        // 2. Register keyboard shortcuts for instant manual reload
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-            // F5 or Ctrl+Shift+R -> Reload CSS Stylesheet
             if (event.getCode() == KeyCode.F5 || (event.isControlDown() && event.isShiftDown() && event.getCode() == KeyCode.R)) {
                 logger.info("[DevHotReloader] Manual hot reload triggered via shortcut: {}", event.getCode());
                 event.consume();
                 reloadCss(stage, scene, true);
             }
-            // Ctrl+Shift+F5 -> Reload FXML Layout
+
             else if (event.isControlDown() && event.isShiftDown() && event.getCode() == KeyCode.F5) {
                 logger.info("[DevHotReloader] Manual FXML reload triggered via Ctrl+Shift+F5");
                 event.consume();
@@ -101,10 +83,8 @@ public class DevHotReloader {
             }
         });
 
-        // 3. Start background file watcher (polling every 350ms for low overhead & immediate response)
         startWatcher(stage, scene);
 
-        // Apply hot reloadable CSS initially so any local modifications are active
         reloadCss(stage, scene, false);
     }
 
@@ -121,7 +101,6 @@ public class DevHotReloader {
 
         watcherExecutor.scheduleWithFixedDelay(() -> {
             try {
-                // Check watched CSS sources (theme.css, components.css)
                 long cssModified = latestCssModified();
                 if (cssModified > lastCssModified) {
                     lastCssModified = cssModified;
@@ -129,7 +108,6 @@ public class DevHotReloader {
                     Platform.runLater(() -> reloadCss(stage, scene, true));
                 }
 
-                // Check FXML (optional notification/log)
                 File fxmlFile = new File(FXML_SOURCE_PATH);
                 if (fxmlFile.exists()) {
                     long modified = fxmlFile.lastModified();
@@ -147,9 +125,6 @@ public class DevHotReloader {
         logger.info("[DevHotReloader] File watcher active for {} (interval: 350ms)", CSS_SOURCE_PATH);
     }
 
-    /**
-     * Reloads the CSS stylesheet dynamically into the active Scene.
-     */
     public static void reloadCss(Stage stage, Scene scene, boolean showToast) {
         if (!isReloading.compareAndSet(false, true)) {
             return;
@@ -164,16 +139,14 @@ public class DevHotReloader {
                 if (!sourceCss.exists()) {
                     continue;
                 }
-                // Only load the variant overrides while that theme is active.
+
                 if (sourcePath.contains("theme-dark.css") && AppTheme.getTheme() != AppTheme.Theme.DARK) {
                     continue;
                 }
                 if (sourcePath.contains("theme-light.css") && AppTheme.getTheme() != AppTheme.Theme.LIGHT) {
                     continue;
                 }
-                // Create a temporary CSS file with a unique name to bypass JavaFX's internal stylesheet cache
-                // Keep the source name in the temp file name so its origin stays
-                // identifiable (e.g. AppTheme can remove a stale dark copy).
+
                 String base = sourceCss.getName().replaceAll("\\.css$", "");
                 File tempCss = File.createTempFile("seeloggy-hotreload-" + base + "-", ".css");
                 tempCss.deleteOnExit();
@@ -188,7 +161,6 @@ public class DevHotReloader {
                 return;
             }
 
-            // Clean up older temp files, keeping the most recent batches
             while (createdTempFiles.size() > CSS_SOURCE_PATHS.size() * 3) {
                 File oldFile = createdTempFiles.remove(0);
                 try {
@@ -200,12 +172,10 @@ public class DevHotReloader {
                 try {
                     Parent root = scene.getRoot();
                     if (root != null) {
-                        // Remove previous theme/components or hotreload stylesheets
                         root.getStylesheets().removeIf(DevHotReloader::isReloadableCss);
                     }
                     scene.getStylesheets().removeIf(DevHotReloader::isReloadableCss);
 
-                    // Add new stylesheets
                     scene.getStylesheets().addAll(newCssUrls);
                     if (root != null) {
                         root.applyCss();
@@ -221,7 +191,6 @@ public class DevHotReloader {
                     isReloading.set(false);
                 }
             });
-
         } catch (Exception e) {
             isReloading.set(false);
             logger.error("[DevHotReloader] Failed to reload CSS", e);
@@ -245,9 +214,6 @@ public class DevHotReloader {
         return latest;
     }
 
-    /**
-     * Reloads the FXML layout fresh from disk without closing the Stage.
-     */
     public static void reloadFxml(Stage stage) {
         if (stage == null || !stage.isShowing()) return;
 
@@ -266,7 +232,6 @@ public class DevHotReloader {
             Scene scene = stage.getScene();
             scene.setRoot(newRoot);
 
-            // Reapply CSS
             reloadCss(stage, scene, false);
             showToast(stage, "⚡ Main Layout Reloaded");
             logger.info("[DevHotReloader] ⚡ FXML layout reloaded successfully!");
@@ -276,9 +241,6 @@ public class DevHotReloader {
         }
     }
 
-    /**
-     * Shows a brief, non-intrusive floating toast in the bottom-right corner of the window.
-     */
     private static void showToast(Stage stage, String message) {
         if (stage == null || !stage.isShowing()) return;
 
@@ -299,7 +261,6 @@ public class DevHotReloader {
 
         popup.getContent().add(label);
 
-        // Position in bottom-right corner of stage
         double x = stage.getX() + stage.getWidth() - 250;
         double y = stage.getY() + stage.getHeight() - 75;
         if (x > 0 && y > 0) {
@@ -314,9 +275,6 @@ public class DevHotReloader {
         }
     }
 
-    /**
-     * Shuts down the background watcher service cleanly.
-     */
     public static synchronized void shutdown() {
         if (watcherExecutor != null && !watcherExecutor.isShutdown()) {
             logger.info("[DevHotReloader] Shutting down watcher executor...");

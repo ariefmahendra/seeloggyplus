@@ -21,11 +21,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Defect fix: toolbar toggle icons (Tail, Smart Follow) must keep the theme
- * colour in every state — the previous programmatic fill sometimes lingered and
- * looked off-colour.
- */
 @ExtendWith(ApplicationExtension.class)
 class ToolbarToggleIconThemeTest {
 

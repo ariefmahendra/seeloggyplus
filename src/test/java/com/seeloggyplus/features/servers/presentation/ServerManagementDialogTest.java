@@ -79,9 +79,9 @@ public class ServerManagementDialogTest {
     @Test
     @DisplayName("ServerManagementDialogController should NOT have statusColumn or testConnectionButton fields")
     public void testNoStatusColumnOrTestConnectionButtonFields() {
-        assertThrows(NoSuchFieldException.class, () -> 
+        assertThrows(NoSuchFieldException.class, () ->
                 ServerManagementDialogController.class.getDeclaredField("statusColumn"));
-        assertThrows(NoSuchFieldException.class, () -> 
+        assertThrows(NoSuchFieldException.class, () ->
                 ServerManagementDialogController.class.getDeclaredField("testConnectionButton"));
     }
 
@@ -101,7 +101,6 @@ public class ServerManagementDialogTest {
             loadMethod.setAccessible(true);
             loadMethod.invoke(controller, testServer.getId());
 
-            // Wait for background Task and FX thread
             WaitForAsyncUtils.waitForFxEvents();
             Thread.sleep(400);
             WaitForAsyncUtils.waitForFxEvents();
@@ -112,7 +111,7 @@ public class ServerManagementDialogTest {
             TableView<SSHServerModel> table = (TableView<SSHServerModel>) tableField.get(controller);
 
             assertFalse(table.getItems().isEmpty(), "serverTable items must not be empty after loadServers()");
-            assertTrue(table.getItems().stream().anyMatch(s -> testServer.getId().equals(s.getId())), 
+            assertTrue(table.getItems().stream().anyMatch(s -> testServer.getId().equals(s.getId())),
                     "serverTable must contain the inserted server");
         } finally {
             service.deleteServer(testServer.getId());

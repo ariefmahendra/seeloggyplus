@@ -8,26 +8,21 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-/**
- * Model class representing an SSH server configuration
- * Used for storing and managing SSH connection details
- */
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
 public class SSHServerModel {
 
-    /** Password authentication (default, backwards compatible). */
     public static final String AUTH_PASSWORD = "PASSWORD";
-    /** Private-key authentication using {@link #keyPath} (+ optional {@link #keyPassphrase}). */
+
     public static final String AUTH_KEY = "KEY";
 
     public enum ConnectionStatus {
-        UNKNOWN,      // Not tested yet
-        CONNECTED,    // Successfully connected
-        DISCONNECTED, // Failed to connect
-        TESTING       // Currently testing connection
+        UNKNOWN,
+        CONNECTED,
+        DISCONNECTED,
+        TESTING
     }
 
     private String id;
@@ -46,8 +41,7 @@ public class SSHServerModel {
     private String authType = AUTH_PASSWORD;
     private String keyPath;
     private String keyPassphrase;
-    
-    // Transient field - not stored in database
+
     private transient ConnectionStatus connectionStatus = ConnectionStatus.UNKNOWN;
 
     public SSHServerModel(String name, String host, int port, String username) {
@@ -59,14 +53,10 @@ public class SSHServerModel {
         this.createdAt = LocalDateTime.now();
     }
 
-    /** True when this server authenticates with a private key file. */
     public boolean usesKeyAuth() {
         return AUTH_KEY.equalsIgnoreCase(authType);
     }
 
-    /**
-     * Get display string for SSH server
-     */
     public String getDisplayString() {
         if (name != null && !name.isEmpty()) {
             return String.format("%s (%s@%s:%d)", name, username, host, port);
@@ -74,9 +64,6 @@ public class SSHServerModel {
         return String.format("%s@%s:%d", username, host, port);
     }
 
-    /**
-     * Validate server configuration
-     */
     public boolean isValid() {
         if (host == null || host.trim().isEmpty()) {
             return false;
@@ -87,9 +74,6 @@ public class SSHServerModel {
         return port > 0 && port <= 65535;
     }
 
-    /**
-     * Get validation error message
-     */
     public String getValidationError() {
         if (host == null || host.trim().isEmpty()) {
             return "Host is required";

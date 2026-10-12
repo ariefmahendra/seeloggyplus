@@ -6,14 +6,10 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import java.util.Optional;
 
-/**
- * A simple dialog to prompt the user for a password.
- */
 public class PasswordPromptDialog extends Dialog<String> {
 
     private final PasswordField passwordField;
@@ -35,10 +31,8 @@ public class PasswordPromptDialog extends Dialog<String> {
         getDialogPane().setContent(content);
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
-        // Request focus on the password field by default.
         Platform.runLater(passwordField::requestFocus);
 
-        // Convert the result to the password string when the OK button is clicked.
         this.setResultConverter(dialogButton -> {
             if (dialogButton == ButtonType.OK) {
                 return passwordField.getText();

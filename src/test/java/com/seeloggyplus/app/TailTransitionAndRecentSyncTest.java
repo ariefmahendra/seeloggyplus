@@ -15,11 +15,9 @@ import com.seeloggyplus.features.recent.presentation.RecentFileTreeCell;
 import com.seeloggyplus.shared.util.LineOffsetIndex;
 import com.seeloggyplus.shared.util.MappedFileReader;
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TreeItem;
@@ -46,15 +44,6 @@ import java.io.RandomAccessFile;
 import java.util.function.Consumer;
 import javafx.scene.layout.VBox;
 
-/**
- * Tests covering:
- * 1. Stream mode tail transition (clears previous logs, does not append, then runs tail).
- * 2. Clear recent log file closes corresponding tab pane(s).
- * 3. Recent log files list automatically activates/selects the row matching the open tab pane.
- * 4. Bottom bar line count is always accurate and updated with actual data.
- * 5. High performance & low RAM usage (clears buffers on tail reset, prevents leak).
- * 6. Edge cases (rapid toggles, clearing unopened recent file, downloaded remote file matching, empty file zero division).
- */
 @ExtendWith(ApplicationExtension.class)
 public class TailTransitionAndRecentSyncTest {
 
@@ -139,9 +128,6 @@ public class TailTransitionAndRecentSyncTest {
         assertFalse(renderedText.contains("Tail"), "Recent file rows must not show the open mode");
     }
 
-    // =========================================================================
-    // 1. STREAM MODE TAIL TRANSITION CLEARS RATHER THAN APPENDS
-    // =========================================================================
     @Test
     @DisplayName("Mode Stream: Clicking tail mode clears previous logs and runs tail afresh without appending")
     public void testStreamModeTailTransition_ClearsPreviousLogsAndDoesNotAppend() throws Exception {
@@ -154,7 +140,6 @@ public class TailTransitionAndRecentSyncTest {
             try {
                 openSessionInController(session);
 
-                // Simulate stream receiving 5 initial lines before tail mode is engaged
                 for (int i = 1; i <= 5; i++) {
                     session.getLiveTailList().add(new LogEntry((long) i, "Old Stream Line " + i));
                 }
@@ -163,25 +148,20 @@ public class TailTransitionAndRecentSyncTest {
 
                 assertEquals(5, session.getCanvasLogViewer().getTotalLines(), "Viewer should initially display 5 old stream lines");
 
-                // Disable tail initially to simulate non-tail stream viewing
                 Method disableTailMethod = MainController.class.getDeclaredMethod("disableTail", LogSession.class, boolean.class);
                 disableTailMethod.setAccessible(true);
                 disableTailMethod.invoke(controller, session, true);
 
-                // Old stream lines must still be visible while tail is disabled
                 assertEquals(5, session.getCanvasLogViewer().getTotalLines());
 
-                // User now clicks Tail button (enableTail)
                 Method enableTailMethod = MainController.class.getDeclaredMethod("enableTail");
                 enableTailMethod.setAccessible(true);
                 enableTailMethod.invoke(controller);
 
-                // Verify previous stream logs were CLEARED immediately
                 assertEquals(0, session.getLiveTailList().size(), "Live tail list must be cleared on transition to tail");
                 assertEquals(0, session.getCanvasLogViewer().getTotalLines(), "Canvas viewer must be cleared and reset to 0 lines");
                 assertEquals("Line: 0 / 0", statusLabel.getText(), "Status label should reset to 0 / 0");
 
-                // Now tailer starts streaming fresh lines
                 assertNotNull(mockSsh.lineConsumer, "Tailer lineConsumer must be registered");
                 mockSsh.lineConsumer.accept("Fresh Tail Line 1");
                 mockSsh.lineConsumer.accept("Fresh Tail Line 2");
@@ -192,12 +172,10 @@ public class TailTransitionAndRecentSyncTest {
 
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Give background queue a moment to flush to UI thread
         Thread.sleep(150);
         WaitForAsyncUtils.waitForFxEvents();
 
         Platform.runLater(() -> {
-            // Must contain ONLY 2 lines, NOT 5 + 2 = 7 lines!
             assertEquals(2, session.getLiveTailList().size(), "Must contain only newly received tail lines");
             assertEquals(2, session.getCanvasLogViewer().getTotalLines(), "Viewer total lines must be 2, without appending to old logs");
             assertTrue(statusLabel.getText().contains("2"), "Bottom bar line count must reflect 2 lines");
@@ -205,9 +183,6 @@ public class TailTransitionAndRecentSyncTest {
         WaitForAsyncUtils.waitForFxEvents();
     }
 
-    // =========================================================================
-    // 2. CLEAR RECENT LOG FILE CLOSES CORRESPONDING TAB PANE
-    // =========================================================================
     @Test
     @DisplayName("Clear Recent: Deleting selected file from recent files closes its open tab pane")
     public void testClearSelectedRecentFile_ClosesCorrespondingTabPane() throws Exception {
@@ -241,10 +216,8 @@ public class TailTransitionAndRecentSyncTest {
 
                 assertEquals(2, logTabPane.getTabs().size(), "Both tabs should be open");
 
-                // Close tabs for logFileA
                 recentPanel.closeTabsForLogFile(logFileA);
 
-                // Tab A should be closed, Tab B should remain open
                 assertEquals(1, logTabPane.getTabs().size(), "Only one tab should remain after closing file A");
                 assertFalse(logTabPane.getTabs().contains(tabA), "Tab A must be closed");
                 assertTrue(logTabPane.getTabs().contains(tabB), "Tab B must remain open");
@@ -258,9 +231,6 @@ public class TailTransitionAndRecentSyncTest {
         WaitForAsyncUtils.waitForFxEvents();
     }
 
-    // =========================================================================
-    // 2b. CLEAR ALL RECENT FILES CLOSES ALL TAB PANES
-    // =========================================================================
     @Test
     @DisplayName("Clear Recent: Clearing all recent files closes all open tabs and resets UI")
     public void testClearAllRecentFiles_ClosesAllTabPanesAndResetsUI() throws Exception {
@@ -274,7 +244,6 @@ public class TailTransitionAndRecentSyncTest {
 
                 assertEquals(2, logTabPane.getTabs().size());
 
-                // Execute close all tabs as done in handleClearRecentFiles
                 controller.handleCloseAllTabs();
 
                 assertEquals(0, logTabPane.getTabs().size(), "All tabs should be closed");
@@ -288,9 +257,6 @@ public class TailTransitionAndRecentSyncTest {
         WaitForAsyncUtils.waitForFxEvents();
     }
 
-    // =========================================================================
-    // 3. RECENT SIDEBAR AUTOMATICALLY HIGHLIGHTS CURRENT TAB
-    // =========================================================================
     @Test
     @DisplayName("Recent Sidebar: Active tab selection synchronizes and selects the matching row in recent files")
     public void testActiveTabSelection_SynchronizesRecentSidebarRow() throws Exception {
@@ -319,14 +285,12 @@ public class TailTransitionAndRecentSyncTest {
 
         Platform.runLater(() -> {
             try {
-                // Populate the recent files tree
                 allRecentFiles.setAll(dto1, dto2);
                 recentPanel.rebuildTree();
 
                 Tab tab1 = openSessionInController(session1);
                 Tab tab2 = openSessionInController(session2);
 
-                // Tab 2 is currently active
                 recentPanel.selectForSession(session2);
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -340,7 +304,6 @@ public class TailTransitionAndRecentSyncTest {
             assertNotNull(selected, "A recent file row must be selected");
             assertEquals("app2.log", selected.logFile().getName(), "Active tab 2 must be selected in recent list");
 
-            // Switch to tab 1
             recentPanel.selectForSession(session1);
         });
 
@@ -361,13 +324,9 @@ public class TailTransitionAndRecentSyncTest {
         return item == null || item.getValue() == null ? null : item.getValue().getFile();
     }
 
-    // =========================================================================
-    // 4. BOTTOM BAR LINE COUNT ACCURACY (OPEN FILE AND TAIL MODE)
-    // =========================================================================
     @Test
     @DisplayName("Bottom Bar: Line count is always accurate on file load, scroll/jump, and live tail")
     public void testBottomBarLineCountAccuracy_FileLoadAndTailMode() throws Exception {
-        // Create temp test log file with 25 lines
         File tempFile = File.createTempFile("status_bar_test", ".log");
         tempFile.deleteOnExit();
         StringBuilder sb = new StringBuilder();
@@ -395,20 +354,17 @@ public class TailTransitionAndRecentSyncTest {
                 viewer.loadFile(reader, index);
                 controller.updateBottomBarLineCount(session);
 
-                // 1. Initial load line count verification
                 assertEquals(25, viewer.getTotalLines());
                 assertTrue(statusLabel.getText().contains("25"),
                         "Status label must reflect 25 lines on initial load. Actual: " + statusLabel.getText());
                 assertTrue(statusLabel.getText().contains("Line: 1 / 25"),
                         "Status label should start at Line 1. Actual: " + statusLabel.getText());
 
-                // 2. Jump to line 15
-                viewer.jumpToLine(14); // 0-indexed 14 -> Line 15
+                viewer.jumpToLine(14);
                 controller.updateBottomBarLineCount(session);
                 assertTrue(statusLabel.getText().contains("Line: 15 / 25"),
                         "Status label must update to Line 15. Actual: " + statusLabel.getText());
 
-                // 3. Add tail entries dynamically
                 session.getLiveTailList().add(new LogEntry(26L, "Appended tail line 26"));
                 session.getLiveTailList().add(new LogEntry(27L, "Appended tail line 27"));
                 viewer.refreshTail();
@@ -426,9 +382,6 @@ public class TailTransitionAndRecentSyncTest {
         reader.close();
     }
 
-    // =========================================================================
-    // 5. EDGE CASES
-    // =========================================================================
     @Test
     @DisplayName("Edge Case: Rapid toggling tail mode does not duplicate buffers or leak memory")
     public void testEdgeCase_RapidTailToggle_NoBufferDuplicationOrMemoryLeak() throws Exception {
@@ -445,19 +398,16 @@ public class TailTransitionAndRecentSyncTest {
                 Method disableTailMethod = MainController.class.getDeclaredMethod("disableTail", LogSession.class, boolean.class);
                 disableTailMethod.setAccessible(true);
 
-                // Rapid toggle cycle: Enable -> add lines -> Disable -> Enable -> add lines
                 enableTailMethod.invoke(controller);
                 mockSsh.lineConsumer.accept("Cycle 1 Line A");
                 mockSsh.lineConsumer.accept("Cycle 1 Line B");
 
                 disableTailMethod.invoke(controller, session, true);
 
-                // Second enable: MUST clear old 2 lines from cycle 1
                 enableTailMethod.invoke(controller);
                 assertEquals(0, session.getLiveTailList().size(), "Tail buffer must be cleanly cleared on re-enable");
                 assertEquals(0, session.getCanvasLogViewer().getTotalLines(), "Viewer must show 0 lines immediately after re-enable");
 
-                // Third cycle
                 mockSsh.lineConsumer.accept("Cycle 2 Line C");
                 assertEquals(0, session.getTailSearchScannedUpTo(), "Search scan cursor must be reset to 0 to save RAM");
             } catch (Exception e) {
@@ -485,10 +435,8 @@ public class TailTransitionAndRecentSyncTest {
                 Tab tab = openSessionInController(openSession);
                 assertEquals(1, logTabPane.getTabs().size());
 
-                // Attempt to close tabs for a file that isn't open
                 assertDoesNotThrow(() -> recentPanel.closeTabsForLogFile(unOpenFile));
 
-                // Active tab remains completely intact
                 assertEquals(1, logTabPane.getTabs().size());
                 assertTrue(logTabPane.getTabs().contains(tab));
             } catch (Exception e) {
@@ -515,7 +463,6 @@ public class TailTransitionAndRecentSyncTest {
 
         RecentFilesDto remoteDto = new RecentFilesDto(remoteLogFile, null, "ProdServer");
 
-        // Downloaded file has local temp file, but logFileRecord is the remote database record
         File tempFile = new File(System.getProperty("java.io.tmpdir"), "seeloggyplus-12345-catalina.out");
         LogSession downloadedSession = new LogSession("catalina.out (Remote)", LogSession.SessionType.LOCAL);
         downloadedSession.setLocalFile(tempFile);
@@ -559,7 +506,6 @@ public class TailTransitionAndRecentSyncTest {
                 assertEquals("Line: 0 / 0", statusLabel.getText(),
                         "Empty session must cleanly display 'Line: 0 / 0' without divide by zero or NaN");
 
-                // Null session (all tabs closed)
                 controller.updateBottomBarLineCount(null);
                 assertEquals("Line: 0 / 0", statusLabel.getText(),
                         "Null session must cleanly display 'Line: 0 / 0'");
@@ -571,9 +517,6 @@ public class TailTransitionAndRecentSyncTest {
         WaitForAsyncUtils.waitForFxEvents();
     }
 
-    // =========================================================================
-    // 6. SCROLLER POSITION ACCURACY (OPEN FILE VS STREAM/TAIL MODE)
-    // =========================================================================
     @Test
     @DisplayName("Scroller Position: Regular file open accurately positions scroller at top (0.0) and tracks jump positions")
     public void testScrollerPosition_RegularOpenFile_StartsAtTopAndTracksPosition() throws Exception {
@@ -603,13 +546,11 @@ public class TailTransitionAndRecentSyncTest {
                 CanvasLogViewer viewer = session.getCanvasLogViewer();
                 viewer.loadFile(reader, index);
 
-                // Regular open must start at top: currentTopLine = 0 and vScrollBar value = 0.0
                 assertEquals(0, viewer.getCurrentTopLine(), "Top line must be 0 for regular open");
                 assertEquals(0.0, viewer.getVScrollBar().getValue(), 0.001, "Vertical scrollbar value must be 0.0 at top");
                 assertEquals(0.0, viewer.getHScrollBar().getValue(), 0.001, "Horizontal scrollbar value must be 0.0 at left");
                 assertFalse(viewer.isFollowTail(), "followTail must be false for normal file viewing");
 
-                // Jump to line 40 (0-indexed 39)
                 viewer.jumpToLine(39);
                 assertEquals(39, viewer.getCurrentTopLine(), "Top line must jump to 39");
                 assertEquals(39.0, viewer.getVScrollBar().getValue(), 0.001, "Scrollbar value must match top line 39.0");
@@ -635,14 +576,12 @@ public class TailTransitionAndRecentSyncTest {
                 openSessionInController(session);
                 CanvasLogViewer viewer = session.getCanvasLogViewer();
 
-                // Enable tail
                 Method enableTailMethod = MainController.class.getDeclaredMethod("enableTail");
                 enableTailMethod.setAccessible(true);
                 enableTailMethod.invoke(controller);
 
                 assertTrue(viewer.isFollowTail(), "followTail should be true in tail mode");
 
-                // Add 80 lines
                 for (int i = 1; i <= 80; i++) {
                     mockSsh.lineConsumer.accept("Stream line " + i);
                 }
@@ -685,7 +624,6 @@ public class TailTransitionAndRecentSyncTest {
                 enableTailMethod.setAccessible(true);
                 enableTailMethod.invoke(controller);
 
-                // Stream 60 lines initially
                 for (int i = 1; i <= 60; i++) {
                     mockSsh.lineConsumer.accept("Line " + i);
                 }
@@ -702,14 +640,11 @@ public class TailTransitionAndRecentSyncTest {
             CanvasLogViewer viewer = session.getCanvasLogViewer();
             assertTrue(viewer.isFollowTail());
 
-            // Simulate user dragging vertical scrollbar up to position 10.0
             viewer.getVScrollBar().setValue(10.0);
 
-            // followTail should automatically become false
             assertFalse(viewer.isFollowTail(), "Dragging scrollbar up must auto-pause followTail");
             assertEquals(10, viewer.getCurrentTopLine(), "View should stay at dragged position 10");
 
-            // More tail lines arrive from remote stream
             mockSsh.lineConsumer.accept("Additional line 61");
             mockSsh.lineConsumer.accept("Additional line 62");
         });
@@ -720,7 +655,7 @@ public class TailTransitionAndRecentSyncTest {
 
         Platform.runLater(() -> {
             CanvasLogViewer viewer = session.getCanvasLogViewer();
-            // Crucial: viewer must NOT snap back to bottom because followTail is paused!
+
             assertEquals(10, viewer.getCurrentTopLine(),
                     "Viewer must remain at position 10 and not snap back to bottom while followTail is paused");
         });
@@ -744,14 +679,11 @@ public class TailTransitionAndRecentSyncTest {
                 viewer.setTailBuffer(session.getLiveTailList());
                 viewer.refreshTail();
 
-                // Scroll down
                 viewer.getVScrollBar().setValue(25);
                 assertEquals(25, viewer.getCurrentTopLine());
 
-                // Reset view (0 lines)
                 viewer.resetView();
 
-                // Scroller must clamp cleanly to 0.0 with max = 0.0
                 assertEquals(0.0, viewer.getVScrollBar().getMax(), 0.001);
                 assertEquals(0.0, viewer.getVScrollBar().getValue(), 0.001);
                 assertEquals(0, viewer.getCurrentTopLine());
@@ -763,9 +695,6 @@ public class TailTransitionAndRecentSyncTest {
         WaitForAsyncUtils.waitForFxEvents();
     }
 
-    // =========================================================================
-    // MOCK HELPER
-    // =========================================================================
     private static class MockSSHService extends SSHServiceImpl {
         Consumer<String> lineConsumer;
 

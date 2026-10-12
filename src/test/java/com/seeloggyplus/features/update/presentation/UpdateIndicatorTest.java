@@ -37,10 +37,6 @@ import java.util.function.BooleanSupplier;
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.concurrent.Callable;
 
-/**
- * Update awareness in the status bar: state texts, the background auto-download
- * flow ending in "Restart to update", and the menu preferences.
- */
 @ExtendWith(ApplicationExtension.class)
 class UpdateIndicatorTest {
 
@@ -96,7 +92,6 @@ class UpdateIndicatorTest {
         fail("Condition was not met within timeout");
     }
 
-    /** Coordinator that succeeds instantly without touching the network. */
     static class FakeCoordinator extends UpdateCoordinator {
         FakeCoordinator() {
             super(new UpdateLayout(Path.of("build", "test-data", "fake-install")),
@@ -188,7 +183,6 @@ class UpdateIndicatorTest {
     void autoDownloadMenuPersists() throws Exception {
         assertTrue(autoDownloadMenuItem.isSelected(), "auto-download should default to on");
 
-        // A real menu click toggles the check state and then fires the action.
         Platform.runLater(() -> {
             autoDownloadMenuItem.setSelected(false);
             autoDownloadMenuItem.fire();
@@ -199,7 +193,6 @@ class UpdateIndicatorTest {
         assertEquals("false", new PreferenceServiceImpl()
                 .getPreferencesByCode(UpdatePreferences.AUTO_DOWNLOAD).orElse(null));
 
-        // Restore for other tests sharing the database.
         Platform.runLater(() -> {
             autoDownloadMenuItem.setSelected(true);
             autoDownloadMenuItem.fire();

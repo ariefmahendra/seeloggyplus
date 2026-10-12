@@ -1,6 +1,4 @@
 package com.seeloggyplus.features.update.application;
-
-
 
 import com.seeloggyplus.features.update.domain.UpdateCheckResult;
 import com.seeloggyplus.features.update.domain.AppVersion;
@@ -18,10 +16,6 @@ class UpdateServiceImplTest {
 
     @Test
     void defaultManifestUrlUsesTheUncachedLatestReleaseEndpoint() {
-        // raw.githubusercontent.com serves the manifest with Cache-Control: max-age=300,
-        // so a release published moments ago stayed invisible to update checks. The
-        // latest-release download endpoint is not cached and always resolves to the
-        // manifest attached to the newest release.
         String url = UpdateServiceImpl.DEFAULT_MANIFEST_URL;
         assertTrue(url.startsWith("https://github.com/"), url);
         assertTrue(url.contains("/releases/latest/download/"), url);

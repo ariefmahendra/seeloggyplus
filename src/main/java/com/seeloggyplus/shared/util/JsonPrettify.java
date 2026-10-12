@@ -11,10 +11,6 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Service for prettifying and formatting JSON strings using Jackson Databind.
- * Provides robust JSON validation, formatting, extraction, and minification.
- */
 public class JsonPrettify {
 
     private static final Logger logger = LoggerFactory.getLogger(JsonPrettify.class);
@@ -29,16 +25,10 @@ public class JsonPrettify {
         PRETTY_WRITER = MAPPER.writer(defaultPrinter);
     }
 
-    /**
-     * Prettify JSON string with default 2-space indentation.
-     */
     public static String prettify(String json) {
         return prettify(json, 2);
     }
 
-    /**
-     * Prettify JSON with custom indentation.
-     */
     public static String prettify(String json, int indent) {
         if (json == null || json.trim().isEmpty()) {
             return json;
@@ -64,9 +54,6 @@ public class JsonPrettify {
         }
     }
 
-    /**
-     * Minify JSON string (remove whitespace).
-     */
     public static String minify(String json) {
         if (json == null || json.trim().isEmpty()) {
             return json;
@@ -84,9 +71,6 @@ public class JsonPrettify {
         }
     }
 
-    /**
-     * Validate if string is a valid JSON Object or Array.
-     */
     public static boolean isValidJson(String json) {
         if (json == null || json.trim().isEmpty()) {
             return false;
@@ -100,25 +84,15 @@ public class JsonPrettify {
         }
     }
 
-    /**
-     * Extract the first valid JSON Object or Array from text.
-     */
     public static String extractJson(String text) {
         JsonRegion region = findFirstJsonRegion(text, 0);
         return region != null ? region.jsonText : null;
     }
 
-    /**
-     * Check if text contains a valid JSON Object or Array.
-     */
     public static boolean containsJson(String text) {
         return extractJson(text) != null;
     }
 
-    /**
-     * Format and prettify all JSON blocks found inside a log message,
-     * preserving surrounding log prefixes, timestamps, and suffixes.
-     */
     public static String prettifyFromLog(String logMessage) {
         if (logMessage == null || logMessage.trim().isEmpty()) {
             return logMessage;
@@ -149,9 +123,6 @@ public class JsonPrettify {
         return sb.toString();
     }
 
-    /**
-     * Get JSON validation error message, or null if valid.
-     */
     public static String getValidationError(String json) {
         if (json == null || json.trim().isEmpty()) {
             return "JSON string is empty";
@@ -199,7 +170,6 @@ public class JsonPrettify {
                             } else if (token == JsonToken.END_OBJECT || token == JsonToken.END_ARRAY) {
                                 depth--;
                                 if (depth == 0) {
-                                    // Matched the root object/array
                                     long consumed = parser.getCurrentLocation().getCharOffset();
                                     if (consumed > 0 && consumed <= candidateSub.length()) {
                                         int endIdx = i + (int) consumed;
@@ -215,7 +185,6 @@ public class JsonPrettify {
                         }
                     }
                 } catch (Exception ignored) {
-                    // Not valid JSON start, keep searching
                 }
             }
         }

@@ -73,7 +73,6 @@ class MainStartupTest {
         assertEquals(AppTheme.Theme.GRAPHITE, AppTheme.getTheme(),
                 "The theme must be applied on the JavaFX thread, not in init()");
 
-        // A failing query service proves start() consumes the prepared snapshot.
         var field = Main.class.getDeclaredField("preferenceService");
         field.setAccessible(true);
         var preparedService = new PreferenceServiceImpl() {

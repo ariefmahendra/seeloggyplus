@@ -6,11 +6,6 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- * The installation root must be resolved from a known location, and must fold the
- * blue/green {@code versions/<v>} directory back to the real install root so
- * subsequent updates do not stage/activate in the wrong folder.
- */
 class UpdateLayoutTest {
 
     @Test

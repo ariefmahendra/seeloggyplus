@@ -10,16 +10,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.function.Function;
 
-/**
- * Default {@link UpdateService}. The manifest is fetched over HTTPS and parsed.
- * The fetcher is injectable so tests can run fully offline.
- */
 public class UpdateServiceImpl implements UpdateService {
 
-    // The latest-release download endpoint resolves to the manifest attached to the
-    // newest release and is served with Cache-Control: no-cache. The gh-pages raw
-    // endpoint must not be used: it is cached for five minutes, so a release
-    // published moments ago could stay invisible to update checks.
     public static final String DEFAULT_MANIFEST_URL =
             "https://github.com/ariefmahendra/seeloggyplus/releases/latest/download/update-manifest.json";
 

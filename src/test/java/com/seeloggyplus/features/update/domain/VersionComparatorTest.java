@@ -36,7 +36,7 @@ class VersionComparatorTest {
     void prereleaseIdentifiersFollowSemver() {
         assertTrue(VersionComparator.compare("1.0.0-alpha", "1.0.0-beta") < 0);
         assertTrue(VersionComparator.compare("1.0.0-beta.2", "1.0.0-beta.1") > 0);
-        assertTrue(VersionComparator.compare("1.0.0-1", "1.0.0-alpha") < 0); // numeric < alphanumeric
+        assertTrue(VersionComparator.compare("1.0.0-1", "1.0.0-alpha") < 0);
     }
 
     @Test

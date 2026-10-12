@@ -23,11 +23,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * The drag-and-drop target highlight in the location tree must not change the
- * cell size (no border that makes rows jump while dragging) yet must stay
- * clearly visible.
- */
 @ExtendWith(ApplicationExtension.class)
 class TreeDropIndicatorTest {
 

@@ -14,10 +14,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Covers the server-list organisation features: favorite flag, explicit
- * ordering and grouping.
- */
 class ServerOrganizationTest {
 
     private ServerManagementService service;

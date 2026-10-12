@@ -32,11 +32,6 @@ import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Regression: the toolbar Clear button must empty the log view of the ACTIVE
- * tab. It used to clean only controller-level fields, leaving the session's
- * canvas (reader/index/tail buffer) untouched, so the lines stayed visible.
- */
 @ExtendWith(ApplicationExtension.class)
 class ClearActiveLogViewTest {
 
@@ -195,7 +190,6 @@ class ClearActiveLogViewTest {
         }
     }
 
-    /** Minimal SSH double: captures the stream consumer and counts stop requests. */
     private static class MockTailSSHService extends SSHServiceImpl {
         Consumer<String> lineConsumer;
         int stopCalls;

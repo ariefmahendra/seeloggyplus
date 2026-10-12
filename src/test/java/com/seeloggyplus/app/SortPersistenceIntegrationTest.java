@@ -17,7 +17,6 @@ import com.seeloggyplus.shared.dto.RemoteFileInfo;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.stage.Stage;
@@ -27,7 +26,6 @@ import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
 
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -37,10 +35,6 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 import javafx.concurrent.Task;
 
-/**
- * Unit tests for sort persistence save/restore integration.
- * Validates: Requirements 1.1, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 4.1, 4.2
- */
 @ExtendWith(ApplicationExtension.class)
 public class SortPersistenceIntegrationTest {
 
@@ -70,7 +64,6 @@ public class SortPersistenceIntegrationTest {
         setField(controller, "favoriteFolderService", new StubFavoriteFolderService());
         setField(controller, "sshServiceFactory", (SSHServiceFactory) StubSSHService::new);
 
-        // Clear directory cache
         Map<?, ?> cache = getField("directoryCache");
         cache.clear();
 
@@ -83,17 +76,11 @@ public class SortPersistenceIntegrationTest {
         });
     }
 
-    // -------------------------------------------------------------------------
-    // Test: save on column sort change
-    // -------------------------------------------------------------------------
-
     @Test
     @DisplayName("saveSortOrdering() persists correct key and encoded value on sort change")
     void saveOnColumnSortChange() throws Exception {
-        // Set local location (no server)
         setLocalLocation();
 
-        // Simulate sort by nameColumn ASCENDING
         Platform.runLater(() -> {
             TableColumn<FileInfo, ?> nameCol = findColumn("nameColumn");
             assertNotNull(nameCol, "nameColumn must exist");
@@ -102,7 +89,6 @@ public class SortPersistenceIntegrationTest {
         });
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Verify preference was saved
         String saved = mockPrefs.store.get("file_manager_sort_local");
         assertEquals("nameColumn:ASCENDING", saved);
     }
@@ -123,45 +109,31 @@ public class SortPersistenceIntegrationTest {
         assertEquals("modifiedColumn:DESCENDING", mockPrefs.store.get("file_manager_sort_local"));
     }
 
-    // -------------------------------------------------------------------------
-    // Test: restore on loadFiles
-    // -------------------------------------------------------------------------
-
     @Test
     @DisplayName("restoreSortOrdering() applies saved preference to fileTable sort order")
     void restoreAppliesSavedPreference() throws Exception {
         setLocalLocation();
         mockPrefs.store.put("file_manager_sort_local", "sizeColumn:DESCENDING");
 
-        // Invoke restoreSortOrdering
         runOnFxAndWait(() -> invoke("restoreSortOrdering"));
 
-        // Verify sort order
         assertEquals(1, fileTable.getSortOrder().size());
         TableColumn<FileInfo, ?> col = fileTable.getSortOrder().get(0);
         assertEquals("sizeColumn", col.getId());
         assertEquals(TableColumn.SortType.DESCENDING, col.getSortType());
     }
 
-    // -------------------------------------------------------------------------
-    // Test: fallback when no preference exists
-    // -------------------------------------------------------------------------
-
     @Test
     @DisplayName("restoreSortOrdering() falls back to empty sort order when no preference exists")
     void fallbackWhenNoPreference() throws Exception {
         setLocalLocation();
-        // No preference stored — store is empty
 
-        // Pre-set a sort order so we can verify it gets cleared
         Platform.runLater(() -> {
             TableColumn<FileInfo, ?> nameCol = findColumn("nameColumn");
             fileTable.getSortOrder().setAll(nameCol);
         });
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Now restore — should clear
-        // ponytail: suppress the listener from saving during this test
         mockPrefs.store.clear();
         runOnFxAndWait(() -> invoke("restoreSortOrdering"));
 
@@ -190,14 +162,9 @@ public class SortPersistenceIntegrationTest {
         assertTrue(fileTable.getSortOrder().isEmpty());
     }
 
-    // -------------------------------------------------------------------------
-    // Test: location isolation
-    // -------------------------------------------------------------------------
-
     @Test
     @DisplayName("Local and remote locations use different sort keys")
     void locationIsolation() throws Exception {
-        // Save local sort
         setLocalLocation();
         Platform.runLater(() -> {
             TableColumn<FileInfo, ?> nameCol = findColumn("nameColumn");
@@ -206,7 +173,6 @@ public class SortPersistenceIntegrationTest {
         });
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Save remote sort (different column & direction)
         setRemoteLocation("prod-web");
         Platform.runLater(() -> {
             TableColumn<FileInfo, ?> sizeCol = findColumn("sizeColumn");
@@ -215,18 +181,15 @@ public class SortPersistenceIntegrationTest {
         });
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Verify both stored independently
         assertEquals("nameColumn:ASCENDING", mockPrefs.store.get("file_manager_sort_local"));
         assertEquals("sizeColumn:DESCENDING", mockPrefs.store.get("file_manager_sort_prod-web"));
 
-        // Restore local — should get nameColumn ASCENDING
         setLocalLocation();
         runOnFxAndWait(() -> invoke("restoreSortOrdering"));
         assertEquals(1, fileTable.getSortOrder().size());
         assertEquals("nameColumn", fileTable.getSortOrder().get(0).getId());
         assertEquals(TableColumn.SortType.ASCENDING, fileTable.getSortOrder().get(0).getSortType());
 
-        // Restore remote — should get sizeColumn DESCENDING
         setRemoteLocation("prod-web");
         runOnFxAndWait(() -> invoke("restoreSortOrdering"));
         assertEquals(1, fileTable.getSortOrder().size());
@@ -234,17 +197,12 @@ public class SortPersistenceIntegrationTest {
         assertEquals(TableColumn.SortType.DESCENDING, fileTable.getSortOrder().get(0).getSortType());
     }
 
-    // -------------------------------------------------------------------------
-    // Test: error resilience — no exception propagates on save failure
-    // -------------------------------------------------------------------------
-
     @Test
     @DisplayName("No exception propagates when PreferenceService throws on save")
     void noExceptionOnSaveFailure() throws Exception {
         setLocalLocation();
         mockPrefs.throwOnSave = true;
 
-        // Should not throw
         assertDoesNotThrow(() -> {
             Platform.runLater(() -> {
                 TableColumn<FileInfo, ?> nameCol = findColumn("nameColumn");
@@ -262,13 +220,9 @@ public class SortPersistenceIntegrationTest {
         mockPrefs.throwOnGet = true;
 
         assertDoesNotThrow(() -> runOnFxAndWait(() -> invoke("restoreSortOrdering")));
-        // Should fall back to empty sort order
+
         assertTrue(fileTable.getSortOrder().isEmpty());
     }
-
-    // =========================================================================
-    // Helpers
-    // =========================================================================
 
     @SuppressWarnings("unchecked")
     private <T> T getField(String name) throws Exception {
@@ -309,11 +263,6 @@ public class SortPersistenceIntegrationTest {
             .findFirst().orElse(null);
     }
 
-    /**
-     * The @Start FXML load triggers an async directory load that may complete after
-     * this test replaces services, clearing the sort order and overwriting the
-     * preference store mid-test. Cancel and drain it first for deterministic state.
-     */
     private void drainPendingLoadTaskBeforeStateSetup() throws Exception {
         Field taskField = UnifiedFileManagerDialogController.class.getDeclaredField("currentLoadTask");
         taskField.setAccessible(true);
@@ -354,11 +303,6 @@ public class SortPersistenceIntegrationTest {
         return cls.getDeclaredMethod("of", SSHServerModel.class).invoke(null, server);
     }
 
-    // =========================================================================
-    // Stubs
-    // =========================================================================
-
-    /** In-memory PreferenceService with optional throw behavior */
     static class InMemoryPreferenceService implements PreferenceService {
         final Map<String, String> store = new HashMap<>();
         boolean throwOnSave = false;

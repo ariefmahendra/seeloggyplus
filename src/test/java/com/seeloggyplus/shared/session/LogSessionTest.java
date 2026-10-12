@@ -51,12 +51,10 @@ class LogSessionTest {
         session.addUnreadTailLines(5);
         assertEquals(15, session.getUnreadTailLines());
 
-        // Becoming active automatically resets unread count
         session.setActive(true);
         assertTrue(session.isActive());
         assertEquals(0, session.getUnreadTailLines());
 
-        // Background lines arriving while active: if marked dormant again
         session.setActive(false);
         session.addUnreadTailLines(20);
         assertEquals(20, session.getUnreadTailLines());
@@ -130,7 +128,6 @@ class LogSessionTest {
         assertEquals(0, session.getTailBuffer().size());
         assertNull(session.getFilteredIndexes());
 
-        // Idempotent close - subsequent call should not throw exception
         assertDoesNotThrow(session::close);
     }
 }

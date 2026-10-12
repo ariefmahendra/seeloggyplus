@@ -29,19 +29,13 @@ import com.seeloggyplus.shared.ui.SelectionColors;
 import javafx.geometry.Orientation;
 import javafx.scene.layout.Pane;
 
-/**
- * Canvas-based search result panel.
- * Renders matched lines with highlight, supports click-to-jump.
- */
 public class SearchResultPanel extends VBox {
 
-    // Rendering constants — match CanvasLogViewer style
     private static final int LINE_HEIGHT = 18;
     private static final int PADDING = 4;
     private static final Font MONO_FONT = Font.font("Consolas", FontWeight.NORMAL, 12);
     private static final Font LINE_NUM_FONT = Font.font("Consolas", FontWeight.NORMAL, 10);
 
-    // Palette — swapped at runtime between light and dark (Canvas ignores CSS)
     private Color bgColor;
     private Color textColor;
     private Color lineNumColor;
@@ -58,9 +52,8 @@ public class SearchResultPanel extends VBox {
     private final ScrollBar hScrollBar;
     private final double charWidth;
 
-    // Data
-    private IntArrayList matchedLines;   // global line indexes
-    private String[] lineCache;          // cached line content (preview)
+    private IntArrayList matchedLines;
+    private String[] lineCache;
     private int itemCount = 0;
     private long currentTopLine = 0;
     private double currentScrollX = 0;
@@ -69,10 +62,8 @@ public class SearchResultPanel extends VBox {
     private int hoveredIndex = -1;
     private int leftMargin = 60;
 
-    // Search highlight
     private Pattern searchPattern;
 
-    // Callbacks
     private SearchHitCallback onLineSelected;
     private LongFunction<String> lineContentResolver;
 
@@ -82,7 +73,6 @@ public class SearchResultPanel extends VBox {
     }
 
     public SearchResultPanel() {
-        // Measure char width
         Text measure = new Text("M");
         measure.setFont(MONO_FONT);
         charWidth = measure.getLayoutBounds().getWidth();
@@ -122,13 +112,10 @@ public class SearchResultPanel extends VBox {
             }
         });
 
-        // Layout: canvas + scrollbar in a GridPane
-        // Wrap canvas in a Pane so it resizes with layout
         Pane canvasHolder = new Pane(canvas);
         canvasHolder.setMinSize(0, 0);
         canvasHolder.setPrefSize(0, 0);
 
-        // Bind canvas to holder size
         canvas.widthProperty().bind(canvasHolder.widthProperty());
         canvas.heightProperty().bind(canvasHolder.heightProperty());
 
@@ -154,7 +141,6 @@ public class SearchResultPanel extends VBox {
         setVisible(false);
         setManaged(false);
 
-        // Resize handling — re-render and update scroll when canvas size changes
         canvas.widthProperty().addListener((obs, o, n) -> render());
         canvas.heightProperty().addListener((obs, o, n) -> {
             visibleLineCount = Math.max(1, (int) (n.doubleValue() / LINE_HEIGHT));
@@ -248,7 +234,6 @@ public class SearchResultPanel extends VBox {
         this.selectedIndex = -1;
         this.currentTopLine = 0;
 
-        // Compute left margin based on max line number width
         int maxLineNum = matchedIndexes.get(itemCount - 1) + 1;
         int digits = String.valueOf(maxLineNum).length();
         leftMargin = (int) (digits * charWidth + 16);
@@ -274,15 +259,10 @@ public class SearchResultPanel extends VBox {
         setManaged(false);
     }
 
-    /**
-     * Trim the first {@code count} entries from the result set (used when tail buffer
-     * is trimmed to stay within size limits).
-     */
     public void trimFromStart(int count) {
         if (matchedLines == null || count <= 0) return;
         int removeCount = Math.min(count, itemCount);
 
-        // Build new matchedLines without the first removeCount entries
         IntArrayList trimmed = new IntArrayList();
         for (int i = removeCount; i < itemCount; i++) {
             trimmed.add(matchedLines.get(i));
@@ -290,7 +270,6 @@ public class SearchResultPanel extends VBox {
         matchedLines = trimmed;
         itemCount = matchedLines.size();
 
-        // Rebuild line cache
         String[] newCache = new String[itemCount];
         if (lineCache != null && lineCache.length > removeCount) {
             System.arraycopy(lineCache, removeCount, newCache, 0,
@@ -298,13 +277,11 @@ public class SearchResultPanel extends VBox {
         }
         lineCache = newCache;
 
-        // Adjust selection
         if (selectedIndex >= 0) {
             selectedIndex -= removeCount;
             if (selectedIndex < 0) selectedIndex = -1;
         }
 
-        // Adjust scroll position
         currentTopLine = Math.max(0, currentTopLine - removeCount);
 
         headerLabel.setText(itemCount + " results");
@@ -312,16 +289,11 @@ public class SearchResultPanel extends VBox {
         render();
     }
 
-    /**
-     * Sync panel state with the shared matchedLines reference (used when the caller
-     * has already added entries directly to the IntArrayList that was passed to showResults).
-     */
     public void syncItemCount() {
         if (matchedLines == null) return;
         int newCount = matchedLines.size();
         if (newCount == itemCount) return;
 
-        // Expand line cache
         if (lineCache == null || lineCache.length < newCount) {
             String[] newCache = new String[newCount];
             if (lineCache != null) {
@@ -345,7 +317,7 @@ public class SearchResultPanel extends VBox {
     public void selectIndex(int index) {
         if (index >= 0 && index < itemCount) {
             selectedIndex = index;
-            // Ensure visible
+
             if (index < currentTopLine) {
                 currentTopLine = index;
                 vScrollBar.setValue(currentTopLine);
@@ -369,9 +341,8 @@ public class SearchResultPanel extends VBox {
         vScrollBar.setVisibleAmount(safeVisibleAmount);
         vScrollBar.setBlockIncrement(Math.max(1, visibleLineCount - 1));
 
-        // Horizontal scrollbar — estimate max content width
         double visibleWidth = canvas.getWidth() - leftMargin;
-        double maxLineWidth = 500 * charWidth; // max cached line length
+        double maxLineWidth = 500 * charWidth;
         double maxScroll = Math.max(0, maxLineWidth - visibleWidth);
         hScrollBar.setMax(maxScroll);
         hScrollBar.setVisibleAmount(visibleWidth);
@@ -387,7 +358,6 @@ public class SearchResultPanel extends VBox {
                 long globalIdx = matchedLines.get(matchIndex);
                 String full = lineContentResolver.apply(globalIdx);
                 if (full != null) {
-                    // Limit to 500 chars for rendering performance
                     lineCache[matchIndex] = full.length() > 500 ? full.substring(0, 500) : full;
                     return lineCache[matchIndex];
                 }
@@ -409,7 +379,6 @@ public class SearchResultPanel extends VBox {
 
         int linesToRender = visibleLineCount + 1;
 
-        // Clip content area (right of line numbers)
         gc.save();
         gc.beginPath();
         gc.rect(leftMargin, 0, width - leftMargin, height);
@@ -427,33 +396,29 @@ public class SearchResultPanel extends VBox {
             String line = getLineContent(matchIdx);
             double drawX = leftMargin - currentScrollX;
 
-            // Hover background
             if (matchIdx == hoveredIndex && matchIdx != selectedIndex) {
                 gc.setFill(hoverColor);
                 gc.fillRect(leftMargin, y, width - leftMargin, LINE_HEIGHT);
             }
 
-            // Selection background
             if (matchIdx == selectedIndex) {
                 gc.setFill(selectionColor);
                 gc.fillRect(leftMargin, y, width - leftMargin, LINE_HEIGHT);
             }
 
-            // Search highlight
             if (searchPattern != null && !line.isEmpty()) {
                 gc.setFill(highlightBg);
                 Matcher m = searchPattern.matcher(line);
                 while (m.find()) {
                     double startX = drawX + m.start() * charWidth;
                     double hlWidth = (m.end() - m.start()) * charWidth;
-                    // Skip if entirely off-screen
+
                     if (startX + hlWidth < leftMargin) continue;
                     if (startX > width) break;
                     gc.fillRect(startX, y, hlWidth, LINE_HEIGHT);
                 }
             }
 
-            // Text content — only visible portion
             int visStart = Math.max(0, (int) ((leftMargin - drawX) / charWidth));
             int visEnd = Math.min(line.length(), (int) ((width - drawX) / charWidth) + 1);
             if (visStart < visEnd && visEnd > 0) {
@@ -463,7 +428,6 @@ public class SearchResultPanel extends VBox {
         }
         gc.restore();
 
-        // Line number gutter
         gc.setFill(lineNumBg);
         gc.fillRect(0, 0, leftMargin - 4, height);
         gc.setFont(LINE_NUM_FONT);
@@ -498,7 +462,6 @@ public class SearchResultPanel extends VBox {
         canvas.setOnScroll(e -> {
             if (itemCount == 0) return;
 
-            // Shift+scroll or horizontal scroll → horizontal
             if (e.isShiftDown() || Math.abs(e.getDeltaX()) > Math.abs(e.getDeltaY())) {
                 double delta = e.getDeltaX() != 0 ? e.getDeltaX() : e.getDeltaY();
                 double newX = currentScrollX - delta;
@@ -509,7 +472,6 @@ public class SearchResultPanel extends VBox {
                     render();
                 }
             } else {
-                // Vertical scroll
                 double delta = -Math.round(e.getDeltaY() / 40.0) * 3;
                 long newTop = (long) (currentTopLine + delta);
                 long maxTop = Math.max(0, itemCount - visibleLineCount);

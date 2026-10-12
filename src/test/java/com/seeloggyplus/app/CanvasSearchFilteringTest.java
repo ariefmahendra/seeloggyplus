@@ -10,7 +10,6 @@ import com.seeloggyplus.shared.util.IntArrayList;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
@@ -63,7 +62,6 @@ public class CanvasSearchFilteringTest {
             assertEquals(5, viewer.getItemCount(), "Initial item count should be 5");
             assertNull(viewer.getFilteredIndexes(), "Filtered indexes should initially be null");
 
-            // Filter lines matching "ERROR" (indices 1 and 3)
             IntArrayList filtered = new IntArrayList();
             filtered.add(1);
             filtered.add(3);
@@ -74,18 +72,15 @@ public class CanvasSearchFilteringTest {
             assertNotNull(viewer.getFilteredIndexes(), "getFilteredIndexes must not be null when filtered");
             assertEquals(2, viewer.getFilteredIndexes().size());
 
-            // Jump to line in filtered view
             viewer.jumpToLine(0);
             assertEquals(0, viewer.getSelectedIndex());
 
             viewer.jumpToLine(1);
             assertEquals(1, viewer.getSelectedIndex());
 
-            // Append new match
             viewer.appendToFilter(4);
             assertEquals(3, viewer.getItemCount(), "Item count should increase to 3 after appendToFilter");
 
-            // Clear filter
             viewer.clearFilter();
             assertNull(viewer.getFilteredIndexes(), "Filtered indexes must be null after clearFilter");
             assertEquals(5, viewer.getItemCount(), "Item count must restore to 5 after clearFilter");
@@ -129,7 +124,6 @@ public class CanvasSearchFilteringTest {
             }
         });
 
-        // Wait for search thread pool to complete
         WaitForAsyncUtils.sleep(500, TimeUnit.MILLISECONDS);
         WaitForAsyncUtils.waitForFxEvents();
 
@@ -147,7 +141,6 @@ public class CanvasSearchFilteringTest {
                 assertNotNull(panel);
                 assertEquals(2, panel.getItemCount(), "Panel should contain 2 matches");
 
-                // Clear search
                 Method clearSearchMethod = MainController.class.getDeclaredMethod("clearSearch");
                 clearSearchMethod.setAccessible(true);
                 clearSearchMethod.invoke(controller);
@@ -193,7 +186,6 @@ public class CanvasSearchFilteringTest {
                 Method onActiveSessionChangedMethod = MainController.class.getDeclaredMethod("onActiveSessionChanged", LogSession.class);
                 onActiveSessionChangedMethod.setAccessible(true);
 
-                // Activate session 1 and search "ERROR"
                 onActiveSessionChangedMethod.invoke(controller, session1);
                 Field searchFieldRef = MainController.class.getDeclaredField("searchField");
                 searchFieldRef.setAccessible(true);
@@ -213,25 +205,20 @@ public class CanvasSearchFilteringTest {
 
         Platform.runLater(() -> {
             try {
-                // Session 1 should display all 3 lines in canvas and have highlight
                 assertEquals(3, session1.getCanvasLogViewer().getItemCount());
                 assertEquals(3, session1.getCanvasLogViewer().getTotalLines());
                 assertTrue(session1.getCanvasLogViewer().hasSearchHighlight());
 
-                // Switch to session 2
                 Method onActiveSessionChangedMethod = MainController.class.getDeclaredMethod("onActiveSessionChanged", LogSession.class);
                 onActiveSessionChangedMethod.setAccessible(true);
                 onActiveSessionChangedMethod.invoke(controller, session2);
 
-                // Session 2 should have all 2 lines and no highlight
                 assertEquals(2, session2.getCanvasLogViewer().getItemCount());
                 assertEquals(2, session2.getCanvasLogViewer().getTotalLines());
                 assertFalse(session2.getCanvasLogViewer().hasSearchHighlight());
 
-                // Switch back to session 1
                 onActiveSessionChangedMethod.invoke(controller, session1);
 
-                // Session 1 should preserve all 3 lines and restore highlight
                 assertEquals(3, session1.getCanvasLogViewer().getItemCount());
                 assertEquals(3, session1.getCanvasLogViewer().getTotalLines());
                 assertTrue(session1.getCanvasLogViewer().hasSearchHighlight());
@@ -277,7 +264,6 @@ public class CanvasSearchFilteringTest {
             }
         });
 
-        // Wait for file indexing
         WaitForAsyncUtils.sleep(1000, TimeUnit.MILLISECONDS);
         WaitForAsyncUtils.waitForFxEvents();
 
@@ -288,7 +274,6 @@ public class CanvasSearchFilteringTest {
                 assertEquals(5, viewer.getTotalLines(), "Indexed file should have 5 lines");
                 assertEquals(5, viewer.getItemCount());
 
-                // Set search field to "ERROR" and perform search
                 Field searchFieldRef = MainController.class.getDeclaredField("searchField");
                 searchFieldRef.setAccessible(true);
                 TextField searchField = (TextField) searchFieldRef.get(controller);
@@ -302,7 +287,6 @@ public class CanvasSearchFilteringTest {
             }
         });
 
-        // Wait for parallel search task to complete
         WaitForAsyncUtils.sleep(1000, TimeUnit.MILLISECONDS);
         WaitForAsyncUtils.waitForFxEvents();
 
@@ -319,7 +303,6 @@ public class CanvasSearchFilteringTest {
                 assertNotNull(panel);
                 assertEquals(2, panel.getItemCount(), "Panel shows 2 matches");
 
-                // Clear search
                 Method clearSearchMethod = MainController.class.getDeclaredMethod("clearSearch");
                 clearSearchMethod.setAccessible(true);
                 clearSearchMethod.invoke(controller);

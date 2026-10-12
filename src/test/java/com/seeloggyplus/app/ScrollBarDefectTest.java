@@ -22,10 +22,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Defect fixes: scrollbar step buttons (up/down) must be clickable, and the
- * Find in Files scrollbars must be easy to grab.
- */
 @ExtendWith(ApplicationExtension.class)
 class ScrollBarDefectTest {
 

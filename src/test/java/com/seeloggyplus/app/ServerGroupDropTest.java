@@ -7,11 +7,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Verifies the drag-and-drop targeting rules of the File Management location
- * tree: dropping a server onto a group folder, onto another server, onto the
- * root area (ungrouped) or onto Local Drive.
- */
 class ServerGroupDropTest {
 
     private SSHServerModel server(String name, String group) {

@@ -22,41 +22,25 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Singleton implementation of {@link SSHSessionManager}.
- * <p>
- * Manages a pool of SSH sessions with TTL-based expiration and automatic
- * cleanup.
- */
 public class SSHSessionManagerImpl implements SSHSessionManager {
 
     private static final Logger logger = LoggerFactory.getLogger(SSHSessionManagerImpl.class);
     private static final SSHSessionManagerImpl INSTANCE = new SSHSessionManagerImpl();
 
     private final Map<String, ManagedSession> sessionPool = new ConcurrentHashMap<>();
-    /** Host keys seen but not yet trusted, keyed by {@code host:port}. */
+
     private final Map<String, HostKey> pendingHostKeys = new ConcurrentHashMap<>();
     private PreferenceService preferenceService;
 
-    /**
-     * Private constructor for Singleton.
-     * Initializes the cleanup scheduler.
-     */
     private SSHSessionManagerImpl() {
         ScheduledExecutorService cleanupScheduler = Executors.newSingleThreadScheduledExecutor();
         cleanupScheduler.scheduleAtFixedRate(this::cleanupExpiredSessions, 1, 1, TimeUnit.MINUTES);
     }
 
-    /** Wires the preference port used for connection tuning. */
     public void setPreferenceService(PreferenceService preferenceService) {
         this.preferenceService = preferenceService;
     }
 
-    /**
-     * Retrieves the singleton instance.
-     *
-     * @return The singleton instance.
-     */
     public static SSHSessionManagerImpl getInstance() {
         return INSTANCE;
     }
@@ -72,7 +56,7 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
             SshAuthConfig authConfig) throws JSchException {
         SshAuthConfig auth = authConfig == null ? SshAuthConfig.password() : authConfig;
         String baseKey = generateKey(host, port, username);
-        // Key-based sessions never share a pool entry with password sessions.
+
         String key = auth.type() == SshAuthConfig.AuthType.KEY
                 ? baseKey + "#key:" + (auth.keyPath() == null ? "" : auth.keyPath())
                 : baseKey;
@@ -111,8 +95,6 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
             config.put("PreferredAuthentications", "password,keyboard-interactive");
         }
 
-        // Host keys are verified manually right after login so we can surface the
-        // fingerprint and ask the user before trusting a new host.
         config.put("StrictHostKeyChecking", "no");
         config.put("cipher.s2c", "aes128-ctr,aes192-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com");
         config.put("cipher.c2s", "aes128-ctr,aes192-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com");
@@ -120,13 +102,12 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
         config.put("compression.c2s", "none,zlib@openssh.com");
         config.put("MaxAuthTries", "3");
 
-        session.setServerAliveInterval(60 * 1000); // 60 seconds
+        session.setServerAliveInterval(60 * 1000);
         session.setServerAliveCountMax(3);
 
         session.setConfig(config);
 
-        // Get timeout from preferences (in seconds), convert to milliseconds
-        int timeoutSeconds = 60; // default
+        int timeoutSeconds = 60;
         try {
             String timeoutStr = preferenceService == null
                     ? "60"
@@ -143,7 +124,6 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
         return session;
     }
 
-    /** Manual trust-on-first-use check (StrictHostKeyChecking=no + explicit verify). */
     private void verifyHostKey(Session session, HostKeyRepository knownHosts, String host, int port) {
         HostKey hostKey = session.getHostKey();
         int status = SshKnownHosts.check(knownHosts, host, hostKey);
@@ -212,9 +192,6 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
         });
     }
 
-    /**
-     * Inner class to wrap Session with metadata.
-     */
     private static class ManagedSession {
         @Getter
         private final Session session;

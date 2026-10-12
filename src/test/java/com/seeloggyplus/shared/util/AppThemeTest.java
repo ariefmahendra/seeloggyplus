@@ -1,5 +1,4 @@
 package com.seeloggyplus.shared.util;
-
 
 import com.seeloggyplus.shared.ui.AppTheme;
 import javafx.application.Platform;
@@ -81,9 +80,6 @@ class AppThemeTest {
             stage.setScene(scene);
             stage.show();
 
-            // Simulate hot-reload temp copies. Their names contain the source
-            // basename but NOT the ".css" extension (regression: a stale dark
-            // copy previously stayed applied, leaving components dark).
             scene.getStylesheets().add("file:/tmp/seeloggy-hotreload-theme-dark-123.css");
             scene.getStylesheets().add("file:/tmp/theme-dark-hot reload.css");
 

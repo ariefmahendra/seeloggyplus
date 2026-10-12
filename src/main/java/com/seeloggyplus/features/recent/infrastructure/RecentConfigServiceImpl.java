@@ -12,30 +12,15 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Implementation of {@link RecentFileService}.
- * <p>
- * Manages the business logic for tracking recently opened files,
- * delegating persistence to {@link RecentFileRepository}.
- */
 public class RecentConfigServiceImpl implements RecentFileService {
 
     private static final Logger logger = LoggerFactory.getLogger(RecentConfigServiceImpl.class);
     private final RecentFileRepository recentFileRepository;
 
-    /**
-     * Default constructor.
-     * Initializes with the default repository implementation.
-     */
     public RecentConfigServiceImpl() {
         this(new RecentFileRepositoryImpl());
     }
 
-    /**
-     * Constructor for dependency injection.
-     *
-     * @param recentFileRepository The repository instance to use.
-     */
     public RecentConfigServiceImpl(RecentFileRepository recentFileRepository) {
         this.recentFileRepository = recentFileRepository;
     }

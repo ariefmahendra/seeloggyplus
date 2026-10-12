@@ -23,10 +23,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Defect fix: horizontal scroll (or Shift+wheel) over the tab header moves the
- * selected tab left/right on the main view.
- */
 @ExtendWith(ApplicationExtension.class)
 class TabScrollSwitchTest {
 
@@ -64,8 +60,6 @@ class TabScrollSwitchTest {
             Node header = pane.lookup(".tab-header-area");
             assertNotNull(header, "tab header area must be available");
 
-            // The handler is throttled (cooldown) so one gesture moves one tab;
-            // wait out the cooldown between separate gestures in the test.
             fireAndWait(header, scrollEvent(40, 0, false));
             assertEquals(1, pane.getSelectionModel().getSelectedIndex(),
                     "scroll right must move to the next tab");
@@ -78,7 +72,6 @@ class TabScrollSwitchTest {
             assertEquals(1, pane.getSelectionModel().getSelectedIndex(),
                     "Shift+wheel over the header must move to the next tab");
 
-            // A burst of small events from a single gesture must not skip tabs.
             int before = pane.getSelectionModel().getSelectedIndex();
             for (int i = 0; i < 5; i++) {
                 Event.fireEvent(header, scrollEvent(8, 0, false));

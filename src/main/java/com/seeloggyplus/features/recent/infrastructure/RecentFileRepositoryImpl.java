@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class RecentFileRepositoryImpl implements RecentFileRepository {
+
     private static final Logger logger = LoggerFactory.getLogger(RecentFileRepositoryImpl.class);
 
     public RecentFileRepositoryImpl() {
@@ -42,7 +43,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 "lf.modified, " +
                 "lf.is_remote, " +
                 "lf.ssh_server_id, " +
-                "ss.name AS server_name, " + // Added server name
+                "ss.name AS server_name, " +
                 "lf.parsing_configuration_id AS parsing_config_id, " +
                 "pc.id AS config_id, " +
                 "pc.name AS config_name, " +
@@ -53,7 +54,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 "FROM recent_files rf " +
                 "JOIN log_files lf ON rf.file_id = lf.id " +
                 "LEFT JOIN parsing_configs pc ON lf.parsing_configuration_id = pc.id " +
-                "LEFT JOIN ssh_servers ss ON lf.ssh_server_id = ss.id " + // Added join
+                "LEFT JOIN ssh_servers ss ON lf.ssh_server_id = ss.id " +
                 "ORDER BY rf.last_opened DESC";
 
         Connection conn = getConnection();
@@ -70,15 +71,12 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
 
     @Override
     public void save(RecentFile recentFile) {
-        // file_id is UNIQUE, so INSERT OR REPLACE updates the existing row (timestamp
-        // and remembered OPEN/TAIL mode) instead of inserting duplicates.
         String sql = "INSERT OR REPLACE INTO recent_files (id, file_id, last_opened, mode) VALUES (?, ?, ?, ?)";
         Connection conn = getConnection();
         try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
             preparedStatement.setString(1, recentFile.getId());
             preparedStatement.setString(2, recentFile.getFileId());
 
-            // Handle null lastOpened with current timestamp as fallback
             String lastOpenedStr = recentFile.getLastOpened() != null
                 ? recentFile.getLastOpened().toString()
                 : LocalDateTime.now().toString();
@@ -114,7 +112,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 "lf.modified, " +
                 "lf.is_remote, " +
                 "lf.ssh_server_id, " +
-                "ss.name AS server_name, " + // Added server name
+                "ss.name AS server_name, " +
                 "lf.parsing_configuration_id AS parsing_config_id, " +
                 "pc.id AS config_id, " +
                 "pc.name AS config_name, " +
@@ -125,7 +123,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
                 "FROM recent_files rf " +
                 "JOIN log_files lf ON rf.file_id = lf.id " +
                 "LEFT JOIN parsing_configs pc ON lf.parsing_configuration_id = pc.id " +
-                "LEFT JOIN ssh_servers ss ON lf.ssh_server_id = ss.id " + // Added join
+                "LEFT JOIN ssh_servers ss ON lf.ssh_server_id = ss.id " +
                 "WHERE rf.id = ?";
 
         Connection conn = getConnection();
@@ -199,12 +197,10 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
     private RecentFilesDto mapRowToRecentFileDto(ResultSet rs) throws SQLException{
         LogFile logFile = new LogFile();
 
-        // Populate LogFile from ResultSet
         logFile.setId(rs.getString("file_id"));
         logFile.setName(rs.getString("file_name"));
         logFile.setFilePath(rs.getString("file_path"));
 
-        // Convert size from bytes to human readable format
         String sizeInBytes = rs.getString("size");
         logFile.setSize(FileUtils.formatFileSize(sizeInBytes));
 
@@ -213,15 +209,12 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
         logFile.setSshServerID(rs.getString("ssh_server_id"));
         logFile.setParsingConfigurationID(rs.getString("parsing_config_id"));
 
-        // Get pre-fetched server name
         String serverName = rs.getString("server_name");
 
-        // Handle ParsingConfig - check if it exists in database (LEFT JOIN may return null)
         ParsingConfig parsingConfig = null;
         String configId = rs.getString("config_id");
 
         if (configId != null && !configId.isEmpty()) {
-            // Config exists - populate it
             parsingConfig = new ParsingConfig();
             parsingConfig.setId(configId);
             parsingConfig.setName(rs.getString("config_name"));
@@ -229,7 +222,6 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
             parsingConfig.setRegexPattern(rs.getString("regex_pattern"));
             parsingConfig.setTimestampFormat(rs.getString("timestamp_format"));
 
-            // IMPORTANT: Validate pattern to extract group names and compile regex
             parsingConfig.validatePattern();
         }
 

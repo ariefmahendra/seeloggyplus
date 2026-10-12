@@ -15,17 +15,12 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/**
- * Extracts a downloaded update zip into a new versioned staging directory.
- * Applies zip-slip protection, a content whitelist and a size cap, then verifies
- * the staged jar checksum. Does not activate the version (that is the bootstrapper's job).
- */
 public class UpdateInstaller {
 
     public record StagedUpdate(Path directory, Path jar, String version) {
     }
 
-    private static final long MAX_TOTAL_BYTES = 2L * 1024 * 1024 * 1024; // 2 GB
+    private static final long MAX_TOTAL_BYTES = 2L * 1024 * 1024 * 1024;
     private static final Set<String> ALLOWED_FILES = Set.of(
             "seeloggyplus.jar",
             "launcher.bat",
@@ -57,14 +52,11 @@ public class UpdateInstaller {
                 temp = null;
             } else {
                 move(contentRoot, target);
-                // The wrapper folder was moved out; remove the now-empty staging directory.
+
                 deleteQuietly(temp);
                 temp = null;
             }
 
-            // The package layout is known (the optional single wrapper folder is
-            // stripped above), so the jar always ends up directly inside the version
-            // directory. Do not walk the tree to look for it.
             Path jar = target.resolve(UpdateLayout.APP_JAR_NAME);
             if (!Files.isRegularFile(jar)) {
                 throw new UpdateException("seeloggyplus.jar not found in update package");
@@ -106,8 +98,7 @@ public class UpdateInstaller {
                 if (normalizedRelative.isBlank()) {
                     continue;
                 }
-                // Directories (including the single wrapper folder) are always allowed;
-                // only files are subject to the content whitelist.
+
                 if (entry.isDirectory()) {
                     Files.createDirectories(out);
                     continue;
@@ -173,11 +164,9 @@ public class UpdateInstaller {
                 try {
                     Files.deleteIfExists(p);
                 } catch (IOException ignored) {
-                    // best effort
                 }
             });
         } catch (IOException ignored) {
-            // best effort
         }
     }
 }

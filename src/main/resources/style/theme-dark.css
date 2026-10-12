@@ -1,22 +1,12 @@
-/* ============================================================
-   SeeLoggyPlus — Dark Theme (Phase 7)
-   ------------------------------------------------------------
-   Overrides the design tokens in theme.css. This stylesheet is
-   loaded AFTER theme.css + components.css, so its `.root` token
-   values win. Popup windows inherit it because it is installed
-   at Scene level (see AppTheme).
-   Dark class on the scene root: `theme-dark`.
-   ============================================================ */
-
 .root {
-    /* ---- Chrome ------------------------------------------------ */
+
     -sl-chrome: #23282d;
     -sl-chrome-hover: #343b42;
     -sl-chrome-pressed: #434b53;
     -sl-chrome-text: #d7dbe0;
     -sl-chrome-text-muted: #a0a8b0;
 
-    /* ---- Accent (lighter graphite for dark surfaces) ----------- */
+
     -sl-brand: #4a535e;
     -sl-brand-hover: #5a636e;
     -sl-brand-pressed: #3a424b;
@@ -24,25 +14,25 @@
     -sl-brand-faint: rgba(120, 132, 144, 0.35);
     -sl-on-brand: #ffffff;
 
-    /* ---- Interaction (hover / selected / pressed / focus) ------ */
+
     -sl-accent: #434b53;
     -sl-accent-hover: #343b42;
     -sl-accent-pressed: #23282d;
     -sl-accent-text: #d7dbe0;
 
-    /* ---- Surfaces ---------------------------------------------- */
+
     -sl-bg: #171a1d;
     -sl-surface: #1e2226;
     -sl-surface-alt: #24292e;
     -sl-surface-sunken: #262b30;
     -sl-overlay: rgba(0, 0, 0, 0.55);
 
-    /* ---- Borders ----------------------------------------------- */
+
     -sl-border: #3a424b;
     -sl-border-soft: #2b3138;
     -sl-border-strong: #4a535e;
 
-    /* ---- Text -------------------------------------------------- */
+
     -sl-text: #d7dbe0;
     -sl-text-secondary: #b8c0c8;
     -sl-text-muted: #9aa3ac;
@@ -54,7 +44,7 @@
     -sl-preview-target: #2a3036;
     -sl-selection-bg: rgba(110, 168, 254, 0.28);
 
-    /* ---- Semantic ---------------------------------------------- */
+
     -sl-success: #4ade80;
     -sl-warning: #fbbf24;
     -sl-danger: #f87171;
@@ -69,13 +59,13 @@
     -sl-chrome-danger: #fca5a5;
     -sl-memory-track: #4a535e;
 
-    /* ---- Scrollbar --------------------------------------------- */
+
     -sl-scroll-track: #1e2226;
     -sl-scroll-thumb: #4a535e;
     -sl-scroll-thumb-hover: #5a636e;
     -sl-scroll-thumb-pressed: #6b7480;
 
-    /* ---- Log levels -------------------------------------------- */
+
     -sl-level-fatal-bg: #3a2426;
     -sl-level-fatal-fg: #ff8a80;
     -sl-level-error-bg: #3a2426;
@@ -94,7 +84,7 @@
     -sl-row-warn-bg: #2e2a1e;
     -sl-row-warn-sel: #3a3420;
 
-    /* ---- Syntax highlighting ----------------------------------- */
+
     -sl-syntax-error: #f87171;
     -sl-syntax-warn: #fbbf24;
     -sl-syntax-info: #6ea8fe;
@@ -117,7 +107,7 @@
     -sl-syntax-xml-decl: #5eead4;
     -sl-syntax-xml-cdata: #f9a8d4;
 
-    /* ---- Modena base so default controls turn dark -------------- */
+
     -fx-base: #2b3138;
     -fx-background: #1e2226;
     -fx-control-inner-background: #262b30;
@@ -129,28 +119,27 @@
     -fx-highlight-fill: -sl-selection-bg;
     -fx-highlight-text-fill: -sl-text;
 
-    /* Selected row/item when the control is NOT focused must stay dark so the
-       theme-coloured text and icons remain visible. */
+
     -fx-selection-bar-non-focused: #2f353c;
     -fx-selection-bar-text: #d7dbe0;
 }
 
-/* Literal component overrides that are not token-driven */
+
 .btn-danger-outline:hover {
     -fx-base: #4a2a28;
 }
 
-/* RichTextFX selection highlight (must match SelectionColors.DARK_BACKGROUND) */
+
 .root.theme-dark .styled-text-area .selection {
     -fx-fill: rgba(110, 168, 254, 0.28);
 }
 
-/* Update dialog banner: use dark chrome tone instead of the lighter brand gradient */
+
 .update-dialog-header {
     -fx-background-color: linear-gradient(to right, -sl-chrome, -sl-chrome-hover);
 }
 
-/* Primary / default buttons: darker graphite so they match the dark surfaces */
+
 .btn-primary {
     -fx-background-color: #3a424b;
 }

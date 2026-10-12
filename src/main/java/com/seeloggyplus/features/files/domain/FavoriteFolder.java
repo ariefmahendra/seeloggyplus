@@ -8,11 +8,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FavoriteFolder {
+
     private Integer id;
     private String name;
     private String path;
-    /**
-     * An identifier for the location. Can be a server ID/name or a special value for local drive.
-     */
+
     private String locationId;
 }

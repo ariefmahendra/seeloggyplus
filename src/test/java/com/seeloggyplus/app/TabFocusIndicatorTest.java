@@ -7,7 +7,6 @@ import javafx.scene.Scene;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.BorderStroke;
-import javafx.scene.layout.Border;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
@@ -23,10 +22,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Regression: no visible focus ring/border must appear on the tab header when
- * the TabPane receives focus (e.g. after clicking a log line in the canvas).
- */
 @ExtendWith(ApplicationExtension.class)
 class TabFocusIndicatorTest {
 

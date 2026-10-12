@@ -12,19 +12,10 @@ import javafx.scene.layout.VBox;
 import java.util.Arrays;
 import java.util.Objects;
 
-/**
- * Tree cell for the Recent Files panel.
- * <p>
- * The panel is grouped by source: one expandable node per server (or {@code Local})
- * with the recent files of that source as children. File rows intentionally show
- * only the source + file identity — the old "Open/Tail" suffix was removed because
- * it made the list harder to scan.
- */
 public class RecentFileTreeCell extends TreeCell<RecentFileTreeCell.RecentNode> {
 
     public enum Kind { ROOT, SERVER, FILE }
 
-    /** One node of the recent-files tree. */
     public static final class RecentNode {
         private final Kind kind;
         private final String serverName;
@@ -91,7 +82,6 @@ public class RecentFileTreeCell extends TreeCell<RecentFileTreeCell.RecentNode> 
                 .allMatch(haystack::contains);
     }
 
-    /** Human-readable file name with the temporary download prefix stripped. */
     public static String displayName(LogFile logFile) {
         String name = logFile == null ? null : logFile.getName();
         if (name != null && name.matches("^seeloggyplus-\\d+-(.+)$")) {

@@ -9,11 +9,6 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * The silent Windows launcher is recreated by the app instead of shipped in
- * update packages (older installers reject unknown package entries, which broke
- * self-update from older releases).
- */
 class SilentLauncherInstallerTest {
 
     @TempDir

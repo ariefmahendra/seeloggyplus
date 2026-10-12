@@ -28,11 +28,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Defect: Up/Down keys did not move the log viewer. Verifies the scene-level
- * navigation moves the active canvas viewer's selected row, even when focus is
- * not on the canvas.
- */
 @ExtendWith(ApplicationExtension.class)
 class LogViewerArrowKeyNavigationTest {
 
@@ -83,14 +78,12 @@ class LogViewerArrowKeyNavigationTest {
                 viewer.layout();
                 WaitForAsyncUtils.waitForFxEvents();
                 viewer.setFollowTail(false);
-                // Start from the top so the expected selection is deterministic.
+
                 viewer.getVScrollBar().setValue(0);
                 viewer.applyCss();
                 viewer.layout();
                 WaitForAsyncUtils.waitForFxEvents();
 
-                // Focus is intentionally NOT on the canvas (fire on the root pane),
-                // so this exercises the scene-level navigation fallback.
                 fireKey(root, KeyCode.DOWN);
                 assertEquals(0, viewer.getSelectedIndex(), "first DOWN must select the first row");
                 fireKey(root, KeyCode.DOWN);

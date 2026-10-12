@@ -8,6 +8,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 
 public class SearchNavigator extends HBox {
+
     private final Label statusLabel;
     private final Button prevButton;
     private final Button nextButton;

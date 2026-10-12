@@ -19,10 +19,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Icons must remain visible in dark mode: the default icon color follows the
- * theme text color, while explicitly colored icons keep their color.
- */
 @ExtendWith(ApplicationExtension.class)
 class IconThemeTest {
 

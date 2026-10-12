@@ -42,7 +42,7 @@ class UpdateManifestTest {
         assertEquals(2, manifest.assets().size());
         assertEquals("abc123", manifest.assetFor("portable-nojre").sha256());
         assertEquals(48123456L, manifest.assetFor("portable-nojre").size());
-        assertNotNull(manifest.assetFor("unknown-key")); // falls back to first
+        assertNotNull(manifest.assetFor("unknown-key"));
     }
 
     @Test

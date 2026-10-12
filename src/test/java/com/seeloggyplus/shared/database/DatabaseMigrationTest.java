@@ -15,10 +15,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Verifies that schema migrations preserve user data and never leave the
- * database half-migrated.
- */
 class DatabaseMigrationTest {
 
     @TempDir
@@ -28,7 +24,6 @@ class DatabaseMigrationTest {
         return DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath());
     }
 
-    /** Builds the legacy schema (before favorite/sort_order/group_name). */
     private void createLegacySchema(Connection c) throws SQLException {
         try (Statement stmt = c.createStatement()) {
             stmt.execute("CREATE TABLE parsing_configs (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,"
@@ -66,15 +61,13 @@ class DatabaseMigrationTest {
             assertTrue(DatabaseMigrator.columnExists(c, "parsing_configs", "timestamp_format"));
             assertEquals(DatabaseMigrator.SCHEMA_VERSION, DatabaseMigrator.getUserVersion(c));
 
-            // Existing rows must survive and get sensible defaults.
             assertEquals(2, countServers(c));
             assertEquals("Newest", serverName(c, "new-1"));
             assertEquals(0, serverFavorite(c, "new-1"));
-            // Newest keeps the top position (sort_order 0), oldest becomes 1.
+
             assertEquals(0, serverSortOrder(c, "new-1"));
             assertEquals(1, serverSortOrder(c, "old-1"));
 
-            // A backup must have been created before migrating.
             assertTrue(hasBackup(dbFile), "pre-migration backup should exist");
         }
     }
@@ -112,7 +105,6 @@ class DatabaseMigrationTest {
             createLegacySchema(c);
             insertLegacyServer(c, "s1", "Server One", "2024-01-01T00:00:00");
 
-            // Force every write to fail.
             try (Statement stmt = c.createStatement()) {
                 stmt.execute("PRAGMA query_only = 1");
             }
@@ -120,7 +112,6 @@ class DatabaseMigrationTest {
             assertThrows(DatabaseMigrationException.class,
                     () -> DatabaseMigrator.migrate(c, dbFile, false));
 
-            // The schema must be untouched (rolled back).
             assertFalse(DatabaseMigrator.columnExists(c, "ssh_servers", "favorite"));
             assertEquals(0, DatabaseMigrator.getUserVersion(c));
             assertEquals(1, countServers(c));
@@ -149,7 +140,6 @@ class DatabaseMigrationTest {
             insertLegacyServer(c, "s3", "Three", "2022-01-01T00:00:00");
             DatabaseMigrator.migrate(c, dbFile, false);
 
-            // Simulate a v2 database: groups live on ssh_servers only.
             try (Statement st = c.createStatement()) {
                 st.execute("UPDATE ssh_servers SET group_name = 'Production' WHERE id = 's1'");
                 st.execute("UPDATE ssh_servers SET group_name = 'Production' WHERE id = 's2'");
@@ -162,14 +152,13 @@ class DatabaseMigrationTest {
 
             assertTrue(DatabaseMigrator.tableExists(c, "server_groups"));
             assertEquals(2, groupCount(c));
-            // Oldest server first: Staging (2022) then Production (2024).
+
             assertEquals("Staging", groupNameAt(c, 0));
             assertEquals("Production", groupNameAt(c, 1));
             assertEquals(3, countServers(c), "server rows must survive the group backfill");
             assertEquals("Production", serverGroupName(c, "s1"));
             assertTrue(hasBackup(dbFile));
 
-            // Idempotent: a second run must not duplicate groups.
             DatabaseMigrator.migrate(c, dbFile, false);
             assertEquals(2, groupCount(c));
         }
@@ -183,7 +172,6 @@ class DatabaseMigrationTest {
             insertLegacyServer(c, "s1", "One", "2024-01-01T00:00:00");
             DatabaseMigrator.migrate(c, dbFile, false);
 
-            // Simulate a v3 database: auth columns do not exist yet.
             try (Statement st = c.createStatement()) {
                 st.execute("ALTER TABLE ssh_servers DROP COLUMN auth_type");
                 st.execute("ALTER TABLE ssh_servers DROP COLUMN key_path");
@@ -202,7 +190,6 @@ class DatabaseMigrationTest {
                     "legacy rows keep null auth_type (interpreted as password)");
             assertTrue(hasBackup(dbFile));
 
-            // Idempotent.
             DatabaseMigrator.migrate(c, dbFile, false);
             assertEquals(1, countServers(c));
         }
@@ -213,17 +200,13 @@ class DatabaseMigrationTest {
         Path db = tempDir.resolve("rollback.db");
         try (Connection c = connect(db); Statement st = c.createStatement()) {
             st.execute("CREATE TABLE parsing_configs (id TEXT PRIMARY KEY)");
-            // recent_files is deliberately absent: second ALTER fails.
+
             assertThrows(DatabaseMigrationException.class, () -> DatabaseMigrator.migrate(c, db, false));
             assertFalse(DatabaseMigrator.columnExists(c, "parsing_configs", "timestamp_format"));
             assertEquals(0, DatabaseMigrator.getUserVersion(c));
             assertTrue(hasBackup(db));
         }
     }
-
-    // ------------------------------------------------------------------
-    // helpers
-    // ------------------------------------------------------------------
 
     private int countServers(Connection c) throws SQLException {
         try (Statement stmt = c.createStatement();

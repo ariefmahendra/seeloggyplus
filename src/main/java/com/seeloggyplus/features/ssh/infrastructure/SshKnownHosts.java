@@ -12,12 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
 
-/**
- * Application-managed SSH {@code known_hosts} (trust-on-first-use).
- * <p>
- * Kept outside the DB so the file stays compatible with the standard OpenSSH
- * format and can be inspected by the user.
- */
 public final class SshKnownHosts {
 
     public static final String FILE_NAME = "known_hosts";
@@ -29,10 +23,6 @@ public final class SshKnownHosts {
         return AppPaths.dataFile(FILE_NAME);
     }
 
-    /**
-     * Loads (creating an empty file when missing) the known-hosts repository and
-     * registers it on the given JSch instance, so trusted keys persist to disk.
-     */
     public static HostKeyRepository load(JSch jsch, Path file) throws JSchException {
         try {
             Path parent = file.getParent();
@@ -50,12 +40,10 @@ public final class SshKnownHosts {
     }
 
     public static int check(HostKeyRepository repository, String host, HostKey key) {
-        // HostKey.getKey() is the base64 blob; the repository API expects raw bytes.
         byte[] raw = Base64.getDecoder().decode(key.getKey());
         return repository.check(host, raw);
     }
 
-    /** Persists a trusted key (used by the "Accept &amp; save" flow). */
     public static void trust(HostKeyRepository repository, HostKey key) throws JSchException {
         repository.add(key, yesUserInfo());
     }

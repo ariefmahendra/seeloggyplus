@@ -10,10 +10,6 @@ import net.jqwik.api.Provide;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-/**
- * Property-based test: any generated {@code path + ":" + line + ":" + content}
- * must round-trip through the parser unchanged, as long as the path has no colon.
- */
 class RemoteLogSearchParsePropertyTest {
 
     @Property

@@ -11,7 +11,6 @@ import javafx.scene.layout.Background;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.Paint;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -25,11 +24,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 import javafx.scene.Parent;
 
-/**
- * A focused input field must show a single, clean border. Modena's default
- * focus style stacks a focus ring + border + inner background, which renders as
- * an ugly double border. This guards against that regression in both themes.
- */
 @ExtendWith(ApplicationExtension.class)
 class InputFocusBorderTest {
 

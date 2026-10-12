@@ -9,12 +9,6 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Self-updates never replace the root {@code launcher.bat} (old installers pinned
- * the package whitelist), so legacy installs keep a launcher that runs
- * {@code java.exe} in the foreground and leaves a console window behind. The app
- * heals that file on startup from the launcher staged with the active version.
- */
 class RootLauncherInstallerTest {
 
     private static final String LEGACY_LAUNCHER = """

@@ -16,20 +16,12 @@ import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 
-/**
- * Downloads an update asset with streaming, resume, cancellation and integrity checks.
- * The stream opener is injectable so tests run offline.
- */
 public class UpdateDownloader {
 
     public interface ProgressListener {
         void onProgress(long downloaded, long total);
     }
 
-    /**
-     * A stream plus the offset it actually starts at. {@code startOffset} is 0 when the
-     * server ignored the requested range (HTTP 200) so the caller must not append.
-     */
     public record Opened(InputStream stream, long startOffset) {
     }
 
@@ -50,13 +42,6 @@ public class UpdateDownloader {
         this.opener = opener;
     }
 
-    /**
-     * Downloads {@code asset} into {@code targetDir}, resuming from an existing
-     * {@code .partial} file when present.
-     *
-     * @throws CancellationException when {@code cancelled} becomes true (partial removed)
-     * @throws IOException           on I/O error, size mismatch or checksum mismatch
-     */
     public Path download(UpdateAsset asset, Path targetDir, ProgressListener progress, BooleanSupplier cancelled)
             throws IOException {
         if (asset == null || asset.url() == null || asset.url().isBlank()) {
@@ -73,7 +58,6 @@ public class UpdateDownloader {
              RandomAccessFile output = new RandomAccessFile(partial.toFile(), "rw")) {
             long start = opened.startOffset();
             if (start == 0 && resumeOffset > 0) {
-                // Server ignored the Range header and sent the whole file: restart cleanly.
                 output.setLength(0);
             }
             output.seek(start);
@@ -138,7 +122,6 @@ public class UpdateDownloader {
         try {
             Files.deleteIfExists(path);
         } catch (IOException ignored) {
-            // best effort
         }
     }
 
@@ -161,7 +144,7 @@ public class UpdateDownloader {
                 response.body().close();
                 throw new IOException("HTTP " + code + " for " + url);
             }
-            // 206 means the server honored the requested range; anything else starts at 0.
+
             long startOffset = (code == 206) ? offset : 0L;
             return new Opened(response.body(), startOffset);
         } catch (InterruptedException e) {

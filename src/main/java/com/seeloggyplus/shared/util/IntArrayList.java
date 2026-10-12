@@ -2,11 +2,8 @@ package com.seeloggyplus.shared.util;
 
 import java.util.Arrays;
 
-/**
- * A simple, high-performance, resizeable array of primitive ints.
- * Designed to avoid the boxing overhead of ArrayList<Integer>.
- */
 public class IntArrayList {
+
     private int[] data;
     private int size;
     private static final int DEFAULT_CAPACITY = 10;

@@ -7,13 +7,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Merges per-platform manifests into a single manifest containing every asset.
- *
- * <pre>
- * --out update-manifest.json --in update-manifest-win.json --in update-manifest-linux.json
- * </pre>
- */
 public final class ManifestMergeCli {
 
     private ManifestMergeCli() {

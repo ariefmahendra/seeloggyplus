@@ -32,10 +32,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.List;
 import javafx.application.Platform;
 
-/**
- * Server editor auth UI: choosing private-key auth swaps the password panel for
- * the key panel, and existing key settings are shown when editing a server.
- */
 @ExtendWith(ApplicationExtension.class)
 class ServerEditDialogAuthTest {
 
@@ -185,8 +181,6 @@ class ServerEditDialogAuthTest {
         assertTrue(browse.getStyleClass().contains("browse-button"),
                 "Browse must use the compact style class");
 
-        // Tolerances keep this stable across platforms/fonts while still catching
-        // the old behaviour (button stretched to the row height / oversized padding).
         assertTrue(browse.getHeight() <= keyPath.getHeight() + 4,
                 "Browse must stay proportional to the field instead of stretching (browse="
                         + browse.getHeight() + ", field=" + keyPath.getHeight() + ")");

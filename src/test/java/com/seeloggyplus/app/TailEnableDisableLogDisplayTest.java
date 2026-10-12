@@ -9,7 +9,6 @@ import com.seeloggyplus.shared.ui.canvas.CanvasLogViewer;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.Tab;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
@@ -59,15 +58,12 @@ public class TailEnableDisableLogDisplayTest {
                 CanvasLogViewer viewer = session.getCanvasLogViewer();
                 assertNotNull(viewer, "CanvasLogViewer must be created for session");
 
-                // Before adding tail lines
                 assertEquals(0, viewer.getTotalLines());
 
-                // Add line to session live tail list
                 LogEntry entry = new LogEntry(1L, "2026-09-06 [INFO] Service started");
                 session.getLiveTailList().add(entry);
                 viewer.refreshTail();
 
-                // CanvasLogViewer must immediately reflect the tail lines because tailBuffer is bound
                 assertEquals(1, viewer.getTotalLines(), "Viewer totalLines must reflect session live tail list");
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -99,7 +95,6 @@ public class TailEnableDisableLogDisplayTest {
                 onActiveSessionChangedMethod.setAccessible(true);
                 onActiveSessionChangedMethod.invoke(controller, session);
 
-                // Simulate remote lines received
                 session.getLiveTailList().add(new LogEntry(1L, "Remote Line 1"));
                 session.getLiveTailList().add(new LogEntry(2L, "Remote Line 2"));
                 session.getLiveTailList().add(new LogEntry(3L, "Remote Line 3"));
@@ -108,16 +103,13 @@ public class TailEnableDisableLogDisplayTest {
                 viewer.refreshTail();
                 assertEquals(3, viewer.getTotalLines());
 
-                // Disable tail
                 Method disableTailMethod = MainController.class.getDeclaredMethod("disableTail", LogSession.class, boolean.class);
                 disableTailMethod.setAccessible(true);
                 disableTailMethod.invoke(controller, session, false);
 
-                // Crucial check: remote lines must NOT be cleared from liveTailList or viewer
                 assertEquals(3, session.getLiveTailList().size(), "Remote logs must NOT be wiped when disabling tail");
                 assertEquals(3, viewer.getTotalLines(), "Canvas viewer total lines must remain intact after disabling tail");
 
-                // Re-enable tail in stream mode: per requirement 8.1, clear previous stream logs and run tail afresh
                 Method enableTailMethod = MainController.class.getDeclaredMethod("enableTail");
                 enableTailMethod.setAccessible(true);
                 assertDoesNotThrow(() -> enableTailMethod.invoke(controller));
@@ -125,7 +117,6 @@ public class TailEnableDisableLogDisplayTest {
                 assertEquals(0, session.getLiveTailList().size(), "Stream logs must be cleared when enabling tail from non-tail mode");
                 assertEquals(0, viewer.getTotalLines(), "Canvas viewer must reset to 0 lines ready for fresh tail");
 
-                // Cleanup
                 disableTailMethod.invoke(controller, session, true);
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -159,7 +150,6 @@ public class TailEnableDisableLogDisplayTest {
                 onActiveSessionChangedMethod.setAccessible(true);
                 onActiveSessionChangedMethod.invoke(controller, session);
 
-                // Load file into session via MappedFileReader and LineOffsetIndex
                 try (RandomAccessFile raf = new RandomAccessFile(tempLog, "r")) {
                     LineOffsetIndex index = new LineOffsetIndex();
                     index.buildIndex(raf, p -> {});
@@ -172,15 +162,12 @@ public class TailEnableDisableLogDisplayTest {
                 viewer.loadFile(session.getReader(), session.getIndex());
                 assertEquals(3, viewer.getTotalLines(), "Initial file has 3 lines");
 
-                // Enable tail
                 Method enableTailMethod = MainController.class.getDeclaredMethod("enableTail");
                 enableTailMethod.setAccessible(true);
                 enableTailMethod.invoke(controller);
 
-                // File lines must remain displayed (not erased)
                 assertEquals(3, viewer.getTotalLines(), "File lines must remain displayed when enabling tail");
 
-                // Simulate incoming tail line
                 Method handleTailLineMethod = MainController.class.getDeclaredMethod("handleTailLineBackground", LogSession.class, String.class);
                 handleTailLineMethod.setAccessible(true);
                 handleTailLineMethod.invoke(controller, session, "Line 4 (tail)");
@@ -196,12 +183,10 @@ public class TailEnableDisableLogDisplayTest {
                 CanvasLogViewer viewer = session.getCanvasLogViewer();
                 assertEquals(4, viewer.getTotalLines(), "Incoming tail line must be visible in viewer");
 
-                // Disable tail
                 Method disableTailMethod = MainController.class.getDeclaredMethod("disableTail", LogSession.class, boolean.class);
                 disableTailMethod.setAccessible(true);
                 disableTailMethod.invoke(controller, session, true);
 
-                // All 4 lines must remain visible in viewer
                 assertEquals(4, viewer.getTotalLines(), "All lines (file + tail) must remain visible when tail is disabled");
 
                 if (session.getReader() != null) {
@@ -244,24 +229,20 @@ public class TailEnableDisableLogDisplayTest {
                 Method onActiveSessionChangedMethod = MainController.class.getDeclaredMethod("onActiveSessionChanged", LogSession.class);
                 onActiveSessionChangedMethod.setAccessible(true);
 
-                // Activate Session A
                 onActiveSessionChangedMethod.invoke(controller, sessionA);
 
-                // Enable tail on Session A (invokes startRemoteTailInternal)
                 Method enableTailMethod = MainController.class.getDeclaredMethod("enableTail");
                 enableTailMethod.setAccessible(true);
                 enableTailMethod.invoke(controller);
 
                 assertNotNull(mockSshA.lineConsumer, "Session A must register a lineConsumer when tail is enabled");
 
-                // Now switch active session to Session B
                 onActiveSessionChangedMethod.invoke(controller, sessionB);
 
                 Field managerField = MainController.class.getDeclaredField("tabSessionManager");
                 managerField.setAccessible(true);
                 assertEquals(sessionB, ((TabSessionManager) managerField.get(controller)).getActive());
 
-                // Session A receives a log line while Session B is active
                 mockSshA.lineConsumer.accept("2026-09-06 [INFO] Event from Session A");
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -272,18 +253,14 @@ public class TailEnableDisableLogDisplayTest {
 
         Platform.runLater(() -> {
             try {
-                // Assert Session A got the line
                 assertEquals(1, sessionA.getLiveTailList().size(), "Session A must receive its own tail line");
                 assertEquals("2026-09-06 [INFO] Event from Session A", sessionA.getLiveTailList().get(0).getRawLog());
 
-                // Crucial assertion: Session B must NOT receive Session A's tail line!
                 assertEquals(0, sessionB.getLiveTailList().size(), "Session B live list must NOT receive lines from Session A");
                 assertEquals(0, sessionB.getCanvasLogViewer().getTotalLines(), "Session B viewer must remain empty");
 
-                // Session A was in background, so its unread tail count must be 1
                 assertEquals(1, sessionA.getUnreadTailLines(), "Session A unread tail lines must be incremented for dormant tab");
 
-                // Cleanup
                 Method disableTailMethod = MainController.class.getDeclaredMethod("disableTail", LogSession.class, boolean.class);
                 disableTailMethod.setAccessible(true);
                 disableTailMethod.invoke(controller, sessionA, true);
@@ -328,17 +305,14 @@ public class TailEnableDisableLogDisplayTest {
                 Method enableTailMethod = MainController.class.getDeclaredMethod("enableTail");
                 enableTailMethod.setAccessible(true);
 
-                // 1. Activate session 1 and enable tail
                 onActiveSessionChangedMethod.invoke(controller, session1);
                 enableTailMethod.invoke(controller);
                 assertNotNull(mockSsh1.lineConsumer);
 
-                // 2. Switch to session 2 and enable tail
                 onActiveSessionChangedMethod.invoke(controller, session2);
                 enableTailMethod.invoke(controller);
                 assertNotNull(mockSsh2.lineConsumer);
 
-                // 3. Emit lines to both services
                 mockSsh1.lineConsumer.accept("Log line from server 1");
                 mockSsh2.lineConsumer.accept("Log line from server 2");
             } catch (Exception e) {
@@ -350,26 +324,21 @@ public class TailEnableDisableLogDisplayTest {
 
         Platform.runLater(() -> {
             try {
-                // Check session 2 (currently active)
                 assertEquals(1, session2.getLiveTailList().size());
                 assertEquals("Log line from server 2", session2.getLiveTailList().get(0).getRawLog());
                 assertEquals(1, session2.getCanvasLogViewer().getTotalLines());
 
-                // Check session 1 (in background)
                 assertEquals(1, session1.getLiveTailList().size());
                 assertEquals("Log line from server 1", session1.getLiveTailList().get(0).getRawLog());
                 assertEquals(1, session1.getUnreadTailLines());
 
-                // Switch back to session 1
                 Method onActiveSessionChangedMethod = MainController.class.getDeclaredMethod("onActiveSessionChanged", LogSession.class);
                 onActiveSessionChangedMethod.setAccessible(true);
                 onActiveSessionChangedMethod.invoke(controller, session1);
 
-                // Session 1 is now active, unread count reset, viewer reflects lines
                 assertEquals(0, session1.getUnreadTailLines());
                 assertEquals(1, session1.getCanvasLogViewer().getTotalLines());
 
-                // Cleanup
                 Method disableTailMethod = MainController.class.getDeclaredMethod("disableTail", LogSession.class, boolean.class);
                 disableTailMethod.setAccessible(true);
                 disableTailMethod.invoke(controller, session1, true);

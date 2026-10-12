@@ -7,7 +7,6 @@ import javafx.scene.control.TextArea;
 
 import java.util.Locale;
 
-/** Translates SSH client diagnostics into recovery guidance, retaining the original in Details. */
 public final class SshConnectionFeedback {
 
     public record Feedback(String title, String message, String detail) { }

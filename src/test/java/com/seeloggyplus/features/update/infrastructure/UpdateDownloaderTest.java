@@ -1,5 +1,4 @@
 package com.seeloggyplus.features.update.infrastructure;
-
 
 import com.seeloggyplus.features.update.domain.UpdateAsset;
 import org.junit.jupiter.api.Test;
@@ -18,7 +17,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UpdateDownloaderTest {
 
@@ -31,7 +29,6 @@ class UpdateDownloaderTest {
                 try {
                     Files.deleteIfExists(p);
                 } catch (IOException ignored) {
-                    // best effort
                 }
             });
         }
@@ -99,10 +96,10 @@ class UpdateDownloaderTest {
         UpdateAsset asset = new UpdateAsset("https://example.com/app.zip", content.length, Hashing.sha256(content));
         Path dir = Files.createTempDirectory("seeloggy-dl");
         Path partial = dir.resolve("app.zip.partial");
-        Files.write(partial, "leftover-error-page".getBytes()); // stale 31-byte partial
+        Files.write(partial, "leftover-error-page".getBytes());
         try {
             UpdateDownloader downloader = new UpdateDownloader((url, offset) ->
-                    // Server ignored the Range header: body starts at 0.
+
                     new UpdateDownloader.Opened(new ByteArrayInputStream(content), 0));
             Path out = downloader.download(asset, dir, null, () -> false);
             assertArrayEquals(content, Files.readAllBytes(out),

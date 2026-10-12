@@ -9,30 +9,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Implementation of {@link PreferenceService}.
- * <p>
- * Handles business logic for application preferences, delegating persistence
- * to {@link PreferenceRepository}.
- */
 public class PreferenceServiceImpl implements PreferenceService {
 
     private static final Logger logger = LoggerFactory.getLogger(PreferenceServiceImpl.class);
     private final PreferenceRepository preferencesRepository;
 
-    /**
-     * Default constructor.
-     * Initializes with the default repository implementation.
-     */
     public PreferenceServiceImpl() {
         this(new PreferenceRepositoryImpl());
     }
 
-    /**
-     * Constructor for dependency injection.
-     *
-     * @param preferencesRepository The repository instance to use.
-     */
     public PreferenceServiceImpl(PreferenceRepository preferencesRepository) {
         this.preferencesRepository = preferencesRepository;
     }

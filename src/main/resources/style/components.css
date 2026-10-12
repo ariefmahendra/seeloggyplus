@@ -1,8 +1,3 @@
-/* ============================================================
-   SeeLoggyPlus — Component Styles
-   Requires theme.css (design tokens) to be loaded first.
-   ============================================================ */
-
 .small-combo-box .list-cell {
     -fx-font-size: 12px;
 }
@@ -11,16 +6,12 @@
     -fx-font-size: 12px;
 }
 
-/* ============================================
-   TableView Styling
-   ============================================ */
 
-/* Ensure table cells align to top for multi-line content */
 .table-view .table-cell {
     -fx-alignment: TOP_LEFT;
 }
 
-/* Flat, muted column headers (compact enterprise look) */
+
 .table-view .column-header-background {
     -fx-background-color: -sl-surface-sunken;
     -fx-border-color: transparent transparent -sl-border transparent;
@@ -46,10 +37,7 @@
     -fx-background-color: -sl-text-muted;
 }
 
-/* 
-   Headerless Mode for Raw View 
-   Hides the column header area completely to mimic a text editor
-*/
+
 .header-hidden .column-header-background {
     -fx-max-height: 0;
     -fx-pref-height: 0;
@@ -63,9 +51,7 @@
     visibility: hidden;
 }
 
-/* ============================================
-   TabPane: rectangular tabs + graphite accent
-   ============================================ */
+
 .tab-pane {
     -fx-open-tab-animation: NONE;
     -fx-close-tab-animation: NONE;
@@ -121,8 +107,7 @@
     -fx-background-color: -sl-surface;
 }
 
-/* Suppress the focus ring that appears on the tab header when focus changes
-   (e.g. after clicking a log line in the canvas). */
+
 .tab-pane > .tab-header-area > .headers-region > .tab .focus-indicator,
 .tab-pane > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
     -fx-border-color: transparent;
@@ -130,7 +115,7 @@
     -fx-background-color: transparent;
 }
 
-/* In-tab status indicators (created in MainController) */
+
 .tab-live-indicator {
     -fx-fill: -sl-live;
 }
@@ -144,9 +129,7 @@
     -fx-font-weight: bold;
 }
 
-/* ============================================
-   ScrollBar: Sleek modern scrollbar (clean & professional)
-   ============================================ */
+
 .scroll-bar {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
@@ -187,8 +170,7 @@
     -fx-background-color: -sl-scroll-thumb-pressed;
 }
 
-/* Keep the up/down (and left/right) step buttons visible so a single line/row
-   can be moved at a time by clicking them. */
+
 .scroll-bar .increment-button,
 .scroll-bar .decrement-button {
     -fx-background-color: transparent;
@@ -209,9 +191,6 @@
 }
 
 
-/* ============================================
-   Empty State Styling
-   ============================================ */
 .empty-state-pane {
     -fx-background-color: -sl-surface-alt;
     -fx-padding: 40px;
@@ -258,13 +237,11 @@
     fill: -sl-on-brand;
 }
 
-/* ============================================
-   Toggle Button Active Icon Styling
-   ============================================ */
+
 .toggle-button:selected {
     -fx-background-color: -sl-brand;
     -fx-text-fill: -sl-on-brand;
-    /* No leftover outline: selected toggles must look flat and clean. */
+
     -fx-border-color: transparent;
 }
 
@@ -279,9 +256,7 @@
     fill: -sl-on-brand;
 }
 
-/* ============================================
-   Remote Log Search: keyword highlight
-   ============================================ */
+
 .match-highlight {
     -fx-background-color: yellow;
     -fx-text-fill: black;
@@ -296,9 +271,7 @@
     -fx-background-color: -sl-preview-target;
 }
 
-/* ============================================
-   Update dialog
-   ============================================ */
+
 .update-dialog {
     -fx-background-color: -sl-surface;
 }
@@ -356,9 +329,7 @@
     -fx-padding: 12 22 16 22;
 }
 
-/* ============================================
-   Remote Log Search: easier-to-grab scrollbars & divider
-   ============================================ */
+
 .remote-log-search-dialog .scroll-bar:vertical {
     -fx-pref-width: 16px;
     -fx-min-width: 16px;
@@ -378,9 +349,7 @@
     -fx-min-width: 44px;
 }
 
-/* Selected / highlighted preview line: use the shared (translucent) selection
-   colour and keep theme text colours so it stays readable in both themes.
-   Scoped to the preview list so it cannot leak onto the Context dropdown. */
+
 .remote-log-search-dialog .preview-list .list-cell:selected,
 .remote-log-search-dialog .preview-list .list-cell:filled:selected {
     -fx-background-color: -sl-selection-bg;
@@ -406,13 +375,13 @@
     -fx-background-color: -sl-text-faint;
 }
 
-/* Remote log-location errors: readable explanation and optional diagnostic details. */
+
 .remote-path-error,
 .ssh-connection-feedback {
     -fx-background-color: -sl-surface;
 }
 
-/* Log tabs share the available width; truncate names rather than shrinking text. */
+
 .log-tab-pane > .tab-header-area > .headers-region > .tab .tab-label {
     -fx-text-fill: -sl-text-secondary;
     -fx-text-overrun: ellipsis;
@@ -444,9 +413,7 @@
     -fx-background-color: -sl-surface;
 }
 
-/* ============================================
-   Button hierarchy
-   ============================================ */
+
 .compact-actions .button,
 .compact-actions .toggle-button,
 .unified-file-manager-dialog .button,
@@ -475,9 +442,7 @@
     -fx-opacity: 0.6;
 }
 
-/* ============================================
-   Form controls: consistent radius
-   ============================================ */
+
 .text-field,
 .password-field,
 .text-area,
@@ -488,14 +453,12 @@
     -fx-border-radius: 3;
 }
 
-/* Placeholder text must follow the theme (Modena derives a too-dark colour
-   in dark mode, making placeholder text invisible). */
+
 .text-input {
     -fx-prompt-text-fill: -sl-text-secondary;
 }
 
-/* Single, clean focus border (Modena draws a focus ring + border + inner,
-   which renders as an ugly double border). */
+
 .text-field:focused,
 .password-field:focused,
 .text-area:focused {
@@ -506,9 +469,7 @@
     -fx-border-width: 0;
 }
 
-/* ============================================
-   Toolbars & split pane
-   ============================================ */
+
 .tool-bar {
     -fx-padding: 3 6 3 6;
 }
@@ -523,9 +484,7 @@
     -fx-background-color: -sl-text-faint;
 }
 
-/* ============================================
-   Tooltips
-   ============================================ */
+
 .tooltip {
     -fx-background-color: -sl-chrome;
     -fx-text-fill: -sl-chrome-text;
@@ -534,12 +493,7 @@
     -fx-padding: 4 8 4 8;
 }
 
-/* ============================================
-   Colored icons (theme-independent, readable on light & dark)
-   Higher specificity than the default `.glyph-icon` rule.
-   ============================================ */
-/* Theme-tone icons: they follow the active theme like the rest of the UI.
-   Shape already distinguishes folders/logs/files; colour stays neutral. */
+
 FontAwesomeIconView.favorite-star {
     -fx-fill: -sl-warning;
 }
@@ -556,9 +510,7 @@ FontAwesomeIconView.file-icon-file {
     -fx-fill: -sl-text-muted;
 }
 
-/* ============================================
-   Search result panel & navigator
-   ============================================ */
+
 .search-results-header {
     -fx-font-weight: bold;
     -fx-font-size: 11px;
@@ -571,10 +523,7 @@ FontAwesomeIconView.file-icon-file {
     -fx-padding: 0 5 0 0;
 }
 
-/* ============================================
-   Menus & context menus (popup windows)
-   These inherit the stylesheet only when it is installed on the Scene.
-   ============================================ */
+
 .context-menu {
     -fx-background-color: -sl-surface;
     -fx-border-color: -sl-border;
@@ -603,15 +552,13 @@ FontAwesomeIconView.file-icon-file {
     -fx-border-color: -sl-border-soft;
 }
 
-/* Compact action button next to a form field (e.g. Browse for a key file):
-   keeps its own height instead of stretching to the field height. */
+
 .browse-button {
     -fx-padding: 4 10 4 10;
     -fx-font-size: 12px;
 }
 
-/* Scrollable dialog forms (e.g. Server Edit): keep the dialog surface visible
-   behind the scroll pane and never hide the action row. */
+
 .dialog-form-scroll {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
@@ -622,7 +569,7 @@ FontAwesomeIconView.file-icon-file {
     -fx-background-color: transparent;
 }
 
-/* Collapsible panel sections (e.g. Favorite folders in File Management). */
+
 .titled-pane > .title {
     -fx-background-color: -sl-surface-alt;
     -fx-border-color: -sl-border;
@@ -649,7 +596,7 @@ FontAwesomeIconView.file-icon-file {
     -fx-padding: 4;
 }
 
-/* "What's New" dialog: themed surface, accent badge and notes area. */
+
 .whats-new-dialog {
     -fx-background-color: -sl-surface;
 }
@@ -690,10 +637,7 @@ FontAwesomeIconView.file-icon-file {
     -fx-background-color: transparent;
 }
 
-/* Dropdown fields (ComboBox / ChoiceBox / ChoiceDialog) look like normal form
-   fields in every theme: light surface with dark text on Graphite/Light, and
-   only the Dark theme renders them dark. The dropdown list uses a neutral
-   light highlight instead of the dark accent / blue accent. */
+
 .combo-box,
 .choice-box {
     -fx-background-color: -sl-surface;
@@ -747,7 +691,7 @@ FontAwesomeIconView.file-icon-file {
     -fx-text-fill: -sl-text;
 }
 
-/* Icons on chrome must not inherit the dark text of the content surface. */
+
 .app-toolbar > .glyph-icon, .app-toolbar > FontAwesomeIconView,
 .status-bar .glyph-icon, .status-bar FontAwesomeIconView,
 .menu-bar > .container > .menu-button .glyph-icon,
@@ -772,7 +716,7 @@ FontAwesomeIconView.file-icon-file {
     -fx-text-fill: -sl-accent-text;
 }
 
-/* Keep selection visible when keyboard focus moves to search or another pane. */
+
 .table-view, .list-view, .tree-view {
     -fx-selection-bar: -sl-accent;
     -fx-selection-bar-non-focused: -sl-accent;
@@ -793,9 +737,7 @@ FontAwesomeIconView.file-icon-file {
     -fx-border-width: 2;
 }
 
-/* Drop indicator when dragging a server onto a group folder in the location tree.
-   Uses background layers (no border) so the cell keeps exactly the same size
-   while dragging: an accent bar on the left plus a soft fill for the row. */
+
 .tree-cell:drop-target {
     -fx-background-color: -sl-info, -sl-brand-soft;
     -fx-background-insets: 0, 0 0 0 3;

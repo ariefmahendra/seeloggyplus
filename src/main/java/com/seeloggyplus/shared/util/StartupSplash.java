@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Properties;
 
-/** Updates the status over the JVM's animated splash; native GIF playback owns the bar. */
 public final class StartupSplash {
 
     private static final Logger logger = LoggerFactory.getLogger(StartupSplash.class);
@@ -39,7 +38,6 @@ public final class StartupSplash {
             }
             splash.update();
         } catch (RuntimeException e) {
-            // Splash support is optional and must never prevent startup.
             logger.debug("Could not update startup splash", e);
         }
     }

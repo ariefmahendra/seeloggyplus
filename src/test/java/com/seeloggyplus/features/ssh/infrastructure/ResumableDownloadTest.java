@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 class ResumableDownloadTest {
+
     @Test
     void resumesFromExistingPartialFile() throws Exception {
         byte[] content = new byte[1024];

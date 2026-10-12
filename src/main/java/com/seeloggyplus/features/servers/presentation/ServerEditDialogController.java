@@ -43,12 +43,12 @@ public class ServerEditDialogController {
     @FXML private PasswordField keyPassphraseField;
     @FXML private CheckBox savePassphraseCheckBox;
     @FXML private Button browseKeyButton;
-    
+
     @FXML private Label nameErrorLabel;
     @FXML private Label hostErrorLabel;
     @FXML private Label portErrorLabel;
     @FXML private Label usernameErrorLabel;
-    
+
     @FXML private Button testButton;
     @FXML private Button saveButton;
     @FXML private Button cancelButton;
@@ -93,11 +93,7 @@ public class ServerEditDialogController {
         keyAuthBox.setVisible(keyAuth);
         keyAuthBox.setManaged(keyAuth);
     }
-    
-    /**
-     * Setup password field with TextField for visibility toggle
-     * Ensures both fields have identical size and layout properties
-     */
+
     private void setupPasswordField() {
         passwordTextField = new TextField();
         passwordTextField.setPromptText(passwordField.getPromptText());
@@ -178,7 +174,7 @@ public class ServerEditDialogController {
     }
 
     public void setCloneServer(SSHServerModel original) {
-        this.sshServer = null; // null ensures handleSave() creates a brand new server record
+        this.sshServer = null;
         String baseName = (original.getName() != null && !original.getName().isBlank())
                 ? original.getName()
                 : (original.getHost() != null && !original.getHost().isBlank() ? original.getHost() : "Server");
@@ -241,7 +237,7 @@ public class ServerEditDialogController {
         task.setOnSucceeded(e -> {
             progress.close();
             boolean success = task.getValue();
-            
+
             Alert result;
             if (success) {
                 result = new Alert(Alert.AlertType.INFORMATION);
@@ -278,7 +274,7 @@ public class ServerEditDialogController {
         server.setUsername(usernameField.getText().trim());
         server.setDefaultPath(defaultPathField.getText().trim());
         server.setSavePassword(savePasswordCheckBox.isSelected());
-        
+
         if (savePasswordCheckBox.isSelected()) {
             server.setPassword(passwordField.getText());
         } else {
@@ -310,41 +306,30 @@ public class ServerEditDialogController {
         closeDialog();
     }
 
-    /**
-     * Toggle password visibility between PasswordField (hidden) and TextField (visible)
-     * Updates button icon accordingly
-     */
     private void togglePasswordVisibility() {
         passwordVisible = !passwordVisible;
-        
+
         if (passwordVisible) {
-            // Show password (TextField visible, PasswordField hidden)
             passwordField.setManaged(false);
             passwordField.setVisible(false);
             passwordTextField.setManaged(true);
             passwordTextField.setVisible(true);
             passwordTextField.requestFocus();
             passwordTextField.positionCaret(passwordTextField.getText().length());
-            
-            // Change icon to EYE_SLASH
+
             updatePasswordButtonIcon("EYE_SLASH");
         } else {
-            // Hide password (PasswordField visible, TextField hidden)
             passwordTextField.setManaged(false);
             passwordTextField.setVisible(false);
             passwordField.setManaged(true);
             passwordField.setVisible(true);
             passwordField.requestFocus();
             passwordField.positionCaret(passwordField.getText().length());
-            
-            // Change icon to EYE
+
             updatePasswordButtonIcon("EYE");
         }
     }
-    
-    /**
-     * Update password button icon
-     */
+
     private void updatePasswordButtonIcon(String iconName) {
         if (showPasswordButton.getGraphic() instanceof FontAwesomeIconView icon) {
             icon.setGlyphName(iconName);

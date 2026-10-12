@@ -1,16 +1,10 @@
 package com.seeloggyplus.features.update.domain;
 
-/**
- * Minimal Semantic Versioning comparator.
- * Handles {@code major.minor.patch}, prerelease (e.g. {@code -beta.1}) and build metadata
- * ({@code +build}) which is ignored during comparison.
- */
 public final class VersionComparator {
 
     private VersionComparator() {
     }
 
-    /** @return negative if {@code a < b}, zero if equal, positive if {@code a > b}. */
     public static int compare(String a, String b) {
         int[] coreA = core(a);
         int[] coreB = core(b);
@@ -26,7 +20,7 @@ public final class VersionComparator {
             return 0;
         }
         if (preA.isEmpty()) {
-            return 1; // release is newer than prerelease
+            return 1;
         }
         if (preB.isEmpty()) {
             return -1;
@@ -97,7 +91,7 @@ public final class VersionComparator {
                     return c;
                 }
             } else if (numericA) {
-                return -1; // numeric identifiers have lower precedence
+                return -1;
             } else if (numericB) {
                 return 1;
             } else {

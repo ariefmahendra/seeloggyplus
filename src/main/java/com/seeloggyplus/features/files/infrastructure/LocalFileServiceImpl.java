@@ -12,15 +12,7 @@ import java.nio.file.attribute.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Stream;
 
-/**
- * Implementation of {@link LocalFileService} for local file system operations.
- * <p>
- * Optimized for performance: uses DirectoryStream instead of Files.list(),
- * reads only BasicFileAttributes in a single syscall per file, and detects
- * the OS once to avoid repeated POSIX permission checks on Windows.
- */
 @RequiredArgsConstructor
 public class LocalFileServiceImpl implements LocalFileService {
 
@@ -40,13 +32,6 @@ public class LocalFileServiceImpl implements LocalFileService {
         return System.getProperty("user.home");
     }
 
-    /**
-     * Lists files and directories in the specified path.
-     * <p>
-     * Uses DirectoryStream for lower overhead than Files.list()/Stream.
-     * Reads only BasicFileAttributes (single syscall per file).
-     * Skips expensive owner lookup and permission checks for faster listing.
-     */
     @Override
     public List<FileInfo> listFiles(String directoryPath) throws IOException {
         Path dirPath = Paths.get(directoryPath);
@@ -69,10 +54,6 @@ public class LocalFileServiceImpl implements LocalFileService {
         return result;
     }
 
-    /**
-     * Maps a Path to FileInfo using a single readAttributes call.
-     * Owner and permissions are loaded lazily (set to defaults here).
-     */
     private FileInfo mapPathToFileInfo(Path path) {
         FileInfo fileInfo = new FileInfo();
         fileInfo.setName(path.getFileName().toString());
@@ -112,9 +93,6 @@ public class LocalFileServiceImpl implements LocalFileService {
         return fileInfo;
     }
 
-    /**
-     * Fast POSIX permission string — only called on POSIX systems.
-     */
     private String getPermissionsStringFast(Path path) {
         try {
             Set<PosixFilePermission> perms = Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS);

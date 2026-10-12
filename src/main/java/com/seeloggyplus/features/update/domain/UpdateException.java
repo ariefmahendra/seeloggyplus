@@ -1,6 +1,5 @@
 package com.seeloggyplus.features.update.domain;
 
-/** Raised when an update manifest or asset is invalid. */
 public class UpdateException extends Exception {
 
     public UpdateException(String message) {

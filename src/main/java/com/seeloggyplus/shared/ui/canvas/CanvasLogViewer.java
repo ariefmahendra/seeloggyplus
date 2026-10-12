@@ -46,13 +46,6 @@ import javafx.application.Platform;
 import javafx.event.EventHandler;
 import javafx.geometry.Orientation;
 
-/**
- * High-performance Canvas-based log viewer.
- * Renders only visible lines (~50) directly on Canvas.
- * No ListView, no ObservableList, no VirtualFlow.
- * Scroll: O(1) - just update currentTopLine and repaint
- * Memory: O(lineCount) for index, O(1) for rendering
- */
 public class CanvasLogViewer extends GridPane {
 
     private static final Logger logger = LoggerFactory.getLogger(CanvasLogViewer.class);
@@ -63,7 +56,6 @@ public class CanvasLogViewer extends GridPane {
     private static final Font MONO_FONT = Font.font("Consolas", FontWeight.NORMAL, 13);
     private static final Font LINE_NUM_FONT = Font.font("Consolas", FontWeight.NORMAL, 11);
 
-    // Palette — swapped at runtime between light and dark (Canvas ignores CSS).
     private Color bgColor;
     private Color textColor;
     private Color lineNumColor;
@@ -84,7 +76,6 @@ public class CanvasLogViewer extends GridPane {
     private Color highlightBg;
     private boolean darkMode;
 
-    // Level codes: 0 none, 1 FATAL, 2 ERROR, 3 WARN, 4 INFO, 5 DEBUG, 6 TRACE
     private static final Pattern LEVEL_PATTERN = Pattern.compile("\\b(ERROR|FATAL|WARN|WARNING|INFO|DEBUG|TRACE)\\b",
             Pattern.CASE_INSENSITIVE);
 
@@ -99,10 +90,10 @@ public class CanvasLogViewer extends GridPane {
     private long currentTopLine = 0;
     private double currentScrollX = 0;
     private long totalLines = 0;
-    private long fileLineCount = 0; // Number of lines indexed from file
+    private long fileLineCount = 0;
     private int visibleLineCount = 50;
 
-    private List<LogEntry> tailBuffer = Collections.emptyList(); // Live buffer for tail mode
+    private List<LogEntry> tailBuffer = Collections.emptyList();
 
     private IntArrayList filteredIndexes = null;
     private long filteredCount = 0;
@@ -110,23 +101,21 @@ public class CanvasLogViewer extends GridPane {
     private Pattern searchPattern = null;
 
     private long selectedLine = -1;
-    private long selectionAnchor = -1; // Anchor for Shift+Click range selection
+    private long selectionAnchor = -1;
     private boolean isDragging = false;
     private long dragStartViewLine = -1;
     private long dragEndViewLine = -1;
     private final Set<Long> selectedLineIndexes = new HashSet<>();
 
-    // Context Menu State
     private ContextMenu currentContextMenu;
 
-    // Smooth scroll state
-    private double smoothScrollY = 0;       // Current smooth position (fractional lines)
-    private double targetScrollY = 0;       // Target position set by mouse wheel
-    private double scrollOffsetY = 0;       // Sub-pixel Y offset for rendering (0..LINE_HEIGHT)
-    private boolean renderDirty = false;    // Coalesce renders to one per frame
-    private boolean suppressScrollBarSync = false; // Prevent feedback loop
-    private static final double SCROLL_LERP = 0.55; // Interpolation factor (higher = snappier)
-    private static final double SCROLL_SNAP_THRESHOLD = 0.3; // Snap when close enough
+    private double smoothScrollY = 0;
+    private double targetScrollY = 0;
+    private double scrollOffsetY = 0;
+    private boolean renderDirty = false;
+    private boolean suppressScrollBarSync = false;
+    private static final double SCROLL_LERP = 0.55;
+    private static final double SCROLL_SNAP_THRESHOLD = 0.3;
     private AnimationTimer scrollAnimator;
 
     @Setter
@@ -134,7 +123,6 @@ public class CanvasLogViewer extends GridPane {
     @Setter
     private LineDoubleClickHandler onLineDoubleClick;
 
-    // Status update callback for position info
     @FunctionalInterface
     public interface StatusUpdateHandler {
         void onStatusUpdate(long currentLine, long totalLines, double percentage);
@@ -155,9 +143,8 @@ public class CanvasLogViewer extends GridPane {
         vScrollBar = new ScrollBar();
         vScrollBar.setOrientation(Orientation.VERTICAL);
         vScrollBar.setVisibleAmount(50);
-        vScrollBar.setUnitIncrement(1); // Arrow button clicks scroll 1 line
-        // Stabilize scrollbar thickness so layout math doesn't oscillate.
-        // Slightly wider so the up/down step buttons are easy to click.
+        vScrollBar.setUnitIncrement(1);
+
         vScrollBar.setPrefWidth(14);
         vScrollBar.setMinWidth(14);
         vScrollBar.setMaxWidth(14);
@@ -168,13 +155,12 @@ public class CanvasLogViewer extends GridPane {
         hScrollBar.setMin(0);
         hScrollBar.setMax(2000);
         hScrollBar.setVisibleAmount(800);
-        hScrollBar.setUnitIncrement(20); // Arrow button clicks scroll 20px horizontally
-        // Stabilize scrollbar thickness
+        hScrollBar.setUnitIncrement(20);
+
         hScrollBar.setPrefHeight(10);
         hScrollBar.setMinHeight(10);
         hScrollBar.setMaxHeight(10);
 
-        // Simple layout: Canvas | ScrollBar
         ColumnConstraints col1 = new ColumnConstraints();
         col1.setHgrow(Priority.ALWAYS);
         ColumnConstraints col2 = new ColumnConstraints();
@@ -187,24 +173,20 @@ public class CanvasLogViewer extends GridPane {
         row2.setVgrow(Priority.NEVER);
         getRowConstraints().addAll(row1, row2);
 
-        // Add children
         add(canvas, 0, 0);
         add(vScrollBar, 1, 0);
         add(hScrollBar, 0, 1);
 
-        // Bindings
         setupScrollBarListener();
         setupMouseHandlers();
         setupKeyboardHandlers();
         setupResizeHandler();
         setupSmoothScrollAnimator();
 
-        // Ensure this control does not try to outgrow its parent
         setMinSize(0, 0);
         setPrefSize(Region.USE_COMPUTED_SIZE, Region.USE_COMPUTED_SIZE);
         setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        // Initial palette (light); switched automatically when the scene theme changes.
         applyPalette(false);
 
         sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -218,15 +200,9 @@ public class CanvasLogViewer extends GridPane {
             }
         });
 
-        // Initial render
         render();
     }
 
-    /**
-     * Resets the viewer state (clears file reader, index, and lines).
-     * Used when switching to a mode that doesn't use a local file (e.g., Remote
-     * Tail).
-     */
     public void resetView() {
         this.reader = null;
         this.index = null;
@@ -242,13 +218,13 @@ public class CanvasLogViewer extends GridPane {
         this.selectedLineIndexes.clear();
         this.filteredIndexes = null;
         this.filteredCount = 0;
-        this.lineCacheStartLine = -1; // Invalidate cache
-        this.followTail = true; // Always start following tail when resetting
+        this.lineCacheStartLine = -1;
+        this.followTail = true;
         if (onFollowTailChanged != null) {
             onFollowTailChanged.accept(true);
         }
 
-        leftMargin = 80; // Reset to default
+        leftMargin = 80;
         updateScrollBar();
         suppressScrollBarSync = true;
         vScrollBar.setValue(0);
@@ -259,9 +235,6 @@ public class CanvasLogViewer extends GridPane {
         logger.info("CanvasLogViewer reset.");
     }
 
-    /**
-     * Load a file for viewing.
-     */
     public void loadFile(MappedFileReader reader, LineOffsetIndex index) {
         this.reader = reader;
         this.index = index;
@@ -274,11 +247,10 @@ public class CanvasLogViewer extends GridPane {
         this.selectedLine = -1;
         this.selectionAnchor = -1;
         this.selectedLineIndexes.clear();
-        this.lineCacheStartLine = -1; // Invalidate cache to prevent stale content from previous file
+        this.lineCacheStartLine = -1;
 
-        // Calculate dynamic left margin based on max line number digits
         int maxDigits = String.valueOf(totalLines).length();
-        leftMargin = (int) ((maxDigits + 1) * charWidth + 10); // +1 for padding, +10 for spacing
+        leftMargin = (int) ((maxDigits + 1) * charWidth + 10);
 
         this.followTail = false;
         if (onFollowTailChanged != null) {
@@ -296,10 +268,6 @@ public class CanvasLogViewer extends GridPane {
         logger.info("Loaded file with {} lines, leftMargin={}px", totalLines, leftMargin);
     }
 
-    /**
-     * Set filtered line indexes (for search results).
-     * Pass null to clear filter and show all lines.
-     */
     public void setFilteredIndexes(IntArrayList indexes) {
         this.filteredIndexes = indexes;
         this.filteredCount = (indexes != null) ? indexes.size() : totalLines;
@@ -317,9 +285,6 @@ public class CanvasLogViewer extends GridPane {
         logger.info("Filter applied: showing {} of {} lines", filteredCount, totalLines);
     }
 
-    /**
-     * Clear filter and show all lines.
-     */
     public void clearFilter() {
         setFilteredIndexes(null);
     }
@@ -328,25 +293,15 @@ public class CanvasLogViewer extends GridPane {
         return filteredIndexes;
     }
 
-    /**
-     * Efficiently append a matching line to the current filter view.
-     * Used for real-time tail filtering.
-     */
     public void appendToFilter(long globalIndex) {
         if (filteredIndexes != null) {
             filteredIndexes.add((int) globalIndex);
             filteredCount++;
-            // Don't need full render here, refreshTail() usually follows
         }
     }
 
-    /**
-     * Set the live tail buffer.
-     * The viewer will treat these lines as continuation of the file.
-     */
-    private boolean followTail = true; // Default to true for tail mode
+    private boolean followTail = true;
 
-    // Callback to notify controller when internal state changes (e.g. auto disable)
     @Setter
     private Consumer<Boolean> onFollowTailChanged;
 
@@ -364,10 +319,6 @@ public class CanvasLogViewer extends GridPane {
         }
     }
 
-    /**
-     * Set the live tail buffer.
-     * The viewer will treat these lines as continuation of the file.
-     */
     public void setTailBuffer(List<LogEntry> tailBuffer) {
         this.tailBuffer = (tailBuffer != null) ? tailBuffer : Collections.emptyList();
         this.totalLines = fileLineCount + this.tailBuffer.size();
@@ -375,18 +326,14 @@ public class CanvasLogViewer extends GridPane {
         if (followTail) {
             scrollToBottom();
         } else {
-            updateScrollBar(); // Just update bar size, don't move view
+            updateScrollBar();
         }
     }
 
-    /**
-     * Refresh the view (e.g. when tail buffer updates).
-     */
     public void refreshTail() {
         this.totalLines = fileLineCount + tailBuffer.size();
-        lineCacheStartLine = -1; // Invalidate cache — tail content changed
+        lineCacheStartLine = -1;
 
-        // Clamp currentTopLine so it doesn't point beyond available lines
         long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
         long maxTop = Math.max(0, effectiveLines - visibleLineCount);
         if (currentTopLine > maxTop) {
@@ -403,47 +350,33 @@ public class CanvasLogViewer extends GridPane {
         }
     }
 
-    /**
-     * Atomically transition from tail mode to file-only viewing.
-     * Recalculates totalLines from fileLineCount only (tail buffer should already
-     * be cleared by caller), disables followTail, clamps scroll position, and
-     * re-renders. This is the single entry point for tail→file transition to
-     * avoid scattered state updates.
-     */
     public void exitTailMode() {
         this.followTail = false;
         if (onFollowTailChanged != null) {
             onFollowTailChanged.accept(false);
         }
 
-        // Recalculate total from file + whatever is left in tail buffer (should be 0)
         this.totalLines = fileLineCount + tailBuffer.size();
 
-        // Reset filter state that may have been set during tail
         this.filteredIndexes = null;
         this.filteredCount = 0;
 
-        // Invalidate line cache to prevent stale tail content from being rendered
         this.lineCacheStartLine = -1;
 
-        // Clamp scroll position to valid range
         long effectiveLines = totalLines;
         long maxTop = Math.max(0, effectiveLines - visibleLineCount);
         if (currentTopLine > maxTop) {
             currentTopLine = maxTop;
         }
 
-        // Sync smooth scroll state
         smoothScrollY = currentTopLine;
         targetScrollY = currentTopLine;
         scrollOffsetY = 0;
 
-        // Clear selection state
         this.selectedLine = -1;
         this.selectionAnchor = -1;
         this.selectedLineIndexes.clear();
 
-        // Sync scrollbar and render
         updateScrollBar();
         suppressScrollBarSync = true;
         vScrollBar.setValue(currentTopLine);
@@ -470,9 +403,6 @@ public class CanvasLogViewer extends GridPane {
         fireStatusUpdate(effectiveLines);
     }
 
-    /**
-     * Set search term to highlight in rendered lines.
-     */
     public void setSearchHighlight(String searchText, boolean isRegex, boolean caseSensitive) {
         if (searchText == null || searchText.isEmpty()) {
             this.searchPattern = null;
@@ -491,18 +421,11 @@ public class CanvasLogViewer extends GridPane {
         render();
     }
 
-    /**
-     * Clear search highlight.
-     */
     public void clearSearchHighlight() {
         this.searchPattern = null;
         render();
     }
 
-    /**
-     * Jump to specific line number (0-based).
-     * If filtered, accepts either a view index (0 <= line < filteredCount) or a global line index.
-     */
     public void jumpToLine(long line) {
         if (followTail) {
             setFollowTail(false);
@@ -549,8 +472,6 @@ public class CanvasLogViewer extends GridPane {
         fireStatusUpdate(effectiveLines);
     }
 
-    // Line content cache — avoids re-reading and re-allocating strings for lines
-    // that haven't changed between frames during smooth scroll
     private String[] lineCache = new String[0];
     private int[] lineLevelCache = new int[0];
     private long lineCacheStartLine = -1;
@@ -604,10 +525,6 @@ public class CanvasLogViewer extends GridPane {
         };
     }
 
-    /**
-     * Applies the light or dark palette. Canvas rendering cannot consume CSS, so
-     * colors are switched programmatically when the scene theme changes.
-     */
     private void applyPalette(boolean dark) {
         this.darkMode = dark;
         if (dark) {
@@ -673,21 +590,18 @@ public class CanvasLogViewer extends GridPane {
         gc.setFill(bgColor);
         gc.fillRect(0, 0, width, height);
 
-        // Allow rendering if we have either a reader OR a tail buffer
         if (reader == null && tailBuffer.isEmpty()) {
             return;
         }
 
         long effectiveLineCount = (filteredIndexes != null) ? filteredCount : totalLines;
 
-        // Render one extra line for smooth sub-pixel scrolling
         int linesToRender = visibleLineCount + 1;
 
-        // Populate line cache — reuse strings when currentTopLine hasn't changed
         if (lineCache.length < linesToRender) {
-            lineCache = new String[linesToRender + 10]; // small over-alloc
+            lineCache = new String[linesToRender + 10];
             lineLevelCache = new int[linesToRender + 10];
-            lineCacheStartLine = -1; // force refill
+            lineCacheStartLine = -1;
         }
         if (lineCacheStartLine != currentTopLine) {
             lineCacheStartLine = currentTopLine;
@@ -711,7 +625,6 @@ public class CanvasLogViewer extends GridPane {
         gc.rect(leftMargin, 0, width - leftMargin, height);
         gc.clip();
 
-        // Set font once for all content lines
         gc.setFont(MONO_FONT);
 
         for (int i = 0; i < linesToRender; i++) {
@@ -724,7 +637,7 @@ public class CanvasLogViewer extends GridPane {
                     ? filteredIndexes.get((int) viewIndex) : viewIndex;
 
             double y = PADDING + i * LINE_HEIGHT - scrollOffsetY;
-            if (y + LINE_HEIGHT < 0 || y > height) continue; // off-screen
+            if (y + LINE_HEIGHT < 0 || y > height) continue;
 
             String line = lineCache[i];
             if (line == null) line = "";
@@ -733,11 +646,9 @@ public class CanvasLogViewer extends GridPane {
         }
         gc.restore();
 
-        // Line number gutter
         gc.setFill(lineNumBg);
         gc.fillRect(0, 0, leftMargin - 5, height);
 
-        // Set font once for all line numbers
         gc.setFont(LINE_NUM_FONT);
 
         for (int i = 0; i < linesToRender; i++) {
@@ -751,7 +662,6 @@ public class CanvasLogViewer extends GridPane {
             double y = PADDING + i * LINE_HEIGHT - scrollOffsetY;
             if (y + LINE_HEIGHT < 0 || y > height) continue;
 
-            // Severity accent bar in the gutter gap (fixed; not affected by h-scroll)
             int level = (i < lineLevelCache.length) ? lineLevelCache[i] : 0;
             Color bar = levelBarColor(level);
             if (bar != null) {
@@ -775,29 +685,25 @@ public class CanvasLogViewer extends GridPane {
             return;
         }
 
-        // Compute visible character range to avoid rendering thousands of off-screen glyphs
         int visStart = Math.max(0, (int) ((leftMargin - drawX) / charWidth));
         int visEnd = Math.min(line.length(), (int) ((canvasWidth - drawX) / charWidth) + 1);
 
         boolean isSelected = selectedLineIndexes.contains(globalIndex);
 
-        // 0. Subtle row tint for severe levels (behind selection & highlights)
         Color tint = levelTintColor(levelCode);
         if (tint != null) {
             gc.setFill(tint);
             gc.fillRect(drawX, y, canvasWidth - leftMargin + currentScrollX, LINE_HEIGHT);
         }
 
-        // 1. Draw Selection Background
         if (isSelected) {
             gc.setFill(selectionColor);
             gc.fillRect(drawX, y, canvasWidth - leftMargin + currentScrollX, LINE_HEIGHT);
         }
 
-        // 2. Draw Search Highlights — only scan visible portion
         if (searchPattern != null) {
             Matcher m = searchPattern.matcher(line);
-            // Skip matches entirely before visible area
+
             gc.setFill(highlightBg);
             while (m.find()) {
                 if (m.end() < visStart) continue;
@@ -808,7 +714,6 @@ public class CanvasLogViewer extends GridPane {
             }
         }
 
-        // 3. Base text is always dark — readability over decoration
         gc.setFill(textColor);
         if (visStart > 0 || visEnd < line.length()) {
             String visibleText = line.substring(visStart, visEnd);
@@ -817,7 +722,6 @@ public class CanvasLogViewer extends GridPane {
             gc.fillText(line, drawX, y + 2);
         }
 
-        // 4. Recolor only the level token (subtle severity accent)
         if (levelCode != 0) {
             CharSequence scan = line.length() > 120 ? line.substring(0, 120) : line;
             Matcher lm = LEVEL_PATTERN.matcher(scan);
@@ -844,13 +748,12 @@ public class CanvasLogViewer extends GridPane {
                 hScrollBar.setValue(Math.max(0, Math.min(hScrollBar.getMax(), newVal)));
             } else {
                 double deltaY = e.getDeltaY();
-                // Notepad++ style: 3 lines per scroll notch, immediate, no animation
+
                 long linesToScroll = Math.round(-deltaY / 40.0) * 3;
                 if (linesToScroll == 0 && deltaY != 0) {
                     linesToScroll = deltaY > 0 ? -1 : 1;
                 }
 
-                // Smart Follow Logic:
                 if (linesToScroll < 0 && followTail) {
                     followTail = false;
                     if (onFollowTailChanged != null)
@@ -862,7 +765,6 @@ public class CanvasLogViewer extends GridPane {
 
                 long newTop = Math.max(0, Math.min(maxScroll, currentTopLine + linesToScroll));
 
-                // If scrolling to BOTTOM -> Turn ON follow
                 if (newTop >= maxScroll) {
                     newTop = maxScroll;
                     if (!followTail) {
@@ -872,7 +774,6 @@ public class CanvasLogViewer extends GridPane {
                     }
                 }
 
-                // Immediate snap — no animation
                 currentTopLine = newTop;
                 smoothScrollY = newTop;
                 targetScrollY = newTop;
@@ -891,10 +792,8 @@ public class CanvasLogViewer extends GridPane {
                 return;
             }
 
-            // Grab focus so keyboard navigation works on canvas
             canvas.requestFocus();
 
-            // Hide previous context menu if visible
             if (currentContextMenu != null) {
                 currentContextMenu.hide();
                 currentContextMenu = null;
@@ -935,7 +834,6 @@ public class CanvasLogViewer extends GridPane {
                 long effective = (filteredIndexes != null) ? filteredCount : totalLines;
 
                 if (e.isShiftDown() && selectionAnchor >= 0) {
-                    // Shift+Click: range select from anchor to clicked line
                     long rangeStart = Math.min(selectionAnchor, listIndex);
                     long rangeEnd = Math.max(selectionAnchor, listIndex);
                     selectedLineIndexes.clear();
@@ -952,10 +850,9 @@ public class CanvasLogViewer extends GridPane {
 
                     selectedLine = listIndex;
                     render();
-                    // Fire click handler for the clicked line
+
                     handleMouseClick(e);
                 } else {
-                    // Normal click: set anchor and select single line
                     isDragging = true;
                     dragStartViewLine = viewLine;
                     dragEndViewLine = viewLine;
@@ -977,7 +874,7 @@ public class CanvasLogViewer extends GridPane {
                 return;
 
             long viewLine = (long) ((e.getY() - PADDING + scrollOffsetY) / LINE_HEIGHT);
-            // Clamp to visible area
+
             viewLine = Math.max(0, Math.min(viewLine, visibleLineCount));
 
             if (viewLine != dragEndViewLine) {
@@ -1092,14 +989,12 @@ public class CanvasLogViewer extends GridPane {
                 }
             }
 
-            // Update selection
             selectedLine = newSel;
             selectionAnchor = newSel;
             selectedLineIndexes.clear();
             long globalIdx = (filteredIndexes != null) ? filteredIndexes.get((int) newSel) : newSel;
             selectedLineIndexes.add(globalIdx);
 
-            // Scroll to keep selection visible
             if (newSel < currentTopLine) {
                 currentTopLine = newSel;
             } else if (newSel >= currentTopLine + visibleLineCount) {
@@ -1114,7 +1009,6 @@ public class CanvasLogViewer extends GridPane {
             render();
             fireStatusUpdate(effectiveLines);
 
-            // Fire click handler so detail panel updates
             String content = getLineContent(globalIdx);
             if (onLineClick != null) {
                 onLineClick.handle(globalIdx, content);
@@ -1219,12 +1113,12 @@ public class CanvasLogViewer extends GridPane {
             }
             if (newTop != currentTopLine) {
                 currentTopLine = newTop;
-                // Sync smooth scroll state when scrollbar is dragged directly
+
                 smoothScrollY = newTop;
                 targetScrollY = newTop;
                 scrollOffsetY = 0;
                 render();
-                // Update status bar
+
                 fireStatusUpdate(effectiveLines);
             }
         });
@@ -1240,17 +1134,12 @@ public class CanvasLogViewer extends GridPane {
     }
 
     private void setupResizeHandler() {
-        // Remove feedback loop: only react to *allocated* size changes, and compute
-        // canvas size
-        // using stable scrollbar thickness.
         widthProperty().addListener((obs, o, n) -> resizeCanvas());
         heightProperty().addListener((obs, o, n) -> resizeCanvas());
 
-        // Also react if scrollbar gets skinned and its size changes
         vScrollBar.widthProperty().addListener((obs, o, n) -> resizeCanvas());
         hScrollBar.heightProperty().addListener((obs, o, n) -> resizeCanvas());
 
-        // initial
         resizeCanvas();
     }
 
@@ -1279,7 +1168,6 @@ public class CanvasLogViewer extends GridPane {
             public void handle(long now) {
                 double diff = targetScrollY - smoothScrollY;
                 if (Math.abs(diff) < SCROLL_SNAP_THRESHOLD) {
-                    // Close enough — snap to target
                     if (smoothScrollY != targetScrollY) {
                         smoothScrollY = targetScrollY;
                         applySmoothScroll();
@@ -1288,11 +1176,10 @@ public class CanvasLogViewer extends GridPane {
                         renderDirty = false;
                         render();
                     }
-                    // Animation complete — stop ticking until next scroll input
+
                     stop();
                     scrollAnimating = false;
                 } else {
-                    // Lerp toward target
                     smoothScrollY += diff * SCROLL_LERP;
                     applySmoothScroll();
                     renderDirty = false;
@@ -1300,15 +1187,12 @@ public class CanvasLogViewer extends GridPane {
                 }
             }
         };
-        // Don't start immediately — only start when scroll input arrives
+
         scrollAnimating = false;
     }
 
     private boolean scrollAnimating = false;
 
-    /**
-     * Applies the smooth scroll position to currentTopLine and scrollOffsetY.
-     */
     private void applySmoothScroll() {
         long newTopLine = (long) Math.floor(smoothScrollY);
         double fractional = smoothScrollY - newTopLine;
@@ -1324,7 +1208,6 @@ public class CanvasLogViewer extends GridPane {
         }
         renderDirty = true;
     }
-
 
     private String getLineContent(long globalIndex) {
         if (globalIndex < fileLineCount) {
@@ -1343,7 +1226,7 @@ public class CanvasLogViewer extends GridPane {
         long effectiveLines = (filteredIndexes != null) ? filteredCount : totalLines;
         long max = Math.max(0, effectiveLines - visibleLineCount);
         vScrollBar.setMax(max);
-        // Ensure visibleAmount provides a comfortable, draggable thumb proportion (minimum 12%)
+
         double minVisibleProportion = 0.12;
         double safeVisibleAmount = Math.max(visibleLineCount, effectiveLines * minVisibleProportion);
         vScrollBar.setVisibleAmount(safeVisibleAmount);
@@ -1374,7 +1257,6 @@ public class CanvasLogViewer extends GridPane {
         hScrollBar.setVisibleAmount(visibleWidth);
         hScrollBar.setBlockIncrement(visibleWidth / 2);
 
-        // Fire status update
         fireStatusUpdate(effectiveLines);
     }
 
@@ -1397,7 +1279,7 @@ public class CanvasLogViewer extends GridPane {
             onStatusUpdate.onStatusUpdate(0, 0, 0.0);
             return;
         }
-        long currentLine = Math.min(currentTopLine + 1, effectiveLines); // 1-indexed for display
+        long currentLine = Math.min(currentTopLine + 1, effectiveLines);
         double percentage = currentTopLine * 100.0 / effectiveLines;
         onStatusUpdate.onStatusUpdate(currentLine, effectiveLines, percentage);
     }
@@ -1416,22 +1298,18 @@ public class CanvasLogViewer extends GridPane {
         return (int) currentTopLine;
     }
 
-    /** Returns the number of lines from the indexed file (excludes tail buffer). */
     public long getFileLineCount() {
         return fileLineCount;
     }
 
-    /** Returns total lines (file indexed lines + tail buffer lines). */
     public long getTotalLines() {
         return totalLines;
     }
 
-    /** Requests a redraw of the canvas. */
     public void redraw() {
         render();
     }
 
-    /** Request focus on the canvas so keyboard navigation works. */
     public void requestCanvasFocus() {
         canvas.requestFocus();
     }
@@ -1484,12 +1362,10 @@ public class CanvasLogViewer extends GridPane {
         int count = getItemCount();
         int matches = 0;
 
-        // Safety: Limit scan to avoid main thread freeze
         int scanLimit = 50000;
         int limit = Math.min(count, scanLimit);
 
         for (int i = 0; i < limit; i++) {
-            // Get content
             long globalIndex;
             if (filteredIndexes != null) {
                 globalIndex = filteredIndexes.get(i);
@@ -1509,5 +1385,4 @@ public class CanvasLogViewer extends GridPane {
     public boolean hasSearchHighlight() {
         return searchPattern != null;
     }
-
 }

@@ -6,7 +6,6 @@ plugins {
 }
 
 group = 'com.seeloggyplus'
-// The project version is now defined in the gradle.properties file.
 
 java {
     toolchain {
@@ -28,8 +27,7 @@ javafx {
 }
 
 dependencies {
-    // mwiede/jsch is a drop-in fork of JSch that supports modern keys
-    // (ed25519, ecdsa, rsa-sha2) which the original 0.1.55 does not.
+
     implementation 'com.github.mwiede:jsch:0.2.20'
     compileOnly 'org.projectlombok:lombok:1.18.34'
     annotationProcessor 'org.projectlombok:lombok:1.18.34'
@@ -53,26 +51,16 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.0'
     implementation 'io.krakens:java-grok:0.1.9'
 
-    // TestFX Integration Testing
     testImplementation 'org.testfx:testfx-core:4.0.17'
     testImplementation 'org.testfx:testfx-junit5:4.0.17'
     testImplementation 'org.hamcrest:hamcrest:2.2'
     testImplementation 'org.assertj:assertj-core:3.24.2'
-    // Headless JavaFX rendering for CI (matches JavaFX 21)
+
     testRuntimeOnly 'org.testfx:openjfx-monocle:21.0.2'
 
-    // jqwik Property-Based Testing
     testImplementation 'net.jqwik:jqwik:1.9.2'
 }
 
-// Generates a version.properties file from the project version.
-//
-// The file is written to a dedicated generated-resources directory (NOT directly
-// into processResources' output dir) and that directory is registered as an extra
-// resource source. Declaring `version` as an input and the directory as an output
-// makes the generation cache-correct: Gradle's up-to-date checks / build cache can
-// no longer restore a stale processResources output that drops version.properties,
-// which previously made released builds fall back to the "DEV" version.
 def generatedVersionResources = "$buildDir/generated/version-resources"
 
 def generateVersionProperties = tasks.register('generateVersionProperties') {
@@ -84,20 +72,14 @@ def generateVersionProperties = tasks.register('generateVersionProperties') {
         propsFile.parentFile.mkdirs()
         propsFile.text = "version=${project.version}"
 
-        // Embed the release notes of this version so the app can show a
-        // "What's New" dialog after an update, without network access.
         def notesFile = file("docs/release-notes/${project.version}.md")
         def notesTarget = file("${generatedVersionResources}/release-notes.md")
         notesTarget.setText(notesFile.exists() ? notesFile.getText('UTF-8') : '', 'UTF-8')
     }
 }
-// Ensure the properties file is generated before resources are processed
 processResources.dependsOn generateVersionProperties
 sourceSets.main.resources.srcDir(generatedVersionResources)
 
-// A native animated splash appears before Main/JavaFX are loaded, including javaw
-// launches through the VBS shortcut. Keep the GIF inside the JAR so existing
-// installers and blue/green update layouts need no extra package entries.
 def generatedSplashResources = layout.buildDirectory.dir('generated/splash-resources')
 def generateStartupSplash = tasks.register('generateStartupSplash') {
     inputs.file('src/main/resources/style/theme.css')
@@ -105,7 +87,7 @@ def generateStartupSplash = tasks.register('generateStartupSplash') {
     inputs.property('version', project.version.toString())
     outputs.dir(generatedSplashResources)
     doLast {
-        // Remove assets from earlier generator versions, including the static PNG.
+
         delete generatedSplashResources
         def css = file('src/main/resources/style/theme.css').getText('UTF-8')
         def color = { String token ->
@@ -143,9 +125,7 @@ def generateStartupSplash = tasks.register('generateStartupSplash') {
         } finally {
             graphics.dispose()
         }
-        // GIF palette quantization can shift even flat token colours by a channel
-        // value. Derive one adaptive palette, then preserve the exact theme tokens
-        // for every frame and for the opaque runtime status overlay.
+
         def paletteBytes = new java.io.ByteArrayOutputStream()
         javax.imageio.ImageIO.write(image, 'gif', paletteBytes)
         def indexed = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(paletteBytes.toByteArray()))
@@ -175,8 +155,7 @@ def generateStartupSplash = tasks.register('generateStartupSplash') {
         try {
             writer.setOutput(output)
             writer.prepareWriteSequence(null)
-            // Native GIF playback continues even while FXMLLoader occupies the FX
-            // thread. One 1.2-second loop, without an application animation thread.
+
             int frames = 24
             for (int i = 0; i < frames; i++) {
                 def rendered = new java.awt.image.BufferedImage(480, 230, java.awt.image.BufferedImage.TYPE_INT_RGB)
@@ -194,8 +173,7 @@ def generateStartupSplash = tasks.register('generateStartupSplash') {
                 } finally {
                     frameGraphics.dispose()
                 }
-                // Explicit palette lookup avoids Java2D's indexed-image dithering
-                // and keeps both flat colours and antialiased edges consistent.
+
                 def frame = new java.awt.image.BufferedImage(480, 230, java.awt.image.BufferedImage.TYPE_BYTE_INDEXED, gifPalette)
                 int[] pixels = rendered.getRGB(0, 0, 480, 230, null, 0, 480)
                 byte[] indexes = new byte[pixels.length]
@@ -212,8 +190,7 @@ def generateStartupSplash = tasks.register('generateStartupSplash') {
                 def metadata = writer.getDefaultImageMetadata(javax.imageio.ImageTypeSpecifier.createFromRenderedImage(frame), null)
                 def tree = metadata.getAsTree('javax_imageio_gif_image_1.0')
                 def control = tree.getElementsByTagName('GraphicControlExtension').item(0)
-                // Supply the palette explicitly: default GIF metadata may contain
-                // the web palette rather than the image's custom indexed colours.
+
                 def table = tree.getElementsByTagName('LocalColorTable').item(0)
                 if (table == null) {
                     table = new javax.imageio.metadata.IIOMetadataNode('LocalColorTable')
@@ -231,13 +208,13 @@ def generateStartupSplash = tasks.register('generateStartupSplash') {
                     table.appendChild(entry)
                 }
                 control.setAttribute('disposalMethod', 'none')
-                control.setAttribute('delayTime', '5') // GIF delays are hundredths of a second.
+                control.setAttribute('delayTime', '5')
                 if (i == 0) {
                     def extensions = new javax.imageio.metadata.IIOMetadataNode('ApplicationExtensions')
                     def loop = new javax.imageio.metadata.IIOMetadataNode('ApplicationExtension')
                     loop.setAttribute('applicationID', 'NETSCAPE')
                     loop.setAttribute('authenticationCode', '2.0')
-                    loop.setUserObject([1, 0, 0] as byte[]) // Repeat until the main window appears.
+                    loop.setUserObject([1, 0, 0] as byte[])
                     extensions.appendChild(loop)
                     tree.appendChild(extensions)
                 }
@@ -249,7 +226,7 @@ def generateStartupSplash = tasks.register('generateStartupSplash') {
             writer.dispose()
             output.close()
         }
-        // Runtime status overlays use the exact same token colours as the image.
+
         def hex = { java.awt.Color value -> String.format('#%06x', value.getRGB() & 0xffffff) }
         def palette = generatedSplashResources.get().file('images/startup-splash.properties').asFile
         palette.setText("-sl-chrome=${hex(color('-sl-chrome'))}\n-sl-chrome-text=${hex(color('-sl-chrome-text'))}\n", 'UTF-8')
@@ -264,19 +241,17 @@ jar {
 
 test {
     useJUnitPlatform()
-    // The UI test suite builds many JavaFX scenes/stages; give the test JVM headroom.
+
     maxHeapSize = '2g'
-    // Keep tests hermetic: never hit the real update endpoint.
+
     systemProperty 'seeloggyplus.disableUpdateCheck', 'true'
-    // Isolate test data (DB, keystore, recent files) from the developer's real .data
+
     systemProperty 'seeloggyplus.dataDir', "${buildDir}/test-data"
     systemProperty 'seeloggyplus.launcherProperties', "${buildDir}/test-data/launcher.properties"
     doFirst {
         delete file("${buildDir}/test-data")
     }
 
-    // Headless JavaFX (Monocle) for CI runners without a display.
-    // Always headless, including local runs.
     systemProperty 'testfx.robot', 'glass'
     systemProperty 'testfx.headless', 'true'
     systemProperty 'glass.platform', 'Monocle'
@@ -305,8 +280,7 @@ tasks.register('runDev', JavaExec) {
     systemProperty 'seeloggyplus.dev', 'true'
     dependsOn generateStartupSplash
     jvmArgs "-splash:${generatedSplashResources.get().file('images/startup-splash.gif').asFile.absolutePath}"
-    // Optional local update simulation:
-    //   ./gradlew runDev -PupdateManifestUrl=http://localhost:8000/update-manifest.json
+
     if (project.hasProperty('updateManifestUrl')) {
         systemProperty 'seeloggyplus.updateManifestUrl', project.property('updateManifestUrl')
     }
@@ -352,8 +326,7 @@ tasks.register('packagePortableNoJre', Zip) {
             rename { "${project.name}.jar" }
         }
         from('launcher.bat')
-        // SeeLoggyPlus.vbs is intentionally NOT packaged: older installers reject
-        // unknown package entries. The app recreates it on startup (SilentLauncherInstaller).
+
         from('launcher.sh')
         from('launcher.properties')
         from('LAUNCHER_README.md')
@@ -380,7 +353,7 @@ tasks.register('packagePortableWithJre', Zip) {
             rename { "${project.name}.jar" }
         }
         from('launcher.bat')
-        // SeeLoggyPlus.vbs is intentionally NOT packaged (see packagePortableNoJre).
+
         from('launcher.sh')
         from('launcher.properties')
         from('LAUNCHER_README.md')
@@ -396,9 +369,6 @@ tasks.register('packagePlatform') {
     dependsOn 'packagePortableNoJre', 'packagePortableWithJre'
 }
 
-// ---------------------------------------------------------------------------
-// Update artifacts: per-platform manifest (merged later across platforms)
-// ---------------------------------------------------------------------------
 tasks.register('generatePlatformManifest', JavaExec) {
     group = 'distribution'
     description = 'Generate update-manifest-<platform>.json listing both platform assets'
@@ -457,9 +427,6 @@ tasks.register('buildUpdateArtifacts') {
     dependsOn 'generatePlatformManifest'
 }
 
-// ---------------------------------------------------------------------------
-// Custom JRE creation using jlink (without JavaFX modules — they're in the fat JAR)
-// ---------------------------------------------------------------------------
 tasks.register('createCustomJre', Exec) {
     group = 'distribution'
     description = 'Create a minimal custom JRE using jlink'
@@ -476,11 +443,10 @@ tasks.register('createCustomJre', Exec) {
     outputs.dir(jreOutput)
 
     doFirst {
-        // Clean previous output so jlink doesn't fail on existing directory
+
         delete jreOutput
     }
 
-    // Resolve the jlink executable from the Java 21 toolchain
     def javaToolchainService = project.extensions.getByType(JavaToolchainService)
     def launcher = javaToolchainService.launcherFor {
         languageVersion = JavaLanguageVersion.of(21)

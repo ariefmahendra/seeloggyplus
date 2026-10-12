@@ -1,5 +1,4 @@
 package com.seeloggyplus.features.update.infrastructure;
-
 
 import com.seeloggyplus.features.update.domain.UpdateException;
 import org.junit.jupiter.api.Test;
@@ -60,7 +59,7 @@ class UpdateBootstrapperTest {
             stageVersion(layout, "0.2.0");
             stageVersion(layout, "0.3.0");
             layout.writePrevious("0.2.0");
-            layout.writeCurrent("0.3.0"); // no .ok marker written
+            layout.writeCurrent("0.3.0");
 
             UpdateBootstrapper bootstrapper = new UpdateBootstrapper(layout);
             assertTrue(bootstrapper.shouldRollback());
@@ -98,7 +97,7 @@ class UpdateBootstrapperTest {
             stageVersion(layout, "0.5.1");
             stageVersion(layout, "0.6.3");
             layout.writePrevious("0.5.1");
-            layout.writeCurrent("0.6.3"); // first start: no .ok marker yet
+            layout.writeCurrent("0.6.3");
 
             Optional<String> rollback = new UpdateBootstrapper(layout).confirmStartup("0.6.3");
 

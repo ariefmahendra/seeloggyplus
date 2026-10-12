@@ -24,12 +24,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 import javafx.scene.Node;
 
-/**
- * The Find-in-Files "Context" dropdown must look and behave like the Preferences
- * dropdowns: the pref-list highlight rule used to leak onto the ComboBox button
- * cell, making that one field look different (translucent dark/blue selection)
- * from every other themed field.
- */
 @ExtendWith(ApplicationExtension.class)
 class DropdownConsistencyTest {
 

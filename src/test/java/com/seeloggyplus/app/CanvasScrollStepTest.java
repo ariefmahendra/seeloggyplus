@@ -22,10 +22,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Defect fix: the log viewer must support stepping one row at a time via the
- * scrollbar up/down buttons.
- */
 @ExtendWith(ApplicationExtension.class)
 class CanvasScrollStepTest {
 
@@ -66,7 +62,7 @@ class CanvasScrollStepTest {
 
             ScrollBar bar = viewer.getVScrollBar();
             assertNotNull(bar, "log viewer must expose its vertical scrollbar");
-            // Start from the top (the viewer auto-scrolls to bottom on load).
+
             viewer.setFollowTail(false);
             bar.setValue(0);
             bar.setUnitIncrement(1);

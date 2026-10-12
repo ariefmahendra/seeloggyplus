@@ -14,18 +14,6 @@ import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Guards the theming contract:
- *
- * <ol>
- *   <li>Every theme (graphite/dark/light) defines the exact same set of design
- *       tokens, so adding a token to the base theme forces a decision for every
- *       other theme.</li>
- *   <li>Base + component stylesheets must consume tokens instead of hard-coded
- *       colours, otherwise a component silently stops following the selected
- *       theme (this is what made the light theme look "half graphite").</li>
- * </ol>
- */
 class ThemeTokensTest {
 
     private static final String THEME = "/style/theme.css";
@@ -64,19 +52,16 @@ class ThemeTokensTest {
     @Test
     @DisplayName("Base + component CSS use tokens, not hard-coded colours")
     void componentCssHasNoHardCodedColours() throws Exception {
-        // theme.css: ignore the token-definition block itself.
         String theme = removeRootBlock(read(THEME));
         assertNoRawColours(theme, THEME);
         assertNoRawColours(read(COMPONENTS), COMPONENTS);
         assertNoRawColours(read(RICHTEXT), RICHTEXT);
     }
 
-    // -------------------------------------------------------------------------
-
     private static void assertNoRawColours(String css, String name) {
         Pattern raw = Pattern.compile("#[0-9a-fA-F]{3,8}|rgba?\\s*\\(", Pattern.CASE_INSENSITIVE);
         List<String> offenders = new ArrayList<>();
-        // Comments may mention colours (e.g. documentation); they are not styles.
+
         String withoutComments = css.replaceAll("(?s)/\\*.*?\\*/", "");
         String[] lines = withoutComments.split("\\R");
         for (int i = 0; i < lines.length; i++) {
@@ -84,8 +69,7 @@ class ThemeTokensTest {
             Matcher m = raw.matcher(line);
             while (m.find()) {
                 String match = m.group().toLowerCase();
-                // Drop shadows and the shared selection literal are allowed: they
-                // are not component colour choices.
+
                 boolean allowedShadow = match.startsWith("rgba") && line.contains("rgba(0, 0, 0");
                 boolean allowedSelection = line.replace(" ", "").toLowerCase().contains("rgba(52,58,64,0.18)");
                 if (!allowedShadow && !allowedSelection) {

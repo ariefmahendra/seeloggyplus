@@ -7,10 +7,6 @@ import java.nio.file.Path;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 
-/**
- * Orchestrates a full update: download the asset, stage the new version and activate it.
- * UI-free so it can be tested with injected downloaders and temp directories.
- */
 public class UpdateCoordinator {
 
     public interface ProgressListener {
@@ -75,7 +71,6 @@ public class UpdateCoordinator {
                 try {
                     Files.deleteIfExists(zip);
                 } catch (IOException ignored) {
-                    // best effort cleanup
                 }
             }
         }

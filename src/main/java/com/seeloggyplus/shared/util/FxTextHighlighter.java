@@ -9,13 +9,6 @@ import javafx.scene.layout.Region;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Builds a single-line rich-text row that highlights every occurrence of a search pattern.
- * <p>
- * Mirrors the canvas log viewer approach: the match gets a yellow background mark while the
- * text stays readable. An {@link HBox} is used instead of {@link javafx.scene.text.TextFlow}
- * so the row never wraps, keeping cell heights stable (the caller clips overflow).
- */
 public final class FxTextHighlighter {
 
     public static final String HIGHLIGHT_STYLE_CLASS = "match-highlight";
@@ -24,10 +17,6 @@ public final class FxTextHighlighter {
     private FxTextHighlighter() {
     }
 
-    /**
-     * Appends {@code text} to {@code target}, wrapping each pattern match in a
-     * yellow-background run. Zero-length matches are skipped safely.
-     */
     public static void apply(HBox target, String text, Pattern pattern) {
         if (target == null || text == null) {
             return;
@@ -66,7 +55,7 @@ public final class FxTextHighlighter {
         box.setSpacing(0);
         box.setAlignment(Pos.CENTER_LEFT);
         box.setFillHeight(false);
-        // Keep runs at their natural width; the cell clips overflow so rows stay single-line.
+
         box.setMinWidth(Region.USE_PREF_SIZE);
         apply(box, text, pattern);
         return box;

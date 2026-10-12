@@ -1,15 +1,10 @@
 package com.seeloggyplus.shared.ssh;
 
-/**
- * Raised when an SSH host key cannot be trusted: the server is unknown, or its
- * key changed since it was saved in the application known_hosts file.
- */
 public class HostKeyVerificationException extends RuntimeException {
 
     public enum Reason {
-        /** Host is not present in known_hosts yet (first connection). */
+
         UNKNOWN,
-        /** A different key was already trusted for this host (possible MITM). */
         CHANGED
     }
 

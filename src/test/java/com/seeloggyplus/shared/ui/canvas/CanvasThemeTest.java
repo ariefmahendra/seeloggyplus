@@ -20,10 +20,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * The canvas log viewer ignores CSS and switches its palette programmatically
- * based on the scene theme. This verifies the light/dark switch (Phase 7).
- */
 @ExtendWith(ApplicationExtension.class)
 class CanvasThemeTest {
 

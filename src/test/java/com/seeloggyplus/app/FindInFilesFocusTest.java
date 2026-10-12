@@ -6,7 +6,6 @@ import javafx.css.PseudoClass;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
@@ -23,12 +22,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 import javafx.scene.Node;
 
-/**
- * Find-in-Files focus regression: when a button or the Context dropdown receives
- * focus, the rendered text must stay readable (>= 4.5:1) in every theme. The
- * default action button ("Open &amp; Jump") used to drop to 3.39:1 in Dark because
- * Modena painted its own focus layers under the light text.
- */
 @ExtendWith(ApplicationExtension.class)
 class FindInFilesFocusTest {
 
@@ -58,8 +51,6 @@ class FindInFilesFocusTest {
             assertFocusedContrast(root, "#closeButton", theme, "Close");
             assertFocusedContrast(root, "#contextSelector", theme, "Context dropdown");
 
-            // The default action is disabled until a result is picked; enable it to
-            // measure the focused state the user actually interacts with.
             Button open = (Button) root.lookup("#openButton");
             assertNotNull(open, theme + ": Open & Jump must exist");
             Platform.runLater(() -> open.setDisable(false));
@@ -116,7 +107,6 @@ class FindInFilesFocusTest {
         WaitForAsyncUtils.waitForFxEvents();
     }
 
-    /** Contrast between the dominant background colour and the most distinct text colour. */
     private static double renderedContrast(Image image) {
         int[] buckets = new int[64];
         int w = (int) image.getWidth();

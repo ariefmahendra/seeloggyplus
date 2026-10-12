@@ -31,7 +31,6 @@ class FileManagerStatePersistenceTest {
         try {
             Platform.startup(() -> {});
         } catch (IllegalStateException ignored) {
-            // Already initialized
         }
     }
 
@@ -70,12 +69,10 @@ class FileManagerStatePersistenceTest {
         UnifiedFileManagerDialogController controller = new UnifiedFileManagerDialogController();
         InMemoryPreferenceService prefService = new InMemoryPreferenceService();
 
-        // Inject preferenceService
         Field prefField = UnifiedFileManagerDialogController.class.getDeclaredField("preferenceService");
         prefField.setAccessible(true);
         prefField.set(controller, prefService);
 
-        // Inject locationTree (local node + server node)
         Field locTreeField = UnifiedFileManagerDialogController.class.getDeclaredField("locationTree");
         locTreeField.setAccessible(true);
         TreeView<UnifiedFileManagerDialogController.LocationItem> locationTree = new TreeView<>();
@@ -94,12 +91,10 @@ class FileManagerStatePersistenceTest {
         locationTree.setRoot(root);
         locTreeField.set(controller, locationTree);
 
-        // Inject currentLocation
         Field curLocField = UnifiedFileManagerDialogController.class.getDeclaredField("currentLocation");
         curLocField.setAccessible(true);
         curLocField.set(controller, server2Item);
 
-        // Test saving file
         FileInfo fileA = new FileInfo();
         fileA.setName("file_a.log");
         fileA.setPath("/var/log/a/file_a.log");
@@ -109,11 +104,9 @@ class FileManagerStatePersistenceTest {
         saveMethod.setAccessible(true);
         saveMethod.invoke(controller, fileA);
 
-        // Verify preferences were saved
         assertEquals("Server 2", prefService.getPreferencesByCode("file_manager_last_location").orElse(null));
         assertEquals("file_a.log", prefService.getPreferencesByCode("file_manager_last_file_Server 2").orElse(null));
 
-        // Test restoreLastLocation selects Server 2 (index 1)
         Method restoreLocMethod = UnifiedFileManagerDialogController.class.getDeclaredMethod("restoreLastLocation");
         restoreLocMethod.setAccessible(true);
         restoreLocMethod.invoke(controller);
@@ -161,4 +154,3 @@ class FileManagerStatePersistenceTest {
         assertEquals(target, table.getSelectionModel().getSelectedItem());
     }
 }
-

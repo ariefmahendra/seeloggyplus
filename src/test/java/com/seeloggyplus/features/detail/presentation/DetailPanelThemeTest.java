@@ -31,10 +31,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.seeloggyplus.shared.util.SyntaxHighlighter;
 import java.net.URL;
 
-/**
- * Verifies the log detail panel (RichTextFX) is wired to the theme stylesheet
- * and that its background/text follow the light/dark tokens.
- */
 @ExtendWith(ApplicationExtension.class)
 class DetailPanelThemeTest {
 
@@ -55,7 +51,6 @@ class DetailPanelThemeTest {
         onFxThread(() -> AppTheme.setDark(false));
     }
 
-    /** MainController must create the detail area with the richtext stylesheet. */
     @Test
     void detailAreaHasRichtextStylesheet() {
         onFxThread(() -> {
@@ -92,8 +87,6 @@ class DetailPanelThemeTest {
             StyleClassedTextArea area = themedArea();
             String line = "plain unstyled log line";
 
-            // The application always applies highlighting spans; unmatched parts
-            // carry the "default" class so they follow the theme.
             area.replaceText(line);
             area.setStyleSpans(0, SyntaxHighlighter.computeLogHighlighting(line));
             rootLayout(area);
@@ -114,7 +107,6 @@ class DetailPanelThemeTest {
         });
     }
 
-    /** Builds a standalone detail area whose scene is themed via AppTheme. */
     private StyleClassedTextArea themedArea() {
         StyleClassedTextArea area = new StyleClassedTextArea();
         area.setEditable(false);

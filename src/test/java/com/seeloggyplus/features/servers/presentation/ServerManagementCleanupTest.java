@@ -23,10 +23,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 
-/**
- * Server Management is now a pure CRUD/reorder dialog: grouping and favourite
- * management live in File Management, so the old controls must be gone.
- */
 @ExtendWith(ApplicationExtension.class)
 class ServerManagementCleanupTest {
 

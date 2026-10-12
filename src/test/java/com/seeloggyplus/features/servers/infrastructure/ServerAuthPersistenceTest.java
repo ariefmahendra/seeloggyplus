@@ -19,10 +19,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Authentication settings (password vs private key) must round-trip through the
- * database, with the key passphrase stored encrypted like the password.
- */
 class ServerAuthPersistenceTest {
 
     private ServerManagementService service;

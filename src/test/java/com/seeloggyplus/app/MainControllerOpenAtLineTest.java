@@ -9,7 +9,6 @@ import com.seeloggyplus.shared.ui.canvas.CanvasLogViewer;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.stage.Stage;
@@ -28,11 +27,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
-/**
- * Verifies that opening a file with a target line jumps the canvas viewer to that
- * specific line, clamps out-of-range lines, and keeps the default behaviour when
- * no target line is requested.
- */
 @ExtendWith(ApplicationExtension.class)
 public class MainControllerOpenAtLineTest {
 

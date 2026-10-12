@@ -1,13 +1,3 @@
-# Stops any running SeeLoggyPlus application instance.
-#
-# `gradlew runDev` launches the app as com.seeloggyplus.app.Main (sometimes
-# com.seeloggyplus.app.Launcher) and, on Windows, that process keeps file locks on
-# build/resources/main. If `gradlew test` / `gradlew build` fails with
-# "Failed to clean up stale outputs", run this script (and `gradlew --stop`
-# if needed), then retry the build.
-#
-# Usage: powershell -ExecutionPolicy Bypass -File scripts/stop-app.ps1
-
 $ErrorActionPreference = 'SilentlyContinue'
 
 $targets = Get-CimInstance Win32_Process -Filter "Name='java.exe' OR Name='javaw.exe'" |

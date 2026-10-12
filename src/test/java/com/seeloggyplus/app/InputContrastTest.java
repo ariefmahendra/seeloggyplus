@@ -4,7 +4,6 @@ import com.seeloggyplus.shared.ui.AppTheme;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
-import javafx.scene.control.Control;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextArea;
@@ -31,11 +30,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Text inside input fields must be contrasty and match the active theme:
- * dark text on light fields in light mode, light text on dark fields in dark
- * mode (WCAG AA >= 4.5:1).
- */
 @ExtendWith(ApplicationExtension.class)
 class InputContrastTest {
 
@@ -130,8 +124,6 @@ class InputContrastTest {
         Color fg = promptNode.getFill() instanceof Color c ? c : null;
         assertNotNull(fg, name + " prompt fill must be a colour");
 
-        // Prompt text sits on the inner background (the last opaque fill), not on
-        // the outer border/shadow layers.
         Color bg = innerBackground(field, dark);
         assertNotNull(bg, name + " inner background must be resolvable");
         double ratio = contrastRatio(fg, bg);

@@ -7,21 +7,10 @@ import com.seeloggyplus.shared.ssh.SSHService;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Remote log search using {@code find}/{@code grep} on the server.
- * <p>
- * Design notes (performance):
- * <ul>
- *   <li>Search returns matching lines with numbers via {@code grep -n}, one remote pass.</li>
- *   <li>Results are capped to avoid flooding the UI.</li>
- *   <li>Preview is lazy and only loads a small line range per selected match.</li>
- * </ul>
- */
 public class RemoteLogSearchServiceImpl implements RemoteLogSearchService {
 
     static final int MAX_RESULTS = 500;
@@ -33,7 +22,7 @@ public class RemoteLogSearchServiceImpl implements RemoteLogSearchService {
             throw new IllegalArgumentException("Search server, root path, and query are required");
         }
         String grepFlags = "n" + (caseSensitive ? "" : "i") + (regex ? "E" : "F") + "H";
-        // Search every regular file, not just known log extensions.
+
         String command = "find " + quote(rootPath)
                 + " -type f -exec grep -" + grepFlags + " --binary-files=without-match " + quote(query) + " {} + 2>/dev/null"
                 + " | head -n " + MAX_RESULTS;
@@ -87,12 +76,6 @@ public class RemoteLogSearchServiceImpl implements RemoteLogSearchService {
         return new ArrayList<>(unique);
     }
 
-    /**
-     * Parses {@code path:lineNumber:content}.
-     * <p>
-     * Scanning from the left for the first {@code :<digits>:} keeps content that
-     * contains colons and digits intact (e.g. {@code "...port:8080:refused"}).
-     */
     static RemoteLogSearchMatch parseMatchLine(String line) {
         if (line == null || line.isEmpty()) {
             return null;
@@ -150,7 +133,6 @@ public class RemoteLogSearchServiceImpl implements RemoteLogSearchService {
                 String text = raw.substring(separator + 1);
                 lines.add(new PreviewLine(lineNumber, text, lineNumber == targetLine));
             } catch (NumberFormatException ignored) {
-                // skip malformed preview lines defensively
             }
         }
         return lines;

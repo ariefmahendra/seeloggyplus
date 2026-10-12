@@ -50,10 +50,6 @@ import javafx.geometry.Insets;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Region;
 
-/**
- * Dialog controller for finding log files on a remote server by searching
- * file contents, with lazy line-context preview and open-at-line support.
- */
 public class RemoteLogSearchDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(RemoteLogSearchDialogController.class);
@@ -121,7 +117,6 @@ public class RemoteLogSearchDialogController {
     private int maxTailWindow = 20000;
     private TailRecommendationDecision recommendationDecision = this::showTailRecommendationDialog;
 
-    /** Decision returned when a match is in the head and the tail window must grow. */
     enum TailChoice {
         TAIL_RECOMMENDED, OPEN_INSTEAD, CANCEL
     }
@@ -147,7 +142,6 @@ public class RemoteLogSearchDialogController {
         this.maxTailWindow = Math.max(1, maxTailWindow);
     }
 
-    /** Injected for tests so the warning dialog can be resolved without user interaction. */
     void setRecommendationDecision(TailRecommendationDecision decision) {
         this.recommendationDecision = decision != null ? decision : this::showTailRecommendationDialog;
     }
@@ -162,7 +156,6 @@ public class RemoteLogSearchDialogController {
         contentColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().content()));
         lineColumn.setStyle("-fx-alignment: CENTER-RIGHT;");
 
-        // Columns always fit the window: fixed narrow line column, content absorbs the rest.
         lineColumn.setResizable(false);
         lineColumn.setMinWidth(70);
         lineColumn.setPrefWidth(80);
@@ -560,17 +553,14 @@ public class RemoteLogSearchDialogController {
         return tailAction;
     }
 
-    /** True when the user chose Open & Jump even after a tail recommendation. */
     public boolean isOpenInstead() {
         return openInstead;
     }
 
-    /** Number of trailing lines to tail (0 = use the default window). */
     public int getTailWindowLines() {
         return tailWindowLines;
     }
 
-    /** 0-based index within the tail buffer of the target line, or -1. */
     public int getTailJumpIndex() {
         return tailJumpIndex;
     }

@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Tiny CLI option parser supporting repeated flags (e.g. {@code --asset a=b}). */
 final class CliOptions {
 
     private final Map<String, List<String>> values;

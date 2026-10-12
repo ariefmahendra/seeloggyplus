@@ -12,14 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Regression tests for the "released app shows vDEV" defect.
- *
- * The released application read {@code /version.properties} off the classpath. When
- * that resource was missing (the generated resource was not reliably packaged), the
- * version silently fell back to "DEV" even for tagged releases. These tests lock in
- * that the Gradle build always generates and packages a real version.
- */
 class AppVersionTest {
 
     @Test

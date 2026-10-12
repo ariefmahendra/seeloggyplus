@@ -8,12 +8,8 @@ import java.util.Collections;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Syntax highlighter using RichTextFX StyleSpans for JSON, XML, and Log levels.
- */
 public class SyntaxHighlighter {
 
-    // JSON Pattern
     private static final Pattern JSON_PATTERN = Pattern.compile(
             "(?<KEY>\"([^\"\\\\]|\\\\.)*\"(?=\\s*:))|" +
             "(?<STRING>\"([^\"\\\\]|\\\\.)*\")|" +
@@ -23,7 +19,6 @@ public class SyntaxHighlighter {
             "(?<PUNCTUATION>[\\[\\]{}:,])"
     );
 
-    // XML Pattern
     private static final Pattern XML_TAG_PATTERN = Pattern.compile(
             "(?<ELEMENT>(?<OPENBRACKET></?\\h*)(?<TAGNAME>[a-zA-Z_][a-zA-Z0-9._:-]*)(?<ATTRIBUTES>[^<>]*)(?<CLOSEBRACKET>\\h*/?>))|" +
             "(?<COMMENT><!--[\\s\\S]*?-->)|" +
@@ -35,14 +30,10 @@ public class SyntaxHighlighter {
             "([a-zA-Z_][a-zA-Z0-9._:-]*)\\s*(=)\\s*(\"[^\"]*\"|'[^']*')"
     );
 
-    // Log level Pattern
     private static final Pattern LOG_LEVEL_PATTERN = Pattern.compile(
             "(?i)(ERROR|FATAL|EXCEPTION|WARN|INFO|DEBUG|TRACE)"
     );
 
-    /**
-     * Compute syntax highlighting spans for JSON text.
-     */
     public static StyleSpans<Collection<String>> computeJsonHighlighting(String text) {
         if (text == null || text.isEmpty()) {
             return new StyleSpansBuilder<Collection<String>>().add(Collections.emptyList(), 0).create();
@@ -78,9 +69,6 @@ public class SyntaxHighlighter {
         return spansBuilder.create();
     }
 
-    /**
-     * Compute syntax highlighting spans for XML text.
-     */
     public static StyleSpans<Collection<String>> computeXmlHighlighting(String text) {
         if (text == null || text.isEmpty()) {
             return new StyleSpansBuilder<Collection<String>>().add(Collections.emptyList(), 0).create();
@@ -132,9 +120,6 @@ public class SyntaxHighlighter {
         return spansBuilder.create();
     }
 
-    /**
-     * Compute log level highlighting spans (ERROR, WARN, INFO, DEBUG, TRACE).
-     */
     public static StyleSpans<Collection<String>> computeLogHighlighting(String text) {
         if (text == null || text.isEmpty()) {
             return new StyleSpansBuilder<Collection<String>>().add(Collections.emptyList(), 0).create();

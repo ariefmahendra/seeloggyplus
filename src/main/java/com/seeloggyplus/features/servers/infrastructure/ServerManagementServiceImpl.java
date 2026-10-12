@@ -9,10 +9,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * High-quality implementation of ServerManagementService
- * Handles business logic for SSH server CRUD operations
- */
     public class ServerManagementServiceImpl implements ServerManagementService {
 
     private static final Logger logger = LoggerFactory.getLogger(ServerManagementServiceImpl.class);
@@ -22,14 +18,6 @@ import java.util.UUID;
         this.serverManagementRepository = new ServerManagementRepositoryImpl();
     }
 
-    /**
-     * Save or update SSH server configuration
-     * - If server has no ID (new): generate UUID and set creation timestamp
-     * - If server has ID (existing): update existing record
-     * 
-     * @param server SSHServer to save/update
-     * @throws IllegalArgumentException if server is null or invalid
-     */
     @Override
     public void reorderServers(List<String> ids) {
         serverManagementRepository.reorderServers(ids);
@@ -44,7 +32,7 @@ import java.util.UUID;
     public void createGroup(String name) {
         String clean = normalizeGroupPath(name);
         List<String> existing = serverManagementRepository.getGroupNames();
-        // Create any missing ancestor so nested paths ("Parent/Child") always render.
+
         StringBuilder path = new StringBuilder();
         for (String segment : clean.split("/")) {
             if (path.length() > 0) {
@@ -73,7 +61,7 @@ import java.util.UUID;
         if (serverManagementRepository.getGroupNames().contains(to)) {
             throw new IllegalArgumentException("A group named '" + to + "' already exists");
         }
-        // Make sure the target parent exists before renaming the subtree.
+
         int lastSlash = to.lastIndexOf('/');
         if (lastSlash > 0) {
             createGroup(to.substring(0, lastSlash));
@@ -89,7 +77,6 @@ import java.util.UUID;
         logger.info("Deleted server group subtree: {}", clean);
     }
 
-    /** Normalizes a group path ("Parent/Child"), rejecting blank segments. */
     private static String normalizeGroupPath(String name) {
         String raw = name == null ? "" : name.trim();
         if (raw.isEmpty()) {
@@ -122,7 +109,6 @@ import java.util.UUID;
             throw new IllegalArgumentException("Invalid server configuration: " + error);
         }
 
-        // New server - generate ID and set creation time
         if (server.getId() == null || server.getId().trim().isEmpty()) {
             server.setId(UUID.randomUUID().toString());
             server.setCreatedAt(LocalDateTime.now());
@@ -140,12 +126,6 @@ import java.util.UUID;
         }
     }
 
-    /**
-     * Delete SSH server by ID
-     * 
-     * @param id Server ID to delete
-     * @throws IllegalArgumentException if id is null or empty
-     */
     @Override
     public void deleteServer(String id) {
         if (id == null || id.trim().isEmpty()) {
@@ -154,7 +134,7 @@ import java.util.UUID;
         }
 
         logger.info("Deleting server: {}", id);
-        
+
         try {
             serverManagementRepository.deleteServer(id);
             logger.debug("Server deleted successfully: {}", id);
@@ -164,12 +144,6 @@ import java.util.UUID;
         }
     }
 
-    /**
-     * Update last used timestamp for server
-     * Called when user successfully connects to server
-     * 
-     * @param id Server ID
-     */
     @Override
     public void updateServerLastUsed(String id) {
         if (id == null || id.trim().isEmpty()) {
@@ -178,24 +152,18 @@ import java.util.UUID;
         }
 
         logger.debug("Updating last used timestamp for server: {}", id);
-        
+
         try {
             serverManagementRepository.updateServerLastUsed(id);
         } catch (Exception e) {
             logger.error("Failed to update last used for server: {}", id, e);
-            // Don't throw - this is not critical
         }
     }
 
-    /**
-     * Get all configured SSH servers
-     * 
-     * @return List of all servers (never null, may be empty)
-     */
     @Override
     public List<SSHServerModel> getAllServers() {
         logger.debug("Fetching all servers");
-        
+
         try {
             List<SSHServerModel> servers = serverManagementRepository.getAllServers();
             logger.info("Retrieved {} servers", servers.size());

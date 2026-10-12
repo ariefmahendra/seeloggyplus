@@ -7,17 +7,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Generates a per-platform manifest. Assets are passed as {@code --asset key=file}
- * and their URL is derived from {@code --base-url}.
- *
- * <pre>
- * --version 0.2.0 --base-url https://.../download/0.2.0 --out partial.json
- * --asset windows-nojre=build/distributions/app-win.zip
- * --asset windows-jre=build/distributions/app-win-jre.zip
- * [--channel stable] [--min 0.1.0] [--notes https://...]
- * </pre>
- */
 public final class ManifestGeneratorCli {
 
     private ManifestGeneratorCli() {

@@ -1,9 +1,7 @@
 package com.seeloggyplus.features.update.presentation;
-
 
 import com.seeloggyplus.shared.ui.AppTheme;
 import javafx.application.Platform;
-import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.image.Image;
@@ -25,11 +23,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * The What's New dialog must be fully themed: app icon header, theme tokens on
- * every control, a primary "Got it" button and the embedded release notes text.
- * Renders snapshots for Graphite/Light/Dark under {@code build/whats-new/}.
- */
 @ExtendWith(ApplicationExtension.class)
 class WhatsNewDialogTest {
 
@@ -77,8 +70,6 @@ class WhatsNewDialogTest {
     @DisplayName("renders correctly in Graphite, Light and Dark")
     void rendersInAllThemes() throws Exception {
         for (AppTheme.Theme theme : AppTheme.Theme.values()) {
-            // Switch the theme BEFORE opening: a modal dialog cannot outlive a theme
-            // change in the real app either.
             onFxThread(() -> {
                 AppTheme.setTheme(AppTheme.Theme.DARK);
                 AppTheme.setTheme(theme);
@@ -105,7 +96,6 @@ class WhatsNewDialogTest {
         }
     }
 
-    /** Opens the modal dialog on a helper thread and returns its window. */
     private Window openDialog(String version, String notes) throws Exception {
         Thread dialogThread = new Thread(() -> WhatsNewDialog.show(version, notes));
         dialogThread.setDaemon(true);

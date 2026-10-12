@@ -47,10 +47,10 @@ class JsonPrettifyTest {
         String result = JsonPrettify.prettifyFromLog(log);
 
         assertNotNull(result);
-        // Prefix and suffix must remain intact
+
         assertTrue(result.startsWith("2026-09-05 10:00:00 [INFO] {worker-1} - Received payload: "));
         assertTrue(result.endsWith(" successfully."));
-        // JSON inside must be formatted
+
         assertTrue(result.contains("\"userId\" : 101"));
         assertTrue(result.contains("\"name\" : \"Alice\""));
     }

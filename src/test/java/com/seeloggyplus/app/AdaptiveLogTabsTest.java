@@ -140,7 +140,7 @@ class AdaptiveLogTabsTest {
                 Node close = header.lookup(".tab-close-button");
                 assertNotNull(close);
                 assertTrue(close.isVisible());
-                // A shaped Region's ink bounds are smaller than its allocated button area.
+
                 assertTrue(close.getLayoutBounds().getWidth() >= 12, "The close target must retain its allocated size");
                 assertTrue(close.localToScene(close.getBoundsInLocal()).getMaxX()
                         <= header.localToScene(header.getBoundsInLocal()).getMaxX() + 1,

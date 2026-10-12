@@ -1,5 +1,4 @@
 package com.seeloggyplus.features.update.infrastructure;
-
 
 import com.seeloggyplus.features.update.domain.UpdateManifest;
 import org.junit.jupiter.api.Test;
@@ -32,5 +31,4 @@ class UpdateManifestWriterTest {
         String json = UpdateManifestWriter.build("", "1.0.0", "", "", "", List.of());
         assertTrue(json.contains("\"channel\": \"stable\""));
     }
-
 }

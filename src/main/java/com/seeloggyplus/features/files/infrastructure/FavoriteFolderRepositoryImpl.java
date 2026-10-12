@@ -34,7 +34,7 @@ public class FavoriteFolderRepositoryImpl implements FavoriteFolderRepository {
             return favoriteFolder;
         } catch (SQLException e) {
             logger.error("Error saving favorite folder: {}", favoriteFolder.getName(), e);
-            if (e.getErrorCode() == 19) { // SQLite constraint violation
+            if (e.getErrorCode() == 19) {
                 return null;
             }
             throw new RuntimeException(e);

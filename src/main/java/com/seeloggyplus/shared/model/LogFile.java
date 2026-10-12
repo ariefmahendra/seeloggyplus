@@ -10,6 +10,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 public class LogFile {
+
     private String id;
     private String name;
     private String filePath;

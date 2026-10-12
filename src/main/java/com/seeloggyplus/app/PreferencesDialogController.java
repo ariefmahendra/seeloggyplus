@@ -20,6 +20,7 @@ import java.awt.Desktop;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.util.Properties;
+
 import javafx.scene.text.Font;
 
 public class PreferencesDialogController {
@@ -61,7 +62,8 @@ public class PreferencesDialogController {
     @FXML
     private Button cancelButton;
 
-    @FXML private ComboBox<String> fileDoubleClickComboBox;
+    @FXML
+    private ComboBox<String> fileDoubleClickComboBox;
     private PreferenceService preferenceService;
     @Setter
     private Runnable onSaveCallback;
@@ -122,7 +124,6 @@ public class PreferencesDialogController {
                 .setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1000, 100000, 20000, 1000));
         lpLineLimitSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 10000, 500, 50));
 
-        // Max threads = available logical processors provided by the OS
         sshThreadsSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, availableProcessors,
                 Math.min(4, availableProcessors)));
 
@@ -179,7 +180,7 @@ public class PreferencesDialogController {
 
     private void handleSave() {
         logger.info("handleSave() triggered. Committing spinner values...");
-        // Commit spinners to ensure latest typed value is captured
+
         commitEditorText(appFontSizeSpinner);
         commitEditorText(appMaxMemorySpinner);
         commitEditorText(tailWindowSizeSpinner);
@@ -194,7 +195,6 @@ public class PreferencesDialogController {
         }
         savePreference("app_max_memory_gb", String.valueOf(appMaxMemorySpinner.getValue()));
 
-        // Update launcher.properties for max memory
         updateLauncherConfig(appMaxMemorySpinner.getValue());
 
         savePreference("main_tail_window_size", String.valueOf(tailWindowSizeSpinner.getValue()));
@@ -229,7 +229,6 @@ public class PreferencesDialogController {
                     T value = converter.fromString(text);
                     valueFactory.setValue(value);
                 } catch (Exception e) {
-                    // Ignore invalid input or show error to user
                     logger.warn("Invalid input for spinner {}: {}", spinner.getId(), text);
                 }
             }
@@ -246,17 +245,14 @@ public class PreferencesDialogController {
                     System.getProperty("seeloggyplus.launcherProperties", "launcher.properties"));
             Properties props = new Properties();
 
-            // Read existing properties if file exists
             if (configFile.exists()) {
                 try (FileInputStream fis = new FileInputStream(configFile)) {
                     props.load(fis);
                 }
             }
 
-            // Update max memory property
             props.setProperty("max.memory.gb", String.valueOf(maxMemoryGb));
 
-            // Write properties back to file
             try (FileOutputStream fos = new FileOutputStream(configFile)) {
                 props.store(fos, "SeeLoggy+ Launcher Configuration - Auto-generated");
             }

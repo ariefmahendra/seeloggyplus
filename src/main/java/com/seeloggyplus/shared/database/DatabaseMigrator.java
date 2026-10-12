@@ -16,46 +16,17 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
-/**
- * Versioned, transactional database schema migrator.
- * <p>
- * Design rules (to avoid corrupting or losing user data):
- * <ul>
- *   <li><b>Additive only</b> — columns/tables are only ever added. Nothing is
- *       dropped, renamed or retyped, so downgrading to an older app version
- *       keeps working (old code reads columns by name and ignores extras).</li>
- *   <li><b>Idempotent</b> — every step is guarded by an existence check and a
- *       duplicate-column failure is tolerated, so concurrent instances or a
- *       repeated run cannot break.</li>
- *   <li><b>Atomic</b> — all changes run in a single transaction; on failure the
- *       transaction is rolled back and a {@link DatabaseMigrationException} is
- *       thrown.</li>
- *   <li><b>Backed up</b> — the database is backed up before migrating.</li>
- * </ul>
- */
 public final class DatabaseMigrator {
 
     private static final Logger logger = LoggerFactory.getLogger(DatabaseMigrator.class);
 
-    /** Current expected schema version. Increment when adding a migration. */
     public static final int SCHEMA_VERSION = 4;
 
-    /** How many rolling backups to keep next to the database. */
     private static final int KEEP_BACKUPS = 3;
 
     private DatabaseMigrator() {
     }
 
-    /**
-     * Migrates {@code connection} to {@link #SCHEMA_VERSION}.
-     *
-     * @param connection    open connection to the SQLite database
-     * @param dbFile        the database file (used for the pre-migration backup)
-     * @param isNewDatabase {@code true} when the database was just created and
-     *                      already has the latest schema
-     * @throws DatabaseMigrationException when a migration fails and is rolled back
-     * @throws SQLException                when the connection itself cannot be used
-     */
     public static void migrate(Connection connection, Path dbFile, boolean isNewDatabase) throws SQLException {
         if (isNewDatabase) {
             setUserVersion(connection, SCHEMA_VERSION);
@@ -100,21 +71,14 @@ public final class DatabaseMigrator {
         return base + " No backup could be created.";
     }
 
-    // ------------------------------------------------------------------
-    // Migrations
-    // ------------------------------------------------------------------
-
-    /** v1: timestamp_format on parsing_configs. */
     private static void migrateTimestampFormat(Connection connection) throws SQLException {
         addColumnIfMissing(connection, "parsing_configs", "timestamp_format", "TEXT");
     }
 
-    /** v1: mode on recent_files. */
     private static void migrateRecentFileMode(Connection connection) throws SQLException {
         addColumnIfMissing(connection, "recent_files", "mode", "TEXT");
     }
 
-    /** v2: user organization of the server list (favorite / order / group). */
     private static void migrateServerOrganization(Connection connection) throws SQLException {
         addColumnIfMissing(connection, "ssh_servers", "favorite", "BOOLEAN NOT NULL DEFAULT 0");
         addColumnIfMissing(connection, "ssh_servers", "sort_order", "INTEGER");
@@ -122,14 +86,12 @@ public final class DatabaseMigrator {
         backfillSortOrder(connection);
     }
 
-    /** v4: per-server authentication method (password or private key). */
     private static void migrateServerAuth(Connection connection) throws SQLException {
         addColumnIfMissing(connection, "ssh_servers", "auth_type", "TEXT");
         addColumnIfMissing(connection, "ssh_servers", "key_path", "TEXT");
         addColumnIfMissing(connection, "ssh_servers", "key_passphrase", "TEXT");
     }
 
-    /** v3: first-class server groups, so an empty group survives a restart. */
     private static void migrateServerGroups(Connection connection) throws SQLException {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute("CREATE TABLE IF NOT EXISTS server_groups (name TEXT PRIMARY KEY, sort_order INTEGER)");
@@ -152,10 +114,6 @@ public final class DatabaseMigrator {
         }
     }
 
-    /**
-     * Assigns a stable {@code sort_order} to every server that does not have one
-     * yet, preserving the legacy {@code created_at DESC} order exactly once.
-     */
     static void backfillSortOrder(Connection connection) throws SQLException {
         boolean needsBackfill;
         try (Statement stmt = connection.createStatement();
@@ -175,10 +133,6 @@ public final class DatabaseMigrator {
             logger.info("Migration: backfilled sort_order for {} server(s)", updated);
         }
     }
-
-    // ------------------------------------------------------------------
-    // Schema helpers
-    // ------------------------------------------------------------------
 
     static boolean tableExists(Connection connection, String table) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement(
@@ -213,7 +167,6 @@ public final class DatabaseMigrator {
             logger.info("Migration: added column {}.{}", table, column);
         } catch (SQLException e) {
             if (isDuplicateColumn(e)) {
-                // Another instance migrated concurrently; this is fine.
                 logger.debug("Column {}.{} was added concurrently", table, column);
                 return;
             }
@@ -224,10 +177,6 @@ public final class DatabaseMigrator {
     private static boolean isDuplicateColumn(SQLException e) {
         return e.getMessage() != null && e.getMessage().toLowerCase().contains("duplicate column name");
     }
-
-    // ------------------------------------------------------------------
-    // Schema version
-    // ------------------------------------------------------------------
 
     static int getUserVersion(Connection connection) throws SQLException {
         try (Statement stmt = connection.createStatement();
@@ -242,15 +191,6 @@ public final class DatabaseMigrator {
         }
     }
 
-    // ------------------------------------------------------------------
-    // Backup
-    // ------------------------------------------------------------------
-
-    /**
-     * Creates a consistent, connection-aware backup using {@code VACUUM INTO}.
-     * Failure aborts migration before any schema changes; raw copying a live
-     * SQLite file could omit committed WAL data.
-     */
     static Path backupDatabase(Connection connection, Path dbFile, int fromVersion) {
         Path backup = dbFile.resolveSibling(
                 dbFile.getFileName() + ".bak-v" + fromVersion + "-" + System.currentTimeMillis());

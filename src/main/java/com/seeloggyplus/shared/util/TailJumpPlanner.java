@@ -1,17 +1,10 @@
 package com.seeloggyplus.shared.util;
 
-/**
- * Decides whether a search result line can be reached in tail mode, and how many
- * trailing lines are needed. Pure logic so it can be unit-tested without UI/SSH.
- */
 public final class TailJumpPlanner {
 
     public enum Mode {
-        /** Target falls inside the standard tail window. */
         REACHABLE,
-        /** Target is in the head; the window must be enlarged (recommendation). */
         RECOMMEND_LARGER_WINDOW,
-        /** Total line count unknown; tail without jumping. */
         UNKNOWN
     }
 

@@ -24,7 +24,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.testfx.api.FxRobot;
 import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
@@ -41,11 +40,6 @@ import com.seeloggyplus.features.settings.infrastructure.PreferenceServiceImpl;
 import java.util.Arrays;
 import javafx.scene.control.ListView;
 
-/**
- * UI-level coverage for the WinSCP-style grouping in File Management:
- * the location tree renders group folders with their servers, and the
- * New/Rename/Delete/Move operations update both the tree and the database.
- */
 @ExtendWith(ApplicationExtension.class)
 class FileManagerGroupingTest {
 
@@ -60,7 +54,7 @@ class FileManagerGroupingTest {
     @SuppressWarnings("unchecked")
     void start(Stage stage) throws Exception {
         this.stage = stage;
-        // Never let a leftover server preference connect during FXML initialization.
+
         new PreferenceServiceImpl().saveOrUpdatePreferences(
                 new Preference("file_manager_last_location", "local"));
         serverService = new ServerManagementServiceImpl();

@@ -15,19 +15,10 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
 
-/**
- * Restarts the application after a staged update.
- * <p>
- * On Windows the app is started directly with {@code javaw} so no console window
- * is created: the root {@code launcher.bat} of legacy installs runs
- * {@code java.exe} in the foreground, which would keep a terminal open for the
- * whole session. The platform launcher script remains the fallback.
- */
 public final class UpdateRelauncher {
 
     private static final Logger logger = LoggerFactory.getLogger(UpdateRelauncher.class);
 
-    /** Packaged default of {@code max.memory.gb} in launcher.properties. */
     static final int DEFAULT_MAX_MEMORY_GB = 4;
 
     private UpdateRelauncher() {
@@ -55,14 +46,12 @@ public final class UpdateRelauncher {
         return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
 
-    /** Hidden Windows restart: {@code javaw -Xmx<mem>g -jar <active jar>} from the install root. */
     static ProcessBuilder windowsRelaunch(Path root) {
         return windowsCommand(root, System.getProperty("java.home"))
                 .map(command -> new ProcessBuilder(command).directory(root.toFile()))
                 .orElse(null);
     }
 
-    /** Builds the invisible Windows command, or empty when no jar/JVM can be found. */
     static Optional<List<String>> windowsCommand(Path root, String javaHome) {
         Path jar = activeJar(root);
         Path java = resolveJavaw(javaHome);
@@ -77,7 +66,6 @@ public final class UpdateRelauncher {
         return Optional.of(command);
     }
 
-    /** The jar the launcher would start: {@code current} when staged, else the root jar. */
     static Path activeJar(Path root) {
         try {
             UpdateLayout layout = new UpdateLayout(root);
@@ -92,7 +80,6 @@ public final class UpdateRelauncher {
         return Files.isRegularFile(rootJar) ? rootJar : null;
     }
 
-    /** {@code javaw.exe} from the running JVM; falls back to {@code java.exe}. */
     static Path resolveJavaw(String javaHome) {
         if (javaHome == null || javaHome.isBlank()) {
             return null;
@@ -106,7 +93,6 @@ public final class UpdateRelauncher {
         return Files.isRegularFile(java) ? java : null;
     }
 
-    /** {@code max.memory.gb} from launcher.properties, with a safe default. */
     static int maxMemoryGb(Path root) {
         Path propertiesFile = root.resolve("launcher.properties");
         if (!Files.isRegularFile(propertiesFile)) {

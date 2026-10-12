@@ -17,7 +17,6 @@ public class AboutDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(AboutDialogController.class);
 
-    /** Maintainer contact shown in About; the hyperlink opens the default mail client. */
     public static final String CONTACT_EMAIL = "mahend.arief@gmail.com";
 
     @FXML
@@ -42,7 +41,6 @@ public class AboutDialogController {
         closeButton.setOnAction(e -> closeDialog());
     }
 
-    /** Injected for tests to avoid opening a real mail client. */
     void setBrowser(Consumer<String> browser) {
         this.browser = browser != null ? browser : AboutDialogController::openMailClient;
     }

@@ -1,6 +1,5 @@
 package com.seeloggyplus.features.update.domain;
 
-/** Result of an update check. */
 public record UpdateCheckResult(Status status, UpdateManifest manifest, String currentVersion, String message) {
 
     public enum Status {

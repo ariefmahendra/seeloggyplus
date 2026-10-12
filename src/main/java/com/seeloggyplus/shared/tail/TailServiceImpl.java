@@ -15,14 +15,10 @@ import java.util.function.Consumer;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 
-/**
- * Implementation of {@link TailService} using Apache Commons IO {@link Tailer}.
- */
 public class TailServiceImpl implements TailService {
 
     private static final Logger logger = LoggerFactory.getLogger(TailServiceImpl.class);
 
-    // Constants for behavior
     private static final int TAIL_DELAY_MILLIS = 500;
     private static final int DEFAULT_CONTEXT_ROWS = 20000;
     private static final int ESTIMATED_BYTES_PER_LINE = 150;
@@ -40,7 +36,7 @@ public class TailServiceImpl implements TailService {
     @Override
     public synchronized void startLocalTail(File file, Consumer<String> lineConsumer, Consumer<Exception> errorHandler,
             boolean loadContext, int contextRows) {
-        stopTail(); // Ensure previous session is closed
+        stopTail();
 
         if (file == null || !file.exists()) {
             if (errorHandler != null) {
@@ -53,12 +49,10 @@ public class TailServiceImpl implements TailService {
                 file.getAbsolutePath(), loadContext, contextRows);
         isRunning = true;
 
-        // 1. Load Initial Context (Optional)
         if (loadContext) {
             loadInitialTailContext(file, lineConsumer, contextRows);
         }
 
-        // 2. Start Tailer
         TailerListener listener = new TailerListenerAdapter() {
             @Override
             public void handle(String line) {
@@ -69,7 +63,6 @@ public class TailServiceImpl implements TailService {
 
             @Override
             public void handle(Exception ex) {
-                // InterruptedException is expected when stopTail() interrupts the thread
                 if (ex instanceof InterruptedException) {
                     logger.debug("Tailer thread interrupted (normal shutdown)");
                     return;
@@ -88,7 +81,6 @@ public class TailServiceImpl implements TailService {
             }
         };
 
-        // start from end = true because we already loaded context
         tailer = new Tailer(file, listener, TAIL_DELAY_MILLIS, true);
         Thread thread = new Thread(tailer, "TailService-Thread");
         thread.setDaemon(true);

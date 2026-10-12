@@ -7,7 +7,6 @@ import com.seeloggyplus.shared.model.SSHServerModel;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
@@ -16,7 +15,6 @@ import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
@@ -24,9 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import javafx.concurrent.Task;
 
-/**
- * Verifies the "Find in Files" button state: available only on remote server locations.
- */
 @ExtendWith(ApplicationExtension.class)
 public class FileManagerFindInFilesButtonTest {
 
@@ -63,10 +58,6 @@ public class FileManagerFindInFilesButtonTest {
         return locationClass.getDeclaredMethod("of", SSHServerModel.class).invoke(null, server);
     }
 
-    /**
-     * Cancels the async directory load triggered by FXML initialization so it cannot
-     * write preferences or update UI mid-test (keeps test data clean and deterministic).
-     */
     private void cancelPendingLoadTask() throws Exception {
         Field taskField = UnifiedFileManagerDialogController.class.getDeclaredField("currentLoadTask");
         taskField.setAccessible(true);

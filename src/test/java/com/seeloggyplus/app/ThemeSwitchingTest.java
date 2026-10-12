@@ -19,11 +19,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * End-to-end switching between Graphite / Light / Dark through the real entry
- * point (the Preferences "Theme" combo box) and verifies every open window
- * updates and reverts correctly.
- */
 @ExtendWith(ApplicationExtension.class)
 class ThemeSwitchingTest {
 
@@ -57,7 +52,6 @@ class ThemeSwitchingTest {
 
     @AfterEach
     void resetTheme() {
-        // Cleanup touches live nodes/scenes, so it must run on the FX thread.
         onFxThread(() -> {
             if (themeComboBox != null) {
                 themeComboBox.setValue("Graphite");
@@ -121,7 +115,6 @@ class ThemeSwitchingTest {
         onFxThread(() -> {
             themeComboBox.setValue("Dark");
 
-            // Simulate a hot-reload temp copy of the dark stylesheet on every scene.
             mainScene.getStylesheets().add("file:/tmp/seeloggy-hotreload-theme-dark-999.css");
             prefsScene.getStylesheets().add("file:/tmp/seeloggy-hotreload-theme-dark-999.css");
 

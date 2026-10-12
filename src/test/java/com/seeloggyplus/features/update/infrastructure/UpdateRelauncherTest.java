@@ -11,12 +11,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * The restart after a self-update must not create a console window. On Windows
- * the application is started directly with {@code javaw} (the staged version jar
- * and the launcher.properties memory setting are reused), never through the old
- * foreground launcher script.
- */
 class UpdateRelauncherTest {
 
     @TempDir

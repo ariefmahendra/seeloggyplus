@@ -23,11 +23,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 import javafx.scene.paint.Paint;
 
-/**
- * The JSON/XML prettify syntax highlighting in the detail panel must use the
- * theme colours in BOTH light and dark mode (regression: the default text rule
- * previously overrode the syntax classes).
- */
 @ExtendWith(ApplicationExtension.class)
 class HighlightThemeTest {
 

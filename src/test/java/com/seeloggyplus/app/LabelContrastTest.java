@@ -27,10 +27,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.seeloggyplus.shared.model.SSHServerModel;
 import com.seeloggyplus.shared.util.SshConnectionFeedback;
 
-/**
- * Every label (including labels that accompany input fields) must have readable
- * contrast against its effective background in BOTH light and dark mode.
- */
 @ExtendWith(ApplicationExtension.class)
 class LabelContrastTest {
 
@@ -160,7 +156,7 @@ class LabelContrastTest {
                 Background background = region.getBackground();
                 if (background != null) {
                     var fills = background.getFills();
-                    // Last opaque fill is the content background; earlier layers are borders.
+
                     for (int i = fills.size() - 1; i >= 0; i--) {
                         Color color = toColor(fills.get(i).getFill());
                         if (color != null && color.getOpacity() > 0.5) {

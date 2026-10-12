@@ -26,11 +26,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Defect fix: in the Find in Files preview, the selected/highlighted line must
- * use the shared selection colour and keep readable, theme-matched text in both
- * light and dark mode.
- */
 @ExtendWith(ApplicationExtension.class)
 class PreviewSelectionThemeTest {
 
@@ -92,8 +87,7 @@ class PreviewSelectionThemeTest {
 
     private static ListView<String> buildPreviewList() {
         ListView<String> list = new ListView<>();
-        // The highlight rules are scoped to the preview list so they cannot leak
-        // onto other .list-cell controls (e.g. the Context dropdown button cell).
+
         list.getStyleClass().add("preview-list");
         list.getItems().addAll("first line", "highlighted target line", "third line");
         list.setCellFactory(view -> new ListCell<>() {

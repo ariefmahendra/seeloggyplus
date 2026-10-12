@@ -8,8 +8,8 @@
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.features.servers.presentation.ServerManagementDialogController"
             prefWidth="1050" prefHeight="650">
-    
-    <!-- Top Toolbar -->
+
+
     <top>
         <VBox>
             <ToolBar styleClass="app-toolbar">
@@ -18,27 +18,27 @@
                         <FontAwesomeIconView glyphName="PLUS" size="14"/>
                     </graphic>
                 </Button>
-                
+
                 <Button fx:id="editServerButton" text="Edit">
                     <graphic>
                         <FontAwesomeIconView glyphName="EDIT" size="14"/>
                     </graphic>
                 </Button>
-                
+
                 <Button fx:id="cloneServerButton" text="Clone">
                     <graphic>
                         <FontAwesomeIconView glyphName="COPY" size="14"/>
                     </graphic>
                 </Button>
-                
+
                 <Button fx:id="deleteServerButton" text="Delete">
                     <graphic>
                         <FontAwesomeIconView glyphName="TRASH" size="14"/>
                     </graphic>
                 </Button>
-                
+
                 <Region HBox.hgrow="ALWAYS"/>
-                
+
                 <Button fx:id="refreshButton">
                     <graphic>
                         <FontAwesomeIconView glyphName="REFRESH" size="14"/>
@@ -48,8 +48,8 @@
                     </tooltip>
                 </Button>
             </ToolBar>
-            
-            <!-- Search Bar -->
+
+
             <HBox spacing="10">
                 <padding>
                     <Insets top="10" right="10" bottom="10" left="10"/>
@@ -60,8 +60,8 @@
             </HBox>
         </VBox>
     </top>
-    
-    <!-- Center: Server List -->
+
+
     <center>
         <TableView fx:id="serverTable" VBox.vgrow="ALWAYS">
             <columns>
@@ -81,22 +81,22 @@
             </placeholder>
         </TableView>
     </center>
-    
-    <!-- Bottom: Details Panel -->
+
+
     <bottom>
         <VBox>
             <padding>
                 <Insets top="15" right="15" bottom="15" left="15"/>
             </padding>
-            
+
             <Label text="Server Details">
                 <padding>
                     <Insets bottom="10"/>
                 </padding>
             </Label>
-            
+
             <Separator/>
-            
+
             <GridPane hgap="15" vgap="8">
                 <padding>
                     <Insets top="10"/>
@@ -107,29 +107,29 @@
                     <ColumnConstraints minWidth="100" prefWidth="120"/>
                     <ColumnConstraints hgrow="ALWAYS"/>
                 </columnConstraints>
-                
+
                 <Label text="Name:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
                 <Label fx:id="detailNameLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-                
+
                 <Label text="Host:" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
                 <Label fx:id="detailHostLabel" text="-" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
-                
+
                 <Label text="Username:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
                 <Label fx:id="detailUsernameLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
-                
+
                 <Label text="Port:" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
                 <Label fx:id="detailPortLabel" text="-" GridPane.columnIndex="3" GridPane.rowIndex="1"/>
-                
+
                 <Label text="Default Path:" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
                 <Label fx:id="detailPathLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="2" GridPane.columnSpan="3"/>
-                
+
                 <Label text="Created:" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
                 <Label fx:id="detailCreatedLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
-                
+
                 <Label text="Last Used:" GridPane.columnIndex="2" GridPane.rowIndex="3"/>
                 <Label fx:id="detailLastUsedLabel" text="-" GridPane.columnIndex="3" GridPane.rowIndex="3"/>
             </GridPane>
-            
+
             <HBox spacing="10" alignment="CENTER_RIGHT">
                 <padding>
                     <Insets top="15"/>

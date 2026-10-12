@@ -14,16 +14,10 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.util.function.Predicate;
 
-/**
- * High-performance file reader using memory-mapped I/O.
- * Supports files > 2GB via chunked mappings.
- * Zero-copy read: data goes directly from OS page cache to Java string.
- */
 public class MappedFileReader implements AutoCloseable {
 
     private static final Logger logger = LoggerFactory.getLogger(MappedFileReader.class);
 
-    // 1GB per mapping chunk (safe for most systems)
     private static final long CHUNK_SIZE = 1024L * 1024L * 1024L;
 
     private final long fileSize;
@@ -44,7 +38,6 @@ public class MappedFileReader implements AutoCloseable {
         this.raf = new RandomAccessFile(file, "r");
         this.channel = raf.getChannel();
 
-        // Create chunked mappings
         int numChunks = (int) ((fileSize + CHUNK_SIZE - 1) / CHUNK_SIZE);
         this.buffers = new MappedByteBuffer[numChunks];
         this.chunkOffsets = new long[numChunks];
@@ -60,27 +53,16 @@ public class MappedFileReader implements AutoCloseable {
                 numChunks, file.getName(), fileSize / 1024 / 1024);
     }
 
-    /**
-     * Read a line from the given byte offset.
-     * Thread-safe.
-     * 
-     * @param startOffset Byte offset where line starts
-     * @param maxLength   Maximum bytes to read (use line length from index)
-     * @return Decoded string (without newline)
-     */
     public String readLine(long startOffset, int maxLength) {
         if (startOffset >= fileSize) {
             return "";
         }
 
-        // Find which chunk contains this offset
         int chunkIndex = (int) (startOffset / CHUNK_SIZE);
         int localOffset = (int) (startOffset - chunkOffsets[chunkIndex]);
 
         MappedByteBuffer buffer = buffers[chunkIndex];
 
-        // Allocate local buffer to ensure thread safety
-        // Cap at 8KB or maxLength
         int bufSize = Math.min(maxLength, 8192);
         byte[] localLineBuffer = new byte[bufSize];
 
@@ -100,9 +82,6 @@ public class MappedFileReader implements AutoCloseable {
         return new String(localLineBuffer, 0, len, charset);
     }
 
-    /**
-     * Read line using LineOffsetIndex.
-     */
     public String readLine(LineOffsetIndex index, long lineNumber) {
         if (lineNumber < 0 || lineNumber >= index.getLineCount()) {
             return "";
@@ -114,15 +93,6 @@ public class MappedFileReader implements AutoCloseable {
         return readLine(offset, lineLen);
     }
 
-    /**
-     * Zero-allocation line matching for search.
-     * Decodes line to CharBuffer without creating a String.
-     * 
-     * @param index      Line offset index
-     * @param lineNumber Line number to check
-     * @param matcher    Predicate to test against the CharSequence
-     * @return true if line matches the predicate
-     */
     public boolean lineMatches(LineOffsetIndex index, int lineNumber,
             Predicate<CharSequence> matcher) {
         if (lineNumber < 0 || lineNumber >= index.getLineCount()) {
@@ -155,7 +125,6 @@ public class MappedFileReader implements AutoCloseable {
             }
         }
 
-        // Decode to CharBuffer (reusable sequence) instead of String
         CharBuffer charBuffer = charset.decode(ByteBuffer.wrap(localLineBuffer, 0, len));
         return matcher.test(charBuffer);
     }

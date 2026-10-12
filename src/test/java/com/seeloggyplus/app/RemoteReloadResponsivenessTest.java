@@ -26,10 +26,6 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 import java.lang.reflect.Method;
 
-/**
- * Regression: reloading a remote tail must not block the JavaFX thread while the
- * SSH reconnect runs (this used to freeze the window with "Not Responding").
- */
 @ExtendWith(ApplicationExtension.class)
 class RemoteReloadResponsivenessTest {
 
@@ -37,7 +33,6 @@ class RemoteReloadResponsivenessTest {
     private ServerManagementService serverService;
     private SSHServerModel server;
 
-    /** Connect attempt that blocks until the test releases it (like a slow handshake). */
     static class SlowSshService extends SSHServiceImpl {
         final CountDownLatch connectStarted = new CountDownLatch(1);
         final CountDownLatch releaseConnect = new CountDownLatch(1);
@@ -116,8 +111,6 @@ class RemoteReloadResponsivenessTest {
                 "the reconnect must actually start");
 
         try {
-            // The connect is still blocked; the FX thread must stay free regardless
-            // of how slow the CI machine is.
             long startedAt = System.nanoTime();
             CountDownLatch marker = new CountDownLatch(1);
             Platform.runLater(marker::countDown);

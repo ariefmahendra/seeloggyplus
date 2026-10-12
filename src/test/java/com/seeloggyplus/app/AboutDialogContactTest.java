@@ -6,7 +6,6 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Hyperlink;
-import javafx.scene.layout.Background;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
@@ -25,10 +24,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 import javafx.css.PseudoClass;
 
-/**
- * The About dialog must expose the maintainer contact as a clickable mail link
- * that follows the theme instead of the default JavaFX hyperlink colour.
- */
 @ExtendWith(ApplicationExtension.class)
 class AboutDialogContactTest {
 

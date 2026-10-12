@@ -10,6 +10,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 public class Preference {
+
     private String id;
     private String code;
     private String value;

@@ -25,11 +25,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-/**
- * Encapsulates the entire state of an open log session (single tab).
- * Supports both local files and remote SSH streams.
- * Handles lifecycle cleanup of readers, indexes, and tail services.
- */
 public class LogSession implements AutoCloseable {
 
     private static final Logger logger = LoggerFactory.getLogger(LogSession.class);
@@ -58,7 +53,6 @@ public class LogSession implements AutoCloseable {
     private LineOffsetIndex index;
     private int totalEntries = 0;
 
-    // Tail state
     private boolean tailModeEnabled = false;
     private boolean followTail = true;
     private TailService tailService;
@@ -72,7 +66,6 @@ public class LogSession implements AutoCloseable {
     private volatile boolean active = false;
     private volatile boolean closed = false;
 
-    // Search & Filter state
     private String searchQuery = "";
     private boolean regex = false;
     private boolean caseSensitive = false;
@@ -84,7 +77,6 @@ public class LogSession implements AutoCloseable {
     private Pattern currentTailSearchPattern = null;
     private int tailSearchScannedUpTo = 0;
 
-    // Detail panel state
     private long selectedLine = -1;
     private String selectedLineContent = null;
 

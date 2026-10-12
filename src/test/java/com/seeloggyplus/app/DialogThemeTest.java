@@ -26,10 +26,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * About & Update dialogs must adopt the dark palette: tokens for text and a
- * dark banner/primary button that match the dark surfaces (no light/blue tones).
- */
 @ExtendWith(ApplicationExtension.class)
 class DialogThemeTest {
 

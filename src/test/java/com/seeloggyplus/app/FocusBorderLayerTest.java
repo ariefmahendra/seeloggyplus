@@ -32,16 +32,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 import javafx.geometry.Insets;
 
-/**
- * Focused controls must show a SINGLE focus ring — not a layered/double border.
- * Modena stacks a faint outer halo plus the focus ring; we disable the halo
- * ({@code -fx-faint-focus-color: transparent}) and this guards the regression by
- * sampling the pixels just outside each control while it is focused.
- */
 @ExtendWith(ApplicationExtension.class)
 class FocusBorderLayerTest {
 
-    /** One distinct colour outside the bounds is the (single) focus ring. */
     private static final int MAX_OUTER_LAYERS = 1;
 
     private Stage stage;

@@ -1,5 +1,4 @@
 package com.seeloggyplus.features.update.infrastructure;
-
 
 import com.seeloggyplus.features.update.domain.UpdateAsset;
 import org.junit.jupiter.api.Test;
@@ -30,7 +29,6 @@ class UpdateCoordinatorTest {
                 try {
                     Files.deleteIfExists(p);
                 } catch (IOException ignored) {
-                    // best effort
                 }
             });
         }

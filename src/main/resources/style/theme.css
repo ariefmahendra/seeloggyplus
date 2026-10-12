@@ -1,33 +1,12 @@
-/* ============================================================
-   SeeLoggyPlus — Design Tokens & Base Theme
-   ------------------------------------------------------------
-   Visual language: Enterprise Data-dense (Splunk/Grafana)
-   Accent          : Graphite / neutral dark
-   Density         : Compact
-   Chrome          : Dark graphite (#2b3138)
-   See docs/UI_PLAN.md for the full specification.
-
-   Single source of truth for the application palette.
-   Loaded globally on every FXML root (main view + dialogs).
-
-   JavaFX only supports "looked-up colors" as CSS variables
-   (they must resolve to a color). Spacing, radii and the type
-   scale are therefore documented conventions:
-
-     Spacing : 4 / 8 / 12
-     Radius  : 3 / 4
-     Type    : 11 / 12 / 13 / 15 / 18 / 20
-   ============================================================ */
-
 .root {
-    /* ---- Chrome (menu / toolbar / status bar) ------------------ */
+
     -sl-chrome: #2b3138;
     -sl-chrome-hover: #3a424b;
     -sl-chrome-pressed: #4a535e;
     -sl-chrome-text: #d7dbe0;
     -sl-chrome-text-muted: #a0a8b0;
 
-    /* ---- Accent (interactive) ---------------------------------- */
+
     -sl-brand: #343a40;
     -sl-brand-hover: #212529;
     -sl-brand-pressed: #111418;
@@ -35,28 +14,25 @@
     -sl-brand-faint: rgba(52, 58, 64, 0.25);
     -sl-on-brand: #ffffff;
 
-    /* ---- Interaction (hover / selected / pressed / focus) ------ */
-    /* Every interactive state uses these tokens, so a theme can change the
-       accent colour (e.g. the all-light theme uses blue) without touching
-       component rules. */
+
     -sl-accent: #4a535e;
     -sl-accent-hover: #3a424b;
     -sl-accent-pressed: #2b3138;
     -sl-accent-text: #d7dbe0;
 
-    /* ---- Surfaces ---------------------------------------------- */
+
     -sl-bg: #f1f3f5;
     -sl-surface: #ffffff;
     -sl-surface-alt: #f8f9fa;
     -sl-surface-sunken: #e9ecef;
     -sl-overlay: rgba(0, 0, 0, 0.45);
 
-    /* ---- Borders ----------------------------------------------- */
+
     -sl-border: #ced4da;
     -sl-border-soft: #e9ecef;
     -sl-border-strong: #adb5bd;
 
-    /* ---- Text -------------------------------------------------- */
+
     -sl-text: #1f2329;
     -sl-text-secondary: #495057;
     -sl-text-muted: #6c757d;
@@ -65,12 +41,12 @@
     -sl-text-version: #aeb6bf;
     -sl-text-section: #343a40;
 
-    /* ---- Misc --------------------------------------------------- */
+
     -sl-preview-target: #dde3e9;
-    /* Shared text-selection highlight (canvas, detail panel, text controls) */
+
     -sl-selection-bg: rgba(52, 58, 64, 0.18);
 
-    /* ---- Semantic (desaturated) -------------------------------- */
+
     -sl-success: #2f855a;
     -sl-warning: #92400e;
     -sl-danger: #c0392b;
@@ -80,20 +56,20 @@
     -sl-info: #2b6cb0;
     -sl-live: #2f855a;
 
-    /* Bright variants for indicators on dark chrome (status bar memory gauge) */
+
     -sl-chrome-success: #4ade80;
     -sl-chrome-warning: #fbbf24;
     -sl-chrome-danger: #fca5a5;
-    /* Track behind the memory gauge on the chrome */
+
     -sl-memory-track: #4a535e;
 
-    /* ---- Scrollbar --------------------------------------------- */
+
     -sl-scroll-track: #f1f3f5;
     -sl-scroll-thumb: #c1c7cd;
     -sl-scroll-thumb-hover: #98a1a9;
     -sl-scroll-thumb-pressed: #6b7480;
 
-    /* ---- Log levels (subtle tint, not solid badges) ------------ */
+
     -sl-level-fatal-bg: #fde8e8;
     -sl-level-fatal-fg: #7f1d1d;
     -sl-level-error-bg: #fde8e8;
@@ -112,7 +88,7 @@
     -sl-row-warn-bg: #fdf8e8;
     -sl-row-warn-sel: #fbf0c9;
 
-    /* ---- Syntax highlighting (raw / richtext) ------------------ */
+
     -sl-syntax-error: #b91c1c;
     -sl-syntax-warn: #92400e;
     -sl-syntax-info: #2b6cb0;
@@ -135,12 +111,12 @@
     -sl-syntax-xml-decl: #0f766e;
     -sl-syntax-xml-cdata: #9d174d;
 
-    /* ---- Typography -------------------------------------------- */
+
     -fx-font-family: "Segoe UI";
     -fx-font-size: 12px;
     -fx-font-smoothing-type: gray;
 
-    /* ---- Map onto Modena so default controls inherit the brand -- */
+
     -fx-accent: -sl-brand;
     -fx-focus-color: -sl-brand;
     -fx-faint-focus-color: transparent;
@@ -148,9 +124,7 @@
     -fx-highlight-text-fill: -sl-text;
 }
 
-/* ============================================================
-   Dark chrome: menu bar
-   ============================================================ */
+
 .app-menubar {
     -fx-background-color: -sl-chrome;
 }
@@ -170,9 +144,7 @@
     -fx-text-fill: -sl-accent-text;
 }
 
-/* ============================================================
-   Dark chrome: toolbar
-   ============================================================ */
+
 .app-toolbar {
     -fx-background-color: -sl-chrome;
     -fx-border-color: -sl-chrome-hover;
@@ -192,8 +164,7 @@
     -fx-text-fill: -sl-chrome-text;
     -fx-padding: 4 7 4 7;
     -fx-cursor: hand;
-    /* Reserve the focus-ring space up-front (transparent) so the button does not
-       grow when it gains focus / is clicked. Only the colour changes on focus. */
+
     -fx-border-color: transparent;
     -fx-border-width: 1;
     -fx-border-radius: 3;
@@ -214,8 +185,7 @@
     -fx-background-color: -sl-accent;
 }
 
-/* Icons follow the accent so they stay visible on the accent background
-   (e.g. white on the blue accent of the all-light theme). */
+
 .app-toolbar .button:hover .glyph-icon,
 .app-toolbar .button:hover FontAwesomeIconView,
 .app-toolbar .button:pressed .glyph-icon,
@@ -252,7 +222,7 @@
     -fx-background-radius: 3;
 }
 
-/* Visible focus ring for controls on the chrome (theme accent colour) */
+
 .app-menubar .menu:focused {
     -fx-background-color: -sl-accent-hover;
 }
@@ -271,10 +241,7 @@
     -fx-background-color: transparent;
 }
 
-/* Hover/pressed/selected states sit on the accent fill, so the label must use
-   the accent text token too (otherwise dark chrome-text lands on the blue
-   accent of the Light theme). Declared after the focused rule so a focused
-   button that is being hovered/pressed still switches its text. */
+
 .app-toolbar .button:hover,
 .app-toolbar .button:pressed,
 .status-bar .button:hover,
@@ -289,9 +256,7 @@
     -fx-text-fill: -sl-accent-text;
 }
 
-/* ============================================================
-   Dark chrome: status bar
-   ============================================================ */
+
 .status-bar {
     -fx-padding: 2 10 2 10;
     -fx-background-color: -sl-chrome;
@@ -324,7 +289,7 @@
     -fx-background-radius: 3;
     -fx-text-fill: -sl-chrome-text;
     -fx-cursor: hand;
-    /* Reserve focus-ring space so the button never resizes on focus/click. */
+
     -fx-border-color: transparent;
     -fx-border-width: 1;
     -fx-border-radius: 3;
@@ -339,7 +304,7 @@
     -fx-control-inner-background: -sl-memory-track;
 }
 
-/* Flat memory gauge on the chrome: no Modena highlight/border layers. */
+
 .status-memory-bar > .track {
     -fx-background-color: -sl-memory-track;
     -fx-background-insets: 0;
@@ -374,9 +339,7 @@
     -fx-text-fill: -sl-accent-text;
 }
 
-/* ============================================================
-   Typography helpers
-   ============================================================ */
+
 .section-title {
     -fx-font-weight: bold;
     -fx-font-size: 14px;
@@ -403,7 +366,7 @@
     -fx-text-fill: -sl-text-secondary;
 }
 
-/* About dialog */
+
 .about-version {
     -fx-text-fill: -sl-text-muted;
 }
@@ -416,7 +379,7 @@
     -fx-fill: -sl-text-secondary;
 }
 
-/* Contact mail link: follows the theme info tone instead of the default link blue. */
+
 .about-contact-label {
     -fx-text-fill: -sl-text-secondary;
 }
@@ -435,24 +398,13 @@
     -fx-text-fill: -sl-info;
 }
 
-/* ============================================================
-   Icons
-   Default icon color follows the theme text color so icons stay
-   visible in dark mode. Colored icons override this via classes
-   defined in components.css.
-   ============================================================ */
+
 .glyph-icon,
 FontAwesomeIconView {
     -fx-fill: -sl-text;
 }
 
-/* ============================================================
-   Generic buttons
-   Every button in the application (dialogs, forms, file manager)
-   follows the theme surface/text/border tokens instead of the
-   default JavaFX (Modena) look. Toolbar/status/primary variants
-   below override these rules.
-   ============================================================ */
+
 .button,
 .toggle-button {
     -fx-background-color: -sl-surface;
@@ -485,9 +437,7 @@ FontAwesomeIconView {
     -fx-opacity: 0.6;
 }
 
-/* Explicit focus states: keep the themed surface/text (Modena would paint its
-   own focus layers and can leave dark text on a dark ring). The accent border
-   is the focus indicator. */
+
 .button:focused,
 .toggle-button:focused {
     -fx-background-color: -sl-surface;
@@ -495,7 +445,7 @@ FontAwesomeIconView {
     -fx-border-color: -sl-accent;
 }
 
-/* Default dialog action: brand-filled with readable text (never Modena blue). */
+
 .button:default {
     -fx-background-color: -sl-brand;
     -fx-text-fill: -sl-on-brand;
@@ -573,9 +523,7 @@ FontAwesomeIconView {
     -fx-padding: 2 5;
 }
 
-/* ============================================================
-   Loading overlay
-   ============================================================ */
+
 .loading-overlay {
     -fx-background-color: -sl-overlay;
 }
@@ -600,9 +548,7 @@ FontAwesomeIconView {
     -fx-text-fill: -sl-text-muted;
 }
 
-/* ============================================================
-   Detail panel container (main window)
-   ============================================================ */
+
 .detail-container {
     -fx-border-color: -sl-border-strong;
     -fx-border-width: 1;

@@ -11,7 +11,7 @@ class TailJumpPlannerTest {
         TailJumpPlanner.Plan plan = TailJumpPlanner.plan(1000, 990, 100);
         assertEquals(TailJumpPlanner.Mode.REACHABLE, plan.mode());
         assertEquals(100, plan.tailLines());
-        // first reachable = 901, target 990 -> index 89
+
         assertEquals(89, plan.jumpIndex());
     }
 
@@ -36,7 +36,6 @@ class TailJumpPlannerTest {
 
     @Test
     void exactBoundaryTargetIsReachable() {
-        // target 80001 with window 20000 on 100000 lines -> needed == 20000
         TailJumpPlanner.Plan plan = TailJumpPlanner.plan(100_000, 80_001, 20_000);
         assertEquals(TailJumpPlanner.Mode.REACHABLE, plan.mode());
         assertEquals(0, plan.jumpIndex());

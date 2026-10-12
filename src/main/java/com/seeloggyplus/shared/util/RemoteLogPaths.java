@@ -2,7 +2,6 @@ package com.seeloggyplus.shared.util;
 
 import java.util.regex.Pattern;
 
-/** Shared checks for server log locations; a filename never establishes local provenance. */
 public final class RemoteLogPaths {
 
     private static final Pattern WINDOWS_DRIVE = Pattern.compile("^[A-Za-z]:[\\\\/].*");

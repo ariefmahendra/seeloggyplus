@@ -30,10 +30,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Icons must be contrasty against the active theme in every interactive state
- * (default, hover, pressed, focused, selected). WCAG non-text minimum is 3:1.
- */
 @ExtendWith(ApplicationExtension.class)
 class IconContrastTest {
 

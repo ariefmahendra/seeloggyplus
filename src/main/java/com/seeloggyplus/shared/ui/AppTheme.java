@@ -9,26 +9,10 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Installs the SeeLoggyPlus theme stylesheets on a {@link Scene} and manages the
- * theme switch.
- * <p>
- * Three themes are available:
- * <ul>
- *   <li>{@link Theme#GRAPHITE} (default) — light content surfaces with a dark
- *       graphite chrome (menu/toolbar/status bar).</li>
- *   <li>{@link Theme#LIGHT} — a fully light look, including the chrome.</li>
- *   <li>{@link Theme#DARK} — the dark palette.</li>
- * </ul>
- * Stylesheets added to the scene (rather than only to the root node) are also
- * inherited by popup windows such as menus and context menus, which otherwise
- * fall back to the default JavaFX theme.
- */
 public final class AppTheme {
 
     private static final Logger logger = LoggerFactory.getLogger(AppTheme.class);
 
-    /** The selectable application themes. */
     public enum Theme {
         GRAPHITE("graphite", null, null),
         LIGHT("light", "/style/theme-light.css", "theme-light"),
@@ -56,10 +40,6 @@ public final class AppTheme {
             return styleClass;
         }
 
-        /**
-         * Maps a persisted preference value to a theme. Legacy installs stored
-         * {@code "light"} for the graphite theme; unknown values fall back to GRAPHITE.
-         */
         public static Theme fromPreference(String value) {
             if (value == null || value.isBlank()) {
                 return GRAPHITE;
@@ -81,9 +61,6 @@ public final class AppTheme {
     private AppTheme() {
     }
 
-    /**
-     * Creates a themed {@link Scene} for the given root.
-     */
     public static Scene scene(Parent root) {
         Scene scene = new Scene(root);
         install(scene);
@@ -91,9 +68,6 @@ public final class AppTheme {
         return scene;
     }
 
-    /**
-     * Adds the theme stylesheets to the scene if they are not already present.
-     */
     public static void install(Scene scene) {
         if (scene == null) {
             return;
@@ -114,31 +88,20 @@ public final class AppTheme {
         return theme;
     }
 
-    /**
-     * Switches the palette on every open window and marks the scene roots so
-     * Canvas-based views (which ignore CSS) can react too.
-     */
     public static void setTheme(Theme newTheme) {
         Theme normalized = newTheme == null ? Theme.GRAPHITE : newTheme;
         if (normalized == theme) {
-            // Re-applying the current theme churns stylesheets/style classes on every
-            // open window (and can race with in-flight layout); skip when unchanged.
             return;
         }
         theme = normalized;
         applyToAllWindows(theme);
     }
 
-    /**
-     * Backwards-compatible toggle: {@code true} selects the dark theme, {@code false}
-     * restores the default graphite theme.
-     */
     public static void setDark(boolean value) {
         setTheme(value ? Theme.DARK : Theme.GRAPHITE);
     }
 
     private static void applyToAllWindows(Theme active) {
-        // Snapshot: applying CSS can create/destroy popup windows.
         for (Window window : new ArrayList<>(Window.getWindows())) {
             try {
                 Scene scene = window.getScene();
@@ -150,16 +113,12 @@ public final class AppTheme {
                 applyState(root, active);
                 root.applyCss();
             } catch (RuntimeException ex) {
-                // One problematic window (e.g., a popup mid-teardown) must not
-                // prevent the remaining windows from switching theme.
                 logger.warn("Failed to apply theme to window: {}", window, ex);
             }
         }
     }
 
     private static void applyStylesheets(Scene scene, Theme active) {
-        // Remove any variant stylesheet, including hot-reload temp copies (their
-        // temp file name still contains "theme-dark"/"theme-light").
         scene.getStylesheets().removeIf(url -> url.contains("theme-dark") || url.contains("theme-light"));
         if (active.stylesheet() != null) {
             addIfMissing(scene, active.stylesheet());
@@ -185,7 +144,6 @@ public final class AppTheme {
         }
     }
 
-    /** Stylesheets for a theme without needing a Scene (dialogs built in code). */
     public static List<String> sceneStylesheets(Theme theme) {
         List<String> list = new ArrayList<>();
         addUrl(list, THEME_LIGHT_BASE);
@@ -197,12 +155,10 @@ public final class AppTheme {
         return list;
     }
 
-    /** Applies the theme style classes to a Parent outside a Scene (dialogs in code). */
     public static void applyThemeState(Parent root, Theme theme) {
         applyState(root, theme == null ? Theme.GRAPHITE : theme);
     }
 
-    /** Removes theme-variant stylesheets, then installs the requested theme's ones. */
     public static void refresh(Scene scene) {
         if (scene == null) {
             return;

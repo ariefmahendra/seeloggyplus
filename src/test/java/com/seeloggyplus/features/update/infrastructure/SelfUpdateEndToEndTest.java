@@ -1,5 +1,4 @@
 package com.seeloggyplus.features.update.infrastructure;
-
 
 import com.seeloggyplus.features.update.domain.UpdateAsset;
 import org.junit.jupiter.api.DisplayName;
@@ -21,18 +20,11 @@ import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * End-to-end self-update coverage: a realistic portable package is downloaded
- * (stream injected), staged, activated, health-checked and rolled back using the
- * real coordinator/installer/bootstrapper. It also pins the package layout to the
- * whitelist of older installers so future file additions cannot break updates.
- */
 class SelfUpdateEndToEndTest {
 
     private static final String OLD_VERSION = "0.5.1";
     private static final String NEW_VERSION = "0.6.3";
 
-    /** Entries produced by the portable package tasks (wrapper folder included). */
     private static final List<String> PACKAGE_ENTRIES = List.of(
             "seeloggyplus/seeloggyplus.jar",
             "seeloggyplus/launcher.bat",
@@ -42,7 +34,6 @@ class SelfUpdateEndToEndTest {
             "seeloggyplus/version.properties",
             "seeloggyplus/help/index.html");
 
-    /** Content whitelist of the 0.5.1 installer; packages must still pass it. */
     private static final Set<String> LEGACY_ALLOWED_FILES = Set.of(
             "seeloggyplus.jar",
             "launcher.bat",
@@ -127,7 +118,6 @@ class SelfUpdateEndToEndTest {
                     "the downloaded package must be cleaned up after staging");
         }
 
-        // The silent launcher is not part of the package; the new app heals it.
         assertFalse(zipEntries(packageZip).contains("seeloggyplus/SeeLoggyPlus.vbs"));
         assertTrue(Files.isRegularFile(SilentLauncherInstaller.ensure(root)));
 

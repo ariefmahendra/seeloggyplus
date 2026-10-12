@@ -4,10 +4,6 @@ import com.seeloggyplus.features.update.domain.UpdateException;
 import java.io.IOException;
 import java.util.Optional;
 
-/**
- * Activates staged versions, applies health markers and performs rollback.
- * Kept free of UI so it can run in a bootstrapper process or in tests.
- */
 public class UpdateBootstrapper {
 
     private final UpdateLayout layout;
@@ -16,7 +12,6 @@ public class UpdateBootstrapper {
         this.layout = layout;
     }
 
-    /** Activates a staged version, remembering the current one for rollback. */
     public void activate(String version) throws UpdateException {
         if (!layout.isStaged(version)) {
             throw new UpdateException("Version is not staged: " + version);
@@ -36,15 +31,6 @@ public class UpdateBootstrapper {
         layout.markHealthy(version);
     }
 
-    /**
-     * Reconciles update state with the version that has actually reached
-     * application startup. The running active version is healthy and must be
-     * confirmed before evaluating rollback; otherwise a freshly updated app would
-     * immediately point {@code current} back to the previous release.
-     *
-     * @return the previous version restored when a different unhealthy version was
-     *         active, or empty when no rollback was needed
-     */
     public Optional<String> confirmStartup(String runningVersion) throws IOException {
         Optional<String> current = layout.currentVersion();
         if (current.filter(version -> version.equals(runningVersion)).isPresent()
@@ -58,10 +44,6 @@ public class UpdateBootstrapper {
         return Optional.empty();
     }
 
-    /**
-     * True when the active version is missing or has not reported a healthy start,
-     * while a usable previous version exists.
-     */
     public boolean shouldRollback() throws IOException {
         Optional<String> current = layout.currentVersion();
         if (current.isEmpty()) {
@@ -77,7 +59,6 @@ public class UpdateBootstrapper {
         return previous.isPresent() && layout.isStaged(previous.get());
     }
 
-    /** Switches back to the previous version. @return the version restored, if any. */
     public Optional<String> rollback() throws IOException {
         Optional<String> previous = layout.previousVersion();
         if (previous.isEmpty() || !layout.isStaged(previous.get())) {

@@ -21,10 +21,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.scene.control.TreeView;
 import org.testfx.util.WaitForAsyncUtils;
+
 @ExtendWith(ApplicationExtension.class)
 class FeedbackUiSmokeTest {
+
     Stage stage;
     @Start void start(Stage stage) { this.stage = stage; }
+
     @Test void renderFeedbackDialogs(FxRobot robot) throws Exception {
         var service = new ServerManagementServiceImpl();
         var preferences = new PreferenceServiceImpl();

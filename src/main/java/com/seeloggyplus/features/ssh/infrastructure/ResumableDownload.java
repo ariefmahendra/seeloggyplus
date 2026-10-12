@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 final class ResumableDownload {
+
     interface Source {
         long size() throws IOException;
         InputStream open(long offset) throws IOException;

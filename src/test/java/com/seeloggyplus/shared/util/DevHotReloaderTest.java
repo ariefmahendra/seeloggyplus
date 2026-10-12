@@ -95,7 +95,7 @@ class DevHotReloaderTest {
         assertDoesNotThrow(() -> {
             DevHotReloader.init(testStage, testScene);
             DevHotReloader.shutdown();
-            DevHotReloader.shutdown(); // Idempotent shutdown
+            DevHotReloader.shutdown();
         });
     }
 }

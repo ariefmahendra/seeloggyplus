@@ -6,10 +6,8 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
-/**
- * Generic file model representing both local and remote files
- */
 public class FileInfo implements Comparable<FileInfo> {
+
     private String name;
     private String path;
     private long size;
@@ -188,14 +186,13 @@ public class FileInfo implements Comparable<FileInfo> {
 
     @Override
     public int compareTo(FileInfo other) {
-        // Directories first
         if (this.isDirectory && !other.isDirectory) {
             return -1;
         }
         if (!this.isDirectory && other.isDirectory) {
             return 1;
         }
-        // Then by name
+
         if (this.name != null && other.name != null) {
             return this.name.compareToIgnoreCase(other.name);
         }

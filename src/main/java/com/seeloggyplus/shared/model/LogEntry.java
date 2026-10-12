@@ -9,13 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 
-/**
- * Model class representing a single log entry
- * Designed for performance with lazy loading and efficient memory usage
- */
 public class LogEntry {
 
-    // Getters
     @Getter
     private final long lineNumber;
     @Getter
@@ -33,27 +28,22 @@ public class LogEntry {
     @Getter
     private boolean isParsed;
 
-    // Constructor for unparsed single lines
     public LogEntry(long lineNumber, String rawLog) {
         this(lineNumber, lineNumber, rawLog, new HashMap<>(), false);
     }
 
-    // Constructor for combined unparsed lines
     public LogEntry(long startLineNumber, long endLineNumber, String rawLog) {
         this(startLineNumber, endLineNumber, rawLog, createUnparsedFieldMap(rawLog), false);
     }
 
-    // Constructor for parsed lines
     public LogEntry(long lineNumber, String rawLog, Matcher matcher, List<String> groupNames) {
         this(lineNumber, lineNumber, rawLog, createMapFromMatcher(matcher, groupNames), true);
     }
 
-    // Constructor for parsed lines with pre-existing map
     public LogEntry(long lineNumber, String rawLog, Map<String, String> parsedFields) {
         this(lineNumber, lineNumber, rawLog, parsedFields, true);
     }
 
-    // Private common constructor
     private LogEntry(long lineNumber, long endLineNumber, String rawLog, Map<String, String> parsedFields,
             boolean isParsed) {
         this.lineNumber = lineNumber;
@@ -63,14 +53,11 @@ public class LogEntry {
         this.isParsed = isParsed;
 
         if (isParsed) {
-            // Extract common fields
             this.level = parsedFields.getOrDefault("level", "");
             this.message = parsedFields.getOrDefault("message", "");
             this.thread = parsedFields.getOrDefault("thread", "");
             this.logger = parsedFields.getOrDefault("logger", "");
 
-            // Timestamp is now set externally by the Service layer to ensure correct format
-            // usage
             this.timestamp = null;
         } else {
             this.message = rawLog;
@@ -150,9 +137,6 @@ public class LogEntry {
         return fields;
     }
 
-    /**
-     * Check if log entry matches search criteria
-     */
     public boolean matches(String searchText, boolean caseSensitive) {
         if (searchText == null || searchText.isEmpty()) {
             return true;
@@ -164,9 +148,6 @@ public class LogEntry {
         return searchIn.contains(searchFor);
     }
 
-    /**
-     * Check if log entry matches regex pattern
-     */
     public boolean matchesRegex(String regex) {
         if (regex == null || regex.isEmpty()) {
             return true;

@@ -34,11 +34,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Regression: a selected row/item whose control is NOT focused must keep its
- * theme background so the theme-coloured text and icons stay contrasty
- * (Modena's default non-focused selection bar is light, hiding light icons).
- */
 @ExtendWith(ApplicationExtension.class)
 class SelectedRowInactiveContrastTest {
 
@@ -78,7 +73,7 @@ class SelectedRowInactiveContrastTest {
 
                 table.getSelectionModel().select(0);
                 list.getSelectionModel().select(0);
-                // Move focus away so the controls render the non-focused selection.
+
                 focusSink.requestFocus();
                 root.applyCss();
                 root.layout();

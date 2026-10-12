@@ -3,7 +3,6 @@ package com.seeloggyplus.shared.database;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -16,6 +15,7 @@ import com.seeloggyplus.shared.util.AppPaths;
 
 @Getter
 public class DatabaseConfig {
+
     private static final Logger logger = LoggerFactory.getLogger(DatabaseConfig.class);
     private static DatabaseConfig instance;
     private Connection connection;
@@ -23,8 +23,6 @@ public class DatabaseConfig {
     private DatabaseConfig() {
         try {
             Path dbPath = AppPaths.dataFile("seeloggyplus.db");
-
-            System.out.println(dbPath.toAbsolutePath());
 
             boolean isNewDatabase = !Files.exists(dbPath);
             if (isNewDatabase){
@@ -129,7 +127,6 @@ public class DatabaseConfig {
             stmt.execute(createFavoriteFoldersTable);
             stmt.execute(createServerGroupsTable);
             logger.info("Tables created or already exist.");
-            
         }
     }
 }

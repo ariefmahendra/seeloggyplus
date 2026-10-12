@@ -34,11 +34,6 @@ import java.nio.file.Paths;
 import java.util.Properties;
 import javafx.scene.control.Alert;
 
-/**
- * Main application entry point for SeeLoggyPlus
- * High-performance log viewer with advanced parsing capabilities
- */
-
 public class Main extends Application {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
@@ -46,7 +41,7 @@ public class Main extends Application {
     public static final String VERSION;
 
     static {
-        String version = "DEV"; // Default version for local development
+        String version = "DEV";
         try (InputStream input = Main.class.getResourceAsStream("/version.properties")) {
             Properties prop = new Properties();
             if (input == null) {
@@ -66,7 +61,6 @@ public class Main extends Application {
     private Exception startupFailure;
     private Stage primaryStage;
 
-    /** JavaFX invokes init() on the launcher thread, before starting the UI. */
     @Override
     public void init() {
         try {
@@ -79,8 +73,6 @@ public class Main extends Application {
                 startupPreferences.put(preference.getCode(), preference.getValue());
             }
         } catch (Exception e) {
-            // Report preparation failures in start(), where a visible error dialog
-            // is possible even when launched with javaw and no console.
             startupFailure = e;
         }
     }
@@ -93,28 +85,24 @@ public class Main extends Application {
             if (startupFailure != null) {
                 throw startupFailure;
             }
-            // Restore the saved theme before building the scene
+
             AppTheme.setTheme(getStartupPreference("app_theme")
                     .map(AppTheme.Theme::fromPreference)
                     .orElse(AppTheme.Theme.GRAPHITE));
 
-            // Load main view
             updateStartupStatus("Loading interface...");
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
             Parent root = loader.load();
 
             updateStartupStatus("Opening main window...");
-            // Create scene (themed; stylesheets at scene level so menus/popups inherit them)
+
             Scene scene = AppTheme.scene(root);
 
-            // Configure stage
             primaryStage.setTitle(APP_TITLE + " v" + VERSION);
             primaryStage.setScene(scene);
 
-            // Restore window preferences
             restoreWindowPreferences(primaryStage);
 
-            // Set application icon (if available)
             try {
                 Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/app-icon.png")));
                 primaryStage.getIcons().add(icon);
@@ -122,7 +110,6 @@ public class Main extends Application {
                 logger.warn("Application icon not found");
             }
 
-            // Save window preferences on close
             primaryStage.setOnCloseRequest(event -> {
                 saveWindowPreferences();
                 cleanup();
@@ -132,27 +119,13 @@ public class Main extends Application {
             StartupSplash.close();
             logger.info("SeeLoggyPlus application started successfully");
 
-            // Initialize Dev Hot Reloader for live CSS & layout reloading
             DevHotReloader.init(primaryStage, scene);
-
         } catch (Exception e) {
             logger.error("Failed to start application", e);
             showErrorAndExit("Failed to start application: " + e.getMessage());
         }
     }
 
-    /**
-     * Heals the launch scripts in the installation root on startup:
-     * <ul>
-     *   <li>the Windows silent launcher ({@code SeeLoggyPlus.vbs}) is recreated when
-     *       missing (it is intentionally not shipped in update packages because older
-     *       installers reject unknown entries);</li>
-     *   <li>a root {@code launcher.bat} that predates the {@code javaw} launch is
-     *       replaced with the launcher staged with the active version, so it no
-     *       longer leaves a console window open.</li>
-     * </ul>
-     * Best effort only.
-     */
     private void ensureLaunchers() {
         if (Boolean.getBoolean("seeloggyplus.dev")) {
             return;
@@ -161,7 +134,6 @@ public class Main extends Application {
             Path location = Paths.get(
                     getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
             if (Files.isDirectory(location)) {
-                // Running from classes (IDE/tests); no installation root to heal.
                 return;
             }
             UpdateLayout layout =
@@ -176,9 +148,6 @@ public class Main extends Application {
         }
     }
 
-    /**
-     * Restore window size and position from preferences
-     */
     private void restoreWindowPreferences(Stage stage) {
         Optional<Double> windowX = getPreferenceAsDouble("window_x");
         Optional<Double> windowY = getPreferenceAsDouble("window_y");
@@ -211,9 +180,6 @@ public class Main extends Application {
         stage.setMaximized(maximized);
     }
 
-    /**
-     * Helper for robust get preference as double data type
-     */
     private Optional<Double> getPreferenceAsDouble(String code) {
         return getStartupPreference(code)
                 .filter(Predicate.not(String::isBlank))
@@ -234,9 +200,6 @@ public class Main extends Application {
         return Optional.ofNullable(startupPreferences.get(code));
     }
 
-    /**
-     * Helper for checking coordinate only in screen
-     */
     private boolean isBoundsVisibleOnScreen(double x, double y, double width, double height) {
         Rectangle2D windowBounds = new Rectangle2D(x, y, width, height);
 
@@ -251,9 +214,6 @@ public class Main extends Application {
         return false;
     }
 
-    /**
-     * Save window size and position to preferences
-     */
     private void saveWindowPreferences() {
         if (primaryStage != null) {
             preferenceService
@@ -267,18 +227,11 @@ public class Main extends Application {
         }
     }
 
-    /**
-     * Cleanup resources before exit
-     */
     private void cleanup() {
         logger.info("Cleaning up application resources");
         DevHotReloader.shutdown();
-        // Add any cleanup tasks here
     }
 
-    /**
-     * Show error dialog and exit
-     */
     private void showErrorAndExit(String message) {
         StartupSplash.close();
         Alert alert = new Alert(

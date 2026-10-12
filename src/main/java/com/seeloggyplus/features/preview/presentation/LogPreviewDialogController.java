@@ -7,7 +7,6 @@ import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.stage.Stage;
@@ -19,16 +18,11 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 
-/**
- * Controller for the Log Preview Dialog.
- * Shows the raw content of a log file, line by line.
- */
 public class LogPreviewDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(LogPreviewDialogController.class);
@@ -51,7 +45,6 @@ public class LogPreviewDialogController {
         logListView.setItems(logLines);
         logListView.setCellFactory(lv -> new LogLineCell());
 
-        // Enable selection and copy-paste
         logListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         logListView.setOnKeyPressed(event -> {
             if (new KeyCodeCombination(KeyCode.C,
@@ -70,7 +63,6 @@ public class LogPreviewDialogController {
     }
 
     private void loadPreferences() {
-        // Line limit
         String limitStr = preferenceService.getPreferencesByCode("lp_line_limit").orElse("500");
         try {
             this.previewLineLimit = Integer.parseInt(limitStr);
@@ -78,7 +70,6 @@ public class LogPreviewDialogController {
             logger.warn("Invalid preview line limit preference: {}", limitStr);
         }
 
-        // Font settings
         String fontFamily = preferenceService.getPreferencesByCode("app_font_family").orElse("Consolas");
         String fontSizeStr = preferenceService.getPreferencesByCode("app_font_size").orElse("12");
         int fontSize = 12;
@@ -92,10 +83,6 @@ public class LogPreviewDialogController {
         logListView.setStyle(fontStyle);
     }
 
-    /**
-     * Loads a preview of the file content (local or remote) into the list,
-     * limited to the first previewLineLimit lines.
-     */
     public void loadFile(FileInfo fileInfo, SSHService sshService) {
         fileNameLabel.setText(String.format("Preview: %s (first %d lines)", fileInfo.getPath(), previewLineLimit));
         progressIndicator.setVisible(true);
@@ -164,9 +151,6 @@ public class LogPreviewDialogController {
         stage.close();
     }
 
-    /**
-     * Helper class to represent a line in the log file.
-     */
     public static class LogLine {
         private final long lineNumber;
         private final String content;
@@ -185,9 +169,6 @@ public class LogPreviewDialogController {
         }
     }
 
-    /**
-     * ListCell implementation for LogLine.
-     */
     private static class LogLineCell extends ListCell<LogLine> {
         @Override
         protected void updateItem(LogLine item, boolean empty) {

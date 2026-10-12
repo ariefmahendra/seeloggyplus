@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Guards the launcher scripts against losing blue/green layout support. */
 class LauncherScriptsTest {
 
     @Test

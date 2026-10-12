@@ -10,7 +10,7 @@
             fx:controller="com.seeloggyplus.features.search.presentation.RemoteLogSearchDialogController"
             prefWidth="960" prefHeight="640">
 
-    <!-- Top: Search Form -->
+
     <top>
         <VBox spacing="8">
             <padding>
@@ -43,7 +43,7 @@
         </VBox>
     </top>
 
-    <!-- Center: Results + Preview -->
+
     <center>
         <SplitPane orientation="VERTICAL" dividerPositions="0.55">
             <TableView fx:id="resultTable">
@@ -75,7 +75,7 @@
         </SplitPane>
     </center>
 
-    <!-- Bottom: Actions -->
+
     <bottom>
         <VBox>
             <Separator/>

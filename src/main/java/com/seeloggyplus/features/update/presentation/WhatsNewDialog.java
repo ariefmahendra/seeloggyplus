@@ -30,17 +30,10 @@ import org.slf4j.LoggerFactory;
 import com.seeloggyplus.features.update.domain.ReleaseNotes;
 import java.util.Objects;
 
-/**
- * Themed "What's New" dialog shown once after an update. Built in code but fully
- * themed: app icon, theme tokens on every control, an accent update badge and a
- * themed primary "Got it" button. Displays the plain-text release notes embedded
- * at build time.
- */
 public final class WhatsNewDialog {
 
     private static final Logger logger = LoggerFactory.getLogger(WhatsNewDialog.class);
 
-    /** Node ids the caller can look up in tests. */
     public static final String VERSION_LABEL_ID = "whatsNewVersionLabel";
     public static final String NOTES_TEXT_ID = "whatsNewNotes";
 
@@ -67,7 +60,6 @@ public final class WhatsNewDialog {
         pane.getStylesheets().setAll(AppTheme.sceneStylesheets(face));
         AppTheme.applyThemeState(pane, face);
 
-        // --- Header: app icon + titles + accent badge -------------------------
         Label title = new Label("What's New");
         title.getStyleClass().add("section-title");
 
@@ -88,7 +80,6 @@ public final class WhatsNewDialog {
         header.setPadding(new Insets(0, 0, 4, 0));
         HBox.setHgrow(header.getChildren().get(1), Priority.ALWAYS);
 
-        // --- Body: plain-text release notes, themed like the rest of the app --
         String plainNotes = ReleaseNotes.toPlainText(notes);
         TextArea notesArea = new TextArea(plainNotes.isBlank()
                 ? "Thanks for updating! See the release notes for details."
@@ -104,7 +95,6 @@ public final class WhatsNewDialog {
         content.setPadding(new Insets(16));
         pane.setContent(content);
 
-        // --- Button: themed primary action -----------------------------------
         pane.getButtonTypes().setAll(ButtonType.OK);
         Button ok = (Button) pane.lookupButton(ButtonType.OK);
         if (ok != null) {
@@ -118,7 +108,6 @@ public final class WhatsNewDialog {
         dialog.showAndWait();
     }
 
-    /** The main window when present, so the dialog centers over it. */
     private static Window frontmostWindow() {
         for (Window window : Window.getWindows()) {
             if (window.isShowing() && window instanceof Stage) {
@@ -128,7 +117,6 @@ public final class WhatsNewDialog {
         return null;
     }
 
-    /** Adds the application window icon to the dialog's stage once shown. */
     private static void addAppIcon(Dialog<Void> dialog) {
         if (dialog.getDialogPane().getScene() == null
                 || !(dialog.getDialogPane().getScene().getWindow() instanceof Stage stage)) {
@@ -141,7 +129,6 @@ public final class WhatsNewDialog {
         }
     }
 
-    /** Scales the app icon for the header; an unreadable asset returns an empty box. */
     private static ImageView loadAppIcon() {
         try {
             ImageView view = new ImageView(loadImage());

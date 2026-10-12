@@ -14,7 +14,6 @@ import com.seeloggyplus.shared.util.AppPaths;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.stage.Stage;
@@ -132,8 +131,6 @@ public class UpdateDialogControllerTest {
 
     @Test
     public void cancelButtonTextDuringInstall() throws Exception {
-        // Without an injected coordinator the download would need network, so we only
-        // verify that a fresh result resets the button label and hides the progress bar.
         UpdateCheckResult available = available();
         Platform.runLater(() -> controller.setResult(available));
         WaitForAsyncUtils.waitForFxEvents();
@@ -204,7 +201,6 @@ public class UpdateDialogControllerTest {
                 try {
                     Files.deleteIfExists(p);
                 } catch (IOException ignored) {
-                    // best effort
                 }
             });
         }

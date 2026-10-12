@@ -3,7 +3,6 @@ package com.seeloggyplus.features.update.domain;
 import java.io.InputStream;
 import java.util.Properties;
 
-/** Single access point for the running application version. */
 public final class AppVersion {
 
     private static final String VERSION = resolve();
@@ -24,7 +23,6 @@ public final class AppVersion {
                 version = properties.getProperty("version", version);
             }
         } catch (Exception ignored) {
-            // keep DEV fallback
         }
         return version;
     }

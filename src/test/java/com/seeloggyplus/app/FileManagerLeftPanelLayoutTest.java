@@ -31,11 +31,6 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import java.lang.reflect.Method;
 
-/**
- * Layout regression for the File Management left panel: compact icon action bar,
- * the server tree owning the vertical space, and the Favorite folders section
- * collapsing when empty instead of showing a big empty box.
- */
 @ExtendWith(ApplicationExtension.class)
 class FileManagerLeftPanelLayoutTest {
 
@@ -47,7 +42,7 @@ class FileManagerLeftPanelLayoutTest {
     @Start
     void start(Stage stage) throws Exception {
         this.stage = stage;
-        // Deterministic start: local drive, no leftover server preference.
+
         new PreferenceServiceImpl().saveOrUpdatePreferences(new Preference("file_manager_last_location", LOCAL));
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
         Parent root = loader.load();
@@ -85,7 +80,6 @@ class FileManagerLeftPanelLayoutTest {
         TitledPane pane = field("favoritesPane");
         ListView<?> favoritesList = field("favoritesListView");
 
-        // Start from a clean slate for the local location.
         for (FavoriteFolder existing : favorites.getFavoritesForLocation(LOCAL)) {
             favorites.removeFavorite(existing.getId());
         }

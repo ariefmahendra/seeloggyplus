@@ -6,11 +6,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-/**
- * Loads the release notes that the build embeds for the running version
- * ({@code /release-notes.md}) and converts them to readable plain text for the
- * "What's New" dialog.
- */
 public final class ReleaseNotes {
 
     static final String RESOURCE = "/release-notes.md";
@@ -23,7 +18,6 @@ public final class ReleaseNotes {
     private ReleaseNotes() {
     }
 
-    /** Raw markdown of the embedded notes, or empty when the build had none. */
     public static Optional<String> load() {
         return load(ReleaseNotes.class.getResourceAsStream(RESOURCE));
     }
@@ -40,7 +34,6 @@ public final class ReleaseNotes {
         }
     }
 
-    /** Minimal markdown cleanup for display in a plain text area. */
     public static String toPlainText(String markdown) {
         if (markdown == null || markdown.isBlank()) {
             return "";
@@ -53,7 +46,6 @@ public final class ReleaseNotes {
         return text.trim();
     }
 
-    /** True when the "What's New" dialog should be shown for {@code currentVersion}. */
     public static boolean shouldShow(String currentVersion, String seenVersion) {
         if (currentVersion == null || currentVersion.isBlank() || "DEV".equalsIgnoreCase(currentVersion)) {
             return false;

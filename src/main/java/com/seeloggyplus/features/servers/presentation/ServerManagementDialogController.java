@@ -15,7 +15,6 @@ import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -30,10 +29,6 @@ import java.util.Locale;
 import java.util.Objects;
 import javafx.scene.image.Image;
 
-/**
- * High-performance Server Management Dialog Controller
- * Manages SSH server configurations with professional UI
- */
 public class ServerManagementDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(ServerManagementDialogController.class);
@@ -106,9 +101,6 @@ public class ServerManagementDialogController {
         updateButtonStates();
     }
 
-    /**
-     * Setup table columns with optimized cell factories
-     */
     private void setupTableColumns() {
         nameColumn.setCellValueFactory(cellData -> new SimpleStringProperty(
                 cellData.getValue().getName() != null ? cellData.getValue().getName() : "-"));
@@ -132,13 +124,11 @@ public class ServerManagementDialogController {
 
         serverTable.setItems(filteredServers);
 
-        // Selection listener
         serverTable.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             updateDetailsPanel(newVal);
             updateButtonStates();
         });
 
-        // Row factory for double click to edit
         serverTable.setRowFactory(tv -> {
             TableRow<SSHServerModel> row = new TableRow<>();
             row.setOnMouseClicked(event -> {
@@ -149,7 +139,6 @@ public class ServerManagementDialogController {
             return row;
         });
 
-        // Context Menu for table operations
         ContextMenu contextMenu = new ContextMenu();
 
         MenuItem addMenuItem = new MenuItem("Add Server...");
@@ -186,9 +175,6 @@ public class ServerManagementDialogController {
         serverTable.setContextMenu(contextMenu);
     }
 
-    /**
-     * Setup event handlers with optimized callbacks
-     */
     private void setupEventHandlers() {
         addServerButton.setOnAction(e -> handleAddServer());
         editServerButton.setOnAction(e -> handleEditServer());
@@ -199,21 +185,14 @@ public class ServerManagementDialogController {
         refreshButton.setOnAction(e -> loadServers());
         closeButton.setOnAction(e -> handleClose());
 
-        // Search functionality
         searchField.textProperty().addListener((obs, oldVal, newVal) -> filterServers(newVal));
         clearSearchButton.setOnAction(e -> searchField.clear());
     }
 
-    /**
-     * Load servers from database and check connection status
-     */
     private void loadServers() {
         loadServers(null);
     }
 
-    /**
-     * Load servers from database and optionally select a specific server by ID
-     */
     private void loadServers(String selectServerId) {
         Task<List<SSHServerModel>> task = new Task<>() {
             @Override
@@ -248,9 +227,6 @@ public class ServerManagementDialogController {
         new Thread(task).start();
     }
 
-    /**
-     * Filter servers based on search text
-     */
     private void filterServers(String searchText) {
         String search = searchText == null ? "" : searchText.trim().toLowerCase(Locale.ROOT);
         filteredServers.setAll(allServers.stream()
@@ -258,9 +234,6 @@ public class ServerManagementDialogController {
                 .toList());
     }
 
-    /**
-     * Check if server matches search criteria
-     */
     private boolean matchesSearch(SSHServerModel server, String search) {
         return (server.getGroupName() != null && server.getGroupName().toLowerCase(Locale.ROOT).contains(search)) || (server.getName() != null && server.getName().toLowerCase().contains(search)) ||
                 server.getHost().toLowerCase().contains(search) ||
@@ -268,9 +241,6 @@ public class ServerManagementDialogController {
                 (server.getDefaultPath() != null && server.getDefaultPath().toLowerCase().contains(search));
     }
 
-    /**
-     * Handle add server action
-     */
     private void handleAddServer() {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/ServerEditDialog.fxml"));
@@ -298,9 +268,6 @@ public class ServerManagementDialogController {
         }
     }
 
-    /**
-     * Handle edit server action
-     */
     private void handleEditServer() {
         SSHServerModel selected = serverTable.getSelectionModel().getSelectedItem();
         if (selected == null) {
@@ -334,9 +301,6 @@ public class ServerManagementDialogController {
         }
     }
 
-    /**
-     * Handle clone server action
-     */
     private void handleCloneServer() {
         SSHServerModel selected = serverTable.getSelectionModel().getSelectedItem();
         if (selected == null) {
@@ -371,9 +335,6 @@ public class ServerManagementDialogController {
         }
     }
 
-    /**
-     * Handle delete server action
-     */
     private void handleDeleteServer() {
         SSHServerModel selected = serverTable.getSelectionModel().getSelectedItem();
         if (selected == null) {
@@ -394,9 +355,6 @@ public class ServerManagementDialogController {
         }
     }
 
-    /**
-     * Update details panel with server information
-     */
     private void updateDetailsPanel(SSHServerModel server) {
         if (server == null) {
             detailNameLabel.setText("-");
@@ -419,9 +377,6 @@ public class ServerManagementDialogController {
                 .setText(server.getLastUsed() != null ? server.getLastUsed().format(DATE_FORMATTER) : "Never");
     }
 
-    /**
-     * Update button states based on selection
-     */
     private void updateButtonStates() {
         boolean hasSelection = serverTable.getSelectionModel().getSelectedItem() != null;
         editServerButton.setDisable(!hasSelection);
@@ -431,17 +386,11 @@ public class ServerManagementDialogController {
         deleteServerButton.setDisable(!hasSelection);
     }
 
-    /**
-     * Handle close action
-     */
     private void handleClose() {
         Stage stage = (Stage) closeButton.getScene().getWindow();
         stage.close();
     }
 
-    /**
-     * Show error dialog
-     */
     private void showError(String title, String message) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -459,8 +408,6 @@ public class ServerManagementDialogController {
     public SSHServerModel getSelectedServer() {
         return selectedForConnection;
     }
-
-    // --- Window State Restoration Workaround ---
 
     private Stage getUltimateOwner(Stage stage) {
         if (stage == null)
@@ -510,7 +457,6 @@ public class ServerManagementDialogController {
             Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
             addAppIcon(stage);
         } catch (Exception e) {
-            // Ignore if stage not ready
         }
 
         Stage owner = getUltimateOwner((Stage) dialog.getOwner());

@@ -12,7 +12,6 @@ import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
@@ -24,11 +23,9 @@ import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
 
-import com.seeloggyplus.shared.ssh.SSHService;
 import com.seeloggyplus.features.ssh.infrastructure.SSHServiceImpl;
 import com.seeloggyplus.shared.ssh.SSHServiceFactory;
 import com.seeloggyplus.shared.dto.RemoteFileInfo;
-
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -38,13 +35,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
-import java.util.function.Consumer;
 
 import com.seeloggyplus.shared.model.Preference;
 import com.seeloggyplus.shared.settings.PreferenceService;
 
 import static org.junit.jupiter.api.Assertions.*;
-import org.junit.jupiter.api.Disabled;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Locale;
@@ -65,13 +60,11 @@ public class UnifiedFileManagerDialogControllerTest {
     private Button tailButton;
     private Label itemCountLabel;
 
-    // Mocks
     private MockLocalFileService localFileService;
     private MockServerManagementService serverManagementService;
     private MockFavoriteFolderService favoriteFolderService;
     private MockSSHService mockSshService;
 
-    // Platform-neutral filesystem root so tests pass on both Windows and Linux CI.
     private static final boolean IS_WINDOWS =
             System.getProperty("os.name", "").toLowerCase().contains("win");
     private static final String SEP = IS_WINDOWS ? "\\" : "/";
@@ -141,13 +134,11 @@ public class UnifiedFileManagerDialogControllerTest {
             controller.setPreferenceService(new InMemoryPreferenceService());
         }).get();
 
-        // Clear cache
         Field cacheField = UnifiedFileManagerDialogController.class.getDeclaredField("directoryCache");
         cacheField.setAccessible(true);
         Map<?, ?> cache = (Map<?, ?>) cacheField.get(controller);
         cache.clear();
 
-        // Ensure location is reset to Local Drive for test isolation
         Platform.runLater(() -> {
             try {
                 @SuppressWarnings("rawtypes")
@@ -247,8 +238,6 @@ public class UnifiedFileManagerDialogControllerTest {
         });
     }
 
-    // --- POSITIVE SCENARIOS ---
-
     private void invokeControllerMethod(String methodName) {
         Platform.runLater(() -> {
             try {
@@ -261,16 +250,14 @@ public class UnifiedFileManagerDialogControllerTest {
 
     @Test
     public void testNavigationButtons(FxRobot robot) throws Exception {
-        // Go to Home
         invokeControllerMethod("navigateHome");
-        Thread.sleep(1000); // Wait for background task
+        Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
         assertEquals(HOME, pathField.getText());
 
-        // Select directory "folder1"
         Platform.runLater(() -> fileTable.getSelectionModel().select(0));
         WaitForAsyncUtils.waitForFxEvents();
-        
+
         Platform.runLater(() -> {
             try {
                 Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleFileDoubleClick");
@@ -282,10 +269,9 @@ public class UnifiedFileManagerDialogControllerTest {
         WaitForAsyncUtils.waitForFxEvents();
         assertEquals(FOLDER1, pathField.getText());
 
-        // Select directory "folder1" (inside folder1)
-        Platform.runLater(() -> fileTable.getSelectionModel().select(1)); // index 0 is "..", index 1 is "folder1"
+        Platform.runLater(() -> fileTable.getSelectionModel().select(1));
         WaitForAsyncUtils.waitForFxEvents();
-        
+
         Platform.runLater(() -> {
             try {
                 Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleFileDoubleClick");
@@ -297,19 +283,16 @@ public class UnifiedFileManagerDialogControllerTest {
         WaitForAsyncUtils.waitForFxEvents();
         assertEquals(FOLDER1_INNER, pathField.getText());
 
-        // Back
         invokeControllerMethod("navigateBack");
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
         assertEquals(FOLDER1, pathField.getText());
 
-        // Forward
         invokeControllerMethod("navigateForward");
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
         assertEquals(FOLDER1_INNER, pathField.getText());
 
-        // Up
         invokeControllerMethod("navigateUp");
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
@@ -318,8 +301,6 @@ public class UnifiedFileManagerDialogControllerTest {
 
     @Test
     public void testNavigateViaGoButton(FxRobot robot) throws Exception {
-        // Keep the toolbar wide enough that the Go button never falls into the
-        // overflow menu (the window can inherit a smaller size from earlier windows).
         robot.interact(() -> {
             if (stage.getWidth() < 1100) {
                 stage.setWidth(1100);
@@ -346,12 +327,11 @@ public class UnifiedFileManagerDialogControllerTest {
         });
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
-        
+
         Platform.runLater(() -> searchField.setText("file1"));
         Thread.sleep(500);
         WaitForAsyncUtils.waitForFxEvents();
-        
-        // Clear
+
         Platform.runLater(() -> searchField.setText(""));
         Thread.sleep(500);
         WaitForAsyncUtils.waitForFxEvents();
@@ -363,15 +343,13 @@ public class UnifiedFileManagerDialogControllerTest {
         Thread.sleep(1500);
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Select the first directory
-        Platform.runLater(() -> fileTable.getSelectionModel().select(0)); // 0 is "folder1" (no ".." in C:\)
+        Platform.runLater(() -> fileTable.getSelectionModel().select(0));
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
 
         FileInfo selected = fileTable.getSelectionModel().getSelectedItem();
         assertNotNull(selected, "Item should be selected");
-        
-        // Add favorite programmatically to bypass context menu UI flakiness in tests
+
         Platform.runLater(() -> {
             try {
                 Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleAddToFavorites");
@@ -384,7 +362,6 @@ public class UnifiedFileManagerDialogControllerTest {
 
         assertTrue(favoriteFolderService.isFavorite(selected.getPath(), "local"));
 
-        // Remove
         Platform.runLater(() -> {
             try {
                 Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleRemoveFromFavorites");
@@ -404,21 +381,19 @@ public class UnifiedFileManagerDialogControllerTest {
         Thread.sleep(1500);
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Select directory
-        Platform.runLater(() -> fileTable.getSelectionModel().select(0)); // "folder1"
+        Platform.runLater(() -> fileTable.getSelectionModel().select(0));
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
         assertTrue(openButton.isDisabled());
         assertTrue(previewButton.isDisabled());
         assertTrue(tailButton.isDisabled());
 
-        // Select local file
-        Platform.runLater(() -> fileTable.getSelectionModel().select(1)); // "file1.txt"
+        Platform.runLater(() -> fileTable.getSelectionModel().select(1));
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
         assertFalse(openButton.isDisabled());
         assertFalse(previewButton.isDisabled());
-        assertFalse(tailButton.isDisabled()); // Tail is available for local and remote files
+        assertFalse(tailButton.isDisabled());
     }
 
     @Test
@@ -426,7 +401,7 @@ public class UnifiedFileManagerDialogControllerTest {
         robot.clickOn("#homeButton");
         WaitForAsyncUtils.waitForFxEvents();
 
-        Platform.runLater(() -> fileTable.getSelectionModel().select(2)); // "file1.txt"
+        Platform.runLater(() -> fileTable.getSelectionModel().select(2));
         WaitForAsyncUtils.waitForFxEvents();
 
         Platform.runLater(() -> {
@@ -453,7 +428,7 @@ public class UnifiedFileManagerDialogControllerTest {
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
 
-        assertEquals(1, localFileService.callCount); // First call
+        assertEquals(1, localFileService.callCount);
 
         Platform.runLater(() -> {
             try {
@@ -465,7 +440,7 @@ public class UnifiedFileManagerDialogControllerTest {
         Thread.sleep(200);
         WaitForAsyncUtils.waitForFxEvents();
 
-        assertEquals(1, localFileService.callCount); // Should be cached!
+        assertEquals(1, localFileService.callCount);
 
         Label status = getField("statusLabel");
         assertNotNull(status);
@@ -475,7 +450,6 @@ public class UnifiedFileManagerDialogControllerTest {
 
     @Test
     public void testStaleWhileRevalidateRendersImmediately(FxRobot robot) throws Exception {
-        // Prepare expired cache entry
         Field cacheField = UnifiedFileManagerDialogController.class.getDeclaredField("directoryCache");
         cacheField.setAccessible(true);
         @SuppressWarnings("unchecked")
@@ -487,20 +461,18 @@ public class UnifiedFileManagerDialogControllerTest {
         f.setSize(1234L);
         staleFiles.add(f);
 
-        // Access inner CacheEntry via reflection or construct
         Class<?> cacheEntryClass = Class.forName("com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogController$CacheEntry");
         Constructor<?> ctor = cacheEntryClass.getDeclaredConstructor(List.class);
         ctor.setAccessible(true);
         Object staleEntry = ctor.newInstance(staleFiles);
 
-        // Set timestamp back by 10 minutes so it is expired
         Field tsField = cacheEntryClass.getDeclaredField("timestamp");
         tsField.setAccessible(true);
         tsField.set(staleEntry, System.currentTimeMillis() - (10 * 60 * 1000));
 
         cache.put("local:" + STALE_DIR, staleEntry);
 
-        localFileService.simulateDelay = true; // Service takes 500ms
+        localFileService.simulateDelay = true;
         int initialCalls = localFileService.callCount;
 
         Platform.runLater(() -> {
@@ -511,16 +483,13 @@ public class UnifiedFileManagerDialogControllerTest {
             } catch (Exception e) {}
         });
 
-        // Check IMMEDIATELY (well before 500ms delay of service)
         Thread.sleep(50);
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Stale files should already be displayed immediately (0ms perceived latency!)
         assertEquals(1.0, fileTable.getOpacity(), "Table must remain full opacity (not dimmed) when showing stale cache");
         assertFalse(fileTable.getItems().isEmpty(), "Stale files must be displayed immediately without waiting for network");
         assertEquals("stale-file.log", fileTable.getItems().get(0).getName());
 
-        // Wait for background revalidation to finish
         Thread.sleep(800);
         WaitForAsyncUtils.waitForFxEvents();
 
@@ -531,13 +500,12 @@ public class UnifiedFileManagerDialogControllerTest {
     public void testSortingBySize(FxRobot robot) {
         robot.clickOn("#homeButton");
         WaitForAsyncUtils.waitForFxEvents();
-        // Since testfx click on column header is tricky, we can check the comparator
-        assertNotNull(fileTable.getColumns().get(2).getComparator()); // Size column
+
+        assertNotNull(fileTable.getColumns().get(2).getComparator());
     }
 
     @Test
     public void testAutoRefreshOnFocus(FxRobot robot) throws Exception {
-        // Only refreshes if remote location, but we can call it manually to test logic
         Platform.runLater(() -> {
             try {
                 Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleWindowGainedFocus");
@@ -546,28 +514,22 @@ public class UnifiedFileManagerDialogControllerTest {
             } catch (Exception e) {}
         });
         WaitForAsyncUtils.waitForFxEvents();
-        // No exception means it handled it.
     }
-
-    // --- NEGATIVE SCENARIOS ---
 
     @Test
     public void testDirectoryLoadFailure(FxRobot robot) {
         localFileService.throwError = true;
         robot.clickOn("#homeButton");
         WaitForAsyncUtils.waitForFxEvents();
-        // Just verify it doesn't crash and we get an error status or empty table.
-        // It should show an error dialog which blocks TestFX, but we can at least assert it tried.
     }
 
     @Test
     public void testNavigateBeyondRoot(FxRobot robot) {
         robot.clickOn("#homeButton");
         WaitForAsyncUtils.waitForFxEvents();
-        
+
         robot.clickOn("#upButton");
         WaitForAsyncUtils.waitForFxEvents();
-        // Should not crash, path should remain C:\
     }
 
     @Test
@@ -575,10 +537,9 @@ public class UnifiedFileManagerDialogControllerTest {
         robot.clickOn("#homeButton");
         WaitForAsyncUtils.waitForFxEvents();
 
-        Platform.runLater(() -> fileTable.getSelectionModel().select(2)); // file
+        Platform.runLater(() -> fileTable.getSelectionModel().select(2));
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Call handleTail
         Platform.runLater(() -> {
             try {
                 Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleTail");
@@ -587,15 +548,12 @@ public class UnifiedFileManagerDialogControllerTest {
             } catch (Exception e) {}
         });
         WaitForAsyncUtils.waitForFxEvents();
-        // Local files support the same Tail action as remote files.
+
         assertEquals(UnifiedFileManagerDialogController.OpenAction.TAIL, controller.getOpenAction());
     }
 
-    // --- SERVER SCENARIOS ---
-
     @Test
     public void testServerConnectionSuccess(FxRobot robot) throws Exception {
-        // Trigger server selection
         Platform.runLater(() -> {
             try {
                 Class<?> locationItemClass = Class.forName("com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogController$LocationItem");
@@ -607,10 +565,9 @@ public class UnifiedFileManagerDialogControllerTest {
                 m.invoke(controller, item);
             } catch (Exception e) {}
         });
-        Thread.sleep(1500); // Wait for connect task
+        Thread.sleep(1500);
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Connected and navigated to default path "/"
         assertEquals("/", pathField.getText());
         assertTrue(mockSshService.connectCalled);
     }
@@ -618,7 +575,7 @@ public class UnifiedFileManagerDialogControllerTest {
     @Test
     public void testServerConnectionFailure(FxRobot robot) throws Exception {
         mockSshService.simulateFailure = true;
-        // Trigger server selection
+
         Platform.runLater(() -> {
             try {
                 Class<?> locationItemClass = Class.forName("com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogController$LocationItem");
@@ -630,12 +587,9 @@ public class UnifiedFileManagerDialogControllerTest {
                 m.invoke(controller, item);
             } catch (Exception e) {}
         });
-        Thread.sleep(1500); // Wait for connect task
+        Thread.sleep(1500);
         WaitForAsyncUtils.waitForFxEvents();
 
-        // The failed connect must fall back to the local location. Comparing the path
-        // against "/" would be wrong on Unix (the local home is "/" there too), so
-        // assert the active location and the local home path instead.
         assertTrue(mockSshService.connectCalled);
         assertNull(controller.getActiveServer(), "a failed connect must fall back to a local location");
         assertEquals(localFileService.getHomeDirectory(), pathField.getText(),
@@ -644,18 +598,14 @@ public class UnifiedFileManagerDialogControllerTest {
 
     @Test
     public void testRemoteFileTailAction(FxRobot robot) throws Exception {
-        // First connect
         testServerConnectionSuccess(robot);
 
-        // Select a remote file in the table (mock returns a file)
-        Platform.runLater(() -> fileTable.getSelectionModel().select(0)); // remoteFile.log
+        Platform.runLater(() -> fileTable.getSelectionModel().select(0));
         Thread.sleep(200);
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Tail button should now be enabled for remote files
         assertFalse(tailButton.isDisabled());
 
-        // Call handleTail
         Platform.runLater(() -> {
             try {
                 Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleTail");
@@ -669,7 +619,6 @@ public class UnifiedFileManagerDialogControllerTest {
         assertEquals(UnifiedFileManagerDialogController.OpenAction.TAIL, controller.getOpenAction());
     }
 
-    /** Waits until an item with the given name appears in the table (polling, no fixed sleep). */
     private FileInfo waitForTableItem(String name, long timeoutMs) throws Exception {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
@@ -700,9 +649,6 @@ public class UnifiedFileManagerDialogControllerTest {
         assertEquals("localuser", file1.getOwner());
         assertEquals("localuser", ownerCol.getCellObservableValue(file1).getValue());
 
-        // Now switch to remote server and verify remote owner mapping.
-        // Build the LocationItem via reflection so the test does not depend on servers
-        // already existing in the local database (empty DB on CI runners).
         Platform.runLater(() -> {
             try {
                 Class<?> locationItemClass = Class.forName(
@@ -727,8 +673,6 @@ public class UnifiedFileManagerDialogControllerTest {
         assertEquals("remoteuser", remoteFile.getOwner());
         assertEquals("remoteuser", ownerCol.getCellObservableValue(remoteFile).getValue());
     }
-
-    // --- Mock Classes ---
 
     class MockLocalFileService implements LocalFileService {
         public int callCount = 0;
@@ -777,7 +721,7 @@ public class UnifiedFileManagerDialogControllerTest {
         public List<SSHServerModel> getAllServers() {
             SSHServerModel s = new SSHServerModel();
             s.setId("server1"); s.setName("Server 1"); s.setHost("localhost");
-            // Non-blank password so the controller never opens a password prompt in tests.
+
             s.setPassword("dummy");
             return Arrays.asList(s);
         }
@@ -802,7 +746,6 @@ public class UnifiedFileManagerDialogControllerTest {
 
         @Override public void disconnect() {}
         @Override public boolean isConnected() { return connectCalled && !simulateFailure; }
-        
         @Override
         public List<RemoteFileInfo> listFiles(String remotePath) throws IOException {
             if (simulateFailure) throw new IOException("Remote Mock Error");
@@ -836,6 +779,7 @@ public class UnifiedFileManagerDialogControllerTest {
             return favs.stream().anyMatch(f -> f.getPath().equals(path));
         }
     }
+
     @Test
     public void testFileDoubleClick(FxRobot robot) throws Exception {
         Platform.runLater(() -> {
@@ -848,10 +792,9 @@ public class UnifiedFileManagerDialogControllerTest {
         Thread.sleep(1500);
         WaitForAsyncUtils.waitForFxEvents();
 
-        // Select directory "folder1"
         Platform.runLater(() -> fileTable.getSelectionModel().select(0));
         WaitForAsyncUtils.waitForFxEvents();
-        
+
         Platform.runLater(() -> {
             try {
                 Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleFileDoubleClick");
@@ -861,11 +804,10 @@ public class UnifiedFileManagerDialogControllerTest {
         });
         Thread.sleep(1500);
         WaitForAsyncUtils.waitForFxEvents();
-        
+
         assertEquals(FOLDER1, pathField.getText());
 
-        // Select file "file1.txt" (inside folder1)
-        Platform.runLater(() -> fileTable.getSelectionModel().select(2)); // Should be a file inside folder1 (index 0 is "..", 1 is "folder1", 2 is "file1.txt")
+        Platform.runLater(() -> fileTable.getSelectionModel().select(2));
         WaitForAsyncUtils.waitForFxEvents();
 
         Platform.runLater(() -> {
@@ -877,7 +819,7 @@ public class UnifiedFileManagerDialogControllerTest {
         });
         Thread.sleep(500);
         WaitForAsyncUtils.waitForFxEvents();
-        
+
         assertEquals(UnifiedFileManagerDialogController.OpenAction.OPEN, controller.getOpenAction());
     }
 
@@ -887,7 +829,7 @@ public class UnifiedFileManagerDialogControllerTest {
         Thread.sleep(1500);
         WaitForAsyncUtils.waitForFxEvents();
 
-        Platform.runLater(() -> fileTable.getSelectionModel().select(1)); // "file1.txt"
+        Platform.runLater(() -> fileTable.getSelectionModel().select(1));
         WaitForAsyncUtils.waitForFxEvents();
 
         Thread t = new Thread(() -> {
@@ -901,14 +843,13 @@ public class UnifiedFileManagerDialogControllerTest {
         });
         t.start();
         Thread.sleep(1500);
-        
+
         robot.type(KeyCode.ESCAPE);
         WaitForAsyncUtils.waitForFxEvents();
     }
 
     @Test
     public void testManageServersAction(FxRobot robot) throws Exception {
-        // Run on separate thread to prevent showAndWait from blocking TestFX thread
         Thread t = new Thread(() -> {
             Platform.runLater(() -> {
                 try {
@@ -920,8 +861,7 @@ public class UnifiedFileManagerDialogControllerTest {
         });
         t.start();
         Thread.sleep(1500);
-        
-        // Close the newly opened ServerManagementDialog by typing ESCAPE
+
         robot.type(KeyCode.ESCAPE);
         WaitForAsyncUtils.waitForFxEvents();
     }

@@ -10,7 +10,7 @@
     <top>
         <VBox>
             <MenuBar fx:id="menuBar" styleClass="app-menubar">
-                <!-- File Menu -->
+
                 <Menu text="_File">
                     <MenuItem accelerator="Ctrl+O" onAction="#handleOpen" text="Open..." />
                     <MenuItem fx:id="closeTabMenuItem" accelerator="Ctrl+W" onAction="#handleCloseCurrentTab" text="Close Tab" />
@@ -19,7 +19,7 @@
                     <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit" />
                 </Menu>
 
-                <!-- View Menu -->
+
                 <Menu text="_View">
                     <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel" />
                     <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel" />
@@ -28,14 +28,14 @@
                     <MenuItem accelerator="F5" text="Refresh" />
                 </Menu>
 
-                <!-- Settings Menu -->
+
                 <Menu text="_Settings">
                     <MenuItem fx:id="serverManagementMenuItem" accelerator="Ctrl+M" text="Server Management..." />
                     <SeparatorMenuItem />
                     <MenuItem fx:id="preferencesMenuItem" text="Preferences..." />
                 </Menu>
 
-                <!-- Help Menu -->
+
                 <Menu text="_Help">
                     <MenuItem fx:id="helpContentsMenuItem" text="Help Contents" accelerator="F1" />
                     <SeparatorMenuItem />
@@ -47,7 +47,7 @@
                 </Menu>
             </MenuBar>
 
-            <!-- Toolbar -->
+
             <ToolBar styleClass="app-toolbar">
                 <ToggleButton fx:id="toggleLeftPanelButton" selected="true">
                     <graphic>
@@ -126,17 +126,17 @@
         </VBox>
     </top>
 
-    <!-- Center: Main Content -->
+
     <center>
         <StackPane fx:id="centerRoot">
             <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
                 <fx:include fx:id="recentPanel" source="RecentFilesPanel.fxml" />
 
                 <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
-                    <!-- Center Panel: Log Table / Tabs -->
+
                     <VBox spacing="0">
                         <StackPane fx:id="logContainer" VBox.vgrow="ALWAYS">
-                            <!-- Empty State Pane -->
+
                             <VBox fx:id="emptyStatePane" alignment="CENTER" spacing="12" styleClass="empty-state-pane">
                                 <FontAwesomeIconView glyphName="FILE_TEXT_ALT" size="48" styleClass="empty-state-icon" />
                                 <Label text="No Log File Open" styleClass="empty-state-title" />
@@ -156,7 +156,7 @@
                 </SplitPane>
             </SplitPane>
 
-            <!-- Loading Overlay -->
+
             <VBox fx:id="loadingOverlay" alignment="CENTER" visible="false" styleClass="loading-overlay">
                 <VBox alignment="CENTER" spacing="15" styleClass="loading-card">
                     <ProgressIndicator fx:id="loadingProgress" minWidth="60" minHeight="60" maxWidth="60" maxHeight="60" />
@@ -170,7 +170,7 @@
                 </VBox>
             </VBox>
 
-            <!-- NOTE: clip Rectangle size is set/bound in controller (FXML binding to width/height isn't reliable here). -->
+
             <clip>
                 <Rectangle fx:id="centerClip" />
             </clip>
@@ -179,19 +179,19 @@
 
     <bottom>
         <HBox alignment="CENTER_LEFT" spacing="10" styleClass="status-bar">
-            <!-- Status Info (left side) -->
+
             <Label fx:id="statusLabel" text="Line: 0 / 0 (0%)" styleClass="status-text"/>
             <Separator orientation="VERTICAL" />
-            
-            <!-- Spacer to push memory stats to right -->
+
+
             <Region HBox.hgrow="ALWAYS" />
-            
-            <!-- Update awareness (right side) -->
+
+
             <Label fx:id="updateStatusLabel" styleClass="status-link" visible="false" managed="false">
                 <tooltip><Tooltip text="A new version is available - click to update" /></tooltip>
             </Label>
 
-            <!-- Memory Stats (right side) -->
+
              <Button text="GC" onAction="#handleGC" styleClass="btn-compact">
                 <tooltip><Tooltip text="Run Garbage Collection" /></tooltip>
              </Button>
