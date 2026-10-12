@@ -1,6 +1,7 @@
 package com.seeloggyplus.features.logs.infrastructure.persistence;
 
 import com.seeloggyplus.features.logs.application.port.ParsingConfigRepository;
+import com.seeloggyplus.shared.database.FatalDatabaseException;
 import com.seeloggyplus.shared.model.ParsingConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +35,7 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
             }
         } catch (SQLException e) {
             logger.error("Error finding parsing config by id: {}", id, e);
+            throw new FatalDatabaseException("Error finding parsing config by id: " + id, e);
         }
         return Optional.empty();
     }
@@ -49,6 +51,7 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
             }
         } catch (SQLException e) {
             logger.error("Error finding all parsing configs", e);
+            throw new FatalDatabaseException("Error finding all parsing configs", e);
         }
         return configs;
     }
@@ -65,6 +68,7 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
             preparedStatement.executeUpdate();
         } catch (SQLException e) {
             logger.error("Error saving parsing config: {}", config.getName(), e);
+            throw new FatalDatabaseException("Error saving parsing config: " + config.getName(), e);
         }
     }
 
@@ -80,6 +84,7 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
             preparedStatement.executeUpdate();
         } catch (SQLException e) {
             logger.error("Error updating parsing config: {}", config.getName(), e);
+            throw new FatalDatabaseException("Error updating parsing config: " + config.getName(), e);
         }
     }
 
@@ -91,6 +96,7 @@ public class ParsingConfigRepositoryImpl implements ParsingConfigRepository {
             preparedStatement.executeUpdate();
         } catch (SQLException e) {
             logger.error("Error deleting parsing config: {}", config.getName(), e);
+            throw new FatalDatabaseException("Error deleting parsing config: " + config.getName(), e);
         }
     }
 

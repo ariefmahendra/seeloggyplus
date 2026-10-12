@@ -6,6 +6,7 @@ import com.seeloggyplus.shared.model.ParsingConfig;
 import com.seeloggyplus.features.recent.domain.RecentFile;
 import com.seeloggyplus.features.recent.infrastructure.RecentFileRepository;
 import com.seeloggyplus.shared.database.DatabaseConfig;
+import com.seeloggyplus.shared.database.FatalDatabaseException;
 import com.seeloggyplus.shared.util.FileUtils;
 
 import java.sql.Connection;
@@ -25,11 +26,18 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
 
     private static final Logger logger = LoggerFactory.getLogger(RecentFileRepositoryImpl.class);
 
+    private final Connection connection;
+
     public RecentFileRepositoryImpl() {
+        this.connection = null;
+    }
+
+    public RecentFileRepositoryImpl(Connection connection) {
+        this.connection = connection;
     }
 
     private Connection getConnection() {
-        return DatabaseConfig.getInstance().getConnection();
+        return connection != null ? connection : DatabaseConfig.getInstance().getConnection();
     }
 
     @Override
@@ -65,6 +73,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
             }
         } catch (SQLException e) {
             logger.error("Error finding all recent files", e);
+            throw new FatalDatabaseException("Error finding all recent files", e);
         }
         return recentFiles;
     }
@@ -87,6 +96,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
             logger.info("Successfully saved recent file: {} (mode={})", recentFile.getFileId(), recentFile.getMode());
         } catch (SQLException e) {
             logger.error("Error saving recent file: {}", recentFile.getId(), e);
+            throw new FatalDatabaseException("Error saving recent file: " + recentFile.getId(), e);
         }
     }
 
@@ -98,6 +108,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
             stmt.executeUpdate(sql);
         } catch (SQLException e) {
             logger.error("Error deleting all recent files", e);
+            throw new FatalDatabaseException("Error deleting all recent files", e);
         }
     }
 
@@ -136,6 +147,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
             }
         } catch (SQLException e) {
             logger.error("Error finding recent file by id: {}", id, e);
+            throw new FatalDatabaseException("Error finding recent file by id: " + id, e);
         }
         return recentFileDto;
     }
@@ -155,6 +167,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
             }
         } catch (SQLException e) {
             logger.error("Error finding recent file by fileId: {}", fileId, e);
+            throw new FatalDatabaseException("Error finding recent file by fileId: " + fileId, e);
         }
         return Optional.ofNullable(recentFile);
     }
@@ -169,6 +182,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
             preparedStatement.execute();
         } catch (SQLException e){
             logger.error("Error deleting recent file by id: {}", id, e);
+            throw new FatalDatabaseException("Error deleting recent file by id: " + id, e);
         }
     }
 
@@ -182,6 +196,7 @@ public class RecentFileRepositoryImpl implements RecentFileRepository {
             preparedStatement.execute();
         } catch (SQLException e){
             logger.error("Error deleting recent file by fileId: {}", fileId, e);
+            throw new FatalDatabaseException("Error deleting recent file by fileId: " + fileId, e);
         }
     }
 

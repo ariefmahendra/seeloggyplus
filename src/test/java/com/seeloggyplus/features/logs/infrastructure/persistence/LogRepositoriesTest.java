@@ -1,5 +1,6 @@
 package com.seeloggyplus.features.logs.infrastructure.persistence;
 
+import com.seeloggyplus.shared.database.FatalDatabaseException;
 import com.seeloggyplus.shared.database.NotFoundException;
 import com.seeloggyplus.shared.model.LogFile;
 import com.seeloggyplus.shared.model.ParsingConfig;
@@ -80,5 +81,30 @@ class LogRepositoriesTest {
         repository.delete(config);
         assertTrue(repository.findById("config").isEmpty());
         assertFalse(connection.isClosed());
+    }
+
+    @Test
+    void parsingConfigMutationFailuresAreReported() throws Exception {
+        ParsingConfigRepositoryImpl repository = new ParsingConfigRepositoryImpl(connection);
+        try (var statement = connection.createStatement()) {
+            statement.execute("DROP TABLE parsing_configs");
+        }
+        ParsingConfig config = new ParsingConfig("Test", "(?<message>.*)");
+        config.setId("config");
+
+        assertThrows(FatalDatabaseException.class, () -> repository.save(config));
+        assertThrows(FatalDatabaseException.class, () -> repository.update(config));
+        assertThrows(FatalDatabaseException.class, () -> repository.delete(config));
+    }
+
+    @Test
+    void parsingConfigReadFailuresAreReported() throws Exception {
+        ParsingConfigRepositoryImpl repository = new ParsingConfigRepositoryImpl(connection);
+        try (var statement = connection.createStatement()) {
+            statement.execute("DROP TABLE parsing_configs");
+        }
+
+        assertThrows(FatalDatabaseException.class, () -> repository.findById("config"));
+        assertThrows(FatalDatabaseException.class, repository::findAll);
     }
 }
