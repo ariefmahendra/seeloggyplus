@@ -16,6 +16,7 @@ import com.seeloggyplus.features.update.domain.UpdateCheckResult;
 import com.seeloggyplus.features.update.infrastructure.UpdateCoordinator;
 import com.seeloggyplus.features.update.infrastructure.UpdateLayout;
 import com.seeloggyplus.features.update.domain.UpdatePreferences;
+import com.seeloggyplus.features.update.application.UpdateService;
 import com.seeloggyplus.features.update.application.UpdateServiceImpl;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
@@ -57,6 +58,7 @@ public class UpdateFeature {
     private Supplier<UpdateCoordinator> updateCoordinatorFactory =
             () -> new UpdateCoordinator(UpdateLayout.installationRoot(),
                     UpdateDialogController.stagingDirectory());
+    private Supplier<UpdateService> updateServiceFactory = () -> new UpdateServiceImpl(updateManifestUrl());
 
     public UpdateFeature(PreferenceService preferenceService) {
         this.preferenceService = preferenceService;
@@ -180,6 +182,12 @@ public class UpdateFeature {
         }
     }
 
+    public void setUpdateServiceFactory(Supplier<UpdateService> factory) {
+        if (factory != null) {
+            this.updateServiceFactory = factory;
+        }
+    }
+
     public void startBackgroundUpdate(UpdateCheckResult result) {
         if (result == null || result.manifest() == null || !result.hasUpdate()) {
             return;
@@ -241,7 +249,7 @@ public class UpdateFeature {
         Thread.ofVirtual().start(() -> {
             UpdateCheckResult result;
             try {
-                result = new UpdateServiceImpl(updateManifestUrl()).check(channel);
+                result = updateServiceFactory.get().check(channel);
             } catch (Exception e) {
                 result = UpdateCheckResult.error(AppVersion.current(),
                         e.getMessage() == null ? "Update check failed" : e.getMessage());
