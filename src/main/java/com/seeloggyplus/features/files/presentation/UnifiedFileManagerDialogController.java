@@ -29,14 +29,12 @@ import javafx.collections.transformation.SortedList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import lombok.Getter;
 import org.slf4j.Logger;
@@ -74,16 +72,11 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.Priority;
 import javafx.util.Duration;
 
-/**
- * Controller for the Unified File Manager Dialog.
- * Handles both local and remote file browsing.
- */
 public class UnifiedFileManagerDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(UnifiedFileManagerDialogController.class);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    // FXML Components
     @FXML
     private Button backButton;
     @FXML
@@ -153,7 +146,6 @@ public class UnifiedFileManagerDialogController {
     @FXML
     private Button openButton;
 
-    // --- Favorites Components ---
     private ListView<FavoriteFolder> favoritesListView;
     private ContextMenu fileContextMenu;
     private MenuItem addToFavoritesMenuItem;
@@ -163,12 +155,10 @@ public class UnifiedFileManagerDialogController {
         OPEN, TAIL
     }
 
-    // Services
     private LocalFileService localFileService;
     private ServerCatalog serverManagementService;
     private PreferenceService preferenceService;
     private SSHServiceFactory sshServiceFactory;
-
 
     private FavoriteFolderService favoriteFolderService;
 
@@ -181,12 +171,10 @@ public class UnifiedFileManagerDialogController {
 
         @Override
         public void openPreview(FileInfo file, SSHService sshService) {
-            // no-op default
         }
 
         @Override
         public void openServerManagement() {
-            // no-op default
         }
     };
 
@@ -206,17 +194,17 @@ public class UnifiedFileManagerDialogController {
     @Getter
     private OpenAction openAction = OpenAction.OPEN;
 
-    // --- Performance Enhancements ---
     private final Map<String, CacheEntry> directoryCache = new ConcurrentHashMap<>();
     private final Set<String> favoritePathsCache = new HashSet<>();
-    private static final long CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+    private static final long CACHE_DURATION_MS = 5 * 60 * 1000;
     private boolean suppressAutoRefresh = false;
     private boolean suppressSortSave = false;
     private boolean locationTreeReady;
+    private boolean pendingRemoteRestore;
     private String draggedLocationServerId;
     private String draggedLocationGroup;
     private OpenAction doubleClickAction = OpenAction.OPEN;
-    private String cachedFavoritesLocationId = null; // Track which location favorites are cached for
+    private String cachedFavoritesLocationId = null;
 
     private final ExecutorService fileIoExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "FileManager-IO");
@@ -271,7 +259,6 @@ public class UnifiedFileManagerDialogController {
         setupFileTable();
         setupEventHandlers();
 
-        // WinSCP-style keyboard shortcuts
         Platform.runLater(() -> {
             if (pathField != null && pathField.getScene() != null) {
                 pathField.getScene().getAccelerators().put(
@@ -306,8 +293,6 @@ public class UnifiedFileManagerDialogController {
             suppressAutoRefresh = false;
             return;
         }
-        // WinSCP-style: do not automatically clear cache or re-download on focus.
-        // Manual refresh is available via the refresh button or Ctrl+R.
     }
 
     private void setupLocationTree() {
@@ -339,8 +324,7 @@ public class UnifiedFileManagerDialogController {
                 event.consume();
             });
         }
-        // Selecting a node must never open it: starting a drag selects the row before
-        // the drag is detected. Connections happen on click or Enter instead.
+
         locationTree.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) {
                 handleLocationClick(selectedLocationItem());
@@ -351,7 +335,6 @@ public class UnifiedFileManagerDialogController {
         locationTree.setRoot(buildLocationRoot());
     }
 
-    /** Builds the WinSCP-style location tree: Local, nested group folders, ungrouped servers. */
     private TreeItem<LocationItem> buildLocationRoot() {
         TreeItem<LocationItem> root = new TreeItem<>(LocationItem.root());
         root.setExpanded(true);
@@ -375,7 +358,6 @@ public class UnifiedFileManagerDialogController {
         return root;
     }
 
-    /** Creates (if needed) every segment of a "Parent/Child" path and returns the deepest folder. */
     private TreeItem<LocationItem> ensureFolderNode(TreeItem<LocationItem> root,
             Map<String, TreeItem<LocationItem>> folders, String path) {
         TreeItem<LocationItem> parent = root;
@@ -613,7 +595,6 @@ public class UnifiedFileManagerDialogController {
         return menu;
     }
 
-    /** Dropping onto a folder joins it, onto a server joins its group, onto Local/root ungroups. */
     public static String groupForDropTarget(LocationItem target) {
         if (target == null) {
             return null;
@@ -653,14 +634,13 @@ public class UnifiedFileManagerDialogController {
         if (server == null) {
             return;
         }
-        // Dragging/moving must never open the server; the tree is only rebuilt.
+
         server.setGroupName(groupName);
         serverManagementService.saveServer(server);
         rebuildLocationTree();
         selectNode(findServerNodeById(serverId));
     }
 
-    /** Opens a location on an explicit click/Enter. Selection alone (drag start) does nothing. */
     public void handleLocationClick(LocationItem location) {
         if (location == null || !(location.isLocal() || location.isServer())
                 || isSameLocation(location, currentLocation)) {
@@ -689,7 +669,6 @@ public class UnifiedFileManagerDialogController {
         return item == null ? null : item.getValue();
     }
 
-    /** New groups are created inside the selected group (or the selected server's group). */
     private static String parentPathForNewGroup(LocationItem item) {
         if (item == null) {
             return null;
@@ -941,8 +920,7 @@ public class UnifiedFileManagerDialogController {
             VBox.setVgrow(favoritesListView, Priority.ALWAYS);
         }
         favoriteCurrentButton.setOnAction(e -> toggleCurrentFavorite());
-        // The server tree is the primary content of the left panel; favorites
-        // collapse into a section so an empty list never eats vertical space.
+
         VBox.setVgrow(locationTree, Priority.ALWAYS);
     }
 
@@ -1080,8 +1058,7 @@ public class UnifiedFileManagerDialogController {
         });
 
         SortedList<FileInfo> sortedData = new SortedList<>(filteredFiles);
-        // ponytail: fallback comparator — directories first, then modified desc, tie-break name asc
-        // Optimized to use primitive long comparison and String.CASE_INSENSITIVE_ORDER to avoid object churn
+
         Comparator<FileInfo> defaultSort = Comparator
             .<FileInfo>comparingInt(f -> f.getName().equals("..") ? 0 : (f.isDirectory() ? 1 : 2))
             .thenComparing((f1, f2) -> Long.compare(f2.getModifiedTime(), f1.getModifiedTime()))
@@ -1114,10 +1091,6 @@ public class UnifiedFileManagerDialogController {
             }
         });
 
-        // ponytail: single unified save trigger for all sort state changes.
-        // JavaFX column header click cycles: ASC → DESC → clear.
-        // We listen to BOTH list changes (new column / clear) and sortType toggles (ASC↔DESC),
-        // but coalesce into one deferred save so we always read final state.
         Runnable deferredSave = new Runnable() {
             private boolean scheduled = false;
             @Override public void run() {
@@ -1199,13 +1172,12 @@ public class UnifiedFileManagerDialogController {
             currentPrefetchFuture.cancel(true);
         }
 
-        // Disconnect from the previous session if there was one
         if (activeSshService != null) {
             activeSshService.disconnect();
             activeSshService = null;
         }
 
-        currentPath = null; // Never carry a path into another server's navigation history.
+        currentPath = null;
         currentLocation = location;
         updateFindInFilesState();
         if (preferenceService != null) {
@@ -1214,18 +1186,16 @@ public class UnifiedFileManagerDialogController {
         }
         backHistory.clear();
         forwardHistory.clear();
-        cachedFavoritesLocationId = null; // Force favorites reload for new location
+        cachedFavoritesLocationId = null;
         updateNavigationButtons();
         loadFavoritesForCurrentLocation();
 
         if (location.getServer() == null) {
-            // This is a local drive, no connection needed
             String lastPath = preferenceService.getPreferencesByCode(lastPathKey())
                 .filter(p -> !p.isBlank())
                 .orElse(localFileService.getHomeDirectory());
             navigateTo(lastPath);
         } else {
-            // This is a remote server, create a new service and connect
             activeSshService = createSshService();
             connectToRemote(location.getServer());
         }
@@ -1235,10 +1205,10 @@ public class UnifiedFileManagerDialogController {
         String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
         if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
             logger.info("Password for server {} is not saved, prompting user.", server.getName());
-            suppressAutoRefresh = true; // Prevent focus-triggered refresh while dialog is open
+            suppressAutoRefresh = true;
             PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
             Optional<String> result = prompt.showAndWait();
-            suppressAutoRefresh = true; // Re-set: closing dialog triggers focus gain before connect finishes
+            suppressAutoRefresh = true;
 
             if (result.isPresent() && !result.get().isBlank()) {
                 password = result.get();
@@ -1246,7 +1216,7 @@ public class UnifiedFileManagerDialogController {
             } else {
                 logger.info("User cancelled password prompt. Aborting connection.");
                 updateStatus("Connection cancelled.");
-                selectLocalLocation(); // Go back to local
+                selectLocalLocation();
                 return;
             }
         }
@@ -1287,7 +1257,7 @@ public class UnifiedFileManagerDialogController {
                 fileTable.setCursor(Cursor.DEFAULT);
                 String detail = connectingService.getLastConnectError();
                 showConnectionError(server, detail);
-                selectLocalLocation(); // Go back to local on failure
+                selectLocalLocation();
             }
         });
 
@@ -1299,7 +1269,7 @@ public class UnifiedFileManagerDialogController {
             Throwable ex = connectTask.getException();
             logger.error("SSH Connection task failed", ex);
             showConnectionError(server, ex != null ? ex.getMessage() : connectingService.getLastConnectError());
-            selectLocalLocation(); // Go back to local on failure
+            selectLocalLocation();
         });
 
         new Thread(connectTask).start();
@@ -1435,8 +1405,12 @@ public class UnifiedFileManagerDialogController {
         }
         selectNode(target);
         LocationItem item = target.getValue();
-        // Bare controllers (unit tests) have no live tree; navigate only when it is ready,
-        // so restoring never opens a connection in isolation tests.
+
+        if (item.isServer() && sshServiceFactory == null) {
+            pendingRemoteRestore = true;
+            return;
+        }
+
         if (locationTreeReady && (item.isLocal() || item.isServer())) {
             handleLocationSelected(item);
         }
@@ -1453,7 +1427,6 @@ public class UnifiedFileManagerDialogController {
         try {
             var sortOrder = fileTable.getSortOrder();
             if (sortOrder.isEmpty()) {
-                // 3rd click (clear) — remove preference so default sort is used on next open
                 logger.info("saveSortOrdering: key={}, value=(cleared)", sortKey());
                 preferenceService.saveOrUpdatePreferences(new Preference(sortKey(), ""));
                 return;
@@ -1517,14 +1490,13 @@ public class UnifiedFileManagerDialogController {
         String normalizedNewPath = normalizePathString(path);
         String normalizedCurrentPath = normalizePathString(currentPath);
 
-        // If user repeatedly double-clicks while actively loading this exact path, ignore duplicate trigger
         if (normalizedNewPath != null && normalizedNewPath.equals(normalizedCurrentPath)
                 && currentLoadTask != null && currentLoadTask.isRunning()) {
             return;
         }
 
         if (normalizedCurrentPath != null && !normalizedCurrentPath.equals(normalizedNewPath)) {
-            backHistory.push(currentPath); // Push the original, un-normalized path for display
+            backHistory.push(currentPath);
             forwardHistory.clear();
         }
 
@@ -1560,14 +1532,12 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void loadFiles(String path) {
-        // Invalidate even before a cache hit; an old network response must not overwrite this folder.
         if (currentLoadTask != null) currentLoadTask.cancel(false);
         currentLoadTask = null;
         if (currentPrefetchFuture != null && !currentPrefetchFuture.isDone()) {
             currentPrefetchFuture.cancel(false);
         }
 
-        // --- Caching Layer (Stale-While-Revalidate) ---
         String cacheKey = getCacheKey(path);
         CacheEntry cachedEntry = directoryCache.get(cacheKey);
 
@@ -1631,7 +1601,6 @@ public class UnifiedFileManagerDialogController {
                     }
                 }
 
-                // Add ".." entry for parent directory navigation
                 String parentPath = getParentPath(path);
                 if (parentPath != null) {
                     FileInfo upDir = new FileInfo();
@@ -1654,11 +1623,11 @@ public class UnifiedFileManagerDialogController {
         loadTask.setOnSucceeded(e -> {
             if (loadTask != currentLoadTask) return;
             List<FileInfo> loadedFiles = loadTask.getValue();
-            directoryCache.put(cacheKey, new CacheEntry(loadedFiles)); // Update cache
+            directoryCache.put(cacheKey, new CacheEntry(loadedFiles));
 
             if (!wasShowingStale || !isSameFileList(allFiles, loadedFiles)) {
                 allFiles.setAll(loadedFiles);
-                restoreSortOrdering(); // restores saved sort or falls back to defaultSort
+                restoreSortOrdering();
                 itemCountLabel.setText(allFiles.size() + " items");
                 restoreFileSelection();
             }
@@ -1776,7 +1745,6 @@ public class UnifiedFileManagerDialogController {
                             subFiles.add(f);
                         }
 
-                        // Add ".." entry
                         FileInfo upDir = new FileInfo();
                         upDir.setName("..");
                         upDir.setDirectory(true);
@@ -1851,7 +1819,6 @@ public class UnifiedFileManagerDialogController {
                         preferenceService.getPreferencesByCode("main_tail_window_size").orElse("20000"));
             }
         } catch (Exception ignored) {
-            // fall through to default
         }
         return 20000;
     }
@@ -1916,9 +1883,9 @@ public class UnifiedFileManagerDialogController {
             return;
         }
         favoriteFolderService.addFavorite(selected.getName(), selected.getPath(), getLocationIdForCurrent());
-        cachedFavoritesLocationId = null; // Invalidate favorites cache
+        cachedFavoritesLocationId = null;
         loadFavoritesForCurrentLocation();
-        fileTable.refresh(); // To update styling
+        fileTable.refresh();
     }
 
     private void handleRemoveFromFavorites() {
@@ -1927,15 +1894,14 @@ public class UnifiedFileManagerDialogController {
             return;
         }
 
-        // We need the ID to delete it.
         favoriteFolderService.getFavoritesForLocation(getLocationIdForCurrent()).stream()
                 .filter(fav -> fav.getPath().equals(selected.getPath()))
                 .findFirst()
                 .ifPresent(fav -> favoriteFolderService.removeFavorite(fav.getId()));
 
-        cachedFavoritesLocationId = null; // Invalidate favorites cache
+        cachedFavoritesLocationId = null;
         loadFavoritesForCurrentLocation();
-        fileTable.refresh(); // To update styling
+        fileTable.refresh();
     }
 
     private void loadFavoritesForCurrentLocation() {
@@ -1944,7 +1910,6 @@ public class UnifiedFileManagerDialogController {
 
         String locationId = getLocationIdForCurrent();
 
-        // Skip DB query if favorites for this location are already cached
         if (locationId.equals(cachedFavoritesLocationId)) {
             return;
         }
@@ -1966,7 +1931,7 @@ public class UnifiedFileManagerDialogController {
         if (currentLocation == null) {
             return "";
         }
-        // Use a constant for local, and server name for remote.
+
         return currentLocation.getServer() == null ? "local" : currentLocation.getServer().getName();
     }
 
@@ -1981,8 +1946,6 @@ public class UnifiedFileManagerDialogController {
         prefetchExecutor.shutdown();
         locationMutationExecutor.shutdown();
 
-        // Ensure any active connection is terminated when the dialog closes, unless we
-        // selected a file to open
         if (activeSshService != null && selectedFileResult == null) {
             activeSshService.disconnect();
         } else if (activeSshService != null && selectedFileResult != null) {
@@ -1999,7 +1962,7 @@ public class UnifiedFileManagerDialogController {
         if (!backHistory.isEmpty()) {
             forwardHistory.push(currentPath);
             String prev = backHistory.pop();
-            currentPath = prev; // Don't push to back history again
+            currentPath = prev;
             pathField.setText(prev);
             preferenceService.saveOrUpdatePreferences(new Preference(lastPathKey(), prev));
             loadFiles(prev);
@@ -2025,11 +1988,9 @@ public class UnifiedFileManagerDialogController {
 
         String parent = null;
         if (currentLocation.getServer() == null) {
-            // Local
             File f = new File(currentPath);
             parent = f.getParent();
         } else {
-            // Remote (Simple string manipulation for now)
             if (!currentPath.equals("/")) {
                 int lastSlash = currentPath.lastIndexOf('/');
                 if (lastSlash > 0) {
@@ -2055,7 +2016,7 @@ public class UnifiedFileManagerDialogController {
 
     private void refreshCurrentPath() {
         if (currentPath != null) {
-            directoryCache.remove(getCacheKey(currentPath)); // Invalidate cache for this path
+            directoryCache.remove(getCacheKey(currentPath));
             logger.info("Cache invalidated for path: {}", currentPath);
             loadFiles(currentPath);
         }
@@ -2148,17 +2109,14 @@ public class UnifiedFileManagerDialogController {
         return selectedFileResult;
     }
 
-    /** 1-based line to jump to when the file was chosen from Find in Files, or 0. */
     public int getPendingJumpLine() {
         return pendingJumpLine;
     }
 
-    /** Tail window (last N lines) requested by Find in Files, or 0 for the default. */
     public int getPendingTailWindowLines() {
         return pendingTailWindowLines;
     }
 
-    /** 0-based index within the tail buffer to jump to, or -1. */
     public int getPendingTailJumpIndex() {
         return pendingTailJumpIndex;
     }
@@ -2177,6 +2135,10 @@ public class UnifiedFileManagerDialogController {
 
     public void setSshServiceFactory(SSHServiceFactory factory) {
         this.sshServiceFactory = factory;
+        if (pendingRemoteRestore) {
+            pendingRemoteRestore = false;
+            restoreLastLocation();
+        }
     }
 
     public void setServerCatalog(ServerCatalog catalog) {
@@ -2192,7 +2154,6 @@ public class UnifiedFileManagerDialogController {
         restoreLastLocation();
     }
 
-    /** One node of the location tree: the hidden root, Local Drive, a group folder, or a server. */
     public static class LocationItem {
         enum Kind { ROOT, LOCAL, GROUP, SERVER }
 
@@ -2266,16 +2227,9 @@ public class UnifiedFileManagerDialogController {
         }
     }
 
-    /**
-     * Parses a human-readable file size string (e.g., "1.2 KB", "5 MB") into bytes.
-     * Returns -1 if the string is not a valid size (e.g., "-").
-     *
-     * @param formattedSize The formatted size string.
-     * @return The size in bytes, or -1 if unparseable.
-     */
     private long parseFormattedSize(String formattedSize) {
         if (formattedSize == null || formattedSize.equals("-") || formattedSize.trim().isEmpty()) {
-            return -1L; // Representing directories or unknown sizes
+            return -1L;
         }
 
         String[] parts = formattedSize.trim().split(" ");
@@ -2328,7 +2282,6 @@ public class UnifiedFileManagerDialogController {
                 AppIcons.apply(stage);
             }
         } catch (Exception e) {
-            // Ignore
         }
     }
 }
