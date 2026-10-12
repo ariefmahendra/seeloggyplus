@@ -13,6 +13,18 @@ Entrypoints: `com.seeloggyplus.app.Main` (JavaFX `Application`) and
 Rule strength: **MUST** = never skip; **SHOULD** = default, deviate only with a
 clear reason; **NEVER** = stop and choose another path.
 
+## 0. Skills & source style
+
+- Project-local skills live in `.agents/skills/` (lockfile `skills-lock.json`).
+  Before analysis or code changes, load the relevant skill and mention it briefly:
+  `codebase-design` (refactors/interface design), `java-junit` (tests),
+  `systematic-debugging` (bugs), and the `javafx-*` skills by area.
+- Repository rules override skill defaults (for example: no full-suite runs during
+  feature work, tests always headless).
+- Sources carry no comments: Java, FXML, CSS, XML, and Gradle/script sources MUST
+  NOT contain comments. Rationale belongs here, in `docs/`, tests, or commit
+  messages.
+
 ## 1. Commands
 
 MUST run all Gradle commands through the wrapper with `--no-daemon` on Windows
@@ -86,13 +98,20 @@ them windowed or optional.
 ## 5. Architecture
 
 - Packages: `app` (entrypoints + shell/FXML controllers), `shared.model`,
-  `shared.dto`, `shared.logs` (log I/O, parsing, parsing config, log file
-  persistence), `shared.settings`, `shared.servers`, `shared.tail`,
+  `shared.dto`, `shared.logs.port` (public log contracts only), `shared.progress`
+  (generic I/O progress callbacks), `shared.settings`, `shared.servers`, `shared.tail`,
   `shared.database` (config + migrator only), `shared.util`, `shared.ssh`,
   `shared.ui` (+`shared.ui.canvas`), `shared.session`, and
   `features.<name>.{domain,application,infrastructure,presentation}` (for example
   `features.search`, `features.settings`, `features.servers`, `features.update`,
   `features.recent`, `features.ssh`).
+- Log use cases live in `features.logs.application`; internal repository/detection
+  ports in `features.logs.application.port`; JDBC, file I/O and Grok adapters in
+  `features.logs.infrastructure.{persistence,io,parsing}`. Shared log contracts
+  MUST NOT contain implementations or repository ports. `app.composition.LogServices`
+  wires log dependencies; consumers use public ports, not feature implementations.
+  Repositories borrow an injected connection; they do not own or close it. The
+  existing shared database connection policy is unchanged by this separation.
 - Ports in `shared`, implementations in features: `shared.settings.PreferenceService`
   is a port implemented by `features.settings.infrastructure.PreferenceServiceImpl`;
   the server registry contract is `shared.servers.ServerCatalog`, implemented by
