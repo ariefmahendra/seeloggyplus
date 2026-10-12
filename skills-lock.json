@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "skills": {
+    "codebase-design": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/codebase-design/SKILL.md",
+      "computedHash": "fb1d8ab98ad151551eeade003e3ae55a46578a380fd9fc3ed4dbf9c2fbce0a9f"
+    },
+    "java-junit": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/java-junit/SKILL.md",
+      "computedHash": "fbf3cb0d47ffb44bdb6e1ebcc4d89dd7083208efdfc5b88f316c8bc2b58250b5"
+    },
+    "javafx-animation-canvas-render-loop": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-animation-canvas-render-loop/SKILL.md",
+      "computedHash": "3f5c6fa994215d4fbf176aafad051411fcac00cd3d9bac2b4eef865fbfcdf07b"
+    },
+    "javafx-architecture-frameworks": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-architecture-frameworks/SKILL.md",
+      "computedHash": "6d664e02e2cfdff0f8cd08496dd54d842ab00aff6891f5e115ecc954407fc9b3"
+    },
+    "javafx-concurrency-services": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-concurrency-services/SKILL.md",
+      "computedHash": "0d532b757a9f1c3480f2415448c7630d1ef4a4b07c5bf0706bd01b97a3e1fe00"
+    },
+    "javafx-desktop-shell-integration": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-desktop-shell-integration/SKILL.md",
+      "computedHash": "bd7b559b12c69b9c98bc2c64163288b3f37b116a4933c3af6c4823288b0e84b2"
+    },
+    "javafx-devtools-inspection-debugging": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-devtools-inspection-debugging/SKILL.md",
+      "computedHash": "40a61cea5c61780f0c16b60f8471596cdf5ad8d041c783b6f7038a9e20cf206b"
+    },
+    "javafx-file-workflows-search": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-file-workflows-search/SKILL.md",
+      "computedHash": "9463f4660304ce5b17b15fddac64e9db1de4c1f7533444546961c852997f4d5b"
+    },
+    "javafx-fxml-controls-css": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-fxml-controls-css/SKILL.md",
+      "computedHash": "adffa176a7521bc7130397522478222990f262526eaca7e11212aa708db7868e"
+    },
+    "javafx-reactive-binding-state": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-reactive-binding-state/SKILL.md",
+      "computedHash": "5ec993a821e5c7cb0191d33a9bb459ab99b66e36a84e6099e5e5ca6fdcaa3f2f"
+    },
+    "javafx-real-world-application-patterns": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-real-world-application-patterns/SKILL.md",
+      "computedHash": "ab5204973aa75873d6b46fde5af52c0cbbfd31762e4e164d34b8b62fbf00523b"
+    },
+    "javafx-testing-packaging-distribution": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-testing-packaging-distribution/SKILL.md",
+      "computedHash": "b9e4ef88480f6950ffa7bbc4ca1ebb2973a9e7589eaa6dfa5b8fc7c8715c0049"
+    },
+    "javafx-theming-icons-styling": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-theming-icons-styling/SKILL.md",
+      "computedHash": "0a28a94664d3c8c070a617ae16ad68b8d72eaecd28965fcaa749a0da15a860b8"
+    },
+    "javafx-ui-layout-navigation": {
+      "source": "JohannesRabauer/javafx-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javafx-ui-layout-navigation/SKILL.md",
+      "computedHash": "a2bcf1807c7d202b56c396dfd2ba03560e3dfbe0acb7e61b8e8a485490b9dfb4"
+    },
+    "systematic-debugging": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/systematic-debugging/SKILL.md",
+      "computedHash": "276fb0aadb002ab930cc2a56de89e16995a2e3e70b33587652bf0a5fb123148d"
+    },
+    "test-driven-development": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/test-driven-development/SKILL.md",
+      "computedHash": "3cfe4ebb6fa7288f668d87880d279c8e48f7a92b63415e296857060f5ce22e05"
+    }
+  }
+}
