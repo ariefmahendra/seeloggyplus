@@ -5,6 +5,7 @@ import com.seeloggyplus.features.servers.infrastructure.ServerManagementServiceI
 import com.seeloggyplus.shared.model.SSHServerModel;
 import com.seeloggyplus.shared.ssh.SSHServiceFactory;
 import com.seeloggyplus.shared.ui.AppTheme;
+import com.seeloggyplus.shared.ui.DialogPresenter;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
@@ -86,6 +87,7 @@ public class ServerManagementDialogController {
     private ObservableList<SSHServerModel> allServers;
     private ObservableList<SSHServerModel> filteredServers;
     private SSHServerModel selectedForConnection;
+    private DialogPresenter dialogPresenter = defaultDialogPresenter();
 
     @FXML
     public void initialize() {
@@ -256,7 +258,7 @@ public class ServerManagementDialogController {
             dialog.initOwner(addServerButton.getScene().getWindow());
             dialog.setScene(AppTheme.scene(root));
 
-            showAndWaitAndRestore(dialog);
+            dialogPresenter.present(dialog);
 
             if (controller.isSaved()) {
                 SSHServerModel saved = controller.getSavedServer();
@@ -289,7 +291,7 @@ public class ServerManagementDialogController {
             dialog.initOwner(editServerButton.getScene().getWindow());
             dialog.setScene(AppTheme.scene(root));
 
-            showAndWaitAndRestore(dialog);
+            dialogPresenter.present(dialog);
 
             if (controller.isSaved()) {
                 SSHServerModel saved = controller.getSavedServer();
@@ -322,7 +324,7 @@ public class ServerManagementDialogController {
             dialog.initOwner(cloneServerButton.getScene().getWindow());
             dialog.setScene(AppTheme.scene(root));
 
-            showAndWaitAndRestore(dialog);
+            dialogPresenter.present(dialog);
 
             if (controller.isSaved()) {
                 SSHServerModel saved = controller.getSavedServer();
@@ -347,7 +349,7 @@ public class ServerManagementDialogController {
         alert.setContentText(String.format("Are you sure you want to delete '%s'?\nThis action cannot be undone.",
                 selected.getDisplayString()));
 
-        Optional<ButtonType> result = showAndWaitAndRestore(alert);
+        Optional<ButtonType> result = dialogPresenter.present(alert);
         if (result.isPresent() && result.get() == ButtonType.OK) {
             serverService.deleteServer(selected.getId());
             loadServers();
@@ -397,12 +399,30 @@ public class ServerManagementDialogController {
             alert.setTitle("Error");
             alert.setHeaderText(title);
             alert.setContentText(message);
-            showAndWaitAndRestore(alert);
+            dialogPresenter.present(alert);
         });
     }
 
     public void setSshServiceFactory(SSHServiceFactory factory) {
         this.sshServiceFactory = factory;
+    }
+
+    public void setDialogPresenter(DialogPresenter dialogPresenter) {
+        this.dialogPresenter = dialogPresenter == null ? defaultDialogPresenter() : dialogPresenter;
+    }
+
+    private DialogPresenter defaultDialogPresenter() {
+        return new DialogPresenter() {
+            @Override
+            public void present(Stage dialog) {
+                showAndWaitAndRestore(dialog);
+            }
+
+            @Override
+            public <T> Optional<T> present(Dialog<T> dialog) {
+                return showAndWaitAndRestore(dialog);
+            }
+        };
     }
 
     public SSHServerModel getSelectedServer() {
