@@ -33,6 +33,7 @@ import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -1154,7 +1155,7 @@ public class UnifiedFileManagerDialogController {
         cancelButton.setOnAction(e -> closeDialog());
         openButton.setOnAction(e -> handleOpen());
 
-        fileTable.setOnKeyPressed(event -> {
+        fileTable.addEventHandler(KeyEvent.KEY_PRESSED, event -> {
             if (new KeyCodeCombination(KeyCode.C,
                     KeyCombination.CONTROL_DOWN).match(event)) {
                 copySelectionToClipboard(fileTable);
