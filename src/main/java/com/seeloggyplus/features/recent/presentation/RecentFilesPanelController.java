@@ -23,6 +23,8 @@ import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -32,8 +34,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class RecentFilesPanelController {
+
+    private static final Logger logger = LoggerFactory.getLogger(RecentFilesPanelController.class);
 
     public interface Host {
         void onOpenRecent(RecentFilesDto recent);
@@ -67,6 +75,12 @@ public class RecentFilesPanelController {
     private Button pinLeftPanelButton;
 
     private final ObservableList<RecentFilesDto> allRecentFiles = FXCollections.observableArrayList();
+    private final ExecutorService refreshExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "Recent-Files-Refresh");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final AtomicInteger refreshGeneration = new AtomicInteger();
 
     private RecentFileService recentFileService;
     private LogFileService logFileService;
@@ -117,9 +131,24 @@ public class RecentFilesPanelController {
         recentFilesTreeView.setRoot(root);
     }
 
-    public void refresh() {
-        allRecentFiles.setAll(recentFileService.findAll());
-        rebuildTree();
+    public CompletableFuture<Void> refresh() {
+        if (recentFileService == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        int generation = refreshGeneration.incrementAndGet();
+        return CompletableFuture
+                .supplyAsync(recentFileService::findAll, refreshExecutor)
+                .thenAcceptAsync(files -> {
+                    if (generation != refreshGeneration.get()) {
+                        return;
+                    }
+                    allRecentFiles.setAll(files);
+                    rebuildTree();
+                }, Platform::runLater)
+                .exceptionally(error -> {
+                    logger.error("Failed to load recent files", error);
+                    return null;
+                });
     }
 
     public void refreshTree() {
@@ -153,8 +182,7 @@ public class RecentFilesPanelController {
         recent.setLastOpened(LocalDateTime.now());
         recent.setMode(session.isTailModeEnabled() ? RecentFile.MODE_TAIL : RecentFile.MODE_OPEN);
         recentFileService.save(file, recent);
-        refresh();
-        selectForSession(session);
+        refresh().thenRun(() -> selectForSession(session));
     }
 
     public void markTailOpened(LogFile logFile, String remotePath) {
@@ -164,10 +192,7 @@ public class RecentFilesPanelController {
         recent.setMode(RecentFile.MODE_TAIL);
         recentFileService.save(logFile, recent);
         final String serverId = logFile.getSshServerID();
-        Platform.runLater(() -> {
-            refresh();
-            selectRecentFile(remotePath, serverId, true);
-        });
+        refresh().thenRun(() -> selectRecentFile(remotePath, serverId, true));
     }
 
     public void closeTabsForLogFile(LogFile logFile) {
@@ -275,8 +300,7 @@ public class RecentFilesPanelController {
         recentFilesTreeView.setShowRoot(false);
         recentFilesTreeView.setCellFactory(tree -> new RecentFileTreeCell(host::monitoringRemotePath));
         recentFilesTreeView.getStyleClass().add("recent-files-list");
-        allRecentFiles.setAll(recentFileService.findAll());
-        rebuildTree();
+        refresh();
         recentFilesTreeView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         recentFilesTreeView.setContextMenu(leftPanelContextMenu);
 

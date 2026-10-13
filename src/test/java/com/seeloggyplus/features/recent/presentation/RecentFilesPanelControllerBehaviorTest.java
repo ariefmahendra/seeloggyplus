@@ -10,6 +10,7 @@ import com.seeloggyplus.shared.session.LogSession;
 import com.seeloggyplus.shared.session.TabSessionManager;
 import com.seeloggyplus.shared.ui.AppTheme;
 import javafx.event.Event;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.Alert;
@@ -29,8 +30,10 @@ import org.testfx.util.WaitForAsyncUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -43,6 +46,16 @@ class RecentFilesPanelControllerBehaviorTest {
     private Stage stage;
     private final FakeRecentFileService recentService = new FakeRecentFileService();
     private final FakeHost host = new FakeHost();
+    private java.util.concurrent.CompletableFuture<Void> initialRefresh;
+
+    @org.junit.jupiter.api.BeforeEach
+    void awaitInitialRefresh() {
+        try {
+            initialRefresh.get(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+    }
 
     @Start
     @SuppressWarnings("unchecked")
@@ -59,6 +72,7 @@ class RecentFilesPanelControllerBehaviorTest {
         stage.setScene(AppTheme.scene(root));
         stage.show();
         WaitForAsyncUtils.waitForFxEvents();
+        initialRefresh = panel.refresh();
 
         tree = (TreeView<RecentFileTreeCell.RecentNode>) root.lookup("#recentFilesTreeView");
         assertNotNull(tree);
@@ -133,6 +147,42 @@ class RecentFilesPanelControllerBehaviorTest {
         assertEquals(1, host.closeRequests);
     }
 
+    @Test
+    void refreshLoadsRecentFilesOffTheFxThread() {
+        recentService.resetTracking();
+
+        onFx(panel::refresh);
+
+        awaitFx(() -> recentService.findAllCalls > 0);
+        assertFalse(recentService.findAllRanOnFxThread,
+                "recent files must be loaded off the JavaFX application thread");
+    }
+
+    @Test
+    void refreshShowsEntriesAddedAfterStart() {
+        recentService.files.add(dto(local("file-3", "/logs/third.log", "2026-10-12T11:00:00"), null,
+                RecentFile.MODE_OPEN));
+
+        onFx(panel::refresh);
+
+        awaitFx(() -> fileNodes().stream()
+                .anyMatch(node -> "file-3".equals(node.getValue().getFile().logFile().getId())));
+    }
+
+    private void awaitFx(java.util.function.BooleanSupplier condition) {
+        try {
+            WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> {
+                try {
+                    return WaitForAsyncUtils.asyncFx(() -> condition.getAsBoolean()).get(2, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    return false;
+                }
+            });
+        } catch (java.util.concurrent.TimeoutException e) {
+            throw new AssertionError("condition was not met within 5 seconds", e);
+        }
+    }
+
     private List<TreeItem<RecentFileTreeCell.RecentNode>> fileNodes() {
         List<TreeItem<RecentFileTreeCell.RecentNode>> nodes = new ArrayList<>();
         for (TreeItem<RecentFileTreeCell.RecentNode> group : tree.getRoot().getChildren()) {
@@ -188,9 +238,20 @@ class RecentFilesPanelControllerBehaviorTest {
     private static class FakeRecentFileService implements RecentFileService {
         private final List<RecentFilesDto> files = new ArrayList<>();
         private final List<RecentFile> deletedAll = new ArrayList<>();
+        private volatile int findAllCalls;
+        private volatile boolean findAllRanOnFxThread;
+
+        void resetTracking() {
+            findAllCalls = 0;
+            findAllRanOnFxThread = false;
+        }
 
         @Override
         public List<RecentFilesDto> findAll() {
+            findAllCalls++;
+            if (Platform.isFxApplicationThread()) {
+                findAllRanOnFxThread = true;
+            }
             return List.copyOf(files);
         }
 

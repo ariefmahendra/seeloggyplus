@@ -41,6 +41,16 @@ class RecentFilesTreeTest {
     private TreeView<RecentFileTreeCell.RecentNode> recentFilesTreeView;
     private ObservableList<RecentFilesDto> allRecentFiles;
     private TextField filterField;
+    private java.util.concurrent.CompletableFuture<Void> initialRefresh;
+
+    @org.junit.jupiter.api.BeforeEach
+    void awaitInitialRefresh() {
+        try {
+            initialRefresh.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+    }
 
     @Start
     @SuppressWarnings("unchecked")
@@ -53,6 +63,7 @@ class RecentFilesTreeTest {
         stage.setScene(AppTheme.scene(root));
         stage.show();
         WaitForAsyncUtils.waitForFxEvents();
+        initialRefresh = panel.refresh();
 
         recentFilesTreeView = (TreeView<RecentFileTreeCell.RecentNode>) featureField("recentFilesTreeView");
         allRecentFiles = (ObservableList<RecentFilesDto>) featureField("allRecentFiles");
