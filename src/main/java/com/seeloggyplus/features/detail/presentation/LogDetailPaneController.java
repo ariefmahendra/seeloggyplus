@@ -1,6 +1,5 @@
 package com.seeloggyplus.features.detail.presentation;
 
-import com.seeloggyplus.shared.ui.ToggleStyleSupport;
 import com.seeloggyplus.shared.util.JsonPrettify;
 import com.seeloggyplus.shared.util.SyntaxHighlighter;
 import com.seeloggyplus.shared.util.XmlPrettify;
@@ -60,8 +59,6 @@ public class LogDetailPaneController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         setupDetailPanel();
-        ToggleStyleSupport.configure(prettifyJsonButton);
-        ToggleStyleSupport.configure(prettifyXmlButton);
 
         prettifyJsonButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
             autoPrettifyJson = newVal;

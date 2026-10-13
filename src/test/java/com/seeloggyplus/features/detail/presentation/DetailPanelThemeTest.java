@@ -4,11 +4,13 @@ import com.seeloggyplus.app.MainController;
 
 import com.seeloggyplus.features.detail.presentation.LogDetailPaneController;
 import com.seeloggyplus.shared.ui.AppTheme;
+import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -105,6 +107,41 @@ class DetailPanelThemeTest {
 
             AppTheme.setDark(false);
         });
+    }
+
+    @Test
+    void prettifyToggleIconsFollowTheTheme() {
+        onFxThread(() -> {
+            stage.setScene(AppTheme.scene(mainRoot));
+            stage.show();
+
+            ToggleButton json = prettifyToggle("prettifyJsonButton");
+            FontAwesomeIconView icon = (FontAwesomeIconView) json.getGraphic();
+            assertNotNull(icon, "prettify toggle must have an icon graphic");
+
+            json.setSelected(true);
+            mainRoot.applyCss();
+            assertEquals(Color.web("#ffffff"), icon.getFill(),
+                    "selected prettify icon must use the on-brand token");
+
+            json.setSelected(false);
+            mainRoot.applyCss();
+            assertEquals(Color.web("#1f2329"), icon.getFill(),
+                    "unselected prettify icon must use the text token");
+        });
+    }
+
+    private ToggleButton prettifyToggle(String name) {
+        try {
+            Field controllerField = MainController.class.getDeclaredField("detailPaneController");
+            controllerField.setAccessible(true);
+            LogDetailPaneController detailPane = (LogDetailPaneController) controllerField.get(controller);
+            Field field = LogDetailPaneController.class.getDeclaredField(name);
+            field.setAccessible(true);
+            return (ToggleButton) field.get(detailPane);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private StyleClassedTextArea themedArea() {

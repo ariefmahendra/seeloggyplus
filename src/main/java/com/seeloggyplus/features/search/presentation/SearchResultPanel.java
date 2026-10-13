@@ -28,6 +28,8 @@ import java.util.function.LongFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.seeloggyplus.shared.ui.SelectionColors;
+import com.seeloggyplus.shared.ui.AppTheme;
+import com.seeloggyplus.shared.ui.ThemePalette;
 import javafx.geometry.Orientation;
 import javafx.scene.layout.Pane;
 
@@ -47,7 +49,7 @@ public class SearchResultPanel extends VBox {
     private Color selectionColor;
     private Color highlightBg;
     private Color hoverColor;
-    private boolean darkMode;
+    private AppTheme.Theme paletteTheme = AppTheme.Theme.GRAPHITE;
 
     private final Label headerLabel;
     private final Canvas canvas;
@@ -154,7 +156,7 @@ public class SearchResultPanel extends VBox {
 
         setupMouseHandlers();
 
-        applyPalette(false);
+        applyPalette(AppTheme.Theme.GRAPHITE);
 
         sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
@@ -168,41 +170,43 @@ public class SearchResultPanel extends VBox {
         });
     }
 
-    private void applyPalette(boolean dark) {
-        this.darkMode = dark;
-        if (dark) {
-            bgColor = Color.web("#1e2226");
-            textColor = Color.web("#d7dbe0");
-            lineNumColor = Color.web("#8b939c");
-            lineNumBg = Color.web("#262b30");
-            selectionColor = SelectionColors.background(true);
-            highlightBg = Color.web("#facc15", 0.35);
-            hoverColor = Color.web("#2a3036");
-        } else {
-            bgColor = Color.WHITE;
-            textColor = Color.BLACK;
-            lineNumColor = Color.web("#6c757d");
-            lineNumBg = Color.web("#f1f3f5");
-            selectionColor = SelectionColors.background(false);
-            highlightBg = Color.YELLOW;
-            hoverColor = Color.web("#e6f0ff");
-        }
+    private void applyPalette(AppTheme.Theme theme) {
+        this.paletteTheme = theme;
+        bgColor = ThemePalette.color("-sl-surface", theme);
+        textColor = ThemePalette.color("-sl-text", theme);
+        lineNumColor = ThemePalette.color("-sl-canvas-line-number", theme);
+        lineNumBg = ThemePalette.color("-sl-canvas-line-number-bg", theme);
+        selectionColor = SelectionColors.background(theme == AppTheme.Theme.DARK);
+        highlightBg = ThemePalette.color("-sl-canvas-highlight", theme);
+        hoverColor = ThemePalette.color("-sl-canvas-hover", theme);
         setBackground(new Background(new BackgroundFill(bgColor, CornerRadii.EMPTY, Insets.EMPTY)));
         render();
     }
 
     public void setDarkMode(boolean dark) {
-        if (this.darkMode == dark) {
+        setTheme(dark ? AppTheme.Theme.DARK : AppTheme.Theme.GRAPHITE);
+    }
+
+    public void setTheme(AppTheme.Theme theme) {
+        AppTheme.Theme target = theme == null ? AppTheme.Theme.GRAPHITE : theme;
+        if (this.paletteTheme == target) {
             return;
         }
-        applyPalette(dark);
+        applyPalette(target);
     }
 
     private void updateThemeFromScene() {
         Scene scene = getScene();
-        boolean dark = scene != null && scene.getRoot() != null
-                && scene.getRoot().getStyleClass().contains("theme-dark");
-        setDarkMode(dark);
+        Parent themeRoot = scene == null ? null : scene.getRoot();
+        if (themeRoot == null) {
+            setTheme(AppTheme.Theme.GRAPHITE);
+        } else if (themeRoot.getStyleClass().contains("theme-dark")) {
+            setTheme(AppTheme.Theme.DARK);
+        } else if (themeRoot.getStyleClass().contains("theme-light")) {
+            setTheme(AppTheme.Theme.LIGHT);
+        } else {
+            setTheme(AppTheme.Theme.GRAPHITE);
+        }
     }
 
     public void setOnLineSelected(SearchHitCallback handler) {

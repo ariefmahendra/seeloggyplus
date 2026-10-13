@@ -7,12 +7,15 @@ import javafx.application.Platform;
 import javafx.event.Event;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +61,7 @@ class MainControllerTabLifecycleTest {
             new ArrayList<>(sessionMap.values()).forEach(LogSession::close);
             sessionMap.clear();
             logTabPane.getTabs().clear();
+            AppTheme.setDark(false);
         });
         WaitForAsyncUtils.waitForFxEvents();
     }
@@ -203,6 +207,43 @@ class MainControllerTabLifecycleTest {
         WaitForAsyncUtils.waitForFxEvents();
 
         assertEquals("busy.log (+999+)", reference.get().getTab().getText());
+    }
+
+    @Test
+    void liveIndicatorFollowsTheThemeLiveToken() {
+        AtomicReference<LogSession> reference = new AtomicReference<>();
+        Platform.runLater(() -> {
+            try {
+                LogSession session = openSession("live.log", LogSession.SessionType.REMOTE);
+                session.setRemotePath("/var/log/live.log");
+                session.setTailModeEnabled(true);
+                invoke("updateTabBadge", new Class<?>[]{LogSession.class}, session);
+                reference.set(session);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        WaitForAsyncUtils.waitForFxEvents();
+
+        Circle dot = reference.get().getLiveIndicatorDot();
+        Scene scene = dot.getScene();
+        assertNotNull(scene, "the live indicator must be attached to the tab header");
+        Parent root = scene.getRoot();
+
+        Platform.runLater(root::applyCss);
+        WaitForAsyncUtils.waitForFxEvents();
+        assertEquals(Color.web("#2f855a"), dot.getFill(),
+                "graphite live indicator must use the live token");
+
+        Platform.runLater(() -> AppTheme.setDark(true));
+        WaitForAsyncUtils.waitForFxEvents();
+        Platform.runLater(root::applyCss);
+        WaitForAsyncUtils.waitForFxEvents();
+        assertEquals(Color.web("#4ade80"), dot.getFill(),
+                "dark live indicator must use the dark live token");
+
+        Platform.runLater(() -> AppTheme.setDark(false));
+        WaitForAsyncUtils.waitForFxEvents();
     }
 
     @Test

@@ -13,7 +13,6 @@ import com.seeloggyplus.features.ssh.infrastructure.SSHServiceImpl;
 import com.seeloggyplus.features.servers.infrastructure.ServerManagementServiceImpl;
 import com.seeloggyplus.shared.tail.TailServiceImpl;
 import com.seeloggyplus.shared.ui.SshConnectFlow;
-import com.seeloggyplus.shared.ui.ToggleStyleSupport;
 import com.seeloggyplus.features.recent.presentation.RecentFilesPanelController;
 import com.seeloggyplus.shared.util.*;
 import javafx.animation.Animation;
@@ -58,7 +57,6 @@ import java.util.regex.Pattern;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.application.Platform;
-import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -318,13 +316,6 @@ public class MainController {
         setupBottomPanel();
         setupKeyboardShortcuts();
         setupSearchFieldAutoCompletion();
-
-        configureToggleStyle(toggleLeftPanelButton);
-        configureToggleStyle(toggleBottomPanelButton);
-        configureToggleStyle(tailButton);
-        configureToggleStyle(followTailButton);
-        configureToggleStyle(regexCheckBox);
-        configureToggleStyle(caseSensitiveCheckBox);
 
         if (toggleLeftPanelButton != null) {
             toggleLeftPanelButton.setOnAction(e -> toggleLeftPanel());
@@ -755,10 +746,6 @@ public class MainController {
         });
 
         logger.info("Canvas-based log viewer initialized.");
-    }
-
-    private void configureToggleStyle(ToggleButton button) {
-        ToggleStyleSupport.configure(button);
     }
 
     private void handleGlobalLogNavigation(KeyEvent event) {
@@ -3015,9 +3002,6 @@ public class MainController {
                 tailButton.setSelected(false);
                 isProgrammaticUpdate = false;
             }
-            if (tailButton != null) {
-                ToggleStyleSupport.updateIconColor(tailButton, false);
-            }
         }
 
         if (!skipReindex && session.getSessionType() == LogSession.SessionType.LOCAL
@@ -3825,7 +3809,6 @@ public class MainController {
 
         Circle liveDot = new Circle(3.5);
         liveDot.getStyleClass().add("tab-live-indicator");
-        liveDot.setFill(Color.web("#4CAF50"));
         liveDot.setVisible(session.isTailModeEnabled());
         liveDot.setManaged(session.isTailModeEnabled());
         session.setLiveIndicatorDot(liveDot);
@@ -4032,11 +4015,9 @@ public class MainController {
             isProgrammaticUpdate = true;
             if (tailButton != null) {
                 tailButton.setSelected(session.isTailModeEnabled());
-                configureToggleStyle(tailButton);
             }
             if (followTailButton != null) {
                 followTailButton.setSelected(session.isFollowTail());
-                configureToggleStyle(followTailButton);
             }
             isProgrammaticUpdate = false;
 

@@ -109,14 +109,29 @@ class SearchPanelThemeTest {
 
             assertEquals(Color.web("#ffffff"), backgroundFill(panel),
                     "light theme search panel background must be white");
+            assertEquals(Color.web("#1f2329"), paletteField(panel, "textColor"),
+                    "search text must use the theme text token");
+            assertEquals(Color.web("#6c757d"), paletteField(panel, "lineNumColor"));
+            assertEquals(Color.web("#e6f0ff"), paletteField(panel, "hoverColor"));
 
             AppTheme.setDark(true);
             root.applyCss();
             assertEquals(Color.web("#1e2226"), backgroundFill(panel),
                     "dark theme search panel background must be the dark surface");
+            assertEquals(Color.web("#d7dbe0"), paletteField(panel, "textColor"));
+            assertEquals(Color.web("#8b939c"), paletteField(panel, "lineNumColor"));
+            assertEquals(Color.web("#2a3036"), paletteField(panel, "hoverColor"));
 
             AppTheme.setDark(false);
         });
+    }
+
+    private static Object paletteField(SearchResultPanel panel, String name) {
+        try {
+            return privateField(panel, name);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static Object privateField(Object target, String name) throws Exception {

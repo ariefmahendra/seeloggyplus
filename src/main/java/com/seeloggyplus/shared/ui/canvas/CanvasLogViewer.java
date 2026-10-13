@@ -38,6 +38,8 @@ import java.util.List;
 import java.util.Collections;
 import javafx.scene.input.KeyEvent;
 import com.seeloggyplus.shared.ui.SelectionColors;
+import com.seeloggyplus.shared.ui.AppTheme;
+import com.seeloggyplus.shared.ui.ThemePalette;
 import com.seeloggyplus.shared.util.IntArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -74,7 +76,7 @@ public class CanvasLogViewer extends GridPane {
     private Color errorTint;
     private Color warnTint;
     private Color highlightBg;
-    private boolean darkMode;
+    private AppTheme.Theme paletteTheme = AppTheme.Theme.GRAPHITE;
 
     private static final Pattern LEVEL_PATTERN = Pattern.compile("\\b(ERROR|FATAL|WARN|WARNING|INFO|DEBUG|TRACE)\\b",
             Pattern.CASE_INSENSITIVE);
@@ -187,7 +189,7 @@ public class CanvasLogViewer extends GridPane {
         setPrefSize(Region.USE_COMPUTED_SIZE, Region.USE_COMPUTED_SIZE);
         setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        applyPalette(false);
+        applyPalette(AppTheme.Theme.GRAPHITE);
 
         sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
@@ -525,63 +527,54 @@ public class CanvasLogViewer extends GridPane {
         };
     }
 
-    private void applyPalette(boolean dark) {
-        this.darkMode = dark;
-        if (dark) {
-            bgColor = Color.web("#1e2226");
-            textColor = Color.web("#d7dbe0");
-            lineNumColor = Color.web("#8b939c");
-            lineNumBg = Color.web("#262b30");
-            selectionColor = SelectionColors.background(true);
-            fatalText = Color.web("#ff8a80");
-            errorText = Color.web("#f87171");
-            warnText = Color.web("#fbbf24");
-            infoText = Color.web("#6ea8fe");
-            debugText = Color.web("#9aa3ac");
-            traceText = Color.web("#9aa3ac");
-            fatalBar = Color.web("#ef4444");
-            errorBar = Color.web("#ef4444");
-            warnBar = Color.web("#f59e0b");
-            fatalTint = Color.web("#ef4444", 0.12);
-            errorTint = Color.web("#ef4444", 0.10);
-            warnTint = Color.web("#f59e0b", 0.10);
-            highlightBg = Color.web("#facc15", 0.35);
-        } else {
-            bgColor = Color.web("#ffffff");
-            textColor = Color.web("#1f2329");
-            lineNumColor = Color.web("#6c757d");
-            lineNumBg = Color.web("#f1f3f5");
-            selectionColor = SelectionColors.background(false);
-            fatalText = Color.web("#7f1d1d");
-            errorText = Color.web("#b91c1c");
-            warnText = Color.web("#92400e");
-            infoText = Color.web("#2b6cb0");
-            debugText = Color.web("#6c757d");
-            traceText = Color.web("#6c757d");
-            fatalBar = Color.web("#b91c1c");
-            errorBar = Color.web("#dc2626");
-            warnBar = Color.web("#d97706");
-            fatalTint = Color.web("#fdecec");
-            errorTint = Color.web("#fdecec");
-            warnTint = Color.web("#fdf8e8");
-            highlightBg = Color.YELLOW;
-        }
+    private void applyPalette(AppTheme.Theme theme) {
+        this.paletteTheme = theme;
+        bgColor = ThemePalette.color("-sl-surface", theme);
+        textColor = ThemePalette.color("-sl-text", theme);
+        lineNumColor = ThemePalette.color("-sl-canvas-line-number", theme);
+        lineNumBg = ThemePalette.color("-sl-canvas-line-number-bg", theme);
+        selectionColor = SelectionColors.background(theme == AppTheme.Theme.DARK);
+        fatalText = ThemePalette.color("-sl-level-fatal-fg", theme);
+        errorText = ThemePalette.color("-sl-level-error-fg", theme);
+        warnText = ThemePalette.color("-sl-level-warn-fg", theme);
+        infoText = ThemePalette.color("-sl-level-info-fg", theme);
+        debugText = ThemePalette.color("-sl-syntax-trace", theme);
+        traceText = ThemePalette.color("-sl-syntax-trace", theme);
+        fatalBar = ThemePalette.color("-sl-level-fatal-bar", theme);
+        errorBar = ThemePalette.color("-sl-level-error-bar", theme);
+        warnBar = ThemePalette.color("-sl-level-warn-bar", theme);
+        fatalTint = ThemePalette.color("-sl-level-fatal-tint", theme);
+        errorTint = ThemePalette.color("-sl-level-error-tint", theme);
+        warnTint = ThemePalette.color("-sl-level-warn-tint", theme);
+        highlightBg = ThemePalette.color("-sl-canvas-highlight", theme);
         setBackground(new Background(new BackgroundFill(bgColor, CornerRadii.EMPTY, Insets.EMPTY)));
         render();
     }
 
     public void setDarkMode(boolean dark) {
-        if (this.darkMode == dark) {
+        setTheme(dark ? AppTheme.Theme.DARK : AppTheme.Theme.GRAPHITE);
+    }
+
+    public void setTheme(AppTheme.Theme theme) {
+        AppTheme.Theme target = theme == null ? AppTheme.Theme.GRAPHITE : theme;
+        if (this.paletteTheme == target) {
             return;
         }
-        applyPalette(dark);
+        applyPalette(target);
     }
 
     private void updateThemeFromScene() {
         Scene scene = getScene();
-        boolean dark = scene != null && scene.getRoot() != null
-                && scene.getRoot().getStyleClass().contains("theme-dark");
-        setDarkMode(dark);
+        Parent themeRoot = scene == null ? null : scene.getRoot();
+        if (themeRoot == null) {
+            setTheme(AppTheme.Theme.GRAPHITE);
+        } else if (themeRoot.getStyleClass().contains("theme-dark")) {
+            setTheme(AppTheme.Theme.DARK);
+        } else if (themeRoot.getStyleClass().contains("theme-light")) {
+            setTheme(AppTheme.Theme.LIGHT);
+        } else {
+            setTheme(AppTheme.Theme.GRAPHITE);
+        }
     }
 
     private void render() {

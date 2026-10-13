@@ -44,6 +44,10 @@
 
     -sl-preview-target: #dbeafe;
     -sl-selection-bg: rgba(52, 58, 64, 0.18);
+    -sl-canvas-line-number: #6c757d;
+    -sl-canvas-line-number-bg: #f1f3f5;
+    -sl-canvas-highlight: #ffff00;
+    -sl-canvas-hover: #e6f0ff;
 
 
     -sl-success: #2f855a;
@@ -79,6 +83,13 @@
     -sl-level-debug-fg: #4b5563;
     -sl-level-trace-bg: #f4f5f6;
     -sl-level-trace-fg: #6b7280;
+
+    -sl-level-fatal-bar: #b91c1c;
+    -sl-level-error-bar: #dc2626;
+    -sl-level-warn-bar: #d97706;
+    -sl-level-fatal-tint: #fdecec;
+    -sl-level-error-tint: #fdecec;
+    -sl-level-warn-tint: #fdf8e8;
 
     -sl-row-error-bg: #fdecec;
     -sl-row-error-sel: #fbd9d9;
