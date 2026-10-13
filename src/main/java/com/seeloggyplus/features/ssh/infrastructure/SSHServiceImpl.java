@@ -497,7 +497,7 @@ public class SSHServiceImpl implements SSHService {
         String name;
         long modifiedTime = 0;
 
-        if (parts.length >= 10 && parts[5].matches("\\d{4}-\\d{2}-\\d{2}")) {
+        if (parts[5].matches("\\d{4}-\\d{2}-\\d{2}")) {
             try {
                 String dateTimeStr = parts[5] + " " + parts[6];
 
