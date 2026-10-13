@@ -15,6 +15,7 @@ import com.seeloggyplus.features.files.infrastructure.FavoriteFolderServiceImpl;
 import com.seeloggyplus.features.files.infrastructure.LocalFileServiceImpl;
 import com.seeloggyplus.shared.ssh.SSHService;
 import com.seeloggyplus.shared.ssh.SSHServiceFactory;
+import com.seeloggyplus.shared.ui.DialogPresenter;
 import com.seeloggyplus.shared.util.PasswordPromptDialog;
 import com.seeloggyplus.shared.util.SshConnectionFeedback;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
@@ -160,6 +161,7 @@ public class UnifiedFileManagerDialogController {
     private ServerCatalog serverManagementService;
     private PreferenceService preferenceService;
     private SSHServiceFactory sshServiceFactory;
+    private DialogPresenter dialogPresenter = defaultDialogPresenter();
 
     private FavoriteFolderService favoriteFolderService;
 
@@ -719,7 +721,7 @@ public class UnifiedFileManagerDialogController {
                 : "Create a group inside '" + parentPath + "'");
         dialog.setContentText("Group name:");
         addAppIcon(dialog);
-        dialog.showAndWait().map(String::trim).filter(name -> !name.isEmpty()).ifPresent(name -> {
+        dialogPresenter.present(dialog).map(String::trim).filter(name -> !name.isEmpty()).ifPresent(name -> {
             String fullPath = parentPath == null || parentPath.isBlank() ? name : parentPath + "/" + name;
             try {
                 createGroup(fullPath);
@@ -737,7 +739,7 @@ public class UnifiedFileManagerDialogController {
         dialog.setHeaderText("Rename group '" + group + "'");
         dialog.setContentText("Group name:");
         addAppIcon(dialog);
-        dialog.showAndWait().map(String::trim).filter(name -> !name.isEmpty() && !name.equals(leaf)).ifPresent(name -> {
+        dialogPresenter.present(dialog).map(String::trim).filter(name -> !name.isEmpty() && !name.equals(leaf)).ifPresent(name -> {
             String parent = parentPath(group);
             String fullPath = parent == null ? name : parent + "/" + name;
             try {
@@ -755,7 +757,7 @@ public class UnifiedFileManagerDialogController {
         alert.setHeaderText("Delete group '" + group + "'?");
         alert.setContentText("Nested groups are deleted as well. Servers become ungrouped. No server is deleted.");
         addAppIcon(alert);
-        alert.showAndWait().filter(button -> button == ButtonType.OK).ifPresent(button -> {
+        dialogPresenter.present(alert).filter(button -> button == ButtonType.OK).ifPresent(button -> {
             try {
                 deleteGroup(group);
             } catch (RuntimeException ex) {
@@ -776,7 +778,7 @@ public class UnifiedFileManagerDialogController {
         dialog.setHeaderText("Move '" + server.getName() + "' to a group");
         dialog.setContentText("Group:");
         addAppIcon(dialog);
-        dialog.showAndWait().ifPresent(choice -> {
+        dialogPresenter.present(dialog).ifPresent(choice -> {
             String target = ungrouped.equals(choice) ? null : choice;
             if (Objects.equals(target, server.getGroupName())) {
                 return;
@@ -1208,7 +1210,7 @@ public class UnifiedFileManagerDialogController {
             logger.info("Password for server {} is not saved, prompting user.", server.getName());
             suppressAutoRefresh = true;
             PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(), server.getUsername());
-            Optional<String> result = prompt.showAndWait();
+            Optional<String> result = dialogPresenter.present(prompt);
             suppressAutoRefresh = true;
 
             if (result.isPresent() && !result.get().isBlank()) {
@@ -2091,7 +2093,7 @@ public class UnifiedFileManagerDialogController {
             addAppIcon(alert);
             alert.setTitle(title);
             alert.setContentText(content);
-            alert.showAndWait();
+            dialogPresenter.present(alert);
         });
     }
 
@@ -2103,7 +2105,7 @@ public class UnifiedFileManagerDialogController {
             if (cancelButton != null && cancelButton.getScene() != null) {
                 alert.initOwner(cancelButton.getScene().getWindow());
             }
-            alert.showAndWait();
+            dialogPresenter.present(alert);
         });
     }
 
@@ -2148,6 +2150,24 @@ public class UnifiedFileManagerDialogController {
         if (locationTree != null) {
             rebuildLocationTree();
         }
+    }
+
+    public void setDialogPresenter(DialogPresenter dialogPresenter) {
+        this.dialogPresenter = dialogPresenter == null ? defaultDialogPresenter() : dialogPresenter;
+    }
+
+    private DialogPresenter defaultDialogPresenter() {
+        return new DialogPresenter() {
+            @Override
+            public void present(Stage dialog) {
+                dialog.showAndWait();
+            }
+
+            @Override
+            public <T> Optional<T> present(Dialog<T> dialog) {
+                return dialog.showAndWait();
+            }
+        };
     }
 
     public void setPreferenceService(PreferenceService service) {
