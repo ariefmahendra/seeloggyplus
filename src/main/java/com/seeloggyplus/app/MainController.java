@@ -1119,7 +1119,9 @@ public class MainController {
                     int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
                     compiledHighlight = Pattern.compile(
                             highlightIsRegex ? highlightPattern : Pattern.quote(highlightPattern), flags);
-                } catch (Exception ignored) {}
+                } catch (Exception ex) {
+                    logger.debug("Ignoring an invalid highlight pattern", ex);
+                }
                 showSearchResultPanel(matches, compiledHighlight);
 
                 int firstLine = matches.get(0);
@@ -4075,7 +4077,9 @@ public class MainController {
                         int flags = session.isCaseSensitive() ? 0 : Pattern.CASE_INSENSITIVE;
                         compiledHighlight = Pattern.compile(
                                 session.isRegex() ? searchText : Pattern.quote(searchText), flags);
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) {
+                        logger.debug("Ignoring an invalid highlight pattern", e);
+                    }
                     if (session.isTailModeEnabled()) {
                         showSearchResultPanelForTail(filteredIndexes, compiledHighlight);
                     } else {

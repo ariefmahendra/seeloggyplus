@@ -259,7 +259,8 @@ public class UpdateFeature {
                 try {
                     preferenceService.saveOrUpdatePreferences(
                             new Preference(UpdatePreferences.LAST_CHECK, String.valueOf(System.currentTimeMillis())));
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    logger.debug("Could not record the last update check", e);
                 }
             }
             Platform.runLater(() -> {
@@ -267,7 +268,8 @@ public class UpdateFeature {
                     String skip = null;
                     try {
                         skip = preferenceService.getPreferencesByCode(UpdatePreferences.skipKey(channel)).orElse(null);
-                    } catch (Exception ignored) {
+                    } catch (Exception e) {
+                        logger.debug("Could not read the skipped update version", e);
                     }
                     if (!checkResult.manifest().latest().equals(skip)) {
                         showUpdateIndicator(checkResult);
@@ -286,7 +288,8 @@ public class UpdateFeature {
                     String skip = null;
                     try {
                         skip = preferenceService.getPreferencesByCode(UpdatePreferences.skipKey(channel)).orElse(null);
-                    } catch (Exception ignored) {
+                    } catch (Exception e) {
+                        logger.debug("Could not read the skipped update version", e);
                     }
                     long snoozeUntil = readLongPreference(UpdatePreferences.SNOOZE_UNTIL, 0);
                     if (UpdateAwareness.shouldPopup(
@@ -393,7 +396,8 @@ public class UpdateFeature {
                 try {
                     preferenceService.saveOrUpdatePreferences(
                             new Preference(UpdatePreferences.skipKey(channel), result.manifest().latest()));
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    logger.debug("Could not save the skipped update version", e);
                 }
                 hideUpdateIndicator();
             } else if (updateController.getSnoozeMillis() > 0) {
@@ -401,7 +405,8 @@ public class UpdateFeature {
                     preferenceService.saveOrUpdatePreferences(new Preference(
                             UpdatePreferences.SNOOZE_UNTIL,
                             String.valueOf(System.currentTimeMillis() + updateController.getSnoozeMillis())));
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    logger.debug("Could not save the update snooze", e);
                 }
             }
         } catch (IOException e) {

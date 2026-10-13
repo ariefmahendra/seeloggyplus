@@ -106,7 +106,8 @@ public class CredentialEncryptor {
 
             try {
                 Files.setPosixFilePermissions(keyPath, PosixFilePermissions.fromString("rw-------"));
-            } catch (UnsupportedOperationException ignored) {
+            } catch (UnsupportedOperationException e) {
+                logger.debug("Could not restrict the key file permissions", e);
             }
 
             logger.info("Generated new encryption key at {}", keyPath.toAbsolutePath());

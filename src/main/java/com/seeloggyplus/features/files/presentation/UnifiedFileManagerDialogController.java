@@ -1819,7 +1819,8 @@ public class UnifiedFileManagerDialogController {
                 return Integer.parseInt(
                         preferenceService.getPreferencesByCode("main_tail_window_size").orElse("20000"));
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            logger.debug("Falling back to the default tail window size", e);
         }
         return 20000;
     }
@@ -2283,6 +2284,7 @@ public class UnifiedFileManagerDialogController {
                 AppIcons.apply(stage);
             }
         } catch (Exception e) {
+            logger.debug("Could not apply the dialog icon", e);
         }
     }
 }

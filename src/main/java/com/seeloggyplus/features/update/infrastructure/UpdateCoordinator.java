@@ -1,6 +1,9 @@
 package com.seeloggyplus.features.update.infrastructure;
 
 import com.seeloggyplus.features.update.domain.UpdateAsset;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -8,6 +11,8 @@ import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 
 public class UpdateCoordinator {
+
+    private static final Logger logger = LoggerFactory.getLogger(UpdateCoordinator.class);
 
     public interface ProgressListener {
         void onProgress(String stage, long done, long total);
@@ -70,7 +75,8 @@ public class UpdateCoordinator {
             if (zip != null) {
                 try {
                     Files.deleteIfExists(zip);
-                } catch (IOException ignored) {
+                } catch (IOException e) {
+                    logger.debug("Could not delete the staged update archive {}", zip, e);
                 }
             }
         }

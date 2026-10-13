@@ -457,6 +457,7 @@ public class ServerManagementDialogController {
             Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
             addAppIcon(stage);
         } catch (Exception e) {
+            logger.debug("Could not apply the dialog icon", e);
         }
 
         Stage owner = getUltimateOwner((Stage) dialog.getOwner());

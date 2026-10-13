@@ -120,6 +120,7 @@ public class GrokLogFormatDetector implements LogFormatDetector {
                     }
                 }
             } catch (Exception e) {
+                logger.debug("Skipping a format that could not be probed", e);
             }
         }
         if (sample.trim().startsWith("{") && sample.trim().endsWith("}")) {

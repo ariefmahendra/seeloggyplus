@@ -15,8 +15,12 @@ import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class UpdateDownloader {
+
+    private static final Logger logger = LoggerFactory.getLogger(UpdateDownloader.class);
 
     public interface ProgressListener {
         void onProgress(long downloaded, long total);
@@ -121,7 +125,8 @@ public class UpdateDownloader {
     private static void deleteQuietly(Path path) {
         try {
             Files.deleteIfExists(path);
-        } catch (IOException ignored) {
+        } catch (IOException e) {
+            logger.debug("Could not delete {}", path, e);
         }
     }
 

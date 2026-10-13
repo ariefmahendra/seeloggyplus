@@ -12,8 +12,12 @@ import java.util.Optional;
 import java.util.stream.Stream;
 import java.net.URI;
 import java.nio.file.Paths;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class UpdateLayout {
+
+    private static final Logger logger = LoggerFactory.getLogger(UpdateLayout.class);
 
     public static final String CURRENT_FILE = "current";
     public static final String PREVIOUS_FILE = "current.previous";
@@ -175,7 +179,8 @@ public final class UpdateLayout {
             walk.sorted(Comparator.reverseOrder()).forEach(p -> {
                 try {
                     Files.deleteIfExists(p);
-                } catch (IOException ignored) {
+                } catch (IOException e) {
+                    logger.debug("Could not delete {}", p, e);
                 }
             });
         }

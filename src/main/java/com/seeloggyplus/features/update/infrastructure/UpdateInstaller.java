@@ -14,8 +14,12 @@ import java.util.Set;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class UpdateInstaller {
+
+    private static final Logger logger = LoggerFactory.getLogger(UpdateInstaller.class);
 
     public record StagedUpdate(Path directory, Path jar, String version) {
     }
@@ -163,10 +167,12 @@ public class UpdateInstaller {
             walk.sorted(Comparator.reverseOrder()).forEach(p -> {
                 try {
                     Files.deleteIfExists(p);
-                } catch (IOException ignored) {
+                } catch (IOException e) {
+                    logger.debug("Could not delete {}", p, e);
                 }
             });
-        } catch (IOException ignored) {
+        } catch (IOException e) {
+            logger.debug("Could not walk {} for deletion", path, e);
         }
     }
 }

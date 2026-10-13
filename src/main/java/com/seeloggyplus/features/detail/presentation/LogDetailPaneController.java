@@ -246,7 +246,9 @@ public class LogDetailPaneController implements Initializable {
                     StyleSpans<Collection<String>> spans = null;
                     try {
                         spans = SyntaxHighlighter.computeJsonHighlighting(prettified);
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) {
+                        logger.debug("Could not compute JSON highlighting", e);
+                    }
                     return new Object[] { prettified, spans };
                 }
                 return null;
@@ -260,7 +262,9 @@ public class LogDetailPaneController implements Initializable {
                         if (spans != null) {
                             try {
                                 detailCodeArea.setStyleSpans(0, spans);
-                            } catch (Exception ignored) {}
+                            } catch (Exception e) {
+                                logger.debug("Could not apply JSON highlighting", e);
+                            }
                         }
                     });
                 }
@@ -294,7 +298,9 @@ public class LogDetailPaneController implements Initializable {
                     StyleSpans<Collection<String>> spans = null;
                     try {
                         spans = SyntaxHighlighter.computeXmlHighlighting(prettified);
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) {
+                        logger.debug("Could not compute XML highlighting", e);
+                    }
                     return new Object[] { prettified, spans };
                 }
                 return null;
@@ -308,7 +314,9 @@ public class LogDetailPaneController implements Initializable {
                         if (spans != null) {
                             try {
                                 detailCodeArea.setStyleSpans(0, spans);
-                            } catch (Exception ignored) {}
+                            } catch (Exception e) {
+                                logger.debug("Could not apply XML highlighting", e);
+                            }
                         }
                     });
                 }

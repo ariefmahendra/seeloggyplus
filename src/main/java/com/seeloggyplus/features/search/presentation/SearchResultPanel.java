@@ -21,6 +21,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.function.LongFunction;
 import java.util.regex.Matcher;
@@ -30,6 +32,8 @@ import javafx.geometry.Orientation;
 import javafx.scene.layout.Pane;
 
 public class SearchResultPanel extends VBox {
+
+    private static final Logger logger = LoggerFactory.getLogger(SearchResultPanel.class);
 
     private static final int LINE_HEIGHT = 18;
     private static final int PADDING = 4;
@@ -361,7 +365,9 @@ public class SearchResultPanel extends VBox {
                     lineCache[matchIndex] = full.length() > 500 ? full.substring(0, 500) : full;
                     return lineCache[matchIndex];
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                logger.debug("Could not resolve the full line for a search match", e);
+            }
         }
         lineCache[matchIndex] = "";
         return "";

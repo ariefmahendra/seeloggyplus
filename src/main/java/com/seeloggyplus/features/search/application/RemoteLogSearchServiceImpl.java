@@ -4,6 +4,8 @@ import com.seeloggyplus.shared.model.PreviewLine;
 import com.seeloggyplus.features.search.domain.RemoteLogSearchMatch;
 import com.seeloggyplus.features.search.application.RemoteLogSearchService;
 import com.seeloggyplus.shared.ssh.SSHService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -12,6 +14,8 @@ import java.util.List;
 import java.util.Set;
 
 public class RemoteLogSearchServiceImpl implements RemoteLogSearchService {
+
+    private static final Logger logger = LoggerFactory.getLogger(RemoteLogSearchServiceImpl.class);
 
     static final int MAX_RESULTS = 500;
 
@@ -132,7 +136,8 @@ public class RemoteLogSearchServiceImpl implements RemoteLogSearchService {
                 int lineNumber = Integer.parseInt(raw.substring(0, separator).trim());
                 String text = raw.substring(separator + 1);
                 lines.add(new PreviewLine(lineNumber, text, lineNumber == targetLine));
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                logger.debug("Skipping a preview line without a numeric prefix", e);
             }
         }
         return lines;

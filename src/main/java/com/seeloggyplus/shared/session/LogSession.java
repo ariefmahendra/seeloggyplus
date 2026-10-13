@@ -439,7 +439,9 @@ public class LogSession implements AutoCloseable {
         if (canvasLogViewer != null) {
             try {
                 canvasLogViewer.resetView();
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                logger.debug("Could not reset the canvas view", e);
+            }
         }
 
         synchronized (tailBuffer) {

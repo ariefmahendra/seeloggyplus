@@ -176,7 +176,8 @@ public class SSHServiceImpl implements SSHService {
         if (isConnected()) {
             try {
                 SSHSessionManagerImpl.getInstance().getSession(host, port, username, password, DEFAULT_TTL);
-            } catch (JSchException ignored) {
+            } catch (JSchException e) {
+                logger.debug("Could not refresh the pooled SSH session", e);
             }
             return currentSession;
         }
@@ -507,7 +508,8 @@ public class SSHServiceImpl implements SSHService {
                 LocalDateTime ldt = LocalDateTime.parse(dateTimeStr,
                         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
                 modifiedTime = ldt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                logger.debug("Could not parse the remote modified time", e);
             }
 
             int nameStart = parts[7].matches("[+-]\\d{4}") ? 8 : 7;
@@ -526,7 +528,8 @@ public class SSHServiceImpl implements SSHService {
                             DateTimeFormatter.ofPattern("MMM d yyyy", Locale.ENGLISH));
                     modifiedTime = ld.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                logger.debug("Could not parse the remote modified time", e);
             }
 
             name = joinFrom(parts, 8);
@@ -600,7 +603,8 @@ public class SSHServiceImpl implements SSHService {
             if (reusableSftpChannel != null) {
                 try {
                     reusableSftpChannel.disconnect();
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    logger.debug("Could not close the reusable SFTP channel", e);
                 }
                 reusableSftpChannel = null;
             }

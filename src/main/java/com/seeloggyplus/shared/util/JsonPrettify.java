@@ -184,7 +184,8 @@ public class JsonPrettify {
                             token = parser.nextToken();
                         }
                     }
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    logger.debug("Could not prettify the log payload", e);
                 }
             }
         }

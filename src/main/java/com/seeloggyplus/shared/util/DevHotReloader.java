@@ -165,7 +165,9 @@ public class DevHotReloader {
                 File oldFile = createdTempFiles.remove(0);
                 try {
                     oldFile.delete();
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    logger.debug("Could not delete a rotated hot-reload stylesheet", e);
+                }
             }
 
             Platform.runLater(() -> {
@@ -284,7 +286,9 @@ public class DevHotReloader {
         for (File temp : createdTempFiles) {
             try {
                 temp.delete();
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                logger.debug("Could not delete a hot-reload stylesheet", e);
+            }
         }
         createdTempFiles.clear();
     }
