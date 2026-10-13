@@ -56,6 +56,47 @@ class SearchPanelThemeTest {
     }
 
     @Test
+    void navigatorStatusReflectsCountsAndVisibility() throws Exception {
+        SearchNavigator navigator = new SearchNavigator();
+        Label status = (Label) privateField(navigator, "statusLabel");
+
+        navigator.setMatchCount(-1);
+        assertEquals("Scanning...", status.getText());
+        assertTrue(navigator.isVisible());
+
+        navigator.setMatchCount(0);
+        assertEquals("No matches", status.getText());
+
+        navigator.setMatchCount(7);
+        assertEquals("7 matches", status.getText());
+
+        navigator.updateStatus(2, 5);
+        assertEquals("2 / 5", status.getText());
+
+        navigator.updateStatus(0, 0);
+        assertEquals("No matches", status.getText());
+
+        navigator.clear();
+        assertEquals("", status.getText());
+        assertFalse(navigator.isVisible());
+    }
+
+    @Test
+    void navigatorButtonsInvokeTheirHandlers() throws Exception {
+        SearchNavigator navigator = new SearchNavigator();
+        javafx.scene.control.Button prev = (javafx.scene.control.Button) privateField(navigator, "prevButton");
+        javafx.scene.control.Button next = (javafx.scene.control.Button) privateField(navigator, "nextButton");
+        java.util.List<String> calls = new java.util.ArrayList<>();
+        navigator.setOnPrevious(() -> calls.add("prev"));
+        navigator.setOnNext(() -> calls.add("next"));
+
+        prev.fire();
+        next.fire();
+
+        assertEquals(java.util.List.of("prev", "next"), calls);
+    }
+
+    @Test
     void resultPanelPaletteFollowsTheme() {
         onFxThread(() -> {
             SearchResultPanel panel = new SearchResultPanel();

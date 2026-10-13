@@ -191,6 +191,73 @@ class PreferencesDialogControllerTest {
         assertEquals("No download files", label(dialog.root(), "sshDownloadInfoLabel").getText());
     }
 
+    @Test
+    void downloadInfoFormatsKilobyteSizes() throws Exception {
+        Files.write(tempDir.resolve("seeloggyplus-1-big.log"), new byte[2048]);
+        save("ssh_download_directory", tempDir.toString());
+
+        Loaded dialog = loadDialog();
+
+        assertEquals("1 file(s), " + String.format("%.1f KB", 2.0),
+                label(dialog.root(), "sshDownloadInfoLabel").getText());
+    }
+
+    @Test
+    void formatSizeCoversEveryUnit() throws Exception {
+        Loaded dialog = loadDialog();
+        java.lang.reflect.Method formatSize =
+                PreferencesDialogController.class.getDeclaredMethod("formatSize", long.class);
+        formatSize.setAccessible(true);
+
+        assertEquals("512 B", formatSize.invoke(dialog.controller(), 512L));
+        assertEquals(String.format("%.1f KB", 1.5), formatSize.invoke(dialog.controller(), 1536L));
+        assertEquals(String.format("%.1f MB", 2.5), formatSize.invoke(dialog.controller(), 2621440L));
+        assertEquals(String.format("%.2f GB", 1.5), formatSize.invoke(dialog.controller(), 1610612736L));
+    }
+
+    @Test
+    void cleanDownloadsReportsWhenNothingMatches() throws Exception {
+        save("ssh_download_directory", tempDir.toString());
+        Loaded dialog = loadDialog();
+
+        onFx(() -> button(dialog.root(), "sshCleanDownloadsButton").fire());
+
+        assertEquals("No download files found.", label(dialog.root(), "sshDownloadInfoLabel").getText());
+    }
+
+    @Test
+    void launcherConfigFailuresAreTolerated() throws Exception {
+        Loaded dialog = loadDialog();
+        java.lang.reflect.Method updateLauncherConfig =
+                PreferencesDialogController.class.getDeclaredMethod("updateLauncherConfig", int.class);
+        updateLauncherConfig.setAccessible(true);
+        String original = System.getProperty("seeloggyplus.launcherProperties");
+        try {
+            System.setProperty("seeloggyplus.launcherProperties", tempDir.toString());
+            updateLauncherConfig.invoke(dialog.controller(), 4);
+
+            Path blocker = Files.writeString(tempDir.resolve("blocker"), "x");
+            System.setProperty("seeloggyplus.launcherProperties",
+                    blocker.resolve("launcher.properties").toString());
+            updateLauncherConfig.invoke(dialog.controller(), 4);
+        } finally {
+            if (original == null) {
+                System.clearProperty("seeloggyplus.launcherProperties");
+            } else {
+                System.setProperty("seeloggyplus.launcherProperties", original);
+            }
+        }
+    }
+
+    @Test
+    void loadsTheLightThemeLabel() throws Exception {
+        save("app_theme", "light");
+
+        Loaded dialog = loadDialog();
+
+        assertEquals("Light", combo(dialog.root(), "themeComboBox").getValue());
+    }
+
     private void save(String key, String value) {
         preferences.saveOrUpdatePreferences(new Preference(key, value));
     }

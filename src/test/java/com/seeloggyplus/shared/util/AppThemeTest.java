@@ -91,6 +91,25 @@ class AppThemeTest {
         });
     }
 
+    @Test
+    void refreshRebuildsStylesheetsForTheActiveTheme() {
+        onFxThread(() -> {
+            AppTheme.setDark(true);
+            Scene scene = AppTheme.scene(new StackPane());
+            assertTrue(hasStylesheet(scene, "theme-dark.css"));
+
+            AppTheme.refresh(scene);
+
+            assertTrue(hasStylesheet(scene, "theme.css"), "theme.css must be restored");
+            assertTrue(hasStylesheet(scene, "components.css"), "components.css must be restored");
+            assertTrue(hasStylesheet(scene, "theme-dark.css"), "active theme stylesheet must be restored");
+            AppTheme.setDark(false);
+        });
+
+        assertDoesNotThrow(() -> AppTheme.refresh(null));
+        assertDoesNotThrow(() -> AppTheme.install(null));
+    }
+
     private static boolean hasStylesheet(Scene scene, String suffix) {
         return scene.getStylesheets().stream().anyMatch(url -> url.endsWith(suffix));
     }

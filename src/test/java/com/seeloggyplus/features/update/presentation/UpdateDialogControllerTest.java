@@ -272,4 +272,57 @@ public class UpdateDialogControllerTest {
                 "updates must be staged under the existing app data folder, not the system temp dir");
         assertEquals("updates", staging.getFileName().toString());
     }
+
+    @Test
+    public void formatBytesCoversEveryUnit() {
+        assertEquals("512 B", UpdateDialogController.formatBytes(512));
+        assertEquals("1.5 KB", UpdateDialogController.formatBytes(1536));
+        assertEquals("5.0 MB", UpdateDialogController.formatBytes(5L * 1024 * 1024));
+        assertEquals("2.0 GB", UpdateDialogController.formatBytes(2L * 1024 * 1024 * 1024));
+        assertEquals("3.0 TB", UpdateDialogController.formatBytes(3L * 1024 * 1024 * 1024 * 1024));
+    }
+
+    @Test
+    public void markInstalledSwitchesToRestartState() throws Exception {
+        UpdateCheckResult available = available();
+        Platform.runLater(() -> {
+            controller.setResult(available);
+            controller.markInstalled("9.9.9");
+        });
+        WaitForAsyncUtils.waitForFxEvents();
+
+        assertTrue(controller.isInstalled());
+        assertEquals("9.9.9", controller.getInstalledVersion());
+        assertEquals("Version 9.9.9 installed. Restart to apply.", statusLabel.getText());
+        assertEquals("Restart Now", downloadButton.getText());
+        assertFalse(skipButton.isVisible());
+        assertFalse(laterButton.isVisible());
+    }
+
+    @Test
+    public void markInstalledIgnoresBlankVersions() throws Exception {
+        UpdateCheckResult available = available();
+        Platform.runLater(() -> {
+            controller.setResult(available);
+            controller.markInstalled(null);
+            controller.markInstalled("   ");
+        });
+        WaitForAsyncUtils.waitForFxEvents();
+
+        assertFalse(controller.isInstalled());
+        assertNull(controller.getInstalledVersion());
+    }
+
+    @Test
+    public void releaseNotesFallBackToTheSystemBrowser() throws Exception {
+        UpdateCheckResult available = available();
+        Platform.runLater(() -> {
+            controller.setResult(available);
+            releaseNotesButton.fire();
+        });
+        WaitForAsyncUtils.waitForFxEvents();
+
+        assertFalse(controller.isInstalled());
+        assertEquals("Download", downloadButton.getText());
+    }
 }
