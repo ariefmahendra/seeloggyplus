@@ -4,6 +4,7 @@ import com.jcraft.jsch.*;
 import com.seeloggyplus.shared.dto.RemoteFileInfo;
 import com.seeloggyplus.shared.progress.ProgressCallback;
 import com.seeloggyplus.shared.ssh.SSHService;
+import com.seeloggyplus.shared.ssh.SSHSessionManager;
 import com.seeloggyplus.shared.ssh.HostKeyVerificationException;
 import com.seeloggyplus.shared.ssh.SshAuthConfig;
 import com.seeloggyplus.shared.util.RemoteLogPaths;
@@ -57,8 +58,14 @@ public class SSHServiceImpl implements SSHService {
     private final AtomicBoolean downloadCancelled = new AtomicBoolean(false);
     private volatile ChannelExec activeCommandChannel;
     private final ExecutorService tailExecutor = Executors.newSingleThreadExecutor();
+    private final SSHSessionManager sessionManager;
 
     public SSHServiceImpl() {
+        this(SSHSessionManagerImpl.getInstance());
+    }
+
+    SSHServiceImpl(SSHSessionManager sessionManager) {
+        this.sessionManager = sessionManager;
     }
 
     @Override
@@ -74,7 +81,7 @@ public class SSHServiceImpl implements SSHService {
         this.password = password;
 
         try {
-            this.currentSession = SSHSessionManagerImpl.getInstance().getSession(this.host, this.port, this.username,
+            this.currentSession = sessionManager.getSession(this.host, this.port, this.username,
                     this.password, ttlMillis, authConfig);
             lastConnectError = null;
             return this.currentSession.isConnected();
@@ -100,7 +107,7 @@ public class SSHServiceImpl implements SSHService {
 
     @Override
     public void trustPendingHostKey() {
-        SSHSessionManagerImpl.getInstance().trustPendingHostKey(host, port);
+        sessionManager.trustPendingHostKey(host, port);
     }
 
     @Override
@@ -175,7 +182,7 @@ public class SSHServiceImpl implements SSHService {
     private Session getSessionOrThrow() throws IOException {
         if (isConnected()) {
             try {
-                SSHSessionManagerImpl.getInstance().getSession(host, port, username, password, DEFAULT_TTL);
+                sessionManager.getSession(host, port, username, password, DEFAULT_TTL);
             } catch (JSchException e) {
                 logger.debug("Could not refresh the pooled SSH session", e);
             }
@@ -381,7 +388,7 @@ public class SSHServiceImpl implements SSHService {
     boolean recoverSession() {
         logger.info("Reconnecting stale SSH session for {}@{}:{}", username, host, port);
         try {
-            SSHSessionManagerImpl.getInstance().closeSession(host, port, username);
+            sessionManager.closeSession(host, port, username);
         } catch (RuntimeException e) {
             logger.debug("Closing the stale SSH session failed: {}", e.getMessage());
         }
@@ -569,7 +576,7 @@ public class SSHServiceImpl implements SSHService {
         logger.info("Forcing SSH session reconnect for {}@{}:{}", username, host, port);
         closeSftpChannel();
         sftpAvailable = null;
-        SSHSessionManagerImpl.getInstance().closeSession(host, port, username);
+        sessionManager.closeSession(host, port, username);
         this.currentSession = null;
         if (password != null && connect(host, port, username, password)) {
             return;
