@@ -858,7 +858,7 @@ public class SSHServiceImpl implements SSHService {
         }
     }
 
-    private String escapeShellArgument(String arg) {
+    String escapeShellArgument(String arg) {
         return "'" + arg.replace("'", "'\\''") + "'";
     }
 
