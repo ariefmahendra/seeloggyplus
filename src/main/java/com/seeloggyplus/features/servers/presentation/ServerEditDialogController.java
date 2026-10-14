@@ -3,6 +3,7 @@ package com.seeloggyplus.features.servers.presentation;
 import com.seeloggyplus.shared.model.SSHServerModel;
 import com.seeloggyplus.features.servers.application.ServerManagementService;
 import com.seeloggyplus.shared.ui.SshConnectFlow;
+import com.seeloggyplus.shared.ui.DialogPresenter;
 import com.seeloggyplus.shared.ssh.SSHService;
 import com.seeloggyplus.shared.ssh.SSHServiceFactory;
 import javafx.concurrent.Task;
@@ -17,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 import com.seeloggyplus.shared.util.SshConnectionFeedback;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
@@ -59,6 +61,7 @@ public class ServerEditDialogController {
     private SSHService sshService;
     private SSHServiceFactory sshServiceFactory;
     private SSHServerModel sshServer;
+    private DialogPresenter dialogPresenter = defaultDialogPresenter();
     @Getter
     private boolean saved = false;
     @Getter
@@ -148,6 +151,24 @@ public class ServerEditDialogController {
         this.sshServiceFactory = factory;
     }
 
+    public void setDialogPresenter(DialogPresenter dialogPresenter) {
+        this.dialogPresenter = dialogPresenter == null ? defaultDialogPresenter() : dialogPresenter;
+    }
+
+    private DialogPresenter defaultDialogPresenter() {
+        return new DialogPresenter() {
+            @Override
+            public void present(Stage dialog) {
+                dialog.showAndWait();
+            }
+
+            @Override
+            public <T> Optional<T> present(Dialog<T> dialog) {
+                return dialog.showAndWait();
+            }
+        };
+    }
+
     private SSHService sshService() {
         if (sshService == null) {
             if (sshServiceFactory == null) {
@@ -202,7 +223,7 @@ public class ServerEditDialogController {
             warning.setTitle("Private Key Required");
             warning.setHeaderText("No private key file selected");
             warning.setContentText("Choose the private key file used for this server.");
-            warning.showAndWait();
+            dialogPresenter.present(warning);
             return;
         }
 
@@ -248,7 +269,7 @@ public class ServerEditDialogController {
                 result = SshConnectionFeedback.createAlert(service.getLastConnectError(), testServer);
             }
             if (hostField.getScene() != null) result.initOwner(hostField.getScene().getWindow());
-            result.showAndWait();
+            dialogPresenter.present(result);
         });
 
         new Thread(task).start();
@@ -287,7 +308,7 @@ public class ServerEditDialogController {
             warning.setTitle("Private Key Required");
             warning.setHeaderText("No private key file selected");
             warning.setContentText("Choose the private key file used for this server.");
-            warning.showAndWait();
+            dialogPresenter.present(warning);
             return;
         }
         server.setAuthType(keyAuth ? SSHServerModel.AUTH_KEY : SSHServerModel.AUTH_PASSWORD);
