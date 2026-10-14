@@ -17,6 +17,7 @@ import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
 import com.seeloggyplus.shared.model.LogEntry;
+import com.seeloggyplus.shared.ui.AppTheme;
 import com.seeloggyplus.shared.ui.canvas.CanvasLogViewer;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import java.io.File;
@@ -270,7 +271,7 @@ public class MainViewFxmlLoadTest {
     }
 
     @Test
-    public void testToggleButtonIconChangesColorWhenActive() throws Exception {
+    public void testToggleButtonIconFollowsTheThemeColours() throws Exception {
         Field tailButtonField = MainController.class.getDeclaredField("tailButton");
         tailButtonField.setAccessible(true);
         ToggleButton tailButton = (ToggleButton) tailButtonField.get(controller);
@@ -278,18 +279,30 @@ public class MainViewFxmlLoadTest {
         assertTrue(tailButton.getGraphic() instanceof FontAwesomeIconView);
         FontAwesomeIconView icon = (FontAwesomeIconView) tailButton.getGraphic();
 
-        Field fileField = MainController.class.getDeclaredField("currentFile");
-        fileField.setAccessible(true);
-        File tempFile = File.createTempFile("test-tail", ".log");
-        tempFile.deleteOnExit();
-        fileField.set(controller, tempFile);
-
         Platform.runLater(() -> {
-            tailButton.setSelected(true);
-            assertEquals(Color.WHITE, icon.getFill(), "Icon fill must be WHITE when toggle button is active");
+            Stage stage = new Stage();
+            stage.setScene(AppTheme.scene(root));
+            stage.show();
+            AppTheme.setTheme(AppTheme.Theme.LIGHT);
+            root.applyCss();
 
             tailButton.setSelected(false);
-            assertNotEquals(Color.WHITE, icon.getFill(), "Icon fill must not be WHITE when toggle button is inactive");
+            root.applyCss();
+            assertEquals(Color.web("#1f2329"), icon.getFill(),
+                    "A toolbar icon must follow the light chrome text token");
+
+            tailButton.setSelected(true);
+            root.applyCss();
+            assertEquals(Color.web("#1f2329"), icon.getFill(),
+                    "A selected toolbar icon must keep following the light chrome text token");
+
+            AppTheme.setDark(true);
+            root.applyCss();
+            assertEquals(Color.web("#d7dbe0"), icon.getFill(),
+                    "Switching to dark must move the icon to the dark chrome text token");
+
+            AppTheme.setDark(false);
+            stage.close();
         });
         WaitForAsyncUtils.waitForFxEvents();
     }
