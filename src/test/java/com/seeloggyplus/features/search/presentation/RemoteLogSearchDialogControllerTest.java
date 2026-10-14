@@ -1,6 +1,7 @@
 package com.seeloggyplus.features.search.presentation;
 
 import com.seeloggyplus.shared.ui.AppTheme;
+import com.seeloggyplus.shared.ui.DialogPresenter;
 
 import com.seeloggyplus.shared.model.FileInfo;
 import com.seeloggyplus.shared.model.PreviewLine;
@@ -9,16 +10,28 @@ import com.seeloggyplus.shared.model.SSHServerModel;
 import com.seeloggyplus.features.ssh.infrastructure.SSHServiceImpl;
 import com.seeloggyplus.shared.util.FxTextHighlighter;
 import javafx.application.Platform;
+import javafx.event.ActionEvent;
+import javafx.event.Event;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.input.Clipboard;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
+import javafx.stage.WindowEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.testfx.framework.junit5.ApplicationExtension;
@@ -27,9 +40,13 @@ import org.testfx.util.WaitForAsyncUtils;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
 import com.seeloggyplus.shared.util.TailJumpPlanner;
@@ -44,10 +61,13 @@ import javafx.scene.layout.HBox;
 public class RemoteLogSearchDialogControllerTest {
 
     private RemoteLogSearchDialogController controller;
+    private Stage stage;
     private TableView<RemoteLogSearchMatch> resultTable;
     private ListView<PreviewLine> previewList;
     private TextField rootPathField;
     private TextField keywordField;
+    private CheckBox regexCheckBox;
+    private CheckBox caseSensitiveCheckBox;
     private ComboBox<Integer> contextSelector;
     private Button searchButton;
     private Button cancelSearchButton;
@@ -57,12 +77,15 @@ public class RemoteLogSearchDialogControllerTest {
     private Button copyPathButton;
     private Label statusLabel;
     private Label previewLabel;
+    private final FakePresenter presenter = new FakePresenter();
 
     @Start
     public void start(Stage stage) throws Exception {
+        this.stage = stage;
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RemoteLogSearchDialog.fxml"));
         Parent root = loader.load();
         controller = loader.getController();
+        controller.setDialogPresenter(presenter);
         stage.setScene(AppTheme.scene(root));
 
         stage.setWidth(1100);
@@ -74,6 +97,8 @@ public class RemoteLogSearchDialogControllerTest {
         previewList = getField("previewList");
         rootPathField = getField("rootPathField");
         keywordField = getField("keywordField");
+        regexCheckBox = getField("regexCheckBox");
+        caseSensitiveCheckBox = getField("caseSensitiveCheckBox");
         contextSelector = getField("contextSelector");
         searchButton = getField("searchButton");
         cancelSearchButton = getField("cancelSearchButton");
@@ -103,11 +128,15 @@ public class RemoteLogSearchDialogControllerTest {
         String previewCommand;
         boolean cancelCalled;
         boolean blockSearch;
+        boolean failSearch;
+        boolean failPreview;
+        int searchCommandCount;
         String searchOutput = "/var/log/app.log:12804:request timeout\n/var/log/error.out:42:timeout after 30s\n";
         String previewOutput = "12803:reset\n12804:request timeout\n12805:retry\n";
         String lineCountOutput = "20000\n";
         final CountDownLatch searchStarted = new CountDownLatch(1);
         final CountDownLatch releaseSearch = new CountDownLatch(1);
+        final CountDownLatch previewAttempted = new CountDownLatch(1);
 
         @Override
         public boolean isConnected() {
@@ -118,6 +147,10 @@ public class RemoteLogSearchDialogControllerTest {
         public String executeCommand(String command) throws IOException {
             if (command.contains("grep")) {
                 searchCommand = command;
+                searchCommandCount++;
+                if (failSearch) {
+                    throw new IOException("search exploded");
+                }
                 if (blockSearch) {
                     searchStarted.countDown();
                     try {
@@ -133,6 +166,10 @@ public class RemoteLogSearchDialogControllerTest {
                 return lineCountOutput;
             }
             previewCommand = command;
+            previewAttempted.countDown();
+            if (failPreview) {
+                throw new IOException("preview exploded");
+            }
             return previewOutput;
         }
 
@@ -488,5 +525,230 @@ public class RemoteLogSearchDialogControllerTest {
         assertNull(ssh.searchCommand);
         assertTrue(statusLabel.getText().contains("required"));
         assertTrue(resultTable.getItems().isEmpty());
+    }
+
+    @Test
+    public void defaultRecommendationTailsWithTheSuggestedWindow() throws Exception {
+        SearchMockSsh ssh = new SearchMockSsh();
+        ssh.lineCountOutput = "100000\n";
+        controller.setMaxTailWindow(100);
+        presenter.responder = dialog -> pickButton(dialog, "Tail last 99951 lines");
+        prepareSingleMatch(ssh, "/a/app.log:50:timeout\n");
+
+        Platform.runLater(tailButton::fire);
+        waitUntil(() -> controller.getChosenFile() != null);
+
+        assertTrue(controller.isTailAction());
+        assertFalse(controller.isOpenInstead());
+        assertEquals(99951, controller.getTailWindowLines());
+        assertEquals(0, controller.getTailJumpIndex());
+        Alert alert = firstAlert();
+        assertEquals("Tail Window Too Small", alert.getTitle());
+        assertTrue(alert.getContentText().contains("100,000 lines"));
+    }
+
+    @Test
+    public void defaultRecommendationCanOpenInsteadOfTailing() throws Exception {
+        SearchMockSsh ssh = new SearchMockSsh();
+        ssh.lineCountOutput = "100000\n";
+        controller.setMaxTailWindow(100);
+        presenter.responder = dialog -> pickButton(dialog, "Open & Jump (download)");
+        prepareSingleMatch(ssh, "/a/app.log:50:timeout\n");
+
+        Platform.runLater(tailButton::fire);
+        waitUntil(() -> controller.getChosenFile() != null);
+
+        assertFalse(controller.isTailAction());
+        assertTrue(controller.isOpenInstead());
+        assertEquals(50, controller.getTargetLine());
+    }
+
+    @Test
+    public void defaultRecommendationCanBeCancelled() throws Exception {
+        SearchMockSsh ssh = new SearchMockSsh();
+        ssh.lineCountOutput = "100000\n";
+        controller.setMaxTailWindow(100);
+        presenter.responder = dialog -> pickButton(dialog, "Cancel");
+        prepareSingleMatch(ssh, "/a/app.log:50:timeout\n");
+
+        Platform.runLater(tailButton::fire);
+        waitUntil(() -> !presenter.dialogs.isEmpty());
+        WaitForAsyncUtils.waitForFxEvents();
+
+        assertNull(controller.getChosenFile(), "cancelling the dialog must not choose a file");
+        assertFalse(controller.isTailAction());
+        assertFalse(controller.isOpenInstead());
+    }
+
+    @Test
+    public void copyPathCopiesTheSelectedPath() throws Exception {
+        SearchMockSsh ssh = new SearchMockSsh();
+        startSearch(ssh, "timeout");
+        waitUntil(() -> resultTable.getItems().size() == 2);
+        Platform.runLater(() -> resultTable.getSelectionModel().select(0));
+        WaitForAsyncUtils.waitForFxEvents();
+
+        Platform.runLater(copyPathButton::fire);
+        WaitForAsyncUtils.waitForFxEvents();
+
+        String copied = WaitForAsyncUtils.asyncFx(() -> Clipboard.getSystemClipboard().getString()).get();
+        assertEquals("/var/log/app.log", copied);
+        assertEquals("Path copied to clipboard.", statusLabel.getText());
+    }
+
+    @Test
+    public void regexAndCaseSensitiveFlagsAreForwarded() throws Exception {
+        SearchMockSsh ssh = new SearchMockSsh();
+        ssh.searchOutput = "/var/log/app.log:1:Request Timeout\n";
+        Platform.runLater(() -> {
+            regexCheckBox.setSelected(true);
+            caseSensitiveCheckBox.setSelected(true);
+        });
+        startSearch(ssh, "Time.*");
+        waitUntil(() -> resultTable.getItems().size() == 1);
+
+        assertTrue(ssh.searchCommand.contains("grep -nEH"), ssh.searchCommand);
+        assertFalse(findHighlights(resultTable).isEmpty());
+
+        ssh.searchOutput = "/var/log/app.log:2:Timeout\n";
+        Platform.runLater(() -> regexCheckBox.setSelected(false));
+        startSearch(ssh, "Timeout");
+        waitUntil(() -> ssh.searchCommandCount == 2);
+
+        assertTrue(ssh.searchCommand.contains("grep -nFH"), ssh.searchCommand);
+    }
+
+    @Test
+    public void searchFailureReportsTheReasonAndReenablesTheButton() throws Exception {
+        SearchMockSsh ssh = new SearchMockSsh();
+        ssh.failSearch = true;
+        startSearch(ssh, "timeout");
+
+        waitUntil(() -> statusLabel.getText().startsWith("Search failed"));
+        assertTrue(statusLabel.getText().contains("search exploded"));
+        assertFalse(searchButton.isDisabled());
+    }
+
+    @Test
+    public void previewFailureLeavesThePreviewEmpty() throws Exception {
+        SearchMockSsh ssh = new SearchMockSsh();
+        ssh.failPreview = true;
+        startSearch(ssh, "timeout");
+        waitUntil(() -> resultTable.getItems().size() == 2);
+
+        Platform.runLater(() -> resultTable.getSelectionModel().select(0));
+        assertTrue(ssh.previewAttempted.await(3, TimeUnit.SECONDS));
+        WaitForAsyncUtils.waitForFxEvents();
+
+        assertTrue(previewList.getItems().isEmpty(), "a failed preview must not render stale content");
+    }
+
+    @Test
+    public void doubleClickOnARowChoosesTheFile() throws Exception {
+        SearchMockSsh ssh = new SearchMockSsh();
+        startSearch(ssh, "timeout");
+        waitUntil(() -> resultTable.getItems().size() == 2);
+
+        Node row = findNonEmptyRow();
+        assertNotNull(row, "the result table must render row cells");
+        Platform.runLater(() -> Event.fireEvent(row, doubleClickEvent()));
+
+        waitUntil(() -> controller.getChosenFile() != null);
+        assertEquals("/var/log/app.log", controller.getChosenFile().getPath());
+        assertFalse(controller.isTailAction());
+    }
+
+    @Test
+    public void enterKeyOnTheTableOpensTheSelection() throws Exception {
+        SearchMockSsh ssh = new SearchMockSsh();
+        startSearch(ssh, "timeout");
+        waitUntil(() -> resultTable.getItems().size() == 2);
+        Platform.runLater(() -> resultTable.getSelectionModel().select(0));
+        WaitForAsyncUtils.waitForFxEvents();
+
+        Platform.runLater(() -> Event.fireEvent(resultTable,
+                new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false)));
+
+        waitUntil(() -> controller.getChosenFile() != null);
+        assertEquals("/var/log/app.log", controller.getChosenFile().getPath());
+    }
+
+    @Test
+    public void enterInTheFieldsRunsTheSearch() throws Exception {
+        SearchMockSsh ssh = new SearchMockSsh();
+        controller.setContext(ssh, server(), "/var/log");
+        Platform.runLater(() -> {
+            keywordField.setText("timeout");
+            rootPathField.fireEvent(new ActionEvent());
+        });
+        waitUntil(() -> ssh.searchCommandCount == 1);
+
+        Platform.runLater(() -> {
+            keywordField.setText("timeout");
+            keywordField.fireEvent(new ActionEvent());
+        });
+        waitUntil(() -> ssh.searchCommandCount == 2);
+    }
+
+    @Test
+    public void closingTheWindowCancelsRunningWork() throws Exception {
+        SearchMockSsh ssh = new SearchMockSsh();
+        ssh.blockSearch = true;
+        startSearch(ssh, "timeout");
+        assertTrue(ssh.searchStarted.await(3, TimeUnit.SECONDS));
+
+        Platform.runLater(() -> stage.fireEvent(new WindowEvent(stage, WindowEvent.WINDOW_CLOSE_REQUEST)));
+        WaitForAsyncUtils.waitForFxEvents();
+
+        assertTrue(ssh.cancelCalled, "closing the dialog must cancel the running remote command");
+        assertTrue(statusLabel.getText().toLowerCase().contains("cancelled"));
+        ssh.releaseSearch.countDown();
+    }
+
+    private Optional<ButtonType> pickButton(Dialog<?> dialog, String text) {
+        if (dialog instanceof Alert alert) {
+            return alert.getButtonTypes().stream()
+                    .filter(button -> button.getText().equals(text))
+                    .findFirst();
+        }
+        return Optional.empty();
+    }
+
+    private Alert firstAlert() {
+        return (Alert) presenter.dialogs.stream().filter(d -> d instanceof Alert).findFirst().orElseThrow();
+    }
+
+    private Node findNonEmptyRow() throws Exception {
+        return WaitForAsyncUtils.asyncFx(() -> {
+            resultTable.applyCss();
+            resultTable.layout();
+            for (Node node : resultTable.lookupAll(".table-row-cell")) {
+                if (node instanceof TableRow<?> row && row.getItem() != null) {
+                    return node;
+                }
+            }
+            return null;
+        }).get();
+    }
+
+    private static MouseEvent doubleClickEvent() {
+        return new MouseEvent(MouseEvent.MOUSE_CLICKED, 0, 0, 0, 0, MouseButton.PRIMARY, 2,
+                false, false, false, false, true, false, false, true, false, false, null);
+    }
+
+    private static final class FakePresenter implements DialogPresenter {
+        final List<Dialog<?>> dialogs = new ArrayList<>();
+        Function<Dialog<?>, Optional<?>> responder = dialog -> Optional.empty();
+
+        @Override
+        public void present(Stage dialog) {
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> Optional<T> present(Dialog<T> dialog) {
+            dialogs.add(dialog);
+            return (Optional<T>) responder.apply(dialog);
+        }
     }
 }

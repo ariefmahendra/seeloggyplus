@@ -7,6 +7,7 @@ import com.seeloggyplus.shared.model.SSHServerModel;
 import com.seeloggyplus.features.search.application.RemoteLogSearchService;
 import com.seeloggyplus.features.search.application.RemoteLogSearchServiceImpl;
 import com.seeloggyplus.shared.ssh.SSHService;
+import com.seeloggyplus.shared.ui.DialogPresenter;
 import com.seeloggyplus.shared.util.FxTextHighlighter;
 import com.seeloggyplus.shared.util.ScrollBarThumbEnhancer;
 import com.seeloggyplus.shared.util.TailJumpPlanner;
@@ -22,6 +23,7 @@ import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -116,6 +118,7 @@ public class RemoteLogSearchDialogController {
     private int tailJumpIndex = -1;
     private int maxTailWindow = 20000;
     private TailRecommendationDecision recommendationDecision = this::showTailRecommendationDialog;
+    private DialogPresenter dialogPresenter = defaultDialogPresenter();
 
     enum TailChoice {
         TAIL_RECOMMENDED, OPEN_INSTEAD, CANCEL
@@ -136,6 +139,24 @@ public class RemoteLogSearchDialogController {
 
     void setSearchService(RemoteLogSearchService searchService) {
         this.searchService = searchService;
+    }
+
+    public void setDialogPresenter(DialogPresenter dialogPresenter) {
+        this.dialogPresenter = dialogPresenter == null ? defaultDialogPresenter() : dialogPresenter;
+    }
+
+    private DialogPresenter defaultDialogPresenter() {
+        return new DialogPresenter() {
+            @Override
+            public void present(Stage dialog) {
+                dialog.showAndWait();
+            }
+
+            @Override
+            public <T> Optional<T> present(Dialog<T> dialog) {
+                return dialog.showAndWait();
+            }
+        };
     }
 
     public void setMaxTailWindow(int maxTailWindow) {
@@ -477,7 +498,7 @@ public class RemoteLogSearchDialogController {
                 totalLines, maxTailWindow, plan.firstReachableLine(), selected.lineNumber(), plan.neededLines()));
         alert.getButtonTypes().setAll(tailRecommend, openJump, cancel);
 
-        Optional<ButtonType> result = alert.showAndWait();
+        Optional<ButtonType> result = dialogPresenter.present(alert);
         if (result.isEmpty() || result.get() == cancel) {
             return TailChoice.CANCEL;
         }
