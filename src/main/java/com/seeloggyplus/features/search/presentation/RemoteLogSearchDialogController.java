@@ -118,7 +118,7 @@ public class RemoteLogSearchDialogController {
     private int tailJumpIndex = -1;
     private int maxTailWindow = 20000;
     private TailRecommendationDecision recommendationDecision = this::showTailRecommendationDialog;
-    private DialogPresenter dialogPresenter = defaultDialogPresenter();
+    private DialogPresenter dialogPresenter = DialogPresenter.showAndWait();
 
     enum TailChoice {
         TAIL_RECOMMENDED, OPEN_INSTEAD, CANCEL
@@ -142,21 +142,7 @@ public class RemoteLogSearchDialogController {
     }
 
     public void setDialogPresenter(DialogPresenter dialogPresenter) {
-        this.dialogPresenter = dialogPresenter == null ? defaultDialogPresenter() : dialogPresenter;
-    }
-
-    private DialogPresenter defaultDialogPresenter() {
-        return new DialogPresenter() {
-            @Override
-            public void present(Stage dialog) {
-                dialog.showAndWait();
-            }
-
-            @Override
-            public <T> Optional<T> present(Dialog<T> dialog) {
-                return dialog.showAndWait();
-            }
-        };
+        this.dialogPresenter = dialogPresenter == null ? DialogPresenter.showAndWait() : dialogPresenter;
     }
 
     public void setMaxTailWindow(int maxTailWindow) {

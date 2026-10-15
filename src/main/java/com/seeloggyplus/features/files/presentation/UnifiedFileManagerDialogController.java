@@ -161,7 +161,7 @@ public class UnifiedFileManagerDialogController {
     private ServerCatalog serverManagementService;
     private PreferenceService preferenceService;
     private SSHServiceFactory sshServiceFactory;
-    private DialogPresenter dialogPresenter = defaultDialogPresenter();
+    private DialogPresenter dialogPresenter = DialogPresenter.showAndWait();
 
     private FavoriteFolderService favoriteFolderService;
 
@@ -2153,21 +2153,7 @@ public class UnifiedFileManagerDialogController {
     }
 
     public void setDialogPresenter(DialogPresenter dialogPresenter) {
-        this.dialogPresenter = dialogPresenter == null ? defaultDialogPresenter() : dialogPresenter;
-    }
-
-    private DialogPresenter defaultDialogPresenter() {
-        return new DialogPresenter() {
-            @Override
-            public void present(Stage dialog) {
-                dialog.showAndWait();
-            }
-
-            @Override
-            public <T> Optional<T> present(Dialog<T> dialog) {
-                return dialog.showAndWait();
-            }
-        };
+        this.dialogPresenter = dialogPresenter == null ? DialogPresenter.showAndWait() : dialogPresenter;
     }
 
     public void setPreferenceService(PreferenceService service) {

@@ -27,10 +27,7 @@ import com.seeloggyplus.features.recent.domain.RecentFile;
 import com.seeloggyplus.features.recent.domain.RecentFilesDto;
 import com.seeloggyplus.features.detail.presentation.LogDetailPaneController;
 import com.seeloggyplus.features.update.presentation.UpdateFeature;
-import com.seeloggyplus.features.files.presentation.FileManagerHost;
 import com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogController;
-import com.seeloggyplus.features.preview.presentation.LogPreviewDialogController;
-import com.seeloggyplus.features.search.presentation.RemoteLogSearchDialogController;
 import com.seeloggyplus.shared.model.*;
 import com.seeloggyplus.shared.logs.port.LogFileService;
 import com.seeloggyplus.shared.logs.port.LogParser;
@@ -41,6 +38,7 @@ import com.seeloggyplus.shared.ssh.SSHServiceFactory;
 import com.seeloggyplus.features.servers.presentation.ServerManagementDialogController;
 import com.seeloggyplus.shared.servers.ServerCatalog;
 import com.seeloggyplus.shared.tail.TailService;
+import com.seeloggyplus.shared.ui.DialogPresenter;
 import com.seeloggyplus.shared.ui.DialogWindowSupport;
 
 import java.io.File;
@@ -1823,109 +1821,8 @@ public class MainController {
             dialog.setMaximized(true);
             dialog.setOnShown(e -> dialog.setMaximized(true));
 
-            controller.setHost(new FileManagerHost() {
-                @Override
-                public FindInFilesResult openFindInFiles(SSHService sshService, SSHServerModel server, String path,
-                        int maxTailWindow) {
-                    try {
-                        FXMLLoader searchLoader = new FXMLLoader(
-                                getClass().getResource("/fxml/RemoteLogSearchDialog.fxml"));
-                        Parent searchRoot = searchLoader.load();
-                        RemoteLogSearchDialogController searchController = searchLoader.getController();
-                        searchController.setContext(sshService, server, path);
-                        searchController.setMaxTailWindow(maxTailWindow);
-
-                        Stage searchDialog = new Stage();
-                        searchDialog.setTitle("Find in Files");
-                        addAppIcon(searchDialog);
-                        searchDialog.initModality(Modality.WINDOW_MODAL);
-                        searchDialog.initOwner(dialog);
-                        searchDialog.setScene(AppTheme.scene(searchRoot));
-                        searchDialog.showAndWait();
-
-                        FileInfo chosen = searchController.getChosenFile();
-                        if (chosen == null) {
-                            return null;
-                        }
-                        return new FindInFilesResult(chosen, searchController.getTargetLine(),
-                                searchController.getTailWindowLines(), searchController.getTailJumpIndex(),
-                                searchController.isTailAction(), searchController.isOpenInstead());
-                    } catch (IOException e) {
-                        logger.error("Failed to open Find in Files dialog", e);
-                        showError("Find in Files", "Could not open dialog: " + e.getMessage());
-                        return null;
-                    }
-                }
-
-                @Override
-                public void openPreview(FileInfo file, SSHService sshService) {
-                    try {
-                        Stage ownerStage = dialog;
-                        Stage restoreStage = ownerStage;
-                        while (restoreStage.getOwner() != null) {
-                            restoreStage = (Stage) restoreStage.getOwner();
-                        }
-
-                        final Stage finalRestoreStage = restoreStage;
-                        boolean wasMaximized = finalRestoreStage.isMaximized();
-                        double oldX = finalRestoreStage.getX();
-                        double oldY = finalRestoreStage.getY();
-                        double oldWidth = finalRestoreStage.getWidth();
-                        double oldHeight = finalRestoreStage.getHeight();
-
-                        FXMLLoader previewLoader = new FXMLLoader(getClass().getResource("/fxml/LogPreviewDialog.fxml"));
-                        Parent previewRoot = previewLoader.load();
-
-                        LogPreviewDialogController previewController = previewLoader.getController();
-                        previewController.setPreferenceService(preferenceService);
-                        previewController.loadFile(file, sshService);
-
-                        Stage stage = new Stage();
-                        addAppIcon(stage);
-                        stage.setTitle("Log Preview");
-                        stage.initModality(Modality.APPLICATION_MODAL);
-                        stage.initOwner(ownerStage);
-                        DialogWindowSupport.restoreWindow(finalRestoreStage, wasMaximized, oldX, oldY, oldWidth,
-                                oldHeight, previewRoot, stage);
-                    } catch (IOException e) {
-                        logger.error("Failed to open log preview dialog", e);
-                        showError("Preview Error", "Could not open the log preview: " + e.getMessage());
-                    }
-                }
-
-                @Override
-                public void openServerManagement() {
-                    try {
-                        Stage ownerStage = dialog;
-                        Stage restoreStage = ownerStage;
-                        while (restoreStage.getOwner() != null) {
-                            restoreStage = (Stage) restoreStage.getOwner();
-                        }
-
-                        final Stage finalRestoreStage = restoreStage;
-                        boolean wasMaximized = finalRestoreStage.isMaximized();
-                        double oldX = finalRestoreStage.getX();
-                        double oldY = finalRestoreStage.getY();
-                        double oldWidth = finalRestoreStage.getWidth();
-                        double oldHeight = finalRestoreStage.getHeight();
-
-                        FXMLLoader serverLoader = new FXMLLoader(
-                                getClass().getResource("/fxml/ServerManagementDialog.fxml"));
-                        Parent serverRoot = serverLoader.load();
-                        ServerManagementDialogController serverController = serverLoader.getController();
-                        serverController.setSshServiceFactory(sshServiceFactory);
-                        Stage stage = new Stage();
-                        addAppIcon(stage);
-                        stage.setTitle("Server Management");
-                        stage.initModality(Modality.APPLICATION_MODAL);
-                        stage.initOwner(ownerStage);
-                        DialogWindowSupport.restoreWindow(finalRestoreStage, wasMaximized, oldX, oldY, oldWidth,
-                                oldHeight, serverRoot, stage);
-                    } catch (IOException e) {
-                        logger.error("Failed to open server management", e);
-                    }
-                }
-            });
+            controller.setHost(new FileManagerDialogHost(dialog, preferenceService, sshServiceFactory,
+                    this::showError, DialogPresenter.showAndWait()));
 
             dialog.showAndWait();
 

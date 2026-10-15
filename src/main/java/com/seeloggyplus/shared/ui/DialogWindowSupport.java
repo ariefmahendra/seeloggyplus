@@ -11,8 +11,14 @@ public final class DialogWindowSupport {
 
     public static void restoreWindow(Stage mainStage, boolean wasMaximized, double oldX, double oldY,
             double oldWidth, double oldHeight, Parent root, Stage dialog) {
+        restoreWindow(mainStage, wasMaximized, oldX, oldY, oldWidth, oldHeight, root, dialog,
+                DialogPresenter.showAndWait());
+    }
+
+    public static void restoreWindow(Stage mainStage, boolean wasMaximized, double oldX, double oldY,
+            double oldWidth, double oldHeight, Parent root, Stage dialog, DialogPresenter presenter) {
         dialog.setScene(AppTheme.scene(root));
-        dialog.showAndWait();
+        presenter.present(dialog);
 
         Platform.runLater(() -> {
             if (wasMaximized) {

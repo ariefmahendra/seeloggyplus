@@ -61,7 +61,7 @@ public class ServerEditDialogController {
     private SSHService sshService;
     private SSHServiceFactory sshServiceFactory;
     private SSHServerModel sshServer;
-    private DialogPresenter dialogPresenter = defaultDialogPresenter();
+    private DialogPresenter dialogPresenter = DialogPresenter.showAndWait();
     @Getter
     private boolean saved = false;
     @Getter
@@ -152,21 +152,7 @@ public class ServerEditDialogController {
     }
 
     public void setDialogPresenter(DialogPresenter dialogPresenter) {
-        this.dialogPresenter = dialogPresenter == null ? defaultDialogPresenter() : dialogPresenter;
-    }
-
-    private DialogPresenter defaultDialogPresenter() {
-        return new DialogPresenter() {
-            @Override
-            public void present(Stage dialog) {
-                dialog.showAndWait();
-            }
-
-            @Override
-            public <T> Optional<T> present(Dialog<T> dialog) {
-                return dialog.showAndWait();
-            }
-        };
+        this.dialogPresenter = dialogPresenter == null ? DialogPresenter.showAndWait() : dialogPresenter;
     }
 
     private SSHService sshService() {
