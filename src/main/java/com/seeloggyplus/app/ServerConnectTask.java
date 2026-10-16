@@ -17,10 +17,6 @@ public class ServerConnectTask extends Task<Boolean> {
         this.secret = secret;
     }
 
-    public static String storedSecret(SSHServerModel server) {
-        return server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
-    }
-
     @Override
     protected Boolean call() {
         return connect();

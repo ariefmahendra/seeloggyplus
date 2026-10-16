@@ -46,7 +46,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.function.Predicate;
@@ -209,6 +208,11 @@ public class MainController {
     private LogParser logParserService;
     private LogFileService logFileService;
     private ServerCatalog serverManagementService;
+    private DialogPresenter dialogPresenter = DialogPresenter.showAndWait();
+
+    public void setDialogPresenter(DialogPresenter dialogPresenter) {
+        this.dialogPresenter = dialogPresenter == null ? DialogPresenter.showAndWait() : dialogPresenter;
+    }
     private PreferenceService preferenceService;
     private final SSHServiceFactory sshServiceFactory = SSHServiceImpl::new;
 
@@ -1610,7 +1614,7 @@ public class MainController {
 
         SSHService sshService = (savedSsh != null && savedSsh.isConnected()) ? savedSsh : sshServiceFactory.create();
 
-        Task<Boolean> connectTask = new ServerConnectTask(sshService, server, ServerConnectTask.storedSecret(server));
+        Task<Boolean> connectTask = new ServerConnectTask(sshService, server, ServerCredentials.storedSecret(server));
         connectTask.setOnSucceeded(e -> {
             hideLoading();
             if (connectTask.getValue()) {
@@ -2342,56 +2346,8 @@ public class MainController {
             hideLoading();
             cancelCurrentLoadingTask();
 
-            Task<SSHService> connectTask = new Task<>() {
-                @Override
-                protected SSHService call() throws Exception {
-                    String sshServerId = logFile.getSshServerID();
-                    if (sshServerId == null || sshServerId.isBlank()) {
-                        throw new IOException("This remote file does not have SSH server information.");
-                    }
-
-                    final SSHServerModel server = serverManagementService.getServerById(sshServerId);
-                    if (server == null) {
-                        throw new IOException("SSH server configuration with ID " + sshServerId + " was not found.");
-                    }
-
-                    final CompletableFuture<String> passwordFuture = new CompletableFuture<>();
-                    if (server.usesKeyAuth()) {
-                        passwordFuture.complete(server.getKeyPassphrase());
-                    } else {
-                        Platform.runLater(() -> {
-                            String password = server.getPassword();
-                            if (password == null || password.isBlank()) {
-                                logger.info("Password for server {} is not saved, prompting user.", server.getName());
-                                PasswordPromptDialog prompt = new PasswordPromptDialog(server.getHost(),
-                                        server.getUsername());
-                                prompt.showAndWait().ifPresentOrElse(passwordFuture::complete,
-                                        () -> passwordFuture.complete(null));
-                            } else {
-                                passwordFuture.complete(password);
-                            }
-                        });
-                    }
-                    String password = passwordFuture.get();
-                    if (!server.usesKeyAuth() && password == null) {
-                        logger.info("User cancelled password prompt for remote recent file.");
-                        updateMessage("SSH connection cancelled.");
-                        cancel();
-                        return null;
-                    }
-
-                    updateMessage("Connecting to " + server.getHost() + "...");
-                    SSHService sshService = sshServiceFactory.create();
-                    boolean connected = SshConnectFlow.connect(sshService, server, password);
-
-                    if (!connected) {
-                        throw new IOException("Could not connect to " + server.getHost());
-                    }
-
-                    serverManagementService.updateServerLastUsed(server.getId());
-                    return sshService;
-                }
-            };
+            Task<SSHService> connectTask = new RemoteConnectTask(
+                    logFile.getSshServerID(), serverManagementService, sshServiceFactory, dialogPresenter);
 
             showLoading("Connecting to remote server...");
             connectTask.runningProperty().addListener((obs, wasRunning, isRunning) -> {
@@ -2721,19 +2677,12 @@ public class MainController {
             }
 
             final SSHServerModel finalServer = server;
-            String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
-            if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
-                PasswordPromptDialog prompt = new PasswordPromptDialog(
-                        server.getHost(), server.getUsername());
-                Optional<String> result = prompt.showAndWait();
-                if (result.isPresent() && !result.get().isBlank()) {
-                    password = result.get();
-                } else {
-                    disableTail(targetSession, false);
-                    return;
-                }
+            Optional<String> resolvedSecret = ServerCredentials.resolveSecret(server, dialogPresenter);
+            if (!server.usesKeyAuth() && resolvedSecret.isEmpty()) {
+                disableTail(targetSession, false);
+                return;
             }
-            final String finalPassword = password;
+            final String finalPassword = resolvedSecret.orElse(null);
             showLoading("Connecting to " + server.getHost() + "...");
 
             SSHService newSsh = sshServiceFactory.create();
@@ -2787,19 +2736,12 @@ public class MainController {
             return;
         }
 
-        String password = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
-        if (!server.usesKeyAuth() && (password == null || password.isBlank())) {
-            PasswordPromptDialog prompt = new PasswordPromptDialog(
-                    server.getHost(), server.getUsername());
-            Optional<String> result = prompt.showAndWait();
-            if (result.isPresent() && !result.get().isBlank()) {
-                password = result.get();
-            } else {
-                disableTail();
-                return;
-            }
+        Optional<String> resolvedSecret = ServerCredentials.resolveSecret(server, dialogPresenter);
+        if (!server.usesKeyAuth() && resolvedSecret.isEmpty()) {
+            disableTail();
+            return;
         }
-        final String finalPassword = password;
+        final String finalPassword = resolvedSecret.orElse(null);
 
         showLoading("Connecting to " + server.getHost() + "...");
 
