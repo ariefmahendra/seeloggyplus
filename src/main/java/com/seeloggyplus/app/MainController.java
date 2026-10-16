@@ -1610,15 +1610,7 @@ public class MainController {
 
         SSHService sshService = (savedSsh != null && savedSsh.isConnected()) ? savedSsh : sshServiceFactory.create();
 
-        Task<Boolean> connectTask = new Task<>() {
-            @Override
-            protected Boolean call() {
-                if (sshService.isConnected()) return true;
-                String secret = server.usesKeyAuth() ? server.getKeyPassphrase() : server.getPassword();
-                if (!server.usesKeyAuth() && (secret == null || secret.isBlank())) return false;
-                return SshConnectFlow.connect(sshService, server, secret);
-            }
-        };
+        Task<Boolean> connectTask = new ServerConnectTask(sshService, server, ServerConnectTask.storedSecret(server));
         connectTask.setOnSucceeded(e -> {
             hideLoading();
             if (connectTask.getValue()) {
@@ -2744,42 +2736,32 @@ public class MainController {
             final String finalPassword = password;
             showLoading("Connecting to " + server.getHost() + "...");
 
-            Task<Boolean> connectTask = new Task<>() {
-                private final SSHService newSsh = sshServiceFactory.create();
-
-                @Override
-                protected Boolean call() throws Exception {
-                    return SshConnectFlow.connect(newSsh, finalServer, finalPassword);
-                }
-
-                @Override
-                protected void succeeded() {
-                    hideLoading();
-                    if (getValue()) {
-                        targetSession.setSshService(newSsh);
-                        newSsh.tailFile(targetSession.getRemotePath(), tailWindowSize,
-                                line -> handleTailLineBackground(targetSession, line),
-                                error -> Platform.runLater(() -> {
-                                    logger.error("Remote tail error for {}: {}", targetSession.getTitle(), error);
-                                    showError("Remote Tail Error", error);
-                                    disableTail(targetSession, false);
-                                }));
-                        updateTabBadge(targetSession);
-                    } else {
-                        showError("Connection Failed", "Could not connect to " + finalServer.getHost());
-                        disableTail(targetSession, false);
-                    }
-                }
-
-                @Override
-                protected void failed() {
-                    hideLoading();
-                    Throwable ex = getException();
-                    logger.error("SSH connection failed", ex);
-                    showError("Connection Failed", ex != null ? ex.getMessage() : "Unknown error");
+            SSHService newSsh = sshServiceFactory.create();
+            Task<Boolean> connectTask = new ServerConnectTask(newSsh, finalServer, finalPassword);
+            connectTask.setOnSucceeded(e -> {
+                hideLoading();
+                if (connectTask.getValue()) {
+                    targetSession.setSshService(newSsh);
+                    newSsh.tailFile(targetSession.getRemotePath(), tailWindowSize,
+                            line -> handleTailLineBackground(targetSession, line),
+                            error -> Platform.runLater(() -> {
+                                logger.error("Remote tail error for {}: {}", targetSession.getTitle(), error);
+                                showError("Remote Tail Error", error);
+                                disableTail(targetSession, false);
+                            }));
+                    updateTabBadge(targetSession);
+                } else {
+                    showError("Connection Failed", "Could not connect to " + finalServer.getHost());
                     disableTail(targetSession, false);
                 }
-            };
+            });
+            connectTask.setOnFailed(e -> {
+                hideLoading();
+                Throwable ex = connectTask.getException();
+                logger.error("SSH connection failed", ex);
+                showError("Connection Failed", ex != null ? ex.getMessage() : "Unknown error");
+                disableTail(targetSession, false);
+            });
             Thread.ofVirtual().start(connectTask);
             return;
         }
@@ -2821,33 +2803,25 @@ public class MainController {
 
         showLoading("Connecting to " + server.getHost() + "...");
 
-        Task<Boolean> connectTask = new Task<>() {
-            private final SSHService sshService = sshServiceFactory.create();
-
-            @Override
-            protected Boolean call() throws Exception {
-                return SshConnectFlow.connect(sshService, server, finalPassword);
-            }
-
-            @Override
-            protected void succeeded() {
+        SSHService sshService = sshServiceFactory.create();
+        Task<Boolean> connectTask = new ServerConnectTask(sshService, server, finalPassword);
+        connectTask.setOnSucceeded(e -> {
+            hideLoading();
+            if (connectTask.getValue()) {
+                startRemoteTail(remotePath, sshService, server);
+            } else {
                 hideLoading();
-                if (getValue()) {
-                    startRemoteTail(remotePath, sshService, server);
-                } else {
-                    hideLoading();
-                    showError("Connection Failed", "Could not connect to " + server.getHost());
-                    disableTail();
-                }
-            }
-
-            @Override
-            protected void failed() {
-                hideLoading();
-                showError("Connection Error", getException() != null ? getException().getMessage() : "Failed to connect");
+                showError("Connection Failed", "Could not connect to " + server.getHost());
                 disableTail();
             }
-        };
+        });
+        connectTask.setOnFailed(e -> {
+            hideLoading();
+            showError("Connection Error",
+                    connectTask.getException() != null ? connectTask.getException().getMessage()
+                            : "Failed to connect");
+            disableTail();
+        });
         Thread.ofVirtual().start(connectTask);
     }
 
