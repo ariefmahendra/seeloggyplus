@@ -3390,7 +3390,7 @@ public class MainController {
 
     private <T> Optional<T> showAndWaitAndRestore(Dialog<T> dialog) {
         if (menuBar == null || menuBar.getScene() == null || menuBar.getScene().getWindow() == null) {
-            return dialog.showAndWait();
+            return dialogPresenter.present(dialog);
         }
         Stage mainStage = (Stage) menuBar.getScene().getWindow();
         boolean wasMaximized = mainStage.isMaximized();
@@ -3403,7 +3403,7 @@ public class MainController {
             dialog.initOwner(mainStage);
         }
 
-        Optional<T> result = dialog.showAndWait();
+        Optional<T> result = dialogPresenter.present(dialog);
 
         Platform.runLater(() -> {
             if (wasMaximized) {
