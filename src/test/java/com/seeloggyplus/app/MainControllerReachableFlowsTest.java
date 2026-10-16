@@ -76,6 +76,8 @@ class MainControllerReachableFlowsTest {
         volatile String tailedRemotePath;
         volatile long downloadDelayMillis;
         volatile boolean emitProgress;
+        final CountDownLatch progressEmitted = new CountDownLatch(1);
+        volatile CountDownLatch releaseProgress;
         Consumer<String> lineConsumer;
         Consumer<String> errorConsumer;
 
@@ -111,6 +113,11 @@ class MainControllerReachableFlowsTest {
                 }
                 if (emitProgress && progressCallback != null) {
                     progressCallback.onProgress(0.5, 50, 100);
+                    progressEmitted.countDown();
+                    CountDownLatch release = releaseProgress;
+                    if (release != null) {
+                        release.await();
+                    }
                 }
                 Files.writeString(Path.of(localPath), "remote line\n");
                 return true;
@@ -884,13 +891,17 @@ class MainControllerReachableFlowsTest {
         FakeSshService first = new FakeSshService();
         first.downloadDelayMillis = 800;
         first.emitProgress = true;
+        first.releaseProgress = new CountDownLatch(1);
 
         fx(() -> invoke("openRemoteLogFile", new Class<?>[]{String.class, String.class, SSHService.class,
                 SSHServerModel.class}, remotePath, "remote-flow.log", first, server));
 
         Label loadingLabel = (Label) field("loadingLabel");
-        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS,
+        assertTrue(first.progressEmitted.await(10, TimeUnit.SECONDS),
+                "the fake download must report progress");
+        WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS,
                 () -> loadingLabel.getText() != null && loadingLabel.getText().startsWith("Downloading... 50%"));
+        first.releaseProgress.countDown();
         awaitTabs(1);
         assertEquals(1, first.downloadCount);
 
