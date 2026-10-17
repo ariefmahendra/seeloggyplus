@@ -10,8 +10,6 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.util.function.Predicate;
 
 public class MappedFileReader implements AutoCloseable {
@@ -20,8 +18,11 @@ public class MappedFileReader implements AutoCloseable {
 
     private static final long CHUNK_SIZE = 1024L * 1024L * 1024L;
 
+    public static final int MAX_LINE_BYTES = 256 * 1024;
+
     private final long fileSize;
     private final Charset charset;
+    private final long chunkSize;
     private final RandomAccessFile raf;
     private final FileChannel channel;
     private final MappedByteBuffer[] buffers;
@@ -32,19 +33,24 @@ public class MappedFileReader implements AutoCloseable {
     }
 
     public MappedFileReader(File file, Charset charset) throws IOException {
+        this(file, charset, CHUNK_SIZE);
+    }
+
+    MappedFileReader(File file, Charset charset, long chunkSize) throws IOException {
         this.fileSize = file.length();
         this.charset = charset;
+        this.chunkSize = chunkSize;
 
         this.raf = new RandomAccessFile(file, "r");
         this.channel = raf.getChannel();
 
-        int numChunks = (int) ((fileSize + CHUNK_SIZE - 1) / CHUNK_SIZE);
+        int numChunks = (int) ((fileSize + chunkSize - 1) / chunkSize);
         this.buffers = new MappedByteBuffer[numChunks];
         this.chunkOffsets = new long[numChunks];
 
         for (int i = 0; i < numChunks; i++) {
-            long offset = (long) i * CHUNK_SIZE;
-            long size = Math.min(CHUNK_SIZE, fileSize - offset);
+            long offset = (long) i * chunkSize;
+            long size = Math.min(chunkSize, fileSize - offset);
             chunkOffsets[i] = offset;
             buffers[i] = channel.map(FileChannel.MapMode.READ_ONLY, offset, size);
         }
@@ -54,32 +60,15 @@ public class MappedFileReader implements AutoCloseable {
     }
 
     public String readLine(long startOffset, int maxLength) {
-        if (startOffset >= fileSize) {
+        if (startOffset < 0 || startOffset >= fileSize || maxLength <= 0) {
             return "";
         }
 
-        int chunkIndex = (int) (startOffset / CHUNK_SIZE);
-        int localOffset = (int) (startOffset - chunkOffsets[chunkIndex]);
+        int cap = (int) Math.min((long) maxLength, MAX_LINE_BYTES);
+        byte[] lineBuffer = new byte[cap];
+        int len = fillLineBytes(startOffset, lineBuffer, cap);
 
-        MappedByteBuffer buffer = buffers[chunkIndex];
-
-        int bufSize = Math.min(maxLength, 8192);
-        byte[] localLineBuffer = new byte[bufSize];
-
-        int bytesToRead = Math.min(bufSize, buffer.capacity() - localOffset);
-        int len = 0;
-
-        for (int i = 0; i < bytesToRead; i++) {
-            byte b = buffer.get(localOffset + i);
-            if (b == '\n') {
-                break;
-            }
-            if (b != '\r') {
-                localLineBuffer[len++] = b;
-            }
-        }
-
-        return new String(localLineBuffer, 0, len, charset);
+        return new String(lineBuffer, 0, len, charset);
     }
 
     public String readLine(LineOffsetIndex index, long lineNumber) {
@@ -88,9 +77,9 @@ public class MappedFileReader implements AutoCloseable {
         }
 
         long offset = index.getOffset((int) lineNumber);
-        int lineLen = (int) Math.min(index.getLineLength((int) lineNumber, fileSize), 10000);
+        long lineLength = index.getLineLength((int) lineNumber, fileSize);
 
-        return readLine(offset, lineLen);
+        return readLine(offset, (int) Math.min(lineLength, MAX_LINE_BYTES));
     }
 
     public boolean lineMatches(LineOffsetIndex index, int lineNumber,
@@ -99,34 +88,46 @@ public class MappedFileReader implements AutoCloseable {
             return false;
         }
 
-        long startOffset = index.getOffset(lineNumber);
-        int maxLength = (int) Math.min(index.getLineLength(lineNumber, fileSize), 10000);
+        return matcher.test(readLine(index, lineNumber));
+    }
 
-        if (startOffset >= fileSize) {
-            return false;
-        }
+    private int fillLineBytes(long startOffset, byte[] target, int maxBytes) {
+        int written = 0;
+        long position = startOffset;
 
-        int chunkIndex = (int) (startOffset / CHUNK_SIZE);
-        int localOffset = (int) (startOffset - chunkOffsets[chunkIndex]);
-        MappedByteBuffer buffer = buffers[chunkIndex];
+        while (written < maxBytes && position < fileSize) {
+            int chunkIndex = (int) (position / chunkSize);
+            int localOffset = (int) (position - chunkOffsets[chunkIndex]);
+            MappedByteBuffer buffer = buffers[chunkIndex];
 
-        int bufSize = Math.min(maxLength, 8192);
-        byte[] localLineBuffer = new byte[bufSize];
-        int bytesToRead = Math.min(bufSize, buffer.capacity() - localOffset);
-        int len = 0;
-
-        for (int i = 0; i < bytesToRead; i++) {
-            byte b = buffer.get(localOffset + i);
-            if (b == '\n') {
+            int available = buffer.capacity() - localOffset;
+            if (available <= 0) {
                 break;
             }
-            if (b != '\r') {
-                localLineBuffer[len++] = b;
+
+            int scanned = 0;
+            boolean endOfLine = false;
+
+            while (scanned < available && written < maxBytes) {
+                byte b = buffer.get(localOffset + scanned);
+                scanned++;
+                if (b == '\n') {
+                    endOfLine = true;
+                    break;
+                }
+                if (b != '\r') {
+                    target[written++] = b;
+                }
+            }
+
+            position += scanned;
+
+            if (endOfLine) {
+                break;
             }
         }
 
-        CharBuffer charBuffer = charset.decode(ByteBuffer.wrap(localLineBuffer, 0, len));
-        return matcher.test(charBuffer);
+        return written;
     }
 
     @Override
