@@ -17,6 +17,8 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
+import javafx.scene.image.WritableImage;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -99,7 +101,7 @@ class CanvasLogViewerInteractionTest {
     }
 
     @Test
-    void filteredShiftClickCopiesInGlobalLineOrder() {
+    void filteredShiftClickCopiesMappedLinesInViewOrder() {
         onFxThread(() -> {
             CanvasLogViewer viewer = shownViewer();
             viewer.setTailBuffer(tailLines(5));
@@ -112,7 +114,7 @@ class CanvasLogViewerInteractionTest {
                     rowY(1), MouseButton.PRIMARY, 1, true, true));
             viewer.copySelectedLines();
 
-            String expected = String.join(System.lineSeparator(), "tail-2", "tail-4");
+            String expected = String.join(System.lineSeparator(), "tail-4", "tail-2");
             assertEquals(expected, Clipboard.getSystemClipboard().getString());
         });
     }
@@ -129,13 +131,13 @@ class CanvasLogViewerInteractionTest {
             Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
                     rowY(1), MouseButton.PRIMARY, 1, false, true));
             Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
-                    rowY(4), MouseButton.PRIMARY, 1, false, true));
+                    10000, rowY(4), MouseButton.PRIMARY, 1, false, true));
             Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
-                    -50, MouseButton.PRIMARY, 1, false, true));
+                    10000, -50, MouseButton.PRIMARY, 1, false, true));
             Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
-                    10000, MouseButton.PRIMARY, 1, false, true));
+                    10000, 10000, MouseButton.PRIMARY, 1, false, true));
             Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
-                    10000, MouseButton.PRIMARY, 1, false, true));
+                    10000, 10000, MouseButton.PRIMARY, 1, false, true));
 
             Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_RELEASED,
                     rowY(4), MouseButton.SECONDARY, 1, false, false));
@@ -154,6 +156,150 @@ class CanvasLogViewerInteractionTest {
                 expected.append("tail-").append(i + 1);
             }
             assertEquals(expected.toString(), Clipboard.getSystemClipboard().getString());
+        });
+    }
+
+    @Test
+    void dragWithinLineSelectsCharactersAndCopiesSubstring() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setTailBuffer(tailLines(5));
+            viewer.getVScrollBar().setValue(0);
+            Canvas canvas = canvasOf(viewer);
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 2), rowY(1), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
+                    charX(viewer, 6), rowY(1), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_RELEASED,
+                    charX(viewer, 6), rowY(1), MouseButton.PRIMARY, 1, false, false));
+
+            assertTrue(viewer.hasSelection());
+            viewer.copySelectedLines();
+            assertEquals("il-2", Clipboard.getSystemClipboard().getString());
+
+            KeyEvent ctrlC = keyEvent(KeyCode.C, true);
+            viewer.handleKeyNavigation(ctrlC);
+            assertTrue(ctrlC.isConsumed());
+            assertEquals("il-2", Clipboard.getSystemClipboard().getString());
+        });
+    }
+
+    @Test
+    void dragAcrossLinesCopiesPartialFirstAndLastLine() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setTailBuffer(tailLines(5));
+            viewer.getVScrollBar().setValue(0);
+            Canvas canvas = canvasOf(viewer);
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 3), rowY(0), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
+                    charX(viewer, 2), rowY(2), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_RELEASED,
+                    charX(viewer, 2), rowY(2), MouseButton.PRIMARY, 1, false, false));
+
+            viewer.copySelectedLines();
+
+            String expected = String.join(System.lineSeparator(), "l-1", "tail-2", "ta");
+            assertEquals(expected, Clipboard.getSystemClipboard().getString());
+        });
+    }
+
+    @Test
+    void dragBackwardsNormalizesSelectionOrder() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setTailBuffer(tailLines(5));
+            viewer.getVScrollBar().setValue(0);
+            Canvas canvas = canvasOf(viewer);
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 4), rowY(2), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
+                    charX(viewer, 1), rowY(0), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_RELEASED,
+                    charX(viewer, 1), rowY(0), MouseButton.PRIMARY, 1, false, false));
+
+            viewer.copySelectedLines();
+
+            String expected = String.join(System.lineSeparator(), "ail-1", "tail-2", "tail");
+            assertEquals(expected, Clipboard.getSystemClipboard().getString());
+        });
+    }
+
+    @Test
+    void dragClampsCharacterIndexToLineLength() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setTailBuffer(tailLines(5));
+            viewer.getVScrollBar().setValue(0);
+            Canvas canvas = canvasOf(viewer);
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 2), rowY(0), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
+                    10000, rowY(1), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_RELEASED,
+                    10000, rowY(1), MouseButton.PRIMARY, 1, false, false));
+
+            viewer.copySelectedLines();
+
+            String expected = String.join(System.lineSeparator(), "il-1", "tail-2");
+            assertEquals(expected, Clipboard.getSystemClipboard().getString());
+        });
+    }
+
+    @Test
+    void contextMenuCopyKeepsCharacterSelection() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setTailBuffer(tailLines(5));
+            viewer.getVScrollBar().setValue(0);
+            Canvas canvas = canvasOf(viewer);
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 1), rowY(2), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
+                    charX(viewer, 4), rowY(2), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_RELEASED,
+                    charX(viewer, 4), rowY(2), MouseButton.PRIMARY, 1, false, false));
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 2), rowY(2), MouseButton.SECONDARY, 1, false, false));
+
+            ContextMenu menu = (ContextMenu) privateField(viewer, "currentContextMenu");
+            assertNotNull(menu);
+            menu.getItems().get(0).fire();
+
+            assertEquals("ail", Clipboard.getSystemClipboard().getString());
+        });
+    }
+
+    @Test
+    void contextMenuSelectsClickedLineWhenOutsideSelection() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setTailBuffer(tailLines(5));
+            viewer.getVScrollBar().setValue(0);
+            Canvas canvas = canvasOf(viewer);
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 1), rowY(0), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
+                    charX(viewer, 4), rowY(0), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_RELEASED,
+                    charX(viewer, 4), rowY(0), MouseButton.PRIMARY, 1, false, false));
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 1), rowY(3), MouseButton.SECONDARY, 1, false, false));
+
+            ContextMenu menu = (ContextMenu) privateField(viewer, "currentContextMenu");
+            assertNotNull(menu);
+            menu.getItems().get(0).fire();
+
+            assertEquals("tail-4", Clipboard.getSystemClipboard().getString());
         });
     }
 
@@ -414,6 +560,56 @@ class CanvasLogViewerInteractionTest {
         });
     }
 
+    @Test
+    void dragHighlightCoversOnlyTheSelectedCharacters() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setTailBuffer(tailLines(5));
+            viewer.getVScrollBar().setValue(0);
+            Canvas canvas = canvasOf(viewer);
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 2), rowY(1), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
+                    charX(viewer, 6), rowY(1), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_RELEASED,
+                    charX(viewer, 6), rowY(1), MouseButton.PRIMARY, 1, false, false));
+
+            int sampleY = 4 + 18 + 1;
+            WritableImage image = canvas.snapshot(null, null);
+            Color inside = image.getPixelReader().getColor((int) charX(viewer, 3), sampleY);
+            Color insideSecond = image.getPixelReader().getColor((int) charX(viewer, 5), sampleY);
+            Color beforeStart = image.getPixelReader().getColor((int) charX(viewer, 1), sampleY);
+            Color afterEnd = image.getPixelReader().getColor((int) charX(viewer, 8), sampleY);
+
+            assertEquals(inside, insideSecond);
+            assertTrue(inside.getBrightness() < beforeStart.getBrightness());
+            assertEquals(beforeStart, afterEnd);
+        });
+    }
+
+    @Test
+    void clickHighlightSpansTheWholeRow() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setTailBuffer(tailLines(5));
+            viewer.getVScrollBar().setValue(0);
+            Canvas canvas = canvasOf(viewer);
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 2), rowY(1), MouseButton.PRIMARY, 1, false, true));
+
+            int sampleY = 4 + 18 + 1;
+            WritableImage image = canvas.snapshot(null, null);
+            Color nearText = image.getPixelReader().getColor((int) charX(viewer, 1), sampleY);
+            Color farRight = image.getPixelReader().getColor((int) canvas.getWidth() - 20, sampleY);
+            Color otherRow = image.getPixelReader().getColor((int) charX(viewer, 1), 4 + 3 * 18 + 1);
+
+            assertEquals(nearText, farRight);
+            assertTrue(nearText.getBrightness() < otherRow.getBrightness());
+        });
+    }
+
     private CanvasLogViewer shownViewer() {
         CanvasLogViewer viewer = new CanvasLogViewer();
         stage.setScene(AppTheme.scene(viewer));
@@ -436,10 +632,19 @@ class CanvasLogViewerInteractionTest {
 
     private static MouseEvent mouseEvent(Canvas canvas, EventType<MouseEvent> type, double localY,
             MouseButton button, int clickCount, boolean shiftDown, boolean primaryDown) {
-        Point2D scenePoint = canvas.localToScene(0, localY);
+        return mouseEvent(canvas, type, 0, localY, button, clickCount, shiftDown, primaryDown);
+    }
+
+    private static MouseEvent mouseEvent(Canvas canvas, EventType<MouseEvent> type, double localX, double localY,
+            MouseButton button, int clickCount, boolean shiftDown, boolean primaryDown) {
+        Point2D scenePoint = canvas.localToScene(localX, localY);
         return new MouseEvent(type, scenePoint.getX(), scenePoint.getY(), scenePoint.getX(), scenePoint.getY(),
                 button, clickCount, shiftDown, false, false, false,
                 primaryDown, false, false, true, false, false, null);
+    }
+
+    private static double charX(CanvasLogViewer viewer, int charIndex) {
+        return privateInt(viewer, "leftMargin") + charIndex * privateDouble(viewer, "charWidth");
     }
 
     private static ScrollEvent scrollEvent(double deltaX, double deltaY, boolean shiftDown) {

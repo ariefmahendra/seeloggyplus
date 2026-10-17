@@ -33,7 +33,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.seeloggyplus.shared.model.LogEntry;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Collections;
 import javafx.scene.input.KeyEvent;
@@ -41,8 +40,6 @@ import com.seeloggyplus.shared.ui.SelectionColors;
 import com.seeloggyplus.shared.ui.AppTheme;
 import com.seeloggyplus.shared.ui.ThemePalette;
 import com.seeloggyplus.shared.util.IntArrayList;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.function.Consumer;
 import javafx.application.Platform;
 import javafx.event.EventHandler;
@@ -103,11 +100,16 @@ public class CanvasLogViewer extends GridPane {
     private Pattern searchPattern = null;
 
     private long selectedLine = -1;
-    private long selectionAnchor = -1;
+    private long selectionStartViewLine = -1;
+    private int selectionStartChar = 0;
+    private long selectionEndViewLine = -1;
+    private int selectionEndChar = 0;
+    private boolean selectionWholeLine = false;
     private boolean isDragging = false;
     private long dragStartViewLine = -1;
     private long dragEndViewLine = -1;
-    private final Set<Long> selectedLineIndexes = new HashSet<>();
+    private int dragStartChar = 0;
+    private int dragEndChar = 0;
 
     private ContextMenu currentContextMenu;
 
@@ -205,6 +207,126 @@ public class CanvasLogViewer extends GridPane {
         render();
     }
 
+    private void clearSelectionRange() {
+        selectionStartViewLine = -1;
+        selectionStartChar = 0;
+        selectionEndViewLine = -1;
+        selectionEndChar = 0;
+        selectionWholeLine = false;
+    }
+
+    private void clearSelectionState() {
+        selectedLine = -1;
+        clearSelectionRange();
+        isDragging = false;
+        dragStartViewLine = -1;
+        dragEndViewLine = -1;
+        dragStartChar = 0;
+        dragEndChar = 0;
+    }
+
+    private boolean hasSelectionRange() {
+        return selectionStartViewLine >= 0 && selectionEndViewLine >= 0;
+    }
+
+    private long toGlobalLine(long viewIndex) {
+        if (filteredIndexes != null && viewIndex >= 0 && viewIndex < filteredIndexes.size()) {
+            return filteredIndexes.get((int) viewIndex);
+        }
+        return viewIndex;
+    }
+
+    private int lineLengthAt(long viewIndex) {
+        String line = viewIndex < 0 ? null : getLineContent(toGlobalLine(viewIndex));
+        return line == null ? 0 : line.length();
+    }
+
+    private void selectWholeLine(long viewIndex) {
+        if (viewIndex < 0) {
+            clearSelectionRange();
+            return;
+        }
+        selectionStartViewLine = viewIndex;
+        selectionStartChar = 0;
+        selectionEndViewLine = viewIndex;
+        selectionEndChar = lineLengthAt(viewIndex);
+        selectionWholeLine = true;
+    }
+
+    private void selectWholeLineRange(long anchorLine, long caretLine) {
+        if (anchorLine < 0 || caretLine < 0) {
+            clearSelectionRange();
+            return;
+        }
+        selectionStartViewLine = Math.min(anchorLine, caretLine);
+        selectionStartChar = 0;
+        selectionEndViewLine = Math.max(anchorLine, caretLine);
+        selectionEndChar = lineLengthAt(selectionEndViewLine);
+        selectionWholeLine = true;
+    }
+
+    private void setCharSelection(long anchorLine, int anchorChar, long caretLine, int caretChar) {
+        boolean anchorFirst = anchorLine < caretLine || (anchorLine == caretLine && anchorChar <= caretChar);
+        if (anchorFirst) {
+            selectionStartViewLine = anchorLine;
+            selectionStartChar = anchorChar;
+            selectionEndViewLine = caretLine;
+            selectionEndChar = caretChar;
+        } else {
+            selectionStartViewLine = caretLine;
+            selectionStartChar = caretChar;
+            selectionEndViewLine = anchorLine;
+            selectionEndChar = anchorChar;
+        }
+        selectionWholeLine = false;
+    }
+
+    private boolean isViewLineSelected(long viewIndex) {
+        return hasSelectionRange() && viewIndex >= selectionStartViewLine && viewIndex <= selectionEndViewLine;
+    }
+
+    private int selectionStartCharAt(long viewIndex) {
+        return viewIndex == selectionStartViewLine ? selectionStartChar : 0;
+    }
+
+    private int selectionEndCharAt(long viewIndex, int lineLength) {
+        return viewIndex == selectionEndViewLine ? Math.min(selectionEndChar, lineLength) : lineLength;
+    }
+
+    private int charIndexAt(double localX, long viewIndex) {
+        int length = lineLengthAt(viewIndex);
+        double textX = localX - leftMargin + currentScrollX;
+        int index = (int) Math.round(textX / charWidth);
+        return Math.max(0, Math.min(index, length));
+    }
+
+    private String buildSelectedText() {
+        if (!hasSelectionRange()) {
+            if (selectedLine < 0) {
+                return null;
+            }
+            String line = getLineContent(toGlobalLine(selectedLine));
+            return line == null ? null : line;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (long view = selectionStartViewLine; view <= selectionEndViewLine; view++) {
+            String line = getLineContent(toGlobalLine(view));
+            if (line == null) {
+                line = "";
+            }
+            int from = Math.min(selectionStartCharAt(view), line.length());
+            int to = Math.max(from, selectionEndCharAt(view, line.length()));
+            if (to > from) {
+                sb.append(line, from, to);
+            }
+            if (view < selectionEndViewLine) {
+                sb.append(System.lineSeparator());
+            }
+        }
+        return sb.toString();
+    }
+
     public void resetView() {
         this.reader = null;
         this.index = null;
@@ -215,9 +337,7 @@ public class CanvasLogViewer extends GridPane {
         this.smoothScrollY = 0;
         this.targetScrollY = 0;
         this.scrollOffsetY = 0;
-        this.selectedLine = -1;
-        this.selectionAnchor = -1;
-        this.selectedLineIndexes.clear();
+        clearSelectionState();
         this.filteredIndexes = null;
         this.filteredCount = 0;
         this.lineCacheStartLine = -1;
@@ -246,9 +366,7 @@ public class CanvasLogViewer extends GridPane {
         this.smoothScrollY = 0;
         this.targetScrollY = 0;
         this.scrollOffsetY = 0;
-        this.selectedLine = -1;
-        this.selectionAnchor = -1;
-        this.selectedLineIndexes.clear();
+        clearSelectionState();
         this.lineCacheStartLine = -1;
 
         int maxDigits = String.valueOf(totalLines).length();
@@ -277,8 +395,7 @@ public class CanvasLogViewer extends GridPane {
         this.smoothScrollY = 0;
         this.targetScrollY = 0;
         this.scrollOffsetY = 0;
-        this.selectedLine = -1;
-        this.selectedLineIndexes.clear();
+        clearSelectionState();
         this.lineCacheStartLine = -1;
 
         updateScrollBar();
@@ -375,9 +492,7 @@ public class CanvasLogViewer extends GridPane {
         targetScrollY = currentTopLine;
         scrollOffsetY = 0;
 
-        this.selectedLine = -1;
-        this.selectionAnchor = -1;
-        this.selectedLineIndexes.clear();
+        clearSelectionState();
 
         updateScrollBar();
         suppressScrollBarSync = true;
@@ -438,20 +553,16 @@ public class CanvasLogViewer extends GridPane {
         }
 
         long targetViewIndex = line;
-        long targetGlobalLine = line;
 
         if (filteredIndexes != null) {
             if (line >= 0 && line < filteredCount) {
                 targetViewIndex = line;
-                targetGlobalLine = filteredIndexes.get((int) line);
             } else {
                 int foundIdx = filteredIndexes.indexOf((int) line);
                 if (foundIdx >= 0) {
                     targetViewIndex = foundIdx;
-                    targetGlobalLine = line;
                 } else {
                     targetViewIndex = 0;
-                    targetGlobalLine = filteredIndexes.isEmpty() ? 0 : filteredIndexes.get(0);
                 }
             }
         }
@@ -459,8 +570,7 @@ public class CanvasLogViewer extends GridPane {
         long maxTop = Math.max(0, effectiveLines - visibleLineCount);
         currentTopLine = Math.max(0, Math.min(targetViewIndex, maxTop));
         selectedLine = targetViewIndex;
-        selectedLineIndexes.clear();
-        selectedLineIndexes.add(targetGlobalLine);
+        selectWholeLine(targetViewIndex);
         smoothScrollY = currentTopLine;
         targetScrollY = currentTopLine;
         scrollOffsetY = 0;
@@ -635,7 +745,7 @@ public class CanvasLogViewer extends GridPane {
             String line = lineCache[i];
             if (line == null) line = "";
             int level = lineLevelCache[i];
-            renderLineContent(line, level, leftMargin, y, actualLineIndex);
+            renderLineContent(line, level, leftMargin, y, viewIndex);
         }
         gc.restore();
 
@@ -669,7 +779,7 @@ public class CanvasLogViewer extends GridPane {
         }
     }
 
-    private void renderLineContent(String line, int levelCode, double x, double y, long globalIndex) {
+    private void renderLineContent(String line, int levelCode, double x, double y, long viewIndex) {
         double drawX = x - currentScrollX;
         double canvasWidth = canvas.getWidth();
 
@@ -681,7 +791,7 @@ public class CanvasLogViewer extends GridPane {
         int visStart = Math.max(0, (int) ((leftMargin - drawX) / charWidth));
         int visEnd = Math.min(line.length(), (int) ((canvasWidth - drawX) / charWidth) + 1);
 
-        boolean isSelected = selectedLineIndexes.contains(globalIndex);
+        boolean isSelected = isViewLineSelected(viewIndex);
 
         Color tint = levelTintColor(levelCode);
         if (tint != null) {
@@ -690,8 +800,15 @@ public class CanvasLogViewer extends GridPane {
         }
 
         if (isSelected) {
-            gc.setFill(selectionColor);
-            gc.fillRect(drawX, y, canvasWidth - leftMargin + currentScrollX, LINE_HEIGHT);
+            int selStart = Math.max(0, Math.min(selectionStartCharAt(viewIndex), line.length()));
+            int selEnd = Math.max(selStart, selectionEndCharAt(viewIndex, line.length()));
+            boolean toRowEnd = selectionWholeLine || viewIndex < selectionEndViewLine;
+            double selX = drawX + selStart * charWidth;
+            double selW = toRowEnd ? (canvasWidth - selX) : (selEnd - selStart) * charWidth;
+            if (selW > 0) {
+                gc.setFill(selectionColor);
+                gc.fillRect(selX, y, selW, LINE_HEIGHT);
+            }
         }
 
         if (searchPattern != null) {
@@ -806,9 +923,8 @@ public class CanvasLogViewer extends GridPane {
             }
 
             if (e.getButton() == MouseButton.SECONDARY) {
-                if (!selectedLineIndexes.contains(globalIndex)) {
-                    selectedLineIndexes.clear();
-                    selectedLineIndexes.add(globalIndex);
+                if (!isViewLineSelected(listIndex)) {
+                    selectWholeLine(listIndex);
                     render();
                 }
 
@@ -825,37 +941,27 @@ public class CanvasLogViewer extends GridPane {
 
             if (e.getButton() == MouseButton.PRIMARY) {
                 long effective = (filteredIndexes != null) ? filteredCount : totalLines;
+                boolean inRange = listIndex >= 0 && listIndex < effective;
+                int clickChar = charIndexAt(e.getX(), listIndex);
 
-                if (e.isShiftDown() && selectionAnchor >= 0) {
-                    long rangeStart = Math.min(selectionAnchor, listIndex);
-                    long rangeEnd = Math.max(selectionAnchor, listIndex);
-                    selectedLineIndexes.clear();
-
-                    for (long idx = rangeStart; idx <= rangeEnd && idx < effective; idx++) {
-                        long mappedIdx;
-                        if (filteredIndexes != null) {
-                            mappedIdx = filteredIndexes.get((int) idx);
-                        } else {
-                            mappedIdx = idx;
-                        }
-                        selectedLineIndexes.add(mappedIdx);
-                    }
-
-                    selectedLine = listIndex;
+                if (e.isShiftDown() && selectedLine >= 0) {
+                    long caretLine = inRange ? listIndex : Math.max(0, effective - 1);
+                    selectWholeLineRange(selectedLine, caretLine);
+                    selectedLine = caretLine;
                     render();
-
                     handleMouseClick(e);
                 } else {
                     isDragging = true;
                     dragStartViewLine = viewLine;
                     dragEndViewLine = viewLine;
-                    selectionAnchor = listIndex;
-                    selectedLineIndexes.clear();
-
-                    if (listIndex < effective) {
-                        selectedLineIndexes.add(globalIndex);
+                    dragStartChar = clickChar;
+                    dragEndChar = clickChar;
+                    if (inRange) {
+                        selectedLine = listIndex;
+                        selectWholeLine(listIndex);
+                    } else {
+                        clearSelectionRange();
                     }
-
                     handleMouseClick(e);
                     render();
                 }
@@ -867,30 +973,18 @@ public class CanvasLogViewer extends GridPane {
                 return;
 
             long viewLine = (long) ((e.getY() - PADDING + scrollOffsetY) / LINE_HEIGHT);
-
             viewLine = Math.max(0, Math.min(viewLine, visibleLineCount));
 
-            if (viewLine != dragEndViewLine) {
+            long effective = (filteredIndexes != null) ? filteredCount : totalLines;
+            long lastIndex = Math.max(0, effective - 1);
+            long anchorLine = Math.min(currentTopLine + dragStartViewLine, lastIndex);
+            long caretLine = Math.min(currentTopLine + viewLine, lastIndex);
+            int caretChar = charIndexAt(e.getX(), caretLine);
+
+            if (viewLine != dragEndViewLine || caretChar != dragEndChar) {
                 dragEndViewLine = viewLine;
-                selectedLineIndexes.clear();
-
-                long start = Math.min(dragStartViewLine, dragEndViewLine);
-                long end = Math.max(dragStartViewLine, dragEndViewLine);
-                long effective = (filteredIndexes != null) ? filteredCount : totalLines;
-
-                for (long i = start; i <= end; i++) {
-                    long listIdx = currentTopLine + i;
-                    if (listIdx >= effective)
-                        break;
-
-                    long mappedIdx;
-                    if (filteredIndexes != null) {
-                        mappedIdx = filteredIndexes.get((int) listIdx);
-                    } else {
-                        mappedIdx = listIdx;
-                    }
-                    selectedLineIndexes.add(mappedIdx);
-                }
+                dragEndChar = caretChar;
+                setCharSelection(anchorLine, dragStartChar, caretLine, caretChar);
                 render();
             }
         });
@@ -983,10 +1077,7 @@ public class CanvasLogViewer extends GridPane {
             }
 
             selectedLine = newSel;
-            selectionAnchor = newSel;
-            selectedLineIndexes.clear();
-            long globalIdx = (filteredIndexes != null) ? filteredIndexes.get((int) newSel) : newSel;
-            selectedLineIndexes.add(globalIdx);
+            selectWholeLine(newSel);
 
             if (newSel < currentTopLine) {
                 currentTopLine = newSel;
@@ -1002,9 +1093,9 @@ public class CanvasLogViewer extends GridPane {
             render();
             fireStatusUpdate(effectiveLines);
 
-            String content = getLineContent(globalIdx);
+            String content = getLineContent(toGlobalLine(newSel));
             if (onLineClick != null) {
-                onLineClick.handle(globalIdx, content);
+                onLineClick.handle(toGlobalLine(newSel), content);
             }
 
             e.consume();
@@ -1053,7 +1144,7 @@ public class CanvasLogViewer extends GridPane {
     }
 
     public boolean hasSelection() {
-        return !selectedLineIndexes.isEmpty() || selectedLine >= 0;
+        return hasSelectionRange() || selectedLine >= 0;
     }
 
     public void copySelectedLines() {
@@ -1062,37 +1153,15 @@ public class CanvasLogViewer extends GridPane {
             return;
         }
 
-        if (selectedLineIndexes.isEmpty()) {
-            if (selectedLine >= 0) {
-                long idx = (filteredIndexes != null && selectedLine < filteredIndexes.size())
-                        ? filteredIndexes.get((int) selectedLine) : selectedLine;
-                selectedLineIndexes.add(idx);
-            } else {
-                return;
-            }
+        String selected = buildSelectedText();
+        if (selected == null || selected.isEmpty()) {
+            return;
         }
 
-        StringBuilder sb = new StringBuilder();
-        List<Long> sortedIndices = new ArrayList<>(selectedLineIndexes);
-        Collections.sort(sortedIndices);
-
-        for (int i = 0; i < sortedIndices.size(); i++) {
-            long globalIndex = sortedIndices.get(i);
-            String line = getLineContent(globalIndex);
-            if (line != null) {
-                sb.append(line);
-                if (i < sortedIndices.size() - 1) {
-                    sb.append(System.lineSeparator());
-                }
-            }
-        }
-
-        if (sb.length() > 0) {
-            ClipboardContent content = new ClipboardContent();
-            content.putString(sb.toString());
-            Clipboard.getSystemClipboard().setContent(content);
-            logger.info("Copied {} lines to clipboard", sortedIndices.size());
-        }
+        ClipboardContent content = new ClipboardContent();
+        content.putString(selected);
+        Clipboard.getSystemClipboard().setContent(content);
+        logger.info("Copied {} characters to clipboard", selected.length());
     }
 
     private void setupScrollBarListener() {
@@ -1322,17 +1391,14 @@ public class CanvasLogViewer extends GridPane {
         }
 
         long targetViewIndex = line;
-        long targetGlobalLine = line;
 
         if (filteredIndexes != null) {
             if (line >= 0 && line < filteredCount) {
                 targetViewIndex = line;
-                targetGlobalLine = filteredIndexes.get((int) line);
             } else {
                 int foundIdx = filteredIndexes.indexOf((int) line);
                 if (foundIdx >= 0) {
                     targetViewIndex = foundIdx;
-                    targetGlobalLine = line;
                 } else {
                     return;
                 }
@@ -1341,8 +1407,7 @@ public class CanvasLogViewer extends GridPane {
 
         if (targetViewIndex >= 0 && targetViewIndex < effectiveLines) {
             selectedLine = targetViewIndex;
-            selectedLineIndexes.clear();
-            selectedLineIndexes.add(targetGlobalLine);
+            selectWholeLine(targetViewIndex);
             render();
         }
     }
