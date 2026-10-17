@@ -61,6 +61,34 @@ public class MainViewFxmlLoadTest {
     }
 
     @Test
+    public void testRecentPanelRootAndControllerAreBothInjected() throws Exception {
+        Field panelField = MainController.class.getDeclaredField("recentPanel");
+        panelField.setAccessible(true);
+        Field controllerField = MainController.class.getDeclaredField("recentPanelController");
+        controllerField.setAccessible(true);
+        var recentController = (com.seeloggyplus.features.recent.presentation.RecentFilesPanelController) controllerField.get(controller);
+        assertSame(recentController.getRoot(), panelField.get(controller));
+    }
+
+    @Test
+    public void testFxmlDeclaresStylesheetsAndPreservesThemeSwitching() throws Exception {
+        WaitForAsyncUtils.asyncFx(() -> {
+            assertTrue(root.getStylesheets().stream().anyMatch(url -> url.endsWith("/style/theme.css")));
+            assertTrue(root.getStylesheets().stream().anyMatch(url -> url.endsWith("/style/components.css")));
+            Stage stage = new Stage();
+            try {
+                stage.setScene(AppTheme.scene(root)); stage.show();
+                for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                    AppTheme.setTheme(theme); root.applyCss(); root.layout();
+                    var label = (javafx.scene.control.Label) root.lookup("#statusLabel");
+                    Color expected = theme == AppTheme.Theme.LIGHT ? Color.web("#1f2329") : Color.web("#d7dbe0");
+                    assertEquals(expected, label.getTextFill(), theme.name());
+                }
+            } finally { stage.close(); AppTheme.setTheme(AppTheme.Theme.GRAPHITE); }
+        }).get();
+    }
+
+    @Test
     public void testMainControllerKeepsInjectedLogServicesDuringFxmlInitialization() throws Exception {
         LogServices services = LogServices.createDefault();
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));

@@ -3,23 +3,27 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import java.net.URL?>
 
-<BorderPane fx:id="rootPane"
+<BorderPane
             xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.features.update.presentation.UpdateDialogController"
             styleClass="update-dialog"
             prefWidth="600" prefHeight="440">
 
+    <stylesheets>
+        <URL value="@../style/components.css" />
+    </stylesheets>
     <top>
         <VBox styleClass="update-dialog-header">
             <Label fx:id="titleLabel" text="Update Available" styleClass="update-dialog-title"/>
-            <Label fx:id="versionLabel" text="" styleClass="update-dialog-version"/>
+            <Label fx:id="versionLabel" styleClass="update-dialog-version"/>
         </VBox>
     </top>
 
     <center>
         <VBox spacing="12" styleClass="update-dialog-body">
-            <HBox spacing="8" alignment="CENTER_LEFT" styleClass="update-dialog-meta">
+            <HBox spacing="8" alignment="CENTER_LEFT">
                 <Label text="Package:" styleClass="update-dialog-field"/>
                 <Label fx:id="assetLabel" text="-" styleClass="update-dialog-value"/>
                 <Region HBox.hgrow="ALWAYS"/>

@@ -141,6 +141,8 @@ public class MainController {
 
     private VBox leftPanel;
     @FXML
+    private VBox recentPanel;
+    @FXML
     private RecentFilesPanelController recentPanelController;
 
     @FXML
@@ -429,7 +431,7 @@ public class MainController {
     }
 
     private void setupRecentPanel() {
-        leftPanel = recentPanelController.getRoot();
+        leftPanel = recentPanel;
         recentPanelController.setOnCloseRequest(this::toggleLeftPanel);
         recentPanelController.start(recentFileService, logFileService, tabSessionManager,
                 new RecentFilesPanelController.Host() {

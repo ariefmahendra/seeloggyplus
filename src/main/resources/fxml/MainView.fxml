@@ -6,7 +6,12 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 <?import javafx.scene.shape.Rectangle?>
+<?import java.net.URL?>
 <BorderPane minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.app.MainController">
+    <stylesheets>
+        <URL value="@../style/theme.css" />
+        <URL value="@../style/components.css" />
+    </stylesheets>
     <top>
         <VBox>
             <MenuBar fx:id="menuBar" styleClass="app-menubar">
@@ -39,7 +44,7 @@
                 <Menu text="_Help">
                     <MenuItem fx:id="helpContentsMenuItem" text="Help Contents" accelerator="F1" />
                     <SeparatorMenuItem />
-                <MenuItem fx:id="checkUpdatesMenuItem" text="Check for Updates..." onAction="#handleCheckForUpdates" />
+                <MenuItem text="Check for Updates..." onAction="#handleCheckForUpdates" />
                 <CheckMenuItem fx:id="autoCheckUpdatesMenuItem" text="Check for Updates Automatically" />
                 <CheckMenuItem fx:id="autoDownloadUpdatesMenuItem" text="Download Updates Automatically" />
                 <SeparatorMenuItem />
@@ -134,7 +139,7 @@
 
                 <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
 
-                    <VBox spacing="0">
+                    <VBox>
                         <StackPane fx:id="logContainer" VBox.vgrow="ALWAYS">
 
                             <VBox fx:id="emptyStatePane" alignment="CENTER" spacing="12" styleClass="empty-state-pane">

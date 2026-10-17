@@ -93,6 +93,9 @@ public class UnifiedFileManagerDialogController {
     private Button goButton;
     @FXML
     private TextField pathField;
+    private FilePathBreadcrumb pathBreadcrumb;
+    @FXML
+    private javafx.scene.layout.HBox pathToolbar;
     @FXML
     private TextField searchField;
     @FXML
@@ -261,6 +264,11 @@ public class UnifiedFileManagerDialogController {
         applyDoubleClickPreference();
         setupFileTable();
         setupEventHandlers();
+        int pathIndex = pathToolbar.getChildren().indexOf(pathField);
+        pathToolbar.getChildren().remove(pathField);
+        pathBreadcrumb = new FilePathBreadcrumb(pathField, this::navigateTo, this::loadBreadcrumbFolders);
+        pathToolbar.getChildren().add(pathIndex, pathBreadcrumb);
+        javafx.scene.layout.HBox.setHgrow(pathBreadcrumb, Priority.ALWAYS);
 
         Platform.runLater(() -> {
             if (pathField != null && pathField.getScene() != null) {
@@ -273,11 +281,31 @@ public class UnifiedFileManagerDialogController {
                 pathField.getScene().getAccelerators().put(
                         new KeyCodeCombination(KeyCode.L, KeyCombination.CONTROL_DOWN),
                         () -> {
-                            pathField.requestFocus();
+                            pathBreadcrumb.edit();
                             pathField.selectAll();
                         });
             }
         });
+    }
+
+    private java.util.concurrent.CompletableFuture<List<FilePathBreadcrumb.Folder>> loadBreadcrumbFolders(String path) {
+        LocationItem location = currentLocation;
+        SSHService ssh = activeSshService;
+        return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            try {
+                if (location == null || location.getServer() == null) {
+                    return localFileService.listFiles(path).stream()
+                            .filter(file -> file.isDirectory() && !file.getName().equals("..") && !file.getName().equals("."))
+                            .map(file -> new FilePathBreadcrumb.Folder(file.getName(), file.getPath())).toList();
+                }
+                if (ssh == null || !ssh.isConnected()) throw new IOException("Not connected");
+                return ssh.listFiles(path).stream()
+                        .filter(file -> file.isDirectory() && !file.getName().equals("..") && !file.getName().equals("."))
+                        .map(file -> new FilePathBreadcrumb.Folder(file.getName(), file.getPath())).toList();
+            } catch (Exception error) {
+                throw new java.util.concurrent.CompletionException(error);
+            }
+        }, fileIoExecutor);
     }
 
     private void applyDoubleClickPreference() {
@@ -1061,14 +1089,17 @@ public class UnifiedFileManagerDialogController {
         });
 
         SortedList<FileInfo> sortedData = new SortedList<>(filteredFiles);
+        fileTable.setSortPolicy(table -> true);
 
         Comparator<FileInfo> defaultSort = Comparator
             .<FileInfo>comparingInt(f -> f.getName().equals("..") ? 0 : (f.isDirectory() ? 1 : 2))
             .thenComparing((f1, f2) -> Long.compare(f2.getModifiedTime(), f1.getModifiedTime()))
             .thenComparing(FileInfo::getName, String.CASE_INSENSITIVE_ORDER);
-        sortedData.comparatorProperty().bind(
-            fileTable.comparatorProperty().map(c -> c != null ? c : defaultSort)
-        );
+        sortedData.comparatorProperty().bind(javafx.beans.binding.Bindings.createObjectBinding(() -> {
+            Comparator<FileInfo> selectedSort = fileTable.getComparator();
+            return Comparator.<FileInfo>comparingInt(file -> file.isDirectory() && "..".equals(file.getName()) ? 0 : 1)
+                    .thenComparing(selectedSort != null ? selectedSort : defaultSort);
+        }, fileTable.comparatorProperty()));
         fileTable.setItems(sortedData);
 
         fileTable.setOnMouseClicked(event -> {
@@ -1136,7 +1167,7 @@ public class UnifiedFileManagerDialogController {
         refreshButton.setOnAction(e -> refreshCurrentPath());
         goButton.setOnAction(e -> navigateTo(pathField.getText()));
 
-        pathField.setOnAction(e -> navigateTo(pathField.getText()));
+        pathField.setOnAction(e -> { navigateTo(pathField.getText()); pathBreadcrumb.finishEditing(); });
 
         searchField.textProperty().addListener((obs, oldVal, newVal) -> {
             String query = (newVal == null) ? "" : newVal.trim().toLowerCase();

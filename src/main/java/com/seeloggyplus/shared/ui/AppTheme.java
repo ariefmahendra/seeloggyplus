@@ -129,6 +129,15 @@ public final class AppTheme {
         if (root == null) {
             return;
         }
+        String baseStylesheet = toUrl(THEME_LIGHT_BASE);
+        if (root.getStylesheets().contains(baseStylesheet)) {
+            root.getStylesheets().removeIf(url -> url.equals(toUrl(Theme.LIGHT.stylesheet()))
+                    || url.equals(toUrl(Theme.DARK.stylesheet())));
+            if (active.stylesheet() != null) {
+                String override = toUrl(active.stylesheet());
+                if (override != null) root.getStylesheets().add(override);
+            }
+        }
         for (Theme candidate : Theme.values()) {
             String styleClass = candidate.styleClass();
             if (styleClass == null) {

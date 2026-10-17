@@ -111,6 +111,98 @@ class UnifiedFileManagerDialogControllerInteractionTest {
     }
 
     @Test
+    void toolbarButtonsRemainReadableWhenHoveredAndFocusedAcrossThemes() throws Exception {
+        onFx(() -> {
+            var root = stage.getScene().getRoot();
+            var toolbar = (javafx.scene.layout.HBox) root.lookup("#pathToolbar");
+            try {
+                for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                    AppTheme.setTheme(theme); root.applyCss(); root.layout();
+                    for (String id : List.of("backButton", "forwardButton", "upButton", "homeButton", "refreshButton", "goButton", "findInFilesButton")) {
+                        var button = (javafx.scene.control.Button) root.lookup("#" + id);
+                        button.setDisable(false);
+                        double height = button.getHeight(), width = button.getWidth();
+                        for (String state : List.of("hover", "pressed")) {
+                            button.pseudoClassStateChanged(PseudoClass.getPseudoClass(state), true);
+                            button.pseudoClassStateChanged(PseudoClass.getPseudoClass("focused"), true);
+                            root.applyCss(); root.layout();
+                            var bg = (javafx.scene.paint.Color) button.getBackground().getFills().getFirst().getFill();
+                            if (bg.getOpacity() == 0) bg = (javafx.scene.paint.Color) toolbar.getBackground().getFills().getFirst().getFill();
+                            assertTrue(colourContrast((javafx.scene.paint.Color) button.getTextFill(), bg) >= 4.5, theme + id + state);
+                            if (button.getGraphic() instanceof de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView icon) {
+                                assertTrue(colourContrast((javafx.scene.paint.Color) icon.getFill(), bg) >= 3.0, theme + id + state + " icon");
+                            }
+                            assertTrue(button.getHeight() >= 24);
+                            assertEquals(height, button.getHeight(), 0.01);
+                            assertEquals(width, button.getWidth(), 0.01);
+                            button.pseudoClassStateChanged(PseudoClass.getPseudoClass(state), false);
+                            button.pseudoClassStateChanged(PseudoClass.getPseudoClass("focused"), false);
+                        }
+                    }
+                }
+            } finally { AppTheme.setTheme(AppTheme.Theme.GRAPHITE); }
+        });
+    }
+
+    private static double colourContrast(javafx.scene.paint.Color a, javafx.scene.paint.Color b) {
+        double x = colourLuminance(a), y = colourLuminance(b);
+        return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+    }
+
+    private static double colourLuminance(javafx.scene.paint.Color c) {
+        return 0.2126 * colourLinear(c.getRed()) + 0.7152 * colourLinear(c.getGreen()) + 0.0722 * colourLinear(c.getBlue());
+    }
+
+    private static double colourLinear(double v) {
+        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    }
+
+    @Test
+    void parentDirectoryStaysFirstForEverySortDirectionAndWithoutSorting() throws Exception {
+        onFx(() -> {
+            TableView<FileInfo> table = getField(controller, "fileTable");
+            ObservableList<FileInfo> files = getField(controller, "allFiles");
+            FileInfo parent = directory("..", HOME);
+            parent.setModifiedTime(1000);
+            parent.setPermissions("zzzz"); parent.setOwner("zzzz");
+            FileInfo alpha = new FileInfo("alpha.log", HOME + "alpha.log", 1, false, 2000, FileInfo.SourceType.LOCAL);
+            alpha.setPermissions("aaaa"); alpha.setOwner("aaaa");
+            FileInfo zeta = new FileInfo("zeta.log", HOME + "zeta.log", 9999, false, 3000, FileInfo.SourceType.LOCAL);
+            zeta.setPermissions("mmmm"); zeta.setOwner("mmmm");
+            table.getSortOrder().clear();
+            files.setAll(zeta, alpha, parent);
+            assertSame(parent, table.getItems().getFirst());
+            for (TableColumn<FileInfo, ?> column : table.getColumns()) {
+                if (!column.isSortable()) continue;
+                for (TableColumn.SortType direction : TableColumn.SortType.values()) {
+                    column.setSortType(direction);
+                    table.getSortOrder().setAll(column);
+                    table.sort();
+                    assertSame(parent, table.getItems().getFirst(), column.getId() + direction);
+                    assertTrue(table.getComparator().compare(table.getItems().get(1), table.getItems().get(2)) <= 0,
+                            "other entries must follow the selected sorting");
+                }
+            }
+            table.getSortOrder().clear(); table.sort();
+            assertSame(parent, table.getItems().getFirst());
+        });
+    }
+
+    @Test
+    void breadcrumbWidthFollowsFileManagerWidth() throws Exception {
+        onFx(() -> {
+            javafx.scene.layout.Region root = (javafx.scene.layout.Region) stage.getScene().getRoot();
+            root.resize(1000, 600); root.requestLayout(); root.layout();
+            javafx.scene.layout.Region breadcrumb = (javafx.scene.layout.Region) root.lookup(".file-path-breadcrumb");
+            double narrow = breadcrumb.getWidth();
+            root.resize(1500, 600); root.requestLayout(); root.layout();
+            assertEquals(500, breadcrumb.getWidth() - narrow, 2);
+            root.resize(1000, 600); root.requestLayout(); root.layout();
+            assertEquals(narrow, breadcrumb.getWidth(), 2);
+        });
+    }
+
+    @Test
     void controlLAcceleratorSelectsPathFieldText() throws Exception {
         TextField pathField = getField(controller, "pathField");
         WaitForAsyncUtils.asyncFx(() -> pathField.setText(HOME + "accel")).get();

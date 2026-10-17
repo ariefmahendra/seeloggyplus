@@ -787,3 +787,16 @@ FontAwesomeIconView.file-icon-file {
 .app-toolbar .check-box {
     -fx-text-fill: -sl-chrome-text;
 }
+
+.unified-file-manager-dialog .app-toolbar > .button:hover,
+.unified-file-manager-dialog .app-toolbar > .button:pressed {
+    -fx-background-color: -sl-chrome-hover;
+    -fx-text-fill: -sl-chrome-text;
+    -fx-background-insets: 0;
+}
+.unified-file-manager-dialog .app-toolbar > .button:hover .glyph-icon,
+.unified-file-manager-dialog .app-toolbar > .button:pressed .glyph-icon,
+.unified-file-manager-dialog .app-toolbar > .button:hover FontAwesomeIconView,
+.unified-file-manager-dialog .app-toolbar > .button:pressed FontAwesomeIconView {
+    -fx-fill: -sl-chrome-text;
+}
