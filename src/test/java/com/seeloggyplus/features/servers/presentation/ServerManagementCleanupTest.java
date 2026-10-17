@@ -40,10 +40,8 @@ class ServerManagementCleanupTest {
     }
 
     @Test
-    @DisplayName("Server Management no longer offers favorite or grouping controls")
-    void favoriteAndGroupControlsAreGone() {
-        assertNull(root.lookup("#groupTree"), "the group tree must be removed from Server Management");
-        assertNull(root.lookup("#groupButton"), "Move to group must be removed from Server Management");
+    @DisplayName("Server Management keeps favorite controls removed")
+    void favoriteControlsRemainRemoved() {
         assertNull(root.lookup("#favoriteButton"), "favorite toggle must be removed from Server Management");
         assertNull(root.lookup("#favoritesOnly"), "Favorites only filter must be removed from Server Management");
     }

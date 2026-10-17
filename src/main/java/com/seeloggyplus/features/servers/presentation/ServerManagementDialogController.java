@@ -25,6 +25,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Locale;
 import java.util.Objects;
@@ -37,6 +40,12 @@ public class ServerManagementDialogController {
 
     @FXML
     private TableView<SSHServerModel> serverTable;
+    @FXML private TreeView<GroupNode> groupTree;
+    @FXML private Button newGroupButton;
+    @FXML private Button renameGroupButton;
+    @FXML private Button deleteGroupButton;
+    @FXML private Button moveToGroupButton;
+    @FXML private TableColumn<SSHServerModel, String> groupColumn;
     @FXML
     private TableColumn<SSHServerModel, String> nameColumn;
     @FXML
@@ -87,6 +96,19 @@ public class ServerManagementDialogController {
     private ObservableList<SSHServerModel> allServers;
     private ObservableList<SSHServerModel> filteredServers;
     private SSHServerModel selectedForConnection;
+    private List<String> groupNames = List.of();
+    private String selectedGroupPath;
+    private boolean rebuildingGroups;
+    private boolean groupMutationRunning;
+    private int loadGeneration;
+
+    private record ServerSnapshot(List<SSHServerModel> servers, List<String> groups) { }
+
+    private record GroupNode(String path) {
+        @Override public String toString() {
+            return path == null ? "All servers" : path.isEmpty() ? "Ungrouped" : path;
+        }
+    }
     private DialogPresenter dialogPresenter = defaultDialogPresenter();
 
     @FXML
@@ -97,15 +119,219 @@ public class ServerManagementDialogController {
         allServers = FXCollections.observableArrayList();
         filteredServers = FXCollections.observableArrayList();
 
+        setupGroups();
         setupTableColumns();
         setupEventHandlers();
         loadServers();
         updateButtonStates();
     }
 
+    private void setupGroups() {
+        groupTree.setCellFactory(tree -> new TreeCell<>() {
+            private final FontAwesomeIconView icon = new FontAwesomeIconView(FontAwesomeIcon.FOLDER);
+            { icon.setSize("14"); icon.getStyleClass().add("file-icon-folder"); }
+            @Override protected void updateItem(GroupNode item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null); setGraphic(null); setTooltip(null);
+                } else {
+                    String path = item.path();
+                    setText(path == null || path.isEmpty() ? item.toString() : leafName(path));
+                    setGraphic(icon);
+                    setTooltip(new Tooltip(item.toString()));
+                }
+            }
+        });
+        groupTree.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) -> {
+            if (rebuildingGroups) return;
+            selectedGroupPath = selected == null ? null : selected.getValue().path();
+            filterServers(searchField.getText());
+            updateButtonStates();
+        });
+        newGroupButton.setDisable(true);
+        newGroupButton.setOnAction(event -> promptNewGroup());
+        renameGroupButton.setOnAction(event -> promptRenameGroup());
+        deleteGroupButton.setOnAction(event -> promptDeleteGroup());
+        moveToGroupButton.setOnAction(event -> promptMoveToGroup());
+        MenuItem create = new MenuItem("New group...");
+        MenuItem rename = new MenuItem("Rename group...");
+        MenuItem delete = new MenuItem("Delete group");
+        create.setOnAction(event -> promptNewGroup());
+        rename.setOnAction(event -> promptRenameGroup());
+        delete.setOnAction(event -> promptDeleteGroup());
+        ContextMenu menu = new ContextMenu(create, rename, delete);
+        menu.setOnShowing(event -> {
+            create.setDisable(newGroupButton.isDisabled());
+            rename.setDisable(renameGroupButton.isDisabled());
+            delete.setDisable(deleteGroupButton.isDisabled());
+        });
+        groupTree.setContextMenu(menu);
+    }
+
+    private void rebuildGroups() {
+        Map<String, Boolean> expansion = new LinkedHashMap<>();
+        rememberExpansion(groupTree.getRoot(), expansion);
+        TreeItem<GroupNode> root = new TreeItem<>(new GroupNode(null));
+        root.setExpanded(true);
+        Map<String, TreeItem<GroupNode>> folders = new LinkedHashMap<>();
+        TreeItem<GroupNode> ungrouped = new TreeItem<>(new GroupNode(""));
+        root.getChildren().add(ungrouped);
+        for (String path : groupNames) ensureGroup(root, folders, path, expansion);
+        for (SSHServerModel server : allServers) {
+            if (server.getGroupName() != null && !server.getGroupName().isBlank()) {
+                ensureGroup(root, folders, server.getGroupName(), expansion);
+            }
+        }
+        TreeItem<GroupNode> selected = selectedGroupPath == null ? root
+                : selectedGroupPath.isEmpty() ? ungrouped : folders.get(selectedGroupPath);
+        if (selected == null) { selected = root; selectedGroupPath = null; }
+        rebuildingGroups = true;
+        try {
+            groupTree.setRoot(root);
+            for (TreeItem<GroupNode> parent = selected.getParent(); parent != null; parent = parent.getParent()) {
+                parent.setExpanded(true);
+            }
+            groupTree.getSelectionModel().select(selected);
+        } finally { rebuildingGroups = false; }
+    }
+
+    private void rememberExpansion(TreeItem<GroupNode> item, Map<String, Boolean> expansion) {
+        if (item == null) return;
+        expansion.put(item.getValue().path(), item.isExpanded());
+        item.getChildren().forEach(child -> rememberExpansion(child, expansion));
+    }
+
+    private void ensureGroup(TreeItem<GroupNode> root, Map<String, TreeItem<GroupNode>> folders,
+            String path, Map<String, Boolean> expansion) {
+        TreeItem<GroupNode> parent = root;
+        String current = "";
+        for (String segment : path.split("/")) {
+            if (segment.isBlank()) continue;
+            current = current.isEmpty() ? segment : current + "/" + segment;
+            TreeItem<GroupNode> folder = folders.get(current);
+            if (folder == null) {
+                folder = new TreeItem<>(new GroupNode(current));
+                folder.setExpanded(expansion.getOrDefault(current, true));
+                folders.put(current, folder);
+                parent.getChildren().add(folder);
+            }
+            parent = folder;
+        }
+    }
+
+    private boolean belongsToSelectedGroup(String group) {
+        if (selectedGroupPath == null) return true;
+        if (selectedGroupPath.isEmpty()) return group == null || group.isBlank();
+        return selectedGroupPath.equals(group) || group != null && group.startsWith(selectedGroupPath + "/");
+    }
+
+    private void promptNewGroup() {
+        if (groupMutationRunning) return;
+        String parent = selectedGroupPath == null || selectedGroupPath.isEmpty() ? null : selectedGroupPath;
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("New group");
+        dialog.setHeaderText(parent == null ? "Create a server group" : "Create a group inside '" + parent + "'");
+        dialog.setContentText("Group name:");
+        dialogPresenter.present(dialog).map(String::trim).filter(name -> !name.isEmpty()).ifPresent(name -> {
+            String path = parent == null ? name : parent + "/" + name;
+            mutateGroups(() -> serverService.createGroup(path), path, null);
+        });
+    }
+
+    private void promptRenameGroup() {
+        String path = selectedGroupPath;
+        if (groupMutationRunning || path == null || path.isEmpty()) return;
+        TextInputDialog dialog = new TextInputDialog(leafName(path));
+        dialog.setTitle("Rename group");
+        dialog.setHeaderText("Rename group '" + path + "'");
+        dialog.setContentText("Group name:");
+        dialogPresenter.present(dialog).map(String::trim).filter(name -> !name.isEmpty() && !name.equals(leafName(path)))
+                .ifPresent(name -> {
+                    String parent = parentPath(path);
+                    String renamed = parent == null ? name : parent + "/" + name;
+                    mutateGroups(() -> serverService.renameGroup(path, renamed), renamed, null);
+                });
+    }
+
+    private void promptDeleteGroup() {
+        String path = selectedGroupPath;
+        if (groupMutationRunning || path == null || path.isEmpty()) return;
+        Alert dialog = new Alert(Alert.AlertType.CONFIRMATION);
+        dialog.setTitle("Delete group");
+        dialog.setHeaderText("Delete group '" + path + "'?");
+        dialog.setContentText("Nested groups are deleted as well. Servers become ungrouped. No server is deleted.");
+        dialogPresenter.present(dialog).filter(answer -> answer == ButtonType.OK).ifPresent(answer ->
+                mutateGroups(() -> serverService.deleteGroup(path), parentPath(path), null));
+    }
+
+    private void promptMoveToGroup() {
+        SSHServerModel selected = serverTable.getSelectionModel().getSelectedItem();
+        if (groupMutationRunning || selected == null) return;
+        String ungrouped = "(Ungrouped)";
+        List<String> choices = new ArrayList<>();
+        choices.add(ungrouped);
+        choices.addAll(groupNames);
+        ChoiceDialog<String> dialog = new ChoiceDialog<>(selected.getGroupName() == null ? ungrouped : selected.getGroupName(), choices);
+        dialog.setTitle("Move to group");
+        dialog.setHeaderText("Move '" + selected.getName() + "' to a group");
+        dialog.setContentText("Group:");
+        dialogPresenter.present(dialog).ifPresent(choice -> {
+            String target = ungrouped.equals(choice) ? null : choice;
+            if (Objects.equals(target, selected.getGroupName())) return;
+            String id = selected.getId();
+            mutateGroups(() -> {
+                SSHServerModel server = serverService.getServerById(id);
+                if (server == null) throw new IllegalStateException("The selected server no longer exists");
+                server.setGroupName(target);
+                serverService.saveServer(server);
+            }, target == null ? "" : target, id);
+        });
+    }
+
+    private void mutateGroups(Runnable mutation, String groupToSelect, String serverToSelect) {
+        groupMutationRunning = true;
+        loadGeneration++;
+        updateButtonStates();
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() { mutation.run(); return null; }
+        };
+        task.setOnSucceeded(event -> {
+            selectedGroupPath = groupToSelect == null ? null : java.util.Arrays.stream(groupToSelect.split("/", -1))
+                    .map(String::trim).collect(java.util.stream.Collectors.joining("/"));
+            loadServers(serverToSelect);
+        });
+        task.setOnFailed(event -> {
+            groupMutationRunning = false;
+            updateButtonStates();
+            logger.error("Failed to update server groups", task.getException());
+            showError("Group Error", task.getException().getMessage());
+        });
+        startBackground(task);
+    }
+
+    private static void startBackground(Task<?> task) {
+        Thread thread = new Thread(task, "ServerManagement-IO");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private static String parentPath(String path) {
+        int slash = path.lastIndexOf('/');
+        return slash < 0 ? null : path.substring(0, slash);
+    }
+
+    private static String leafName(String path) {
+        int slash = path.lastIndexOf('/');
+        return slash < 0 ? path : path.substring(slash + 1);
+    }
+
     private void setupTableColumns() {
         nameColumn.setCellValueFactory(cellData -> new SimpleStringProperty(
                 cellData.getValue().getName() != null ? cellData.getValue().getName() : "-"));
+
+        groupColumn.setCellValueFactory(cellData -> new SimpleStringProperty(
+                cellData.getValue().getGroupName() == null || cellData.getValue().getGroupName().isBlank()
+                        ? "Ungrouped" : cellData.getValue().getGroupName()));
 
         hostColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getHost()));
 
@@ -159,19 +385,24 @@ public class ServerManagementDialogController {
         deleteMenuItem.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.TRASH));
         deleteMenuItem.setOnAction(e -> handleDeleteServer());
 
+        MenuItem moveMenuItem = new MenuItem("Move to group...");
+        moveMenuItem.setOnAction(event -> promptMoveToGroup());
         contextMenu.getItems().addAll(
                 addMenuItem,
                 new SeparatorMenuItem(),
                 editMenuItem,
                 cloneMenuItem,
+                moveMenuItem,
                 deleteMenuItem
         );
 
         contextMenu.setOnShowing(e -> {
-            boolean hasRow = serverTable.getSelectionModel().getSelectedItem() != null;
+            boolean hasRow = !groupMutationRunning && serverTable.getSelectionModel().getSelectedItem() != null;
+            addMenuItem.setDisable(groupMutationRunning);
             editMenuItem.setDisable(!hasRow);
             cloneMenuItem.setDisable(!hasRow);
             deleteMenuItem.setDisable(!hasRow);
+            moveMenuItem.setDisable(!hasRow || groupMutationRunning);
         });
 
         serverTable.setContextMenu(contextMenu);
@@ -196,42 +427,50 @@ public class ServerManagementDialogController {
     }
 
     private void loadServers(String selectServerId) {
-        Task<List<SSHServerModel>> task = new Task<>() {
+        int generation = ++loadGeneration;
+        ServerManagementService service = serverService;
+        Task<ServerSnapshot> task = new Task<>() {
             @Override
-            protected List<SSHServerModel> call() {
-                return serverService.getAllServers();
+            protected ServerSnapshot call() {
+                return new ServerSnapshot(service.getAllServers(), service.getGroupNames());
             }
         };
 
         task.setOnSucceeded(e -> {
-            allServers.clear();
-            allServers.addAll(task.getValue());
+            if (generation != loadGeneration) return;
+            ServerSnapshot snapshot = task.getValue();
+            allServers.setAll(snapshot.servers());
+            groupNames = List.copyOf(snapshot.groups());
+            rebuildGroups();
             filterServers(searchField.getText());
             serverTable.refresh();
-            logger.info("Loaded {} servers", allServers.size());
-
+            groupMutationRunning = false;
+            updateButtonStates();
+            logger.info("Loaded {} servers and {} groups", allServers.size(), groupNames.size());
             if (selectServerId != null) {
-                for (SSHServerModel s : filteredServers) {
-                    if (selectServerId.equals(s.getId())) {
-                        serverTable.getSelectionModel().select(s);
-                        serverTable.scrollTo(s);
+                for (SSHServerModel server : filteredServers) {
+                    if (selectServerId.equals(server.getId())) {
+                        serverTable.getSelectionModel().select(server);
+                        serverTable.scrollTo(server);
                         break;
                     }
                 }
             }
         });
-
         task.setOnFailed(e -> {
+            if (generation != loadGeneration) return;
+            groupMutationRunning = false;
+            updateButtonStates();
             logger.error("Failed to load servers", task.getException());
             showError("Load Error", "Failed to load servers: " + task.getException().getMessage());
         });
-
-        new Thread(task).start();
+        startBackground(task);
     }
 
     private void filterServers(String searchText) {
         String search = searchText == null ? "" : searchText.trim().toLowerCase(Locale.ROOT);
         filteredServers.setAll(allServers.stream()
+                .filter(server -> belongsToSelectedGroup(server.getGroupName()))
                 .filter(server -> search.isEmpty() || matchesSearch(server, search))
                 .toList());
     }
@@ -251,6 +490,7 @@ public class ServerManagementDialogController {
             ServerEditDialogController controller = loader.getController();
             controller.setServerService(serverService);
             controller.setSshServiceFactory(sshServiceFactory);
+            controller.setInitialGroup(selectedGroupPath == null || selectedGroupPath.isEmpty() ? null : selectedGroupPath);
 
             Stage dialog = new Stage();
             dialog.setTitle("Add SSH Server");
@@ -381,11 +621,18 @@ public class ServerManagementDialogController {
 
     private void updateButtonStates() {
         boolean hasSelection = serverTable.getSelectionModel().getSelectedItem() != null;
-        editServerButton.setDisable(!hasSelection);
+        addServerButton.setDisable(groupMutationRunning);
+        editServerButton.setDisable(groupMutationRunning || !hasSelection);
         if (cloneServerButton != null) {
-            cloneServerButton.setDisable(!hasSelection);
+            cloneServerButton.setDisable(groupMutationRunning || !hasSelection);
         }
-        deleteServerButton.setDisable(!hasSelection);
+        deleteServerButton.setDisable(groupMutationRunning || !hasSelection);
+        boolean selectedGroup = selectedGroupPath != null && !selectedGroupPath.isEmpty();
+        newGroupButton.setDisable(groupMutationRunning);
+        renameGroupButton.setDisable(groupMutationRunning || !selectedGroup);
+        deleteGroupButton.setDisable(groupMutationRunning || !selectedGroup);
+        moveToGroupButton.setDisable(groupMutationRunning || !hasSelection);
+        refreshButton.setDisable(groupMutationRunning);
     }
 
     private void handleClose() {

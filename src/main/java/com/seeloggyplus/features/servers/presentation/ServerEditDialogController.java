@@ -61,6 +61,8 @@ public class ServerEditDialogController {
     private SSHService sshService;
     private SSHServiceFactory sshServiceFactory;
     private SSHServerModel sshServer;
+    @Setter
+    private String initialGroup;
     private DialogPresenter dialogPresenter = DialogPresenter.showAndWait();
     @Getter
     private boolean saved = false;
@@ -182,6 +184,7 @@ public class ServerEditDialogController {
 
     public void setCloneServer(SSHServerModel original) {
         this.sshServer = null;
+        this.initialGroup = original.getGroupName();
         String baseName = (original.getName() != null && !original.getName().isBlank())
                 ? original.getName()
                 : (original.getHost() != null && !original.getHost().isBlank() ? original.getHost() : "Server");
@@ -271,6 +274,7 @@ public class ServerEditDialogController {
             server = sshServer;
         } else {
             server = new SSHServerModel();
+            server.setGroupName(initialGroup);
             server.setId(UUID.randomUUID().toString());
             server.setCreatedAt(LocalDateTime.now());
         }

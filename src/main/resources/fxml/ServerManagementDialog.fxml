@@ -7,7 +7,7 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.features.servers.presentation.ServerManagementDialogController"
-            prefWidth="1050" prefHeight="650">
+            prefWidth="1200" prefHeight="650">
 
 
     <top>
@@ -63,9 +63,22 @@
 
 
     <center>
+        <SplitPane dividerPositions="0.2">
+            <VBox spacing="8" minWidth="210" prefWidth="230">
+                <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+                <Label text="Server groups" styleClass="section-title"/>
+                <Button fx:id="newGroupButton" text="New group..." maxWidth="Infinity"/>
+                <HBox spacing="6">
+                    <Button fx:id="renameGroupButton" text="Rename..." HBox.hgrow="ALWAYS" maxWidth="Infinity" disable="true"/>
+                    <Button fx:id="deleteGroupButton" text="Delete group" HBox.hgrow="ALWAYS" maxWidth="Infinity" disable="true"/>
+                </HBox>
+                <TreeView fx:id="groupTree" VBox.vgrow="ALWAYS"/>
+                <Button fx:id="moveToGroupButton" text="Move selected server..." maxWidth="Infinity" disable="true"/>
+            </VBox>
         <TableView fx:id="serverTable" VBox.vgrow="ALWAYS">
             <columns>
                 <TableColumn fx:id="nameColumn" text="NAME" prefWidth="150" minWidth="100"/>
+                <TableColumn fx:id="groupColumn" text="GROUP" prefWidth="150" minWidth="100"/>
                 <TableColumn fx:id="hostColumn" text="HOST" prefWidth="200" minWidth="150"/>
                 <TableColumn fx:id="portColumn" text="PORT" prefWidth="70" minWidth="60" maxWidth="80"/>
                 <TableColumn fx:id="usernameColumn" text="USERNAME" prefWidth="120" minWidth="80"/>
@@ -80,6 +93,7 @@
                 </VBox>
             </placeholder>
         </TableView>
+        </SplitPane>
     </center>
 
 
