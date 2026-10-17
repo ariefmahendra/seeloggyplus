@@ -5,7 +5,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.stage.Stage;
-import com.seeloggyplus.app.Main;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +15,6 @@ import java.util.function.Consumer;
 public class AboutDialogController {
 
     private static final Logger logger = LoggerFactory.getLogger(AboutDialogController.class);
-
     public static final String CONTACT_EMAIL = "mahend.arief@gmail.com";
 
     @FXML

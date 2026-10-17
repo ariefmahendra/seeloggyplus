@@ -145,8 +145,8 @@ class MainControllerHelperLogicTest {
                 Label label = (Label) field("memoryStatusLabel");
                 ProgressBar bar = (ProgressBar) field("memoryBar");
 
-                assertTrue(label.getText().matches("Used: \\d+ MB / Total: \\d+ MB \\(Max: \\d+ MB\\)"),
-                        "Unexpected memory text: " + label.getText());
+                assertTrue(label.getText().matches("Used: \\d+ MB / Total: \\d+ MB"),
+                        "The label must show the usage with its heap total (no max): " + label.getText());
                 double progress = bar.getProgress();
                 assertTrue(progress >= 0 && progress <= 1, "Progress must be a ratio: " + progress);
 

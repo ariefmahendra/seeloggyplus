@@ -6,203 +6,194 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.shape.Rectangle?>
 <?import java.net.URL?>
-<BorderPane minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.app.MainController">
+<BorderPane minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" xmlns="http://javafx.com/javafx/17"
+            xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.app.MainController">
     <stylesheets>
-        <URL value="@../style/theme.css" />
-        <URL value="@../style/components.css" />
+        <URL value="@../style/theme.css"/>
+        <URL value="@../style/components.css"/>
     </stylesheets>
     <top>
         <VBox>
             <MenuBar fx:id="menuBar" styleClass="app-menubar">
-
                 <Menu text="_File">
-                    <MenuItem accelerator="Ctrl+O" onAction="#handleOpen" text="Open..." />
-                    <MenuItem fx:id="closeTabMenuItem" accelerator="Ctrl+W" onAction="#handleCloseCurrentTab" text="Close Tab" />
-                    <MenuItem fx:id="closeAllTabsMenuItem" onAction="#handleCloseAllTabs" text="Close All Tabs" />
-                    <SeparatorMenuItem />
-                    <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit" />
+                    <MenuItem accelerator="Ctrl+O" onAction="#handleOpen" text="Open..."/>
+                    <MenuItem fx:id="closeTabMenuItem" accelerator="Ctrl+W" onAction="#handleCloseCurrentTab"
+                              text="Close Tab"/>
+                    <MenuItem fx:id="closeAllTabsMenuItem" onAction="#handleCloseAllTabs" text="Close All Tabs"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit"/>
                 </Menu>
-
 
                 <Menu text="_View">
-                    <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel" />
-                    <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel" />
-                    <SeparatorMenuItem />
-                    <MenuItem accelerator="Ctrl+G" onAction="#handleGoToLine" text="Go To Line..." />
-                    <MenuItem accelerator="F5" text="Refresh" />
+                    <CheckMenuItem fx:id="showLeftPanelMenuItem" selected="true" text="Show Recent Files Panel"/>
+                    <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem accelerator="Ctrl+G" onAction="#handleGoToLine" text="Go To Line..."/>
+                    <MenuItem accelerator="F5" text="Refresh"/>
                 </Menu>
-
 
                 <Menu text="_Settings">
-                    <MenuItem fx:id="serverManagementMenuItem" accelerator="Ctrl+M" text="Server Management..." />
-                    <SeparatorMenuItem />
-                    <MenuItem fx:id="preferencesMenuItem" text="Preferences..." />
+                    <MenuItem fx:id="serverManagementMenuItem" accelerator="Ctrl+M" text="Server Management..."/>
+                    <SeparatorMenuItem/>
+                    <MenuItem fx:id="preferencesMenuItem" text="Preferences..."/>
                 </Menu>
-
 
                 <Menu text="_Help">
-                    <MenuItem fx:id="helpContentsMenuItem" text="Help Contents" accelerator="F1" />
-                    <SeparatorMenuItem />
-                <MenuItem text="Check for Updates..." onAction="#handleCheckForUpdates" />
-                <CheckMenuItem fx:id="autoCheckUpdatesMenuItem" text="Check for Updates Automatically" />
-                <CheckMenuItem fx:id="autoDownloadUpdatesMenuItem" text="Download Updates Automatically" />
-                <SeparatorMenuItem />
-                    <MenuItem fx:id="aboutMenuItem" text="About" />
+                    <MenuItem fx:id="helpContentsMenuItem" text="Help Contents" accelerator="F1"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="Check for Updates..." onAction="#handleCheckForUpdates"/>
+                    <CheckMenuItem fx:id="autoCheckUpdatesMenuItem" text="Check for Updates Automatically"/>
+                    <CheckMenuItem fx:id="autoDownloadUpdatesMenuItem" text="Download Updates Automatically"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem fx:id="aboutMenuItem" text="About"/>
                 </Menu>
             </MenuBar>
-
 
             <ToolBar styleClass="app-toolbar">
                 <ToggleButton fx:id="toggleLeftPanelButton" selected="true">
                     <graphic>
-                        <FontAwesomeIconView glyphName="FOLDER_OPEN" size="12" />
+                        <FontAwesomeIconView glyphName="FOLDER_OPEN" size="12"/>
                     </graphic>
-                     <tooltip>
-                        <Tooltip text="Show/Hide Recent Files Panel (Ctrl+B)" />
+                    <tooltip>
+                        <Tooltip text="Show/Hide Recent Files Panel (Ctrl+B)"/>
                     </tooltip>
                 </ToggleButton>
                 <ToggleButton fx:id="toggleBottomPanelButton" selected="true">
                     <graphic>
-                        <FontAwesomeIconView glyphName="FILE_TEXT" size="12" />
-                    </graphic>
-                     <tooltip>
-                        <Tooltip text="Show/Hide Detail Panel (Ctrl+J)" />
-                    </tooltip>
-                </ToggleButton>
-                <Separator orientation="VERTICAL" />
-                <Label text="Search:" />
-                <TextField fx:id="searchField" prefWidth="250" promptText="Include (Search)..." />
-
-                <ToggleButton fx:id="regexCheckBox" text="Regex" />
-                <ToggleButton fx:id="caseSensitiveCheckBox" text="Case Sensitive" />
-                <Button fx:id="searchButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="SEARCH" size="12" />
+                        <FontAwesomeIconView glyphName="FILE_TEXT" size="12"/>
                     </graphic>
                     <tooltip>
-                        <Tooltip text="Apply Filters" />
+                        <Tooltip text="Show/Hide Detail Panel (Ctrl+J)"/>
+                    </tooltip>
+                </ToggleButton>
+                <Separator orientation="VERTICAL"/>
+                <Label text="Search:"/>
+                <TextField fx:id="searchField" prefWidth="250" promptText="Include (Search)..."/>
+
+                <ToggleButton fx:id="regexCheckBox" text="Regex"/>
+                <ToggleButton fx:id="caseSensitiveCheckBox" text="Case Sensitive"/>
+                <Button fx:id="searchButton">
+                    <graphic>
+                        <FontAwesomeIconView glyphName="SEARCH" size="12"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="Apply Filters"/>
                     </tooltip>
                 </Button>
                 <Button fx:id="clearSearchButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12" />
+                        <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12"/>
                     </graphic>
                     <tooltip>
-                        <Tooltip text="Clear All Filters" />
+                        <Tooltip text="Clear All Filters"/>
                     </tooltip>
                 </Button>
-                <SearchNavigator fx:id="searchNavigator" />
-                <Separator orientation="VERTICAL" />
+                <SearchNavigator fx:id="searchNavigator"/>
+                <Separator orientation="VERTICAL"/>
                 <Button fx:id="refreshButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="REFRESH" size="12" />
+                        <FontAwesomeIconView glyphName="REFRESH" size="12"/>
                     </graphic>
                     <tooltip>
-                        <Tooltip text="Reload Log" />
+                        <Tooltip text="Reload Log"/>
                     </tooltip>
                 </Button>
                 <ToggleButton fx:id="tailButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="TERMINAL" size="12" />
+                        <FontAwesomeIconView glyphName="TERMINAL" size="12"/>
                     </graphic>
                     <tooltip>
-                        <Tooltip text="Tail (Enable Tail Mode)" />
+                        <Tooltip text="Tail (Enable Tail Mode)"/>
                     </tooltip>
                 </ToggleButton>
                 <ToggleButton fx:id="followTailButton" selected="true">
                     <graphic>
-                        <FontAwesomeIconView glyphName="ARROW_DOWN" size="12" />
+                        <FontAwesomeIconView glyphName="ARROW_DOWN" size="12"/>
                     </graphic>
                     <tooltip>
-                        <Tooltip text="Smart Follow (Auto-scroll to bottom)" />
+                        <Tooltip text="Smart Follow (Auto-scroll to bottom)"/>
                     </tooltip>
                 </ToggleButton>
-                <Separator orientation="VERTICAL" />
+                <Separator orientation="VERTICAL"/>
                 <Button fx:id="clearLogButton">
                     <graphic>
-                        <FontAwesomeIconView glyphName="TRASH" size="12" />
+                        <FontAwesomeIconView glyphName="TRASH" size="12"/>
                     </graphic>
                     <tooltip>
-                        <Tooltip text="Clear Log View" />
+                        <Tooltip text="Clear Log View"/>
                     </tooltip>
                 </Button>
             </ToolBar>
         </VBox>
     </top>
 
-
     <center>
         <StackPane fx:id="centerRoot">
             <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
-                <fx:include fx:id="recentPanel" source="RecentFilesPanel.fxml" />
-
+                <fx:include fx:id="recentPanel" source="RecentFilesPanel.fxml"/>
                 <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
-
                     <VBox>
                         <StackPane fx:id="logContainer" VBox.vgrow="ALWAYS">
-
                             <VBox fx:id="emptyStatePane" alignment="CENTER" spacing="12" styleClass="empty-state-pane">
-                                <FontAwesomeIconView glyphName="FILE_TEXT_ALT" size="48" styleClass="empty-state-icon" />
-                                <Label text="No Log File Open" styleClass="empty-state-title" />
-                                <Label text="Open a file via File → Open (Ctrl+O), choose from Recent Files, or drag &amp; drop a log file here." styleClass="empty-state-subtitle" />
+                                <FontAwesomeIconView glyphName="FILE_TEXT_ALT" size="48" styleClass="empty-state-icon"/>
+                                <Label text="No Log File Open" styleClass="empty-state-title"/>
+                                <Label text="Open a file via File → Open (Ctrl+O), choose from Recent Files, or drag &amp; drop a log file here."
+                                       styleClass="empty-state-subtitle"/>
                                 <Button text="Open File..." onAction="#handleOpen" styleClass="empty-state-button">
                                     <graphic>
-                                        <FontAwesomeIconView glyphName="FOLDER_OPEN" size="14" fill="white" />
+                                        <FontAwesomeIconView glyphName="FOLDER_OPEN" size="14" fill="white"/>
                                     </graphic>
                                 </Button>
                             </VBox>
-
-                            <TabPane fx:id="logTabPane" styleClass="log-tab-pane" tabClosingPolicy="ALL_TABS" tabDragPolicy="REORDER" visible="false" managed="false" />
+                            <TabPane fx:id="logTabPane" styleClass="log-tab-pane" tabClosingPolicy="ALL_TABS"
+                                     tabDragPolicy="REORDER" visible="false" managed="false"/>
                         </StackPane>
                     </VBox>
 
-                    <fx:include fx:id="detailPane" source="LogDetailPane.fxml" />
+                    <fx:include fx:id="detailPane" source="LogDetailPane.fxml"/>
                 </SplitPane>
             </SplitPane>
-
-
             <VBox fx:id="loadingOverlay" alignment="CENTER" visible="false" styleClass="loading-overlay">
                 <VBox alignment="CENTER" spacing="15" styleClass="loading-card">
-                    <ProgressIndicator fx:id="loadingProgress" minWidth="60" minHeight="60" maxWidth="60" maxHeight="60" />
-                    <Label text="Processing Request..." styleClass="loading-title" />
-                    <Label fx:id="loadingLabel" text="Please wait..." wrapText="true" textAlignment="CENTER" styleClass="loading-subtitle" />
+                    <ProgressIndicator fx:id="loadingProgress" minWidth="60" minHeight="60" maxWidth="60"
+                                       maxHeight="60"/>
+                    <Label text="Processing Request..." styleClass="loading-title"/>
+                    <Label fx:id="loadingLabel" text="Please wait..." wrapText="true" textAlignment="CENTER"
+                           styleClass="loading-subtitle"/>
                     <Button text="Cancel" onAction="#handleCancelProcessing" styleClass="btn-danger-outline">
                         <tooltip>
-                            <Tooltip text="Stop current operation" />
+                            <Tooltip text="Stop current operation"/>
                         </tooltip>
                     </Button>
                 </VBox>
             </VBox>
-
-
             <clip>
-                <Rectangle fx:id="centerClip" />
+                <Rectangle fx:id="centerClip"/>
             </clip>
         </StackPane>
     </center>
 
     <bottom>
         <HBox alignment="CENTER_LEFT" spacing="10" styleClass="status-bar">
-
             <Label fx:id="statusLabel" text="Line: 0 / 0 (0%)" styleClass="status-text"/>
-            <Separator orientation="VERTICAL" />
-
-
-            <Region HBox.hgrow="ALWAYS" />
-
-
+            <Separator orientation="VERTICAL"/>
+            <Region HBox.hgrow="ALWAYS"/>
             <Label fx:id="updateStatusLabel" styleClass="status-link" visible="false" managed="false">
-                <tooltip><Tooltip text="A new version is available - click to update" /></tooltip>
+                <tooltip>
+                    <Tooltip text="A new version is available - click to update"/>
+                </tooltip>
             </Label>
-
-
-             <Button text="GC" onAction="#handleGC" styleClass="btn-compact">
-                <tooltip><Tooltip text="Run Garbage Collection" /></tooltip>
-             </Button>
-            <Separator orientation="VERTICAL" />
+            <Button text="GC" onAction="#handleGC" styleClass="btn-compact">
+                <tooltip>
+                    <Tooltip text="Run Garbage Collection"/>
+                </tooltip>
+            </Button>
+            <Separator orientation="VERTICAL"/>
             <Label fx:id="memoryStatusLabel" text="Memory: ..." styleClass="status-text-muted"/>
-            <ProgressBar fx:id="memoryBar" prefWidth="100" progress="0.0" styleClass="status-memory-bar" >
-                <tooltip><Tooltip text="Heap Usage" /></tooltip>
+            <ProgressBar fx:id="memoryBar" prefWidth="50" progress="0.0" styleClass="status-memory-bar">
+                <tooltip>
+                    <Tooltip text="Heap Usage"/>
+                </tooltip>
             </ProgressBar>
         </HBox>
     </bottom>

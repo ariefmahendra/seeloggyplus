@@ -8,8 +8,6 @@
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.features.servers.presentation.ServerManagementDialogController"
             prefWidth="1200" prefHeight="650">
-
-
     <top>
         <VBox>
             <ToolBar styleClass="app-toolbar">
@@ -49,7 +47,6 @@
                 </Button>
             </ToolBar>
 
-
             <HBox spacing="10">
                 <padding>
                     <Insets top="10" right="10" bottom="10" left="10"/>
@@ -60,7 +57,6 @@
             </HBox>
         </VBox>
     </top>
-
 
     <center>
         <SplitPane dividerPositions="0.2">
@@ -95,7 +91,6 @@
         </TableView>
         </SplitPane>
     </center>
-
 
     <bottom>
         <VBox>

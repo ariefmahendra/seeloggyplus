@@ -8,8 +8,6 @@
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogController"
             prefWidth="900" prefHeight="600" styleClass="unified-file-manager-dialog">
-
-
     <top>
         <VBox>
             <HBox fx:id="pathToolbar" styleClass="app-toolbar" spacing="6" alignment="CENTER_LEFT">
@@ -83,7 +81,6 @@
         </VBox>
     </top>
 
-
     <center>
         <SplitPane dividerPositions="0.25">
 
@@ -125,12 +122,9 @@
                            mouseTransparent="true" wrapText="true" maxWidth="Infinity" StackPane.alignment="BOTTOM_CENTER"/>
                 </StackPane>
                 <TitledPane fx:id="favoritesPane" text="Favorite folders" expanded="false" maxHeight="220">
-                    <content>
-                        <VBox fx:id="favoritesBox" spacing="4"/>
-                    </content>
+                    <VBox fx:id="favoritesBox" spacing="4"/>
                 </TitledPane>
             </VBox>
-
 
             <VBox>
                 <TableView fx:id="fileTable" VBox.vgrow="ALWAYS">
@@ -153,7 +147,6 @@
             </VBox>
         </SplitPane>
     </center>
-
 
     <bottom>
         <VBox>
@@ -196,5 +189,4 @@
             </HBox>
         </VBox>
     </bottom>
-
 </BorderPane>

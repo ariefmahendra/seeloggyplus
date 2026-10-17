@@ -313,6 +313,9 @@
 .status-memory-bar {
     -fx-accent: -sl-chrome-text;
     -fx-control-inner-background: -sl-memory-track;
+    -fx-pref-height: 10;
+    -fx-min-height: 10;
+    -fx-max-height: 10;
 }
 
 

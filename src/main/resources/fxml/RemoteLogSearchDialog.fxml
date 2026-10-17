@@ -9,8 +9,6 @@
             xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.features.search.presentation.RemoteLogSearchDialogController"
             prefWidth="960" prefHeight="640">
-
-
     <top>
         <VBox spacing="8">
             <padding>
@@ -107,5 +105,4 @@
             </HBox>
         </VBox>
     </bottom>
-
 </BorderPane>

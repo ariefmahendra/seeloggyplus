@@ -195,7 +195,9 @@ class MainControllerReachableFlowsTest {
 
         assertFalse(((VBox) field("leftPanel")).isVisible());
         assertFalse(((VBox) field("detailPane")).isVisible());
-        assertTrue(((Label) field("memoryStatusLabel")).getText().startsWith("Used:"));
+        String memoryText = ((Label) field("memoryStatusLabel")).getText();
+        assertTrue(memoryText.matches("Used: \\d+ MB / Total: \\d+ MB"),
+                "The GC refresh must show usage with its heap total (no max): " + memoryText);
         assertTrue(((ToggleButton) field("tailButton")).isDisabled());
         assertFalse((boolean) field("tailModeEnabled"));
     }

@@ -3467,15 +3467,14 @@ public class MainController {
         long total = runtime.totalMemory();
         long free = runtime.freeMemory();
         long used = total - free;
-        long max = runtime.maxMemory();
 
         double usedMb = used / (1024.0 * 1024.0);
         double totalMb = total / (1024.0 * 1024.0);
-        double maxMb = max / (1024.0 * 1024.0);
 
-        double progress = (max > 0) ? (double) used / max : (double) used / total;
+        double progress = total > 0 ? (double) used / total : 0;
+        progress = Math.max(0, Math.min(1, progress));
 
-        String text = String.format("Used: %.0f MB / Total: %.0f MB (Max: %.0f MB)", usedMb, totalMb, maxMb);
+        String text = String.format("Used: %.0f MB / Total: %.0f MB", usedMb, totalMb);
         memoryStatusLabel.setText(text);
 
         memoryBar.getStyleClass().removeAll("memory-ok", "memory-warn", "memory-high");
