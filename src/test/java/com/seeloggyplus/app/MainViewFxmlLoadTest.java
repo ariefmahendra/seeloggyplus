@@ -30,8 +30,10 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.Platform;
 import javafx.event.Event;
+import javafx.scene.control.MenuItem;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.paint.Color;
 import org.testfx.util.WaitForAsyncUtils;
@@ -192,6 +194,18 @@ public class MainViewFxmlLoadTest {
                 .get(controller);
         assertNotNull(detailPaneController);
         assertSame(detailPaneController.getRoot(), pane);
+    }
+
+    @Test
+    public void testViewRefreshMenuItemIsWiredToReload() throws Exception {
+        Field refreshField = MainController.class.getDeclaredField("refreshMenuItem");
+        refreshField.setAccessible(true);
+        MenuItem refresh = (MenuItem) refreshField.get(controller);
+        assertNotNull(refresh, "the View Refresh item must be injected from MainView.fxml");
+        assertEquals("Refresh", refresh.getText());
+        assertEquals(new KeyCodeCombination(KeyCode.F5), refresh.getAccelerator());
+        assertNotNull(refresh.getOnAction(), "the View Refresh item must trigger a handler");
+        assertDoesNotThrow(refresh::fire);
     }
 
     @Test

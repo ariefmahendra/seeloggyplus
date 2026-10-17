@@ -29,7 +29,7 @@
                     <CheckMenuItem fx:id="showBottomPanelMenuItem" selected="true" text="Show Detail Panel"/>
                     <SeparatorMenuItem/>
                     <MenuItem accelerator="Ctrl+G" onAction="#handleGoToLine" text="Go To Line..."/>
-                    <MenuItem accelerator="F5" text="Refresh"/>
+                    <MenuItem fx:id="refreshMenuItem" accelerator="F5" onAction="#handleReload" text="Refresh"/>
                 </Menu>
 
                 <Menu text="_Settings">

@@ -133,6 +133,8 @@ public class MainController {
     private MenuItem helpContentsMenuItem;
     @FXML
     private MenuItem preferencesMenuItem;
+    @FXML
+    private MenuItem refreshMenuItem;
 
     @FXML
     private SplitPane horizontalSplitPane;
@@ -1489,6 +1491,7 @@ public class MainController {
         Thread.ofVirtual().start(task);
     }
 
+    @FXML
     private void handleReload() {
         logger.info("Reload triggered by user.");
 
