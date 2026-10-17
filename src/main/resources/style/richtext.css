@@ -6,6 +6,14 @@
     -fx-background-color: -sl-surface;
 }
 
+.styled-text-area.detail-area .paragraph-box {
+    -fx-padding: 0;
+}
+
+.styled-text-area.detail-area .paragraph-text {
+    -fx-line-spacing: 0;
+}
+
 
 .error {
     -fx-fill: -sl-syntax-error;

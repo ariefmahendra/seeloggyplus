@@ -7,15 +7,18 @@ import com.seeloggyplus.shared.ui.AppTheme;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Bounds;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
+import javafx.scene.shape.Shape;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.fxmisc.richtext.StyleClassedTextArea;
@@ -27,6 +30,9 @@ import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -129,6 +135,56 @@ class DetailPanelThemeTest {
             assertEquals(Color.web("#1f2329"), icon.getFill(),
                     "unselected prettify icon must use the text token");
         });
+    }
+
+    @Test
+    void selectedRowsHighlightIsUniformAcrossAllRows() {
+        onFxThread(() -> {
+            stage.setWidth(1200);
+            stage.setHeight(400);
+            stage.setScene(AppTheme.scene(mainRoot));
+            stage.show();
+            mainRoot.applyCss();
+            mainRoot.layout();
+
+            StyleClassedTextArea area = mainDetailArea();
+            area.replaceText(String.join("\n",
+                    "{",
+                    "  \"level\" : \"ERROR\",",
+                    "  \"pid\" : 2463,",
+                    "  \"thread\" : \"http-nio-8080-exec-6\",",
+                    "  \"service\" : \"notification-gateway\",",
+                    "}"));
+            area.selectRange(0, area.getText().indexOf("}", 1));
+            rootLayout(area);
+
+            List<Bounds> rows = selectionRowBounds(area);
+            assertTrue(rows.size() >= 2, "a multi-line selection must render one highlight per row");
+            double top = rows.get(0).getMinY();
+            double bottom = rows.get(rows.size() - 1).getMaxY() - 1;
+
+            WritableImage image = area.snapshot(null, null);
+            Color expected = image.getPixelReader().getColor((int) image.getWidth() - 25, (int) top);
+            assertNotEquals(Color.WHITE, expected,
+                    "the sampled column must sit inside the selection highlight");
+
+            for (int y = (int) top; y <= bottom; y++) {
+                Color pixel = image.getPixelReader().getColor((int) image.getWidth() - 25, y);
+                assertEquals(expected, pixel,
+                        "every selected row must share one highlight colour, row " + y + " differs");
+            }
+        });
+    }
+
+    private static List<Bounds> selectionRowBounds(Parent parent) {
+        List<Bounds> rows = new ArrayList<>();
+        for (Node node : parent.lookupAll(".selection")) {
+            if (node instanceof Shape shape) {
+                rows.add(parent.sceneToLocal(shape.localToScene(shape.getBoundsInLocal())));
+            }
+        }
+        rows.sort(Comparator.comparingDouble(Bounds::getMinY));
+        return rows;
     }
 
     private ToggleButton prettifyToggle(String name) {
