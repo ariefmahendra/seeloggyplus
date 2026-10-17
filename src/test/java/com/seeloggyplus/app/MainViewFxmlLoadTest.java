@@ -17,6 +17,8 @@ import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
 import com.seeloggyplus.shared.model.LogEntry;
+import com.seeloggyplus.features.detail.presentation.LogDetailPaneController;
+import com.seeloggyplus.features.search.presentation.SearchNavigator;
 import com.seeloggyplus.shared.ui.AppTheme;
 import com.seeloggyplus.shared.ui.canvas.CanvasLogViewer;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
@@ -167,6 +169,29 @@ public class MainViewFxmlLoadTest {
         Field filterField = panel.getClass().getDeclaredField("recentFilesFilterField");
         filterField.setAccessible(true);
         assertNotNull(filterField.get(panel), "recentFilesFilterField must be injected from FXML");
+    }
+
+    @Test
+    public void testToolbarSearchNavigatorInjectedFromFxml() throws Exception {
+        Field navigatorField = MainController.class.getDeclaredField("searchNavigator");
+        navigatorField.setAccessible(true);
+        assertInstanceOf(SearchNavigator.class, navigatorField.get(controller),
+                "the toolbar SearchNavigator must be injected from MainView.fxml");
+    }
+
+    @Test
+    public void testDetailPaneInjectedFromInclude() throws Exception {
+        Field paneField = MainController.class.getDeclaredField("detailPane");
+        paneField.setAccessible(true);
+        Object pane = paneField.get(controller);
+        assertNotNull(pane, "the fx:include fx:id=detailPane must inject the included root");
+
+        Field detailControllerField = MainController.class.getDeclaredField("detailPaneController");
+        detailControllerField.setAccessible(true);
+        LogDetailPaneController detailPaneController = (LogDetailPaneController) detailControllerField
+                .get(controller);
+        assertNotNull(detailPaneController);
+        assertSame(detailPaneController.getRoot(), pane);
     }
 
     @Test

@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import com.seeloggyplus.features.search.presentation.SearchNavigator?>
 <?import de.jensd.fx.glyphs.fontawesome.*?>
-<?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.scene.text.*?>
 <?import javafx.scene.shape.Rectangle?>
 <?import java.net.URL?>
 <BorderPane minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.app.MainController">
@@ -92,7 +91,7 @@
                         <Tooltip text="Clear All Filters" />
                     </tooltip>
                 </Button>
-                <com.seeloggyplus.features.search.presentation.SearchNavigator fx:id="searchNavigator" />
+                <SearchNavigator fx:id="searchNavigator" />
                 <Separator orientation="VERTICAL" />
                 <Button fx:id="refreshButton">
                     <graphic>

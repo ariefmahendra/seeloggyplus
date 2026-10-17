@@ -182,6 +182,7 @@ public class MainController {
     @FXML
     private Button clearLogButton;
 
+    @FXML
     private VBox detailPane;
     @FXML
     private LogDetailPaneController detailPaneController;
@@ -1699,7 +1700,6 @@ public class MainController {
     }
 
     private void setupBottomPanel() {
-        detailPane = detailPaneController.getRoot();
         detailPaneController.setOnPreferenceChanged((code, value) -> preferenceService
                 .saveOrUpdatePreferences(new Preference(code, String.valueOf(value))));
         detailPaneController.setOnCloseRequest(this::handleToggleBottomPanelPin);
