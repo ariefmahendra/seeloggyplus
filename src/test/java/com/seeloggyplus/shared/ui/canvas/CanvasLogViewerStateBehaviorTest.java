@@ -290,6 +290,28 @@ class CanvasLogViewerStateBehaviorTest {
     }
 
     @Test
+    void countMatchesStopsAtTheScanLimitAndFlagsTruncation() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = new CanvasLogViewer();
+            List<LogEntry> many = new ArrayList<>();
+            for (int i = 0; i < CanvasLogViewer.MATCH_SCAN_LIMIT + 5; i++) {
+                many.add(new LogEntry(i + 1L, "needle " + i));
+            }
+            viewer.setTailBuffer(many);
+            viewer.setSearchHighlight("needle", false, false);
+
+            assertEquals(CanvasLogViewer.MATCH_SCAN_LIMIT, viewer.countMatches());
+            assertTrue(viewer.isMatchScanTruncated());
+
+            CanvasLogViewer small = new CanvasLogViewer();
+            small.setTailBuffer(tailLines(5));
+            small.setSearchHighlight("tail", false, false);
+            assertEquals(5, small.countMatches());
+            assertFalse(small.isMatchScanTruncated());
+        });
+    }
+
+    @Test
     void statusUpdatesReportTopLineAndPercentage() {
         onFxThread(() -> {
             CanvasLogViewer viewer = new CanvasLogViewer();

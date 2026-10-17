@@ -120,6 +120,7 @@ public class CanvasLogViewer extends GridPane {
     private boolean suppressScrollBarSync = false;
     private static final double SCROLL_LERP = 0.55;
     private static final double SCROLL_SNAP_THRESHOLD = 0.3;
+    public static final int MATCH_SCAN_LIMIT = 50000;
     private AnimationTimer scrollAnimator;
 
     @Setter
@@ -1420,8 +1421,7 @@ public class CanvasLogViewer extends GridPane {
         int count = getItemCount();
         int matches = 0;
 
-        int scanLimit = 50000;
-        int limit = Math.min(count, scanLimit);
+        int limit = Math.min(count, MATCH_SCAN_LIMIT);
 
         for (int i = 0; i < limit; i++) {
             long globalIndex;
@@ -1442,5 +1442,9 @@ public class CanvasLogViewer extends GridPane {
 
     public boolean hasSearchHighlight() {
         return searchPattern != null;
+    }
+
+    public boolean isMatchScanTruncated() {
+        return getItemCount() > MATCH_SCAN_LIMIT;
     }
 }

@@ -12,6 +12,7 @@ public class SearchNavigator extends HBox {
     private final Label statusLabel;
     private final Button prevButton;
     private final Button nextButton;
+    private final Tooltip scanLimitTooltip = new Tooltip();
 
     public SearchNavigator() {
         this.statusLabel = new Label("0 matches");
@@ -42,12 +43,24 @@ public class SearchNavigator extends HBox {
     }
 
     public void setMatchCount(int count) {
+        setMatchCount(count, false);
+    }
+
+    public void setMatchCount(int count, boolean truncated) {
         if (count < 0) {
             statusLabel.setText("Scanning...");
+            statusLabel.setTooltip(null);
         } else if (count == 0) {
             statusLabel.setText("No matches");
+            statusLabel.setTooltip(null);
+        } else if (truncated) {
+            statusLabel.setText(count + "+ matches");
+            scanLimitTooltip.setText("Counting stops after the first " + count
+                    + " lines; there may be more matches");
+            statusLabel.setTooltip(scanLimitTooltip);
         } else {
             statusLabel.setText(count + " matches");
+            statusLabel.setTooltip(null);
         }
         updateVisibility(true);
     }
@@ -63,6 +76,7 @@ public class SearchNavigator extends HBox {
 
     public void clear() {
         statusLabel.setText("");
+        statusLabel.setTooltip(null);
         updateVisibility(false);
     }
 

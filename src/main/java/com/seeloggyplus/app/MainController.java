@@ -3251,7 +3251,8 @@ public class MainController {
                         }
                     } else if (session == tabSessionManager.getActive() && canvasLogViewer != null && canvasLogViewer.hasSearchHighlight()) {
                         if (searchNavigator != null) {
-                            searchNavigator.setMatchCount(canvasLogViewer.countMatches());
+                            searchNavigator.setMatchCount(canvasLogViewer.countMatches(),
+                                    canvasLogViewer.isMatchScanTruncated());
                         }
                     }
 

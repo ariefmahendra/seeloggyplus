@@ -82,6 +82,21 @@ class SearchPanelThemeTest {
     }
 
     @Test
+    void navigatorStatusMarksTruncatedCounts() throws Exception {
+        SearchNavigator navigator = new SearchNavigator();
+        Label status = (Label) privateField(navigator, "statusLabel");
+
+        navigator.setMatchCount(50000, true);
+        assertEquals("50000+ matches", status.getText());
+        assertNotNull(status.getTooltip(), "a truncated count must explain the scan limit");
+        assertTrue(status.getTooltip().getText().contains("50000"));
+
+        navigator.setMatchCount(7, false);
+        assertEquals("7 matches", status.getText());
+        assertNull(status.getTooltip(), "an exact count must not keep the scan-limit tooltip");
+    }
+
+    @Test
     void navigatorButtonsInvokeTheirHandlers() throws Exception {
         SearchNavigator navigator = new SearchNavigator();
         javafx.scene.control.Button prev = (javafx.scene.control.Button) privateField(navigator, "prevButton");
