@@ -28,6 +28,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TreeView;
 import javafx.scene.image.PixelFormat;
 import javafx.scene.image.WritableImage;
+import javafx.scene.layout.StackPane;
 import javafx.scene.transform.Transform;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
@@ -378,10 +379,13 @@ class LandingScreenshotGeneratorTest {
         robot.interact(() -> {
             try {
                 AppTheme.setTheme(AppTheme.Theme.DARK);
-                Parent root = FXMLLoader.load(getClass().getResource("/fxml/" + fxmlName + ".fxml"));
-                rootRef.set(root);
-                stage.setScene(AppTheme.scene(root));
-                stage.sizeToScene();
+                Parent dialog = FXMLLoader.load(getClass().getResource("/fxml/" + fxmlName + ".fxml"));
+                StackPane wrapper = new StackPane(dialog);
+                wrapper.setStyle("-fx-background-color: #26282c;");
+                rootRef.set(wrapper);
+                stage.setScene(AppTheme.scene(wrapper));
+                stage.setWidth(WINDOW_WIDTH);
+                stage.setHeight(WINDOW_HEIGHT);
                 stage.show();
             } catch (Exception e) {
                 throw new AssertionError(e);
