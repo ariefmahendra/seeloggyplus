@@ -115,7 +115,7 @@ class LandingScreenshotGeneratorTest {
             root.applyCss();
             root.layout();
         });
-        capture(robot, stage.getScene().getRoot(), "file-manager.png");
+        capture(robot, stage.getScene().getRoot(), "file-manager-dark.png");
         robot.interact(stage::hide);
     }
 
@@ -151,7 +151,7 @@ class LandingScreenshotGeneratorTest {
             root.applyCss();
             root.layout();
         });
-        capture(robot, stage.getScene().getRoot(), "remote-browser.png");
+        capture(robot, stage.getScene().getRoot(), "remote-browser-dark.png");
         robot.interact(stage::hide);
     }
 
@@ -180,7 +180,7 @@ class LandingScreenshotGeneratorTest {
             }
         });
         settle(robot);
-        capture(robot, rootRef.get(), "tail.png");
+        capture(robot, rootRef.get(), "tail-dark.png");
         robot.interact(stage::hide);
     }
 
@@ -202,7 +202,7 @@ class LandingScreenshotGeneratorTest {
         });
         runSearch(robot, controller);
         settle(robot);
-        capture(robot, rootRef.get(), "search.png");
+        capture(robot, rootRef.get(), "search-dark.png");
         robot.interact(stage::hide);
     }
 
@@ -220,7 +220,7 @@ class LandingScreenshotGeneratorTest {
 
         showPayloadInDetailPanel(robot, controller, logs.resolve("payment-engine.log"));
         settle(robot);
-        capture(robot, rootRef.get(), "detail.png");
+        capture(robot, rootRef.get(), "detail-dark.png");
         robot.interact(stage::hide);
     }
 
@@ -275,14 +275,14 @@ class LandingScreenshotGeneratorTest {
             return preview != null && preview.getItems() != null && preview.getItems().size() > 0;
         }).get());
         settle(robot);
-        capture(robot, rootRef.get(), "find-in-files.png");
+        capture(robot, rootRef.get(), "find-in-files-dark.png");
         robot.interact(stage::hide);
     }
 
     @Test
     void capturePreferencesSlide(FxRobot robot) throws Exception {
         new PreferenceServiceImpl().saveOrUpdatePreferences(new Preference("app_theme", "dark"));
-        showDialog(robot, "PreferencesDialog", "preferences.png");
+        showDialog(robot, "PreferencesDialog", "preferences-dark.png");
     }
 
     @Test
@@ -291,7 +291,7 @@ class LandingScreenshotGeneratorTest {
         List<SSHServerModel> samples = sampleServers();
         try {
             samples.forEach(service::saveServer);
-            showDialog(robot, "ServerManagementDialog", "server-management.png");
+            showDialog(robot, "ServerManagementDialog", "server-management-dark.png");
         } finally {
             samples.forEach(server -> service.deleteServer(server.getId()));
         }
