@@ -47,6 +47,7 @@ jobs:
         shell: bash
         run: |
           "$PYTHON" scripts/test_verify_release.py
+          "$PYTHON" scripts/test_release_publication.py
           VERSION=$(sed -n 's/^version=//p' gradle.properties | tr -d '\r')
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then VERSION="$GITHUB_REF_NAME"; fi
           "$PYTHON" scripts/verify_release.py "$VERSION"
@@ -237,18 +238,31 @@ jobs:
           echo "----- release-body.md -----"
           cat release-body.md
 
+      - name: Guard published releases
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: '"$PYTHON" scripts/release_publication.py prepare ${{ github.ref_name }}'
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           body_path: release-body.md
           fail_on_unmatched_files: true
           prerelease: false
+          draft: true
           files: |
             build/distributions/seeloggyplus-Portable-linux.zip
             build/distributions/seeloggyplus-Portable-linux-jre.zip
             build/distributions/seeloggyplus-Portable-win.zip
             build/distributions/seeloggyplus-Portable-win-jre.zip
             build/distributions/update-manifest.json
+
+      - name: Publish complete stable release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: '"$PYTHON" scripts/release_publication.py publish ${{ github.ref_name }}'
 
       - name: Stage manifest for GitHub Pages
         shell: bash
