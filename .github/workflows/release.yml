@@ -36,6 +36,11 @@ jobs:
           "$PYTHON" -c "import sys; assert sys.version_info >= (3, 8), 'Python 3.8 or newer is required'"
           echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
 
+      - name: Prepare Linux fonts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: '"$PYTHON" scripts/setup_ci_fonts.py'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -48,6 +53,7 @@ jobs:
         run: |
           "$PYTHON" scripts/test_verify_release.py
           "$PYTHON" scripts/test_release_publication.py
+          "$PYTHON" scripts/test_ci_fonts.py
           VERSION=$(sed -n 's/^version=//p' gradle.properties | tr -d '\r')
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then VERSION="$GITHUB_REF_NAME"; fi
           "$PYTHON" scripts/verify_release.py "$VERSION"
@@ -124,6 +130,11 @@ jobs:
           "$PYTHON" -c "import sys; assert sys.version_info >= (3, 8), 'Python 3.8 or newer is required'"
           echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
 
+      - name: Prepare Linux fonts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: '"$PYTHON" scripts/setup_ci_fonts.py'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -184,6 +195,11 @@ jobs:
           "$PYTHON" --version
           "$PYTHON" -c "import sys; assert sys.version_info >= (3, 8), 'Python 3.8 or newer is required'"
           echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
+
+      - name: Prepare Linux fonts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: '"$PYTHON" scripts/setup_ci_fonts.py'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
