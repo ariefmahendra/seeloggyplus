@@ -88,6 +88,29 @@ class ThemedAlertsTest {
     }
 
     @Test
+    void messageHeightFollowsTheActualFontAndWrappingWidth(FxRobot robot) {
+        robot.interact(() -> {
+            for (var theme : AppTheme.Theme.values()) {
+                AppTheme.setTheme(theme);
+                Alert alert = ThemedAlerts.create(Alert.AlertType.INFORMATION, owner);
+                alert.setHeaderText("Action required");
+                alert.setContentText("Check the selected server and try again.");
+                alert.getDialogPane().setPrefWidth(360);
+                ScrollPane message = (ScrollPane) alert.getDialogPane().getContent().lookup(".message-scroll");
+                ((Label) message.getContent()).setStyle("-fx-font-size: 24px;");
+                try {
+                    alert.show();
+                    alert.getDialogPane().applyCss();
+                    alert.getDialogPane().layout();
+                    assertTrue(message.getViewportBounds().getHeight() >= ((Label) message.getContent()).prefHeight(message.getViewportBounds().getWidth()), "The message must fit using its styled font and actual wrapping width");
+                } finally {
+                    alert.close();
+                }
+            }
+        });
+    }
+
+    @Test
     void shownDialogAndExpandableDetailsFollowThemeChanges(FxRobot robot) {
         robot.interact(() -> {
             Alert alert = ThemedAlerts.create(Alert.AlertType.ERROR, owner);

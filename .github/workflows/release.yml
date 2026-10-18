@@ -60,7 +60,7 @@ jobs:
 
       - name: Verify JavaFX native startup (Linux, headless Monocle)
         if: runner.os == 'Linux'
-        run: ./gradlew --no-daemon test --tests "com.seeloggyplus.app.AboutDialogContactTest" --stacktrace -PheadlessTest
+        run: ./gradlew --no-daemon test --tests "com.seeloggyplus.app.AboutDialogContactTest" --tests "com.seeloggyplus.shared.ui.ThemedAlertsTest" --stacktrace -PheadlessTest
 
       - name: Run tests (Linux, headless Monocle)
         if: runner.os == 'Linux'

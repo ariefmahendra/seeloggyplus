@@ -9,8 +9,6 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.text.Font;
-import javafx.scene.text.Text;
 import javafx.stage.Screen;
 import javafx.stage.Window;
 
@@ -59,16 +57,20 @@ public final class ThemedAlerts {
         message.setWrapText(true);
         message.setMinHeight(Region.USE_PREF_SIZE);
         message.getStyleClass().add("message-text");
-        ScrollPane scroll = new ScrollPane(message);
+        double limit = Math.min(320, Screen.getPrimary().getVisualBounds().getHeight() * .4);
+        ScrollPane scroll = new ScrollPane(message) {
+            @Override
+            protected double computePrefHeight(double width) {
+                double available = width < 0 ? Math.max(320, pane.getPrefWidth() - 48)
+                        : Math.max(1, width - snappedLeftInset() - snappedRightInset());
+                return Math.min(limit, Math.ceil(message.prefHeight(available))
+                        + snappedTopInset() + snappedBottomInset() + 2);
+            }
+        };
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scroll.getStyleClass().add("message-scroll");
-        double limit = Math.min(320, Screen.getPrimary().getVisualBounds().getHeight() * .4);
-        Text measurement = new Text(text);
-        measurement.setFont(Font.font("Segoe UI", 12));
-        measurement.setWrappingWidth(Math.max(320, pane.getPrefWidth() - 48));
-        scroll.setPrefHeight(Math.min(limit, Math.ceil(measurement.getLayoutBounds().getHeight()) + 2));
         scroll.setMaxHeight(limit);
         scroll.setMinHeight(Region.USE_PREF_SIZE);
         pane.setContent(new VBox(scroll));
