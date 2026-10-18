@@ -23,9 +23,18 @@ jobs:
           java-version: '21'
 
       - name: Set up Python
+        if: runner.os == 'Windows'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Select Python runtime
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then PYTHON=python; else PYTHON=python3; fi
+          "$PYTHON" --version
+          "$PYTHON" -c "import sys; assert sys.version_info >= (3, 8), 'Python 3.8 or newer is required'"
+          echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -37,10 +46,10 @@ jobs:
       - name: Validate release metadata
         shell: bash
         run: |
-          python scripts/test_verify_release.py
+          "$PYTHON" scripts/test_verify_release.py
           VERSION=$(sed -n 's/^version=//p' gradle.properties | tr -d '\r')
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then VERSION="$GITHUB_REF_NAME"; fi
-          python scripts/verify_release.py "$VERSION"
+          "$PYTHON" scripts/verify_release.py "$VERSION"
 
       - name: Run tests (Linux, headless Monocle)
         if: runner.os == 'Linux'
@@ -101,9 +110,18 @@ jobs:
           java-version: '21'
 
       - name: Set up Python
+        if: runner.os == 'Windows'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Select Python runtime
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then PYTHON=python; else PYTHON=python3; fi
+          "$PYTHON" --version
+          "$PYTHON" -c "import sys; assert sys.version_info >= (3, 8), 'Python 3.8 or newer is required'"
+          echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -126,7 +144,7 @@ jobs:
         run: |
           mkdir -p build/release-compatibility
           curl --fail --location --retry 3 "https://github.com/${{ github.repository }}/releases/download/0.7.0/seeloggyplus-Portable-${{ matrix.platform }}.zip" --output build/release-compatibility/legacy.zip
-          python -c "import zipfile; z=zipfile.ZipFile('build/release-compatibility/legacy.zip'); open('build/release-compatibility/seeloggyplus.jar','wb').write(z.read('seeloggyplus/seeloggyplus.jar'))"
+          "$PYTHON" -c "import zipfile; z=zipfile.ZipFile('build/release-compatibility/legacy.zip'); open('build/release-compatibility/seeloggyplus.jar','wb').write(z.read('seeloggyplus/seeloggyplus.jar'))"
           ./gradlew --no-daemon verifyReleaseCompatibility -Pplatform=${{ matrix.platform }} -PlegacyJar=build/release-compatibility/seeloggyplus.jar
 
       - name: Upload platform artifacts
@@ -153,9 +171,18 @@ jobs:
           java-version: '21'
 
       - name: Set up Python
+        if: runner.os == 'Windows'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Select Python runtime
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then PYTHON=python; else PYTHON=python3; fi
+          "$PYTHON" --version
+          "$PYTHON" -c "import sys; assert sys.version_info >= (3, 8), 'Python 3.8 or newer is required'"
+          echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -175,7 +202,8 @@ jobs:
         run: ./gradlew --no-daemon mergeManifests
 
       - name: Validate complete release manifest
-        run: python scripts/verify_release.py ${{ github.ref_name }} --distributions build/distributions
+        shell: bash
+        run: '"$PYTHON" scripts/verify_release.py ${{ github.ref_name }} --distributions build/distributions'
 
       - name: Show merged manifest
         shell: bash

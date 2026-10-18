@@ -34,7 +34,10 @@ def validate(version, root, distributions=None):
         require(asset.get("url") == f"https://github.com/ariefmahendra/seeloggyplus/releases/download/{version}/{name}", f"Wrong download URL: {name}")
         require(asset.get("size") == archive.stat().st_size, f"Wrong package size: {name}")
         with archive.open("rb") as stream:
-            digest = hashlib.file_digest(stream, "sha256").hexdigest()
+            checksum = hashlib.sha256()
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                checksum.update(block)
+            digest = checksum.hexdigest()
         require(asset.get("sha256") == digest, f"Wrong checksum: {name}")
         if platform == "linux":
             with zipfile.ZipFile(archive) as package:
