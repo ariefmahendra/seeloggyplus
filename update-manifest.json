@@ -1,27 +1,27 @@
 {
   "channel": "stable",
-  "latest": "0.7.0",
-  "releaseNotesUrl": "https://github.com/ariefmahendra/seeloggyplus/releases/tag/0.7.0",
+  "latest": "0.8.0",
+  "releaseNotesUrl": "https://github.com/ariefmahendra/seeloggyplus/releases/tag/0.8.0",
   "assets": {
-    "windows-nojre": {
-      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.7.0/seeloggyplus-Portable-win.zip",
-      "size": 68475874,
-      "sha256": "31d7fe08dcd6487e5ddff12e0b4412b72d12990d6d584c538ea370be73e84283"
-    },
-    "windows-jre": {
-      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.7.0/seeloggyplus-Portable-win-jre.zip",
-      "size": 103817913,
-      "sha256": "a1a3aadd007413290d17d3d4a7945049840917bd4f31b7f8cc5b78f3696fb20f"
-    },
     "linux-nojre": {
-      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.7.0/seeloggyplus-Portable-linux.zip",
-      "size": 75910616,
-      "sha256": "5e38e757647d6a480efa0b0419d58efebe6ef4b66aa9571265fd3252fcffb2c3"
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.8.0/seeloggyplus-Portable-linux.zip",
+      "size": 77330490,
+      "sha256": "40d8dc05cf43a7ce1fbf1b79433f1527c62fe515ce32329b9867e1777ae60847"
     },
     "linux-jre": {
-      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.7.0/seeloggyplus-Portable-linux-jre.zip",
-      "size": 114556457,
-      "sha256": "5ac349dcac8710bc8eb3f00a1812e8df208c91ce97c9c4685d25d7c317d23e8c"
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.8.0/seeloggyplus-Portable-linux-jre.zip",
+      "size": 115976331,
+      "sha256": "42697b2e7b0b1634a010c115d804880eb88c34161040871d4edcefceb4b19786"
+    },
+    "windows-nojre": {
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.8.0/seeloggyplus-Portable-win.zip",
+      "size": 69892347,
+      "sha256": "3f90f5aebcd65f7a29ae30a9f5a0a98ac7c0bcedc0893899d716fd968b118fac"
+    },
+    "windows-jre": {
+      "url": "https://github.com/ariefmahendra/seeloggyplus/releases/download/0.8.0/seeloggyplus-Portable-win-jre.zip",
+      "size": 105234386,
+      "sha256": "74a8dce19605b113a41a8616a2e563c55bdde1e98920047277184fda1eea932e"
     }
   }
 }
