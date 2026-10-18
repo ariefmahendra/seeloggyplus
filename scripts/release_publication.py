@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 import os
 import urllib.error
@@ -7,7 +8,7 @@ from pathlib import Path
 
 
 def validate_upload(release, version, distributions):
-    if release.get("tag_name") != version or not release.get("draft") or release.get("prerelease"):
+    if release is None or release.get("tag_name") != version or not release.get("draft") or release.get("prerelease"):
         raise ValueError("Only the matching stable draft may be published; published releases are immutable")
     expected = {f"seeloggyplus-Portable-{platform}{suffix}.zip" for platform in ["win", "linux"] for suffix in ["", "-jre"]}
     expected.add("update-manifest.json")
@@ -18,6 +19,13 @@ def validate_upload(release, version, distributions):
         path = distributions / asset["name"]
         if asset.get("state") != "uploaded" or not path.is_file() or asset.get("size") != path.stat().st_size:
             raise ValueError("Release asset was not completely uploaded: " + asset["name"])
+        if path.suffix == ".zip":
+            checksum = hashlib.sha256()
+            with path.open("rb") as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b""):
+                    checksum.update(block)
+            if asset.get("digest") != "sha256:" + checksum.hexdigest():
+                raise ValueError("Uploaded package checksum differs from verified artifact: " + asset["name"])
 
 
 def request(endpoint, method="GET", body=None):
@@ -28,17 +36,31 @@ def request(endpoint, method="GET", body=None):
         return json.load(response)
 
 
+def find_release(version, fetch=request):
+    try:
+        return fetch("releases/tags/" + version)
+    except urllib.error.HTTPError as error:
+        if error.code != 404:
+            raise
+    page = 1
+    while True:
+        releases = fetch("releases?per_page=100&page=" + str(page))
+        matches = [release for release in releases if release.get("tag_name") == version]
+        if len(matches) > 1:
+            raise ValueError("Multiple releases match this tag")
+        if matches:
+            return matches[0]
+        if len(releases) < 100:
+            return None
+        page += 1
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=["prepare", "publish"])
     parser.add_argument("version")
     args = parser.parse_args()
-    try:
-        release = request("releases/tags/" + args.version)
-    except urllib.error.HTTPError as error:
-        if error.code != 404 or args.action != "prepare":
-            raise
-        release = None
+    release = find_release(args.version)
     if args.action == "prepare":
         if release is not None and not release.get("draft"):
             raise ValueError("This release is already published; do not overwrite its assets")

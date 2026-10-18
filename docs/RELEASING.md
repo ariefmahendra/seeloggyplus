@@ -158,6 +158,14 @@ Run it on Windows and Linux before publishing. Never publish when this gate fail
 
 ## One-off / manual release (if CI is unavailable)
 
+If a tag run passed its tests and both platform package jobs but failed only at
+publication, keep the tag unchanged. Dispatch `Recover release publication` on
+main with `release_tag` and `source_run_id`. It verifies the source run's tag,
+commit and successful gates, downloads its original artifacts, validates their
+manifest and uploaded package digests, and publishes only an existing complete
+draft. Release metadata must still match the tested tag. It then publishes the
+update manifest to gh-pages. A failed test or package job cannot use this path.
+
 With the GitHub CLI authenticated (`gh auth login`):
 
 ```bash
