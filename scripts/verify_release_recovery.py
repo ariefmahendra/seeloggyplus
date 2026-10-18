@@ -18,6 +18,15 @@ def validate(run, jobs, version, sha):
             raise ValueError("Source run did not pass its required gate: " + prefix)
 
 
+def fetch_tagged_text(name, version, fetch=request):
+    try:
+        import base64
+        content = fetch("contents/" + name + "?ref=" + version)
+        return base64.b64decode(content["content"]).decode("utf-8").replace("\r\n", "\n")
+    except Exception:
+        return subprocess.check_output(["git", "show", version + ":" + name]).decode("utf-8").replace("\r\n", "\n")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("version")
@@ -30,8 +39,8 @@ if __name__ == "__main__":
     jobs = request("actions/runs/" + str(args.run_id) + "/jobs?per_page=100")["jobs"]
     validate(run, jobs, args.version, commit["sha"])
     for name in ["gradle.properties", "docs/release-notes/" + args.version + ".md"]:
-        tagged = subprocess.check_output(["git", "show", args.version + ":" + name]).decode("utf-8").replace("\r\n", "\n")
-        if Path(name).read_text(encoding="utf-8") != tagged:
+        tagged = fetch_tagged_text(name, args.version)
+        if Path(name).read_text(encoding="utf-8").replace("\r\n", "\n") != tagged:
             raise ValueError("Recovery metadata differs from the tested tag: " + name)
     artifacts = request("actions/runs/" + str(args.run_id) + "/artifacts?per_page=100")["artifacts"]
     packages = [artifact for artifact in artifacts if artifact["name"].startswith("update-")]
