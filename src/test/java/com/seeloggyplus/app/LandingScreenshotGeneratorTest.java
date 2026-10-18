@@ -68,7 +68,7 @@ class LandingScreenshotGeneratorTest {
     }
 
     @Test
-    void captureHeroLightAndDark(FxRobot robot) throws Exception {
+    void captureHero(FxRobot robot) throws Exception {
         new PreferenceServiceImpl().saveOrUpdatePreferences(new Preference("main_auto_prettify_json", "true"));
 
         AtomicReference<Parent> rootRef = new AtomicReference<>();
@@ -89,16 +89,9 @@ class LandingScreenshotGeneratorTest {
         runSearch(robot, controller);
         showPayloadInDetailPanel(robot, controller, logs.resolve("payment-engine.log"));
         settle(robot);
-        capture(robot, rootRef.get(), "hero-light.png");
-
-        robot.interact(() -> AppTheme.setTheme(AppTheme.Theme.DARK));
-        settle(robot);
         capture(robot, rootRef.get(), "hero-dark.png");
 
-        robot.interact(() -> {
-            stage.hide();
-            AppTheme.setTheme(AppTheme.Theme.LIGHT);
-        });
+        robot.interact(stage::hide);
     }
 
     @Test
@@ -236,7 +229,7 @@ class LandingScreenshotGeneratorTest {
         AtomicReference<Object> controllerRef = new AtomicReference<>();
         robot.interact(() -> {
             try {
-                AppTheme.setTheme(AppTheme.Theme.LIGHT);
+                AppTheme.setTheme(AppTheme.Theme.DARK);
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/RemoteLogSearchDialog.fxml"));
                 Parent root = loader.load();
                 rootRef.set(root);
@@ -287,7 +280,7 @@ class LandingScreenshotGeneratorTest {
 
     @Test
     void capturePreferencesSlide(FxRobot robot) throws Exception {
-        new PreferenceServiceImpl().saveOrUpdatePreferences(new Preference("app_theme", "light"));
+        new PreferenceServiceImpl().saveOrUpdatePreferences(new Preference("app_theme", "dark"));
         showDialog(robot, "PreferencesDialog", "preferences.png");
     }
 
@@ -307,7 +300,7 @@ class LandingScreenshotGeneratorTest {
         AtomicReference<MainController> controllerRef = new AtomicReference<>();
         robot.interact(() -> {
             try {
-                AppTheme.setTheme(AppTheme.Theme.LIGHT);
+                AppTheme.setTheme(AppTheme.Theme.DARK);
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
                 Parent root = loader.load();
                 rootRef.set(root);
@@ -384,7 +377,7 @@ class LandingScreenshotGeneratorTest {
         AtomicReference<Parent> rootRef = new AtomicReference<>();
         robot.interact(() -> {
             try {
-                AppTheme.setTheme(AppTheme.Theme.LIGHT);
+                AppTheme.setTheme(AppTheme.Theme.DARK);
                 Parent root = FXMLLoader.load(getClass().getResource("/fxml/" + fxmlName + ".fxml"));
                 rootRef.set(root);
                 stage.setScene(AppTheme.scene(root));
@@ -403,7 +396,7 @@ class LandingScreenshotGeneratorTest {
         AtomicReference<UnifiedFileManagerDialogController> controllerRef = new AtomicReference<>();
         robot.interact(() -> {
             try {
-                AppTheme.setTheme(AppTheme.Theme.LIGHT);
+                AppTheme.setTheme(AppTheme.Theme.DARK);
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
                 Parent root = loader.load();
                 controllerRef.set(loader.getController());
