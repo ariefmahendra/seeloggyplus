@@ -29,22 +29,23 @@ class ThemeTokensTest {
         Set<String> dark = rootTokens(THEME_DARK);
         Set<String> light = rootTokens(THEME_LIGHT);
 
-        assertFalse(base.isEmpty(), "theme.css must define -sl-* tokens");
-
-        assertEquals(base, dark,
-                "theme-dark.css must override every base token. Missing: " + missing(base, dark));
-        assertEquals(base, light,
-                "theme-light.css must override every base token. Missing: " + missing(base, light));
+        assertTrue(base.isEmpty(), "theme.css must contain shared rules, not a third palette");
+        assertFalse(light.isEmpty());
+        assertEquals(light, dark,"Light and Dark must define the same complete token set");
+        var required=new LinkedHashSet<String>();
+        var references=Pattern.compile("-sl-[a-z0-9-]+").matcher(read(THEME)+read(COMPONENTS)+read(RICHTEXT));
+        while(references.find()) required.add(references.group());
+        assertTrue(light.containsAll(required),"Missing theme tokens: "+missing(required,light));
     }
 
     @Test
-    @DisplayName("Light theme uses a blue accent for interactive states")
+    @DisplayName("Light theme uses an official Islands blue accent for interactive states")
     void lightThemeUsesBlueAccent() throws Exception {
         String light = normalize(read(THEME_LIGHT));
-        assertEquals("#2563eb", tokenValue(light, "-sl-accent"),
-                "light theme accent must be blue");
-        assertEquals("#2563eb", tokenValue(light, "-sl-brand"),
-                "light theme brand must be blue so focus/selection match the accent");
+        assertEquals("#3871e1", tokenValue(light, "-sl-accent"),
+                "light theme accent must be official Islands blue");
+        assertEquals("#3871e1", tokenValue(light, "-sl-brand"),
+                "light theme focus and selection must share the muted accent");
         assertEquals("#ffffff", tokenValue(light, "-sl-accent-text"),
                 "light theme accent text must be white");
     }
@@ -71,8 +72,7 @@ class ThemeTokensTest {
                 String match = m.group().toLowerCase();
 
                 boolean allowedShadow = match.startsWith("rgba") && line.contains("rgba(0, 0, 0");
-                boolean allowedSelection = line.replace(" ", "").toLowerCase().contains("rgba(52,58,64,0.18)");
-                if (!allowedShadow && !allowedSelection) {
+                if (!allowedShadow) {
                     offenders.add(name + ":" + (i + 1) + " -> " + line.trim());
                 }
             }

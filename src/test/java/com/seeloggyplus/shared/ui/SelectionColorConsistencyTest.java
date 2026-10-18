@@ -18,9 +18,7 @@ import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
 
-import java.io.InputStream;
 import java.lang.reflect.Field;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -60,25 +58,26 @@ class SelectionColorConsistencyTest {
     }
 
     @Test
-    void cssSelectionColorsMatchJavaConstants() throws Exception {
-        String theme = normalize(readResource("/style/theme.css"));
-        String themeDark = normalize(readResource("/style/theme-dark.css"));
-        String richtext = normalize(readResource("/style/richtext.css"));
-
-        String light = rgba(SelectionColors.LIGHT_BACKGROUND);
-        String dark = rgba(SelectionColors.DARK_BACKGROUND);
-
-        assertTrue(theme.contains(light), "theme.css must use the shared light selection colour: " + light);
-        assertTrue(richtext.contains(light), "richtext.css must use the shared light selection colour: " + light);
-        assertTrue(themeDark.contains(dark), "theme-dark.css must use the shared dark selection colour: " + dark);
+    void nullAndBooleanOverloadsResolveSupportedThemePalettes() {
+        assertEquals(SelectionColors.LIGHT_BACKGROUND, SelectionColors.background((AppTheme.Theme)null));
+        assertEquals(SelectionColors.background(AppTheme.Theme.LIGHT), SelectionColors.background(false));
+        assertEquals(SelectionColors.background(AppTheme.Theme.DARK), SelectionColors.background(true));
     }
 
     @Test
     void detailPanelSelectionMatchesSharedColor() {
+        AtomicReference<StyleClassedTextArea> reference=new AtomicReference<>();
         onFxThread(() -> {
+            AppTheme.setTheme(AppTheme.Theme.LIGHT);
             StyleClassedTextArea area = themedArea();
+            reference.set(area);
             area.replaceText("select me please");
             area.selectRange(0, 6);
+            area.requestFocus();
+        });
+        onFxThread(() -> {
+            StyleClassedTextArea area=reference.get();
+            assertTrue(area.isFocused(),"active selection requires keyboard focus");
             rootLayout(area);
 
             Shape selection = findSelectionPath(area);
@@ -92,6 +91,14 @@ class SelectionColorConsistencyTest {
             assertNotNull(darkSelection);
             assertEquals(SelectionColors.DARK_BACKGROUND, darkSelection.getFill(),
                     "dark detail selection background must match the shared colour");
+
+            Parent root=area.getScene().getRoot();
+            root.setFocusTraversable(true);
+            root.requestFocus();
+            root.applyCss();
+            assertFalse(area.isFocused());
+            assertEquals(Color.web("#33353b"),findSelectionPath(area).getFill(),
+                    "inactive dark detail selection must use the inactive Islands token");
 
             AppTheme.setDark(false);
         });
@@ -133,24 +140,6 @@ class SelectionColorConsistencyTest {
         Field f = viewer.getClass().getDeclaredField("selectionColor");
         f.setAccessible(true);
         return (Color) f.get(viewer);
-    }
-
-    private static String readResource(String path) throws Exception {
-        try (InputStream in = SelectionColorConsistencyTest.class.getResourceAsStream(path)) {
-            assertNotNull(in, "missing resource: " + path);
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        }
-    }
-
-    private static String normalize(String css) {
-        return css.replaceAll("\\s+", "").toLowerCase();
-    }
-
-    private static String rgba(Color color) {
-        int r = (int) Math.round(color.getRed() * 255);
-        int g = (int) Math.round(color.getGreen() * 255);
-        int b = (int) Math.round(color.getBlue() * 255);
-        return String.format("rgba(%d,%d,%d,%.2f)", r, g, b, color.getOpacity());
     }
 
     private static void onFxThread(Runnable action) {

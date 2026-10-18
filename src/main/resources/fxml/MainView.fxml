@@ -3,10 +3,11 @@
 <?import com.seeloggyplus.features.search.presentation.SearchNavigator?>
 <?import de.jensd.fx.glyphs.fontawesome.*?>
 <?import javafx.scene.control.*?>
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.shape.Rectangle?>
 <?import java.net.URL?>
-<BorderPane minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" xmlns="http://javafx.com/javafx/17"
+<BorderPane styleClass="main-view" minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" xmlns="http://javafx.com/javafx/17"
             xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.app.MainController">
     <stylesheets>
         <URL value="@../style/theme.css"/>
@@ -67,11 +68,10 @@
                     </tooltip>
                 </ToggleButton>
                 <Separator orientation="VERTICAL"/>
-                <Label text="Search:"/>
-                <TextField fx:id="searchField" prefWidth="250" promptText="Include (Search)..."/>
+                <TextField fx:id="searchField" minWidth="120" prefWidth="200" promptText="Search logs..."/>
 
-                <ToggleButton fx:id="regexCheckBox" text="Regex"/>
-                <ToggleButton fx:id="caseSensitiveCheckBox" text="Case Sensitive"/>
+                <ToggleButton fx:id="regexCheckBox" text=".*" accessibleText="Regular expression"><tooltip><Tooltip text="Use regular expressions"/></tooltip></ToggleButton>
+                <ToggleButton fx:id="caseSensitiveCheckBox" text="Aa" accessibleText="Case sensitive"><tooltip><Tooltip text="Match case"/></tooltip></ToggleButton>
                 <Button fx:id="searchButton">
                     <graphic>
                         <FontAwesomeIconView glyphName="SEARCH" size="12"/>
@@ -132,18 +132,24 @@
             <SplitPane fx:id="horizontalSplitPane" dividerPositions="0.2">
                 <fx:include fx:id="recentPanel" source="RecentFilesPanel.fxml"/>
                 <SplitPane fx:id="verticalSplitPane" dividerPositions="0.7" orientation="VERTICAL">
-                    <VBox>
+                    <VBox fx:id="logIsland" minHeight="120" minWidth="0">
                         <StackPane fx:id="logContainer" VBox.vgrow="ALWAYS">
-                            <VBox fx:id="emptyStatePane" alignment="CENTER" spacing="12" styleClass="empty-state-pane">
-                                <FontAwesomeIconView glyphName="FILE_TEXT_ALT" size="48" styleClass="empty-state-icon"/>
-                                <Label text="No Log File Open" styleClass="empty-state-title"/>
-                                <Label text="Open a file via File → Open (Ctrl+O), choose from Recent Files, or drag &amp; drop a log file here."
-                                       styleClass="empty-state-subtitle"/>
-                                <Button text="Open File..." onAction="#handleOpen" styleClass="empty-state-button">
-                                    <graphic>
-                                        <FontAwesomeIconView glyphName="FOLDER_OPEN" size="14" fill="white"/>
-                                    </graphic>
-                                </Button>
+                            <VBox fx:id="emptyStatePane" alignment="CENTER" styleClass="empty-state-pane">
+                                <VBox alignment="CENTER" spacing="8" fillWidth="false" minWidth="0" maxWidth="320" styleClass="empty-state-content">
+                                    <StackPane minWidth="44" prefWidth="44" maxWidth="44" minHeight="44" prefHeight="44" maxHeight="44">
+                                        <FontAwesomeIconView glyphName="FILE_TEXT_ALT" size="28" styleClass="empty-state-icon"/>
+                                    </StackPane>
+                                    <Label text="No Log File Open" alignment="CENTER" styleClass="empty-state-title"/>
+                                    <Label text="Drop a log file here or open one with Ctrl+O." wrapText="true" alignment="CENTER" textAlignment="CENTER" maxWidth="280" minWidth="0" styleClass="empty-state-subtitle"/>
+                                    <Button text="Open File..." onAction="#handleOpen" minWidth="120" minHeight="28" prefHeight="28" maxHeight="28" graphicTextGap="6" styleClass="empty-state-button">
+                                        <graphic>
+                                            <FontAwesomeIconView glyphName="FOLDER_OPEN" size="12"/>
+                                        </graphic>
+                                        <VBox.margin>
+                                            <Insets top="4"/>
+                                        </VBox.margin>
+                                    </Button>
+                                </VBox>
                             </VBox>
                             <TabPane fx:id="logTabPane" styleClass="log-tab-pane" tabClosingPolicy="ALL_TABS"
                                      tabDragPolicy="REORDER" visible="false" managed="false"/>
@@ -154,9 +160,9 @@
                 </SplitPane>
             </SplitPane>
             <VBox fx:id="loadingOverlay" alignment="CENTER" visible="false" styleClass="loading-overlay">
-                <VBox alignment="CENTER" spacing="15" styleClass="loading-card">
-                    <ProgressIndicator fx:id="loadingProgress" minWidth="60" minHeight="60" maxWidth="60"
-                                       maxHeight="60"/>
+                <VBox alignment="CENTER" spacing="10" styleClass="loading-card">
+                    <ProgressIndicator fx:id="loadingProgress" minWidth="32" minHeight="32" maxWidth="32"
+                                       maxHeight="32"/>
                     <Label text="Processing Request..." styleClass="loading-title"/>
                     <Label fx:id="loadingLabel" text="Please wait..." wrapText="true" textAlignment="CENTER"
                            styleClass="loading-subtitle"/>
@@ -174,8 +180,9 @@
     </center>
 
     <bottom>
-        <HBox alignment="CENTER_LEFT" spacing="10" styleClass="status-bar">
+        <HBox alignment="CENTER_LEFT" spacing="6" styleClass="status-bar">
             <Label fx:id="statusLabel" text="Line: 0 / 0 (0%)" styleClass="status-text"/>
+            <Label fx:id="selectionStatusLabel" styleClass="status-text-muted" visible="false" managed="false"/>
             <Separator orientation="VERTICAL"/>
             <Region HBox.hgrow="ALWAYS"/>
             <Label fx:id="updateStatusLabel" styleClass="status-link" visible="false" managed="false">

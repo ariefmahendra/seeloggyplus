@@ -11,13 +11,9 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToolBar;
-import javafx.scene.layout.Background;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.LinearGradient;
-import javafx.scene.paint.Paint;
-import javafx.scene.paint.Stop;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -53,9 +49,9 @@ class IconContrastTest {
     }
 
     @Test
-    void graphiteStatusAndPrimaryButtonIconsContrast() {
+    void lightStatusAndPrimaryButtonIconsContrast() {
         onFxThread(() -> {
-            AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+            AppTheme.setTheme(AppTheme.Theme.LIGHT);
             Button statusButton = new Button("Status");
             var statusIcon = new FontAwesomeIconView(FontAwesomeIcon.INFO_CIRCLE);
             statusButton.setGraphic(statusIcon);
@@ -64,8 +60,8 @@ class IconContrastTest {
             var primaryIcon = new FontAwesomeIconView(FontAwesomeIcon.FOLDER_OPEN);
             primary.setGraphic(primaryIcon);
             stage.setScene(AppTheme.scene(new VBox(status, primary))); stage.show();
-            assertContrast(statusButton, statusIcon, "Graphite status icon");
-            assertContrast(primary, primaryIcon, "Graphite primary action icon");
+            assertContrast(statusButton, statusIcon, "Light status icon");
+            assertContrast(primary, primaryIcon, "Light primary action icon");
         });
     }
 
@@ -220,37 +216,7 @@ class IconContrastTest {
     }
 
     private static Color effectiveBackground(Node node) {
-        Node cur = node.getParent();
-        while (cur != null) {
-            if (cur instanceof Region region) {
-                Background bg = region.getBackground();
-                if (bg != null) {
-                    var fills = bg.getFills();
-                    for (int i = fills.size() - 1; i >= 0; i--) {
-                        Color c = toColor(fills.get(i).getFill());
-                        if (c != null && c.getOpacity() > 0.5) {
-                            return c;
-                        }
-                    }
-                }
-            }
-            cur = cur.getParent();
-        }
-        return null;
-    }
-
-    private static Color toColor(Paint paint) {
-        if (paint instanceof Color c) {
-            return c;
-        }
-        if (paint instanceof LinearGradient gradient && !gradient.getStops().isEmpty()) {
-            for (Stop stop : gradient.getStops()) {
-                if (stop.getColor().getOpacity() > 0.5) {
-                    return stop.getColor();
-                }
-            }
-        }
-        return null;
+        return com.seeloggyplus.shared.ui.RenderedColors.background(node.getParent());
     }
 
     private static void reset(ButtonBase control) {

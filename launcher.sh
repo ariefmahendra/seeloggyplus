@@ -1,5 +1,8 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
+
 DEFAULT_MEM=4
 MAX_MEM=$DEFAULT_MEM
 CUSTOM_JAVA_HOME=""
@@ -23,7 +26,6 @@ if [ -f "$CONFIG_FILE" ]; then
 fi
 
 JAVA_CMD="java"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ -n "$CUSTOM_JAVA_HOME" ]; then
     JAVA_CMD="$CUSTOM_JAVA_HOME/bin/java"

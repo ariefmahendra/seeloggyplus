@@ -13,14 +13,13 @@ set "CONFIG_FILE=%SCRIPT_DIR%launcher.properties"
 
 if exist "%CONFIG_FILE%" (
     for /f "tokens=1,2 delims==" %%a in ('type "%CONFIG_FILE%"') do (
-        set KEY=%%a
-        set VALUE=%%b
+        set "KEY=%%a"
+        set "VALUE=%%b"
         
         set KEY=!KEY: =!
-        set VALUE=!VALUE: =!
         
-        if /i "!KEY!"=="max.memory.gb" set MAX_MEM=!VALUE!
-        if /i "!KEY!"=="java.home" set CUSTOM_JAVA_HOME=!VALUE!
+        if /i "!KEY!"=="max.memory.gb" if defined VALUE set "MAX_MEM=!VALUE: =!"
+        if /i "!KEY!"=="java.home" if defined VALUE set "CUSTOM_JAVA_HOME=!VALUE!"
     )
 )
 

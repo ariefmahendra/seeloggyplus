@@ -54,7 +54,7 @@ class ThemeSwitchingTest {
     void resetTheme() {
         onFxThread(() -> {
             if (themeComboBox != null) {
-                themeComboBox.setValue("Graphite");
+                themeComboBox.setValue("Light");
             }
             AppTheme.setDark(false);
             if (prefsStage != null) {
@@ -94,15 +94,15 @@ class ThemeSwitchingTest {
     }
 
     @Test
-    void switchingBackToGraphiteRevertsAllWindows() {
+    void switchingBackToLightRevertsAllWindows() {
         onFxThread(() -> {
             themeComboBox.setValue("Dark");
-            themeComboBox.setValue("Graphite");
+            themeComboBox.setValue("Light");
 
-            assertFalse(AppTheme.isDark(), "theme state must be graphite again");
+            assertFalse(AppTheme.isDark(), "theme state must be light again");
             assertFalse(hasDark(mainScene), "main scene must drop theme-dark.css");
             assertFalse(hasDark(prefsScene), "preferences scene must drop theme-dark.css");
-            assertFalse(hasLight(mainScene), "graphite must not include theme-light.css");
+            assertTrue(hasLight(mainScene), "Light must include theme-light.css");
             assertFalse(mainScene.getRoot().getStyleClass().contains("theme-dark"),
                     "main root must drop theme-dark");
             assertFalse(prefsScene.getRoot().getStyleClass().contains("theme-dark"),
@@ -111,14 +111,14 @@ class ThemeSwitchingTest {
     }
 
     @Test
-    void switchingBackToGraphiteRemovesHotReloadDarkCopy() {
+    void switchingBackToLightRemovesHotReloadDarkCopy() {
         onFxThread(() -> {
             themeComboBox.setValue("Dark");
 
             mainScene.getStylesheets().add("file:/tmp/seeloggy-hotreload-theme-dark-999.css");
             prefsScene.getStylesheets().add("file:/tmp/seeloggy-hotreload-theme-dark-999.css");
 
-            themeComboBox.setValue("Graphite");
+            themeComboBox.setValue("Light");
 
             assertFalse(mainScene.getStylesheets().stream().anyMatch(url -> url.contains("theme-dark")),
                     "main scene must drop the hot-reload dark copy");

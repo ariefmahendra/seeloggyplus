@@ -94,7 +94,7 @@ class ServerEditDialogAuthTest {
                     window.hide();
                 }
             }
-            AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+            AppTheme.setTheme(AppTheme.Theme.LIGHT);
         });
     }
 
@@ -186,6 +186,33 @@ class ServerEditDialogAuthTest {
                         + browse.getHeight() + ", field=" + keyPath.getHeight() + ")");
         assertTrue(browse.getWidth() <= 140,
                 "Browse must stay proportional to its label, was " + browse.getWidth());
+    }
+
+    @Test
+    @DisplayName("compact flat layout fits all themes and auth modes")
+    void compactFlatLayoutFitsAllThemes() {
+        for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+            for (int authIndex : new int[]{0, 1}) {
+                Platform.runLater(() -> {
+                    AppTheme.setTheme(theme);
+                    ((ChoiceBox<?>) root.lookup("#authTypeChoice")).getSelectionModel().select(authIndex);
+                    root.applyCss();
+                    root.layout();
+                });
+                WaitForAsyncUtils.waitForFxEvents();
+                var region = (javafx.scene.layout.Region) root;
+                assertTrue(region.getStyleClass().contains("server-edit-dialog"));
+                assertTrue(region.getPrefWidth() <= 460);
+                assertTrue(region.getPrefHeight() <= 440);
+                for (String id : List.of("nameField", "hostField", "portField", "usernameField", "defaultPathField", "testButton", "cancelButton", "saveButton")) {
+                    var node = (javafx.scene.layout.Region) root.lookup("#" + id);
+                    assertEquals(28, node.getHeight(), 1, id);
+                }
+                var host = root.lookup("#hostField");
+                var port = root.lookup("#portField");
+                assertEquals(host.localToScene(0, 0).getY(), port.localToScene(0, 0).getY(), 1);
+            }
+        }
     }
 
     @Test

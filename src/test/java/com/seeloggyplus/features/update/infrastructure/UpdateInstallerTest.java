@@ -18,6 +18,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UpdateInstallerTest {
 
+    @Test void restoresUnixLauncherAndRuntimeExecutePermissions() throws Exception {
+        Path work = Files.createTempDirectory("seeloggy-permissions");
+        try {
+            Path zip = createZip(work, new String[] {"seeloggyplus/seeloggyplus.jar", "seeloggyplus/launcher.sh",
+                    "seeloggyplus/jre/bin/java", "seeloggyplus/jre/lib/jspawnhelper"}, "jar".getBytes());
+            Path staged = new UpdateInstaller().stage(zip, work.resolve("versions"), "0.8.0", null).directory();
+            for (String name : new String[] {"launcher.sh", "jre/bin/java", "jre/lib/jspawnhelper"}) {
+                Path file = staged.resolve(name);
+                assertTrue(Files.isRegularFile(file));
+                if (Files.getFileAttributeView(file, java.nio.file.attribute.PosixFileAttributeView.class) != null)
+                    assertTrue(Files.isExecutable(file), name + " must remain executable after ZIP extraction");
+            }
+        } finally { deleteRecursively(work); }
+    }
+
     private static void deleteRecursively(Path path) throws IOException {
         if (path == null || !Files.exists(path)) {
             return;

@@ -64,7 +64,7 @@ class FileManagerStatePersistenceTest {
     }
 
     @Test
-    @DisplayName("Should save and restore last opened location and file")
+    @DisplayName("Startup selects local while preserving the last remote server and file")
     void testSaveAndRestoreLastLocationAndFile() throws Exception {
         UnifiedFileManagerDialogController controller = new UnifiedFileManagerDialogController();
         InMemoryPreferenceService prefService = new InMemoryPreferenceService();
@@ -111,9 +111,9 @@ class FileManagerStatePersistenceTest {
         restoreLocMethod.setAccessible(true);
         restoreLocMethod.invoke(controller);
 
-        assertEquals(1, locationTree.getSelectionModel().getSelectedIndex());
-        assertEquals("Server 2",
-                locationTree.getSelectionModel().getSelectedItem().getValue().getServer().getName());
+        assertEquals(0, locationTree.getSelectionModel().getSelectedIndex());
+        assertTrue(locationTree.getSelectionModel().getSelectedItem().getValue().isLocal());
+        assertEquals("server2", prefService.getPreferencesByCode("file_manager_last_server_id").orElse(null));
     }
 
     @Test

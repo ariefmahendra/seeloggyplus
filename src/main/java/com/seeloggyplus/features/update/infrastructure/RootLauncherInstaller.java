@@ -18,8 +18,11 @@ public final class RootLauncherInstaller {
 
     public static boolean heal(Path root) throws IOException {
         Path target = root.resolve(FILE_NAME);
-        if (Files.isRegularFile(target) && isConsoleFree(Files.readString(target, StandardCharsets.UTF_8))) {
-            return false;
+        boolean legacyParser = false;
+        if (Files.isRegularFile(target)) {
+            String existing = Files.readString(target, StandardCharsets.UTF_8);
+            legacyParser = existing.contains("set VALUE=!VALUE: =!");
+            if (isConsoleFree(existing) && !legacyParser) return false;
         }
         Optional<Path> staged = stagedLauncher(root);
         if (staged.isEmpty()) {
@@ -29,6 +32,7 @@ public final class RootLauncherInstaller {
         if (!isConsoleFree(packaged)) {
             return false;
         }
+        if (legacyParser && !packaged.contains("if defined VALUE")) return false;
         Files.createDirectories(root);
         Files.write(target, packaged.getBytes(StandardCharsets.UTF_8));
         return true;
@@ -39,12 +43,37 @@ public final class RootLauncherInstaller {
     }
 
     private static Optional<Path> stagedLauncher(Path root) throws IOException {
+        return stagedLauncher(root, FILE_NAME);
+    }
+
+    public static boolean healUnix(Path root) throws IOException {
+        Path target = root.resolve("launcher.sh");
+        if (Files.isRegularFile(target)) {
+            String existing = Files.readString(target, StandardCharsets.UTF_8);
+            if (existing.contains("cd \"$SCRIPT_DIR\"")) return false;
+            if (!existing.contains("SCRIPT_DIR=") || !existing.contains("APP_JAR=")) return false;
+        }
+        Optional<Path> staged = stagedLauncher(root, "launcher.sh");
+        if (staged.isEmpty()) return false;
+        String packaged = Files.readString(staged.get(), StandardCharsets.UTF_8);
+        if (!packaged.contains("cd \"$SCRIPT_DIR\"")) return false;
+        Files.createDirectories(root);
+        Files.writeString(target, packaged, StandardCharsets.UTF_8);
+        if (Files.getFileAttributeView(target, java.nio.file.attribute.PosixFileAttributeView.class) != null) {
+            var permissions = Files.getPosixFilePermissions(target);
+            permissions.add(java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE);
+            Files.setPosixFilePermissions(target, permissions);
+        }
+        return true;
+    }
+
+    private static Optional<Path> stagedLauncher(Path root, String name) throws IOException {
         UpdateLayout layout = new UpdateLayout(root);
         Optional<String> current = layout.currentVersion();
         if (current.isEmpty()) {
             return Optional.empty();
         }
-        Path candidate = layout.versionDir(current.get()).resolve(FILE_NAME);
+        Path candidate = layout.versionDir(current.get()).resolve(name);
         return Files.isRegularFile(candidate) ? Optional.of(candidate) : Optional.empty();
     }
 }

@@ -128,3 +128,6 @@ target/
 ./seeloggyplus.db
 /.data
 .data/.keystore
+
+test-results/
+__pycache__/

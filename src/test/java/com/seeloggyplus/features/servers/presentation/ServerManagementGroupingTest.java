@@ -71,7 +71,7 @@ class ServerManagementGroupingTest {
         for (String path : service.getGroupNames()) {
             if (path.startsWith(group)) service.deleteGroup(path);
         }
-        WaitForAsyncUtils.asyncFx(() -> AppTheme.setTheme(AppTheme.Theme.GRAPHITE)).get();
+        WaitForAsyncUtils.asyncFx(() -> AppTheme.setTheme(AppTheme.Theme.LIGHT)).get();
     }
 
     @Test void sharedNestedAndEmptyGroupsFilterServersTogetherWithSearch() throws Exception {
@@ -220,10 +220,13 @@ class ServerManagementGroupingTest {
                     for (boolean hover : new boolean[] { false, true }) {
                         button.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("hover"), hover);
                         root.applyCss(); root.layout();
-                        Color bg = (Color) button.getBackground().getFills().getFirst().getFill();
+                        Color bg = com.seeloggyplus.shared.ui.RenderedColors.background(button);
                         assertTrue(contrast((Color) button.getTextFill(), bg) >= 4.5, theme + id);
                         assertTrue(button.getHeight() >= 24, id);
-                        assertTrue(button.getWidth() >= 60, id);
+                        assertEquals(28, button.getWidth(), 1, id);
+                        assertNotNull(button.getTooltip());
+                        var icon = (de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView) button.getGraphic();
+                        assertTrue(contrast((Color) icon.getFill(), bg) >= 3.0, theme + id + " icon");
                     }
                     button.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("hover"), false);
                 }

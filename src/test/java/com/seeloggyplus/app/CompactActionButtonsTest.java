@@ -37,7 +37,7 @@ class CompactActionButtonsTest {
 
     @AfterEach
     void resetTheme(FxRobot robot) {
-        robot.interact(() -> AppTheme.setTheme(AppTheme.Theme.GRAPHITE));
+        robot.interact(() -> AppTheme.setTheme(AppTheme.Theme.LIGHT));
     }
 
     @Test
@@ -53,7 +53,8 @@ class CompactActionButtonsTest {
                 ButtonBase reference = button(main, "refreshButton");
                 for (String id : new String[]{"prettifyJsonButton", "prettifyXmlButton", "copyButton", "clearDetailButton", "pinBottomPanelButton"}) {
                     ButtonBase action = button(main, id);
-                    assertEquals(reference.getPadding(), action.getPadding(), id + " should match toolbar padding");
+                    assertEquals(reference.getPadding().getTop(), action.getPadding().getTop(), id + " should match toolbar vertical density");
+                    assertEquals(reference.getPadding().getBottom(), action.getPadding().getBottom(), id + " should match toolbar vertical density");
                     assertTrue(action.getHeight() <= reference.getHeight() + 2, id + " should match toolbar height");
                     assertTrue(action.getWidth() <= reference.getWidth() + 6, id + " should remain an icon-sized control");
                 }
@@ -78,7 +79,8 @@ class CompactActionButtonsTest {
                     manager.layout();
                     for (String id : new String[]{"newGroupButton", "favoriteCurrentButton", "manageServersButton", "cancelButton", "previewButton", "tailButton", "openButton"}) {
                         ButtonBase action = button(manager, id);
-                        assertEquals(padding, action.getPadding(), id + " should match toolbar padding");
+                        assertEquals(padding.getTop(), action.getPadding().getTop(), id + " should match toolbar vertical density");
+                        assertEquals(padding.getBottom(), action.getPadding().getBottom(), id + " should match toolbar vertical density");
                         assertTrue(action.getHeight() <= height + 2, id + " should match toolbar height");
                         FontAwesomeIconView icon = assertInstanceOf(FontAwesomeIconView.class, action.getGraphic());
                         assertEquals(12, icon.getFont().getSize(), 0.01, id + " should use compact readable glyphs");
@@ -112,7 +114,8 @@ class CompactActionButtonsTest {
                 ButtonBase reference = button(main, "refreshButton");
                 for (String id : new String[]{"pinLeftPanelButton", "clearRecentButton"}) {
                     ButtonBase action = button(main, id);
-                    assertEquals(reference.getPadding(), action.getPadding(), id + " should match toolbar padding");
+                    assertEquals(reference.getPadding().getTop(), action.getPadding().getTop(), id + " should match toolbar vertical density");
+                    assertEquals(reference.getPadding().getBottom(), action.getPadding().getBottom(), id + " should match toolbar vertical density");
                     assertTrue(action.getHeight() <= reference.getHeight() + 2, id + " should match toolbar height");
                 }
                 var tree = assertInstanceOf(Region.class, main.lookup("#recentFilesTreeView"));

@@ -1,5 +1,7 @@
 package com.seeloggyplus.features.search.presentation;
 
+import com.seeloggyplus.shared.ui.ThemedAlerts;
+
 import com.seeloggyplus.shared.model.FileInfo;
 import com.seeloggyplus.shared.model.PreviewLine;
 import com.seeloggyplus.features.search.domain.RemoteLogSearchMatch;
@@ -17,6 +19,7 @@ import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
@@ -155,6 +158,13 @@ public class RemoteLogSearchDialogController {
 
     @FXML
     public void initialize() {
+        Tooltip previewTooltip = new Tooltip();
+        previewTooltip.textProperty().bind(previewLabel.textProperty());
+        previewLabel.setTooltip(previewTooltip);
+        Tooltip pathTooltip = new Tooltip();
+        pathTooltip.textProperty().bind(rootPathField.textProperty());
+        rootPathField.setTooltip(pathTooltip);
+        progressIndicator.managedProperty().bind(progressIndicator.visibleProperty());
         if (rootPane != null) {
             rootPane.getStyleClass().add("remote-log-search-dialog");
         }
@@ -472,7 +482,7 @@ public class RemoteLogSearchDialogController {
         ButtonType openJump = new ButtonType("Open & Jump (download)", ButtonBar.ButtonData.OTHER);
         ButtonType cancel = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
 
-        Alert alert = new Alert(Alert.AlertType.WARNING);
+        Alert alert = ThemedAlerts.create(Alert.AlertType.WARNING);
         if (closeButton != null && closeButton.getScene() != null) {
             alert.initOwner(closeButton.getScene().getWindow());
         }

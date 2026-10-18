@@ -47,9 +47,10 @@ public class SearchResultPanel extends VBox {
     private Color lineNumColor;
     private Color lineNumBg;
     private Color selectionColor;
+    private final javafx.beans.value.ChangeListener<javafx.scene.Node> selectionFocusListener = (owner, previous, current) -> render();
     private Color highlightBg;
     private Color hoverColor;
-    private AppTheme.Theme paletteTheme = AppTheme.Theme.GRAPHITE;
+    private AppTheme.Theme paletteTheme = AppTheme.getTheme();
 
     private final Label headerLabel;
     private final Canvas canvas;
@@ -156,10 +157,12 @@ public class SearchResultPanel extends VBox {
 
         setupMouseHandlers();
 
-        applyPalette(AppTheme.Theme.GRAPHITE);
+        applyPalette(AppTheme.getTheme());
 
         sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (oldScene != null) oldScene.focusOwnerProperty().removeListener(selectionFocusListener);
             if (newScene != null) {
+                newScene.focusOwnerProperty().addListener(selectionFocusListener);
                 Parent themeRoot = newScene.getRoot();
                 if (themeRoot != null) {
                     themeRoot.getStyleClass().addListener(
@@ -173,10 +176,10 @@ public class SearchResultPanel extends VBox {
     private void applyPalette(AppTheme.Theme theme) {
         this.paletteTheme = theme;
         bgColor = ThemePalette.color("-sl-surface", theme);
-        textColor = ThemePalette.color("-sl-text", theme);
+        textColor = ThemePalette.color("-sl-log-text", theme);
         lineNumColor = ThemePalette.color("-sl-canvas-line-number", theme);
         lineNumBg = ThemePalette.color("-sl-canvas-line-number-bg", theme);
-        selectionColor = SelectionColors.background(theme == AppTheme.Theme.DARK);
+        selectionColor = SelectionColors.background(theme);
         highlightBg = ThemePalette.color("-sl-canvas-highlight", theme);
         hoverColor = ThemePalette.color("-sl-canvas-hover", theme);
         setBackground(new Background(new BackgroundFill(bgColor, CornerRadii.EMPTY, Insets.EMPTY)));
@@ -184,11 +187,11 @@ public class SearchResultPanel extends VBox {
     }
 
     public void setDarkMode(boolean dark) {
-        setTheme(dark ? AppTheme.Theme.DARK : AppTheme.Theme.GRAPHITE);
+        setTheme(dark ? AppTheme.Theme.DARK : AppTheme.Theme.LIGHT);
     }
 
     public void setTheme(AppTheme.Theme theme) {
-        AppTheme.Theme target = theme == null ? AppTheme.Theme.GRAPHITE : theme;
+        AppTheme.Theme target = theme == null ? AppTheme.Theme.LIGHT : theme;
         if (this.paletteTheme == target) {
             return;
         }
@@ -199,13 +202,13 @@ public class SearchResultPanel extends VBox {
         Scene scene = getScene();
         Parent themeRoot = scene == null ? null : scene.getRoot();
         if (themeRoot == null) {
-            setTheme(AppTheme.Theme.GRAPHITE);
+            setTheme(AppTheme.Theme.LIGHT);
         } else if (themeRoot.getStyleClass().contains("theme-dark")) {
             setTheme(AppTheme.Theme.DARK);
         } else if (themeRoot.getStyleClass().contains("theme-light")) {
             setTheme(AppTheme.Theme.LIGHT);
         } else {
-            setTheme(AppTheme.Theme.GRAPHITE);
+            setTheme(AppTheme.Theme.LIGHT);
         }
     }
 
@@ -412,7 +415,7 @@ public class SearchResultPanel extends VBox {
             }
 
             if (matchIdx == selectedIndex) {
-                gc.setFill(selectionColor);
+                gc.setFill(SelectionColors.active(this) ? selectionColor : SelectionColors.background(paletteTheme, false));
                 gc.fillRect(leftMargin, y, width - leftMargin, LINE_HEIGHT);
             }
 

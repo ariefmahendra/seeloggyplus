@@ -146,7 +146,7 @@ them windowed or optional.
 ## 7. Theme & contrast (MUST)
 
 - Colours only via `-sl-*` tokens; the token set must match across
-  Graphite/Light/Dark (`ThemeTokensTest`).
+  Light/Dark (`ThemeTokensTest`).
 - Chrome icons/text use `-sl-chrome-text` / `-sl-accent-text`.
 - MUST NOT lower thresholds in `IconContrastTest` / `LabelContrastTest`.
 
@@ -197,3 +197,5 @@ Full checklist: `docs/RELEASING.md`. Sequence:
 6. Published description needs fixing: edit `CHANGELOG.md` + the notes file, push, then
    `gh release edit X.Y.Z --notes-file docs/release-notes/X.Y.Z.md` (or the GitHub API
    via `git credential fill`).
+
+Online documentation is published at https://seeloggyplus-doc.vercel.app/. Offline help is removed in 0.8.0; website guides and README are the user-documentation sources of truth. DocumentationScreenshotGeneratorTest replaces the offline screenshot generator.

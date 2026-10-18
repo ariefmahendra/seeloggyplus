@@ -1,18 +1,14 @@
 package com.seeloggyplus.app;
 
 import com.seeloggyplus.shared.ui.AppTheme;
-import javafx.application.Platform;
+import com.seeloggyplus.shared.ui.RenderedColors;
+import javafx.css.PseudoClass;
 import javafx.fxml.FXMLLoader;
-import javafx.scene.Node;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.layout.Background;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.LinearGradient;
-import javafx.scene.paint.Paint;
-import javafx.scene.paint.Stop;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
@@ -21,152 +17,52 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
-
-import java.util.concurrent.atomic.AtomicReference;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(ApplicationExtension.class)
 class DialogThemeTest {
-
     private Stage stage;
+    private Parent root;
+    @Start void start(Stage stage) { this.stage=stage; }
+    @AfterEach void reset() throws Exception { fx(() -> AppTheme.setTheme(AppTheme.Theme.LIGHT)); }
 
-    @Start
-    void start(Stage stage) {
-        this.stage = stage;
-    }
-
-    @AfterEach
-    void resetTheme() {
-        onFxThread(() -> AppTheme.setDark(false));
-    }
-
-    @Test
-    void aboutDialogTextFollowsTheme() {
-        onFxThread(() -> {
-            Parent root = load("/fxml/AboutDialog.fxml");
-            show(root);
-
-            Label version = (Label) lookup(root, "#versionLabel");
-            Text description = (Text) lookup(root, ".about-description");
-            Label copyright = (Label) lookup(root, ".about-copyright");
-            assertNotNull(version);
-            assertNotNull(description);
-            assertNotNull(copyright);
-
-            AppTheme.setDark(true);
-            apply(root);
-            assertEquals(Color.web("#9aa3ac"), version.getTextFill(), "version must use dark muted text");
-            assertEquals(Color.web("#b8c0c8"), description.getFill(), "description must use dark secondary text");
-            assertEquals(Color.web("#6f787f"), copyright.getTextFill(), "copyright must use dark faint text");
-
-            AppTheme.setDark(false);
-        });
-    }
-
-    @Test
-    void updateDialogBannerIsDarkInDarkMode() {
-        onFxThread(() -> {
-            Parent root = load("/fxml/UpdateDialog.fxml");
-            show(root);
-
-            Region header = (Region) lookup(root, ".update-dialog-header");
-            assertNotNull(header);
-
-            AppTheme.setDark(true);
-            apply(root);
-            Color stop = firstGradientStop(header);
-            assertNotNull(stop, "banner must be a gradient");
-            assertTrue(luminance(stop) < 0.30,
-                    "dark banner must be a dark tone, was " + stop);
-
-            AppTheme.setDark(false);
-        });
-    }
-
-    @Test
-    void primaryButtonMatchesDarkMode() {
-        onFxThread(() -> {
-            Parent root = load("/fxml/UpdateDialog.fxml");
-            show(root);
-            Region download = (Region) lookup(root, "#downloadButton");
-            assertNotNull(download);
-
-            assertEquals(Color.web("#343a40"), backgroundFill(download),
-                    "light primary button must be the graphite brand");
-
-            AppTheme.setDark(true);
-            apply(root);
-            assertEquals(Color.web("#3a424b"), backgroundFill(download),
-                    "dark primary/default button must be the darker graphite tone");
-
-            AppTheme.setDark(false);
-        });
-    }
-
-    private Parent load(String fxml) {
-        try {
-            return FXMLLoader.load(getClass().getResource(fxml));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private void show(Parent root) {
-        Scene scene = AppTheme.scene(root);
-        stage.setScene(scene);
-        stage.show();
-        apply(root);
-    }
-
-    private void apply(Parent root) {
-        root.applyCss();
-        root.layout();
-        WaitForAsyncUtils.waitForFxEvents();
-    }
-
-    private static Node lookup(Parent root, String selector) {
-        return root.lookup(selector);
-    }
-
-    private static Color firstGradientStop(Region region) {
-        Background bg = region.getBackground();
-        if (bg == null || bg.getFills().isEmpty()) {
-            return null;
-        }
-        Paint paint = bg.getFills().get(0).getFill();
-        if (paint instanceof LinearGradient gradient && !gradient.getStops().isEmpty()) {
-            Stop stop = gradient.getStops().get(0);
-            return stop.getColor();
-        }
-        return paint instanceof Color color ? color : null;
-    }
-
-    private static Color backgroundFill(Region region) {
-        Background bg = region.getBackground();
-        if (bg == null || bg.getFills().isEmpty()) {
-            return null;
-        }
-        Paint paint = bg.getFills().get(0).getFill();
-        return paint instanceof Color color ? color : null;
-    }
-
-    private static double luminance(Color c) {
-        return 0.299 * c.getRed() + 0.587 * c.getGreen() + 0.114 * c.getBlue();
-    }
-
-    private static void onFxThread(Runnable action) {
-        AtomicReference<Throwable> error = new AtomicReference<>();
-        Platform.runLater(() -> {
-            try {
-                action.run();
-            } catch (Throwable t) {
-                error.set(t);
+    @Test void aboutDialogTextFollowsTheme() throws Exception {
+        load("AboutDialog");
+        for(var theme:AppTheme.Theme.values()) fx(() -> {
+            AppTheme.setTheme(theme); apply();
+            for(String id:new String[]{"#versionLabel",".about-copyright"}) {
+                var label=(Label)root.lookup(id); readable((Color)label.getTextFill(),RenderedColors.background(label));
             }
+            var description=(Text)root.lookup(".about-description"); readable((Color)description.getFill(),RenderedColors.background(description));
         });
-        WaitForAsyncUtils.waitForFxEvents();
-        if (error.get() != null) {
-            throw new RuntimeException(error.get());
-        }
     }
+    @Test void updateHeaderUsesFlatSurfaceInEveryTheme() throws Exception {
+        load("UpdateDialog");
+        for(var theme:AppTheme.Theme.values()) fx(() -> {
+            AppTheme.setTheme(theme); apply();
+            var header=(Region)root.lookup(".update-dialog-header");
+            assertTrue(header.getBackground().getFills().getFirst().getFill() instanceof Color);
+            assertEquals(RenderedColors.background(root),RenderedColors.background(header));
+            var title=(Label)root.lookup("#titleLabel"); readable((Color)title.getTextFill(),RenderedColors.background(title));
+        });
+    }
+    @Test void primaryButtonKeepsDistinctNeutralFeedback() throws Exception {
+        load("UpdateDialog");
+        for(var theme:AppTheme.Theme.values()) fx(() -> {
+            AppTheme.setTheme(theme); apply(); var button=(Button)root.lookup("#downloadButton");
+            Color idle=RenderedColors.background(button);
+            button.pseudoClassStateChanged(PseudoClass.getPseudoClass("hover"),true); apply(); Color hover=RenderedColors.background(button);
+            assertNotEquals(idle,hover); readable((Color)button.getTextFill(),hover);
+            button.arm(); apply(); assertNotEquals(hover,RenderedColors.background(button)); readable((Color)button.getTextFill(),RenderedColors.background(button));
+            button.disarm(); button.pseudoClassStateChanged(PseudoClass.getPseudoClass("hover"),false);
+        });
+    }
+    private void load(String view) throws Exception {
+        fx(() -> { try { root=new FXMLLoader(getClass().getResource("/fxml/"+view+".fxml")).load(); } catch(Exception error) { throw new AssertionError(error); } stage.setScene(AppTheme.scene(root)); stage.show(); apply(); });
+    }
+    private void apply() { root.applyCss(); root.layout(); }
+    private void fx(Runnable action) throws Exception { WaitForAsyncUtils.asyncFx(action).get(); WaitForAsyncUtils.waitForFxEvents(); }
+    private void readable(Color text,Color bg) { assertTrue((Math.max(lum(text),lum(bg))+.05)/(Math.min(lum(text),lum(bg))+.05)>=4.5,text+" on "+bg); }
+    private double lum(Color c) { return .2126*linear(c.getRed())+.7152*linear(c.getGreen())+.0722*linear(c.getBlue()); }
+    private double linear(double v) { return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4); }
 }

@@ -1,150 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
-
-<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.seeloggyplus.features.servers.presentation.ServerManagementDialogController"
-            prefWidth="1200" prefHeight="650">
-    <top>
-        <VBox>
-            <ToolBar styleClass="app-toolbar">
-                <Button fx:id="addServerButton" text="Add Server">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="PLUS" size="14"/>
-                    </graphic>
-                </Button>
-
-                <Button fx:id="editServerButton" text="Edit">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="EDIT" size="14"/>
-                    </graphic>
-                </Button>
-
-                <Button fx:id="cloneServerButton" text="Clone">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="COPY" size="14"/>
-                    </graphic>
-                </Button>
-
-                <Button fx:id="deleteServerButton" text="Delete">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="TRASH" size="14"/>
-                    </graphic>
-                </Button>
-
-                <Region HBox.hgrow="ALWAYS"/>
-
-                <Button fx:id="refreshButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="REFRESH" size="14"/>
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Refresh"/>
-                    </tooltip>
-                </Button>
-            </ToolBar>
-
-            <HBox spacing="10">
-                <padding>
-                    <Insets top="10" right="10" bottom="10" left="10"/>
-                </padding>
-                <FontAwesomeIconView glyphName="SEARCH" size="16"/>
-                <TextField fx:id="searchField" promptText="Search servers..." HBox.hgrow="ALWAYS"/>
-                <Button text="Clear" fx:id="clearSearchButton"/>
-            </HBox>
-        </VBox>
-    </top>
-
-    <center>
-        <SplitPane dividerPositions="0.2">
-            <VBox spacing="8" minWidth="210" prefWidth="230">
-                <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
-                <Label text="Server groups" styleClass="section-title"/>
-                <Button fx:id="newGroupButton" text="New group..." maxWidth="Infinity"/>
-                <HBox spacing="6">
-                    <Button fx:id="renameGroupButton" text="Rename..." HBox.hgrow="ALWAYS" maxWidth="Infinity" disable="true"/>
-                    <Button fx:id="deleteGroupButton" text="Delete group" HBox.hgrow="ALWAYS" maxWidth="Infinity" disable="true"/>
-                </HBox>
-                <TreeView fx:id="groupTree" VBox.vgrow="ALWAYS"/>
-                <Button fx:id="moveToGroupButton" text="Move selected server..." maxWidth="Infinity" disable="true"/>
-            </VBox>
-        <TableView fx:id="serverTable" VBox.vgrow="ALWAYS">
-            <columns>
-                <TableColumn fx:id="nameColumn" text="NAME" prefWidth="150" minWidth="100"/>
-                <TableColumn fx:id="groupColumn" text="GROUP" prefWidth="150" minWidth="100"/>
-                <TableColumn fx:id="hostColumn" text="HOST" prefWidth="200" minWidth="150"/>
-                <TableColumn fx:id="portColumn" text="PORT" prefWidth="70" minWidth="60" maxWidth="80"/>
-                <TableColumn fx:id="usernameColumn" text="USERNAME" prefWidth="120" minWidth="80"/>
-                <TableColumn fx:id="defaultPathColumn" text="DEFAULT PATH" prefWidth="200" minWidth="150"/>
-                <TableColumn fx:id="lastUsedColumn" text="LAST USED" prefWidth="150" minWidth="120"/>
-            </columns>
-            <placeholder>
-                <VBox alignment="CENTER" spacing="10">
-                    <FontAwesomeIconView glyphName="SERVER" size="48" styleClass="empty-state-icon"/>
-                    <Label text="No SSH servers configured" styleClass="empty-state-title"/>
-                    <Label text="Click 'Add Server' to create a new SSH server configuration" styleClass="empty-state-subtitle"/>
-                </VBox>
-            </placeholder>
-        </TableView>
-        </SplitPane>
-    </center>
-
-    <bottom>
-        <VBox>
-            <padding>
-                <Insets top="15" right="15" bottom="15" left="15"/>
-            </padding>
-
-            <Label text="Server Details">
-                <padding>
-                    <Insets bottom="10"/>
-                </padding>
-            </Label>
-
-            <Separator/>
-
-            <GridPane hgap="15" vgap="8">
-                <padding>
-                    <Insets top="10"/>
-                </padding>
-                <columnConstraints>
-                    <ColumnConstraints minWidth="100" prefWidth="120"/>
-                    <ColumnConstraints hgrow="ALWAYS"/>
-                    <ColumnConstraints minWidth="100" prefWidth="120"/>
-                    <ColumnConstraints hgrow="ALWAYS"/>
-                </columnConstraints>
-
-                <Label text="Name:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                <Label fx:id="detailNameLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-
-                <Label text="Host:" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
-                <Label fx:id="detailHostLabel" text="-" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
-
-                <Label text="Username:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                <Label fx:id="detailUsernameLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
-
-                <Label text="Port:" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
-                <Label fx:id="detailPortLabel" text="-" GridPane.columnIndex="3" GridPane.rowIndex="1"/>
-
-                <Label text="Default Path:" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
-                <Label fx:id="detailPathLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="2" GridPane.columnSpan="3"/>
-
-                <Label text="Created:" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
-                <Label fx:id="detailCreatedLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
-
-                <Label text="Last Used:" GridPane.columnIndex="2" GridPane.rowIndex="3"/>
-                <Label fx:id="detailLastUsedLabel" text="-" GridPane.columnIndex="3" GridPane.rowIndex="3"/>
-            </GridPane>
-
-            <HBox spacing="10" alignment="CENTER_RIGHT">
-                <padding>
-                    <Insets top="15"/>
-                </padding>
-                <Button text="Close" fx:id="closeButton" prefWidth="100"/>
-            </HBox>
-        </VBox>
-    </bottom>
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.features.servers.presentation.ServerManagementDialogController" prefWidth="1000" prefHeight="640" styleClass="server-management-dialog, simple-dialog">
+<top><HBox fx:id="serverToolbar" spacing="6" alignment="CENTER_LEFT" styleClass="server-toolbar">
+<Button fx:id="addServerButton" text="Add Server"><graphic><FontAwesomeIconView glyphName="PLUS" size="12"/></graphic></Button>
+<Separator orientation="VERTICAL"/>
+<Button fx:id="editServerButton" accessibleText="Edit" styleClass="server-icon-button"><graphic><FontAwesomeIconView glyphName="EDIT" size="12"/></graphic><tooltip><Tooltip text="Edit"/></tooltip></Button><Button fx:id="cloneServerButton" accessibleText="Clone" styleClass="server-icon-button"><graphic><FontAwesomeIconView glyphName="COPY" size="12"/></graphic><tooltip><Tooltip text="Clone"/></tooltip></Button><Button fx:id="moveToGroupButton" accessibleText="Move to Group" styleClass="server-icon-button"><graphic><FontAwesomeIconView glyphName="FOLDER_OPEN" size="12"/></graphic><tooltip><Tooltip text="Move to Group"/></tooltip></Button><Button fx:id="deleteServerButton" accessibleText="Delete" styleClass="server-icon-button"><graphic><FontAwesomeIconView glyphName="TRASH" size="12"/></graphic><tooltip><Tooltip text="Delete"/></tooltip></Button><Region HBox.hgrow="ALWAYS"/><TextField fx:id="searchField" promptText="Filter servers..." prefWidth="220" minWidth="160" maxWidth="220"/>
+<Button fx:id="clearSearchButton" accessibleText="Clear Filter" styleClass="server-icon-button"><graphic><FontAwesomeIconView glyphName="TIMES" size="12"/></graphic><tooltip><Tooltip text="Clear Filter"/></tooltip></Button><Button fx:id="refreshButton" accessibleText="Refresh" styleClass="server-icon-button"><graphic><FontAwesomeIconView glyphName="REFRESH" size="12"/></graphic><tooltip><Tooltip text="Refresh"/></tooltip></Button></HBox></top>
+<center><SplitPane fx:id="serverSplitPane" dividerPositions="0.2">
+<VBox fx:id="groupSidebar" minWidth="160" prefWidth="200" maxWidth="320" spacing="8" styleClass="server-group-sidebar"><padding><Insets top="12" right="10" bottom="10" left="10"/></padding>
+<HBox alignment="CENTER_LEFT" spacing="4" styleClass="server-group-header"><Label text="Groups" styleClass="section-title" minWidth="0"/><Region HBox.hgrow="ALWAYS"/>
+<Button fx:id="newGroupButton" accessibleText="New Group" styleClass="server-icon-button"><graphic><FontAwesomeIconView glyphName="PLUS" size="12"/></graphic><tooltip><Tooltip text="New Group"/></tooltip></Button><Button fx:id="renameGroupButton" accessibleText="Rename Group" styleClass="server-icon-button"><graphic><FontAwesomeIconView glyphName="EDIT" size="12"/></graphic><tooltip><Tooltip text="Rename Group"/></tooltip></Button><Button fx:id="deleteGroupButton" accessibleText="Delete Group" styleClass="server-icon-button"><graphic><FontAwesomeIconView glyphName="TRASH" size="12"/></graphic><tooltip><Tooltip text="Delete Group"/></tooltip></Button></HBox><TreeView fx:id="groupTree" VBox.vgrow="ALWAYS"/></VBox>
+<TableView fx:id="serverTable" fixedCellSize="28" tableMenuButtonVisible="true"><columns>
+<TableColumn fx:id="nameColumn" text="Name" prefWidth="160" minWidth="160"/>
+<TableColumn fx:id="hostColumn" text="Host" prefWidth="220" minWidth="180"/>
+<TableColumn fx:id="portColumn" text="Port" prefWidth="64" minWidth="48" maxWidth="64"/>
+<TableColumn fx:id="usernameColumn" text="Username" prefWidth="110" minWidth="80"/>
+<TableColumn fx:id="groupColumn" text="Group" prefWidth="150" visible="false"/>
+<TableColumn fx:id="defaultPathColumn" text="Default Path" prefWidth="200" visible="false"/>
+<TableColumn fx:id="lastUsedColumn" text="Last Used" prefWidth="150" visible="false"/>
+</columns><placeholder><VBox alignment="CENTER" spacing="8"><FontAwesomeIconView glyphName="SERVER" size="32" styleClass="empty-state-icon"/><Label text="No SSH servers configured" styleClass="empty-state-title"/><Label text="Click 'Add Server' to create a new SSH server configuration" styleClass="empty-state-subtitle" wrapText="true"/></VBox></placeholder></TableView>
+</SplitPane></center>
+<bottom><VBox>
+<VBox fx:id="detailsPanel" visible="false" managed="false" spacing="4" styleClass="server-details"><padding><Insets top="6" right="10" bottom="6" left="10"/></padding>
+<HBox spacing="8"><Label text="Name:" styleClass="text-secondary"/><Label fx:id="detailNameLabel" text="-" minWidth="0" maxWidth="Infinity" HBox.hgrow="ALWAYS"/><Label text="Connection:" styleClass="text-secondary"/><Label fx:id="detailConnectionLabel" text="-" minWidth="0" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
+<Label fx:id="detailHostLabel" text="-" visible="false" managed="false"/><Label fx:id="detailUsernameLabel" text="-" visible="false" managed="false"/><Label fx:id="detailPortLabel" text="-" visible="false" managed="false"/></HBox>
+<HBox spacing="8"><Label text="Default Path:" styleClass="text-secondary"/><Label fx:id="detailPathLabel" text="-" minWidth="0" maxWidth="Infinity" HBox.hgrow="ALWAYS"/></HBox>
+<HBox spacing="8"><Label text="Created:" styleClass="text-secondary"/><Label fx:id="detailCreatedLabel" text="-"/><Region HBox.hgrow="ALWAYS"/><Label text="Last Used:" styleClass="text-secondary"/><Label fx:id="detailLastUsedLabel" text="-"/></HBox>
+</VBox>
+<HBox fx:id="serverFooter" spacing="8" alignment="CENTER_LEFT" styleClass="server-footer"><Label fx:id="serverCountLabel" text="0 servers"/><Label fx:id="selectionLabel" text="No selection" minWidth="0" maxWidth="Infinity" HBox.hgrow="ALWAYS"/><ToggleButton fx:id="detailsButton" text="Details" disable="true"/><Button fx:id="closeButton" text="Close" cancelButton="true"/></HBox>
+</VBox></bottom>
 </BorderPane>

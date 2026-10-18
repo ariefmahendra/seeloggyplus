@@ -1,132 +1,7 @@
 .root {
-
-    -sl-chrome: #2b3138;
-    -sl-chrome-hover: #3a424b;
-    -sl-chrome-pressed: #4a535e;
-    -sl-chrome-text: #d7dbe0;
-    -sl-chrome-text-muted: #a0a8b0;
-
-
-    -sl-brand: #343a40;
-    -sl-brand-hover: #212529;
-    -sl-brand-pressed: #111418;
-    -sl-brand-soft: #e9ecef;
-    -sl-brand-faint: rgba(52, 58, 64, 0.25);
-    -sl-on-brand: #ffffff;
-
-
-    -sl-accent: #4a535e;
-    -sl-accent-hover: #3a424b;
-    -sl-accent-pressed: #2b3138;
-    -sl-accent-text: #d7dbe0;
-
-
-    -sl-bg: #f1f3f5;
-    -sl-surface: #ffffff;
-    -sl-surface-alt: #f8f9fa;
-    -sl-surface-sunken: #e9ecef;
-    -sl-overlay: rgba(0, 0, 0, 0.45);
-
-
-    -sl-border: #ced4da;
-    -sl-border-soft: #e9ecef;
-    -sl-border-strong: #adb5bd;
-
-
-    -sl-text: #1f2329;
-    -sl-text-secondary: #495057;
-    -sl-text-muted: #6c757d;
-    -sl-text-faint: #828a91;
-    -sl-text-inverse: #ffffff;
-    -sl-text-version: #aeb6bf;
-    -sl-text-section: #343a40;
-
-
-    -sl-preview-target: #dde3e9;
-
-    -sl-selection-bg: rgba(52, 58, 64, 0.18);
-    -sl-canvas-line-number: #6c757d;
-    -sl-canvas-line-number-bg: #f1f3f5;
-    -sl-canvas-highlight: #ffff00;
-    -sl-canvas-hover: #e6f0ff;
-
-
-    -sl-success: #2f855a;
-    -sl-warning: #92400e;
-    -sl-danger: #c0392b;
-    -sl-danger-hover: #a03325;
-    -sl-danger-soft: #fbeeed;
-    -sl-danger-soft-hover: #f6dedb;
-    -sl-info: #2b6cb0;
-    -sl-live: #2f855a;
-
-
-    -sl-chrome-success: #4ade80;
-    -sl-chrome-warning: #fbbf24;
-    -sl-chrome-danger: #fca5a5;
-
-    -sl-memory-track: #4a535e;
-
-
-    -sl-scroll-track: #f1f3f5;
-    -sl-scroll-thumb: #c1c7cd;
-    -sl-scroll-thumb-hover: #98a1a9;
-    -sl-scroll-thumb-pressed: #6b7480;
-
-
-    -sl-level-fatal-bg: #fde8e8;
-    -sl-level-fatal-fg: #7f1d1d;
-    -sl-level-error-bg: #fde8e8;
-    -sl-level-error-fg: #b91c1c;
-    -sl-level-warn-bg: #fdf3e3;
-    -sl-level-warn-fg: #92400e;
-    -sl-level-info-bg: #e8f0fe;
-    -sl-level-info-fg: #1d4ed8;
-    -sl-level-debug-bg: #eef0f2;
-    -sl-level-debug-fg: #4b5563;
-    -sl-level-trace-bg: #f4f5f6;
-    -sl-level-trace-fg: #6b7280;
-
-    -sl-level-fatal-bar: #b91c1c;
-    -sl-level-error-bar: #dc2626;
-    -sl-level-warn-bar: #d97706;
-    -sl-level-fatal-tint: #fdecec;
-    -sl-level-error-tint: #fdecec;
-    -sl-level-warn-tint: #fdf8e8;
-
-    -sl-row-error-bg: #fdecec;
-    -sl-row-error-sel: #fbd9d9;
-    -sl-row-warn-bg: #fdf8e8;
-    -sl-row-warn-sel: #fbf0c9;
-
-
-    -sl-syntax-error: #b91c1c;
-    -sl-syntax-warn: #92400e;
-    -sl-syntax-info: #2b6cb0;
-    -sl-syntax-debug: #2f855a;
-    -sl-syntax-trace: #6c757d;
-    -sl-syntax-default: #1f2329;
-    -sl-syntax-selection: #1d4ed8;
-    -sl-syntax-selected-line: #e9ecef;
-    -sl-syntax-json-key: #0b5563;
-    -sl-syntax-json-string: #2f855a;
-    -sl-syntax-json-number: #b45309;
-    -sl-syntax-json-boolean: #6b21a8;
-    -sl-syntax-json-null: #6c757d;
-    -sl-syntax-json-punct: #343a40;
-    -sl-syntax-xml-tag: #1e3a8a;
-    -sl-syntax-xml-attr: #b45309;
-    -sl-syntax-xml-equals: #343a40;
-    -sl-syntax-xml-value: #2f855a;
-    -sl-syntax-xml-comment: #6c757d;
-    -sl-syntax-xml-decl: #0f766e;
-    -sl-syntax-xml-cdata: #9d174d;
-
-
     -fx-font-family: "Segoe UI";
     -fx-font-size: 12px;
     -fx-font-smoothing-type: gray;
-
 
     -fx-accent: -sl-brand;
     -fx-focus-color: -sl-brand;
@@ -135,7 +10,6 @@
     -fx-highlight-text-fill: -sl-text;
 }
 
-
 .app-menubar {
     -fx-background-color: -sl-chrome;
 }
@@ -143,18 +17,6 @@
 .app-menubar .label {
     -fx-text-fill: -sl-chrome-text;
 }
-
-.app-menubar .menu:hover,
-.app-menubar .menu:showing {
-    -fx-background-color: -sl-accent-hover;
-}
-
-.app-menubar .menu:hover > .label,
-.app-menubar .menu:showing > .label,
-.app-menubar .menu:focused > .label {
-    -fx-text-fill: -sl-accent-text;
-}
-
 
 .app-toolbar {
     -fx-background-color: -sl-chrome;
@@ -172,30 +34,12 @@
     -fx-background-color: transparent;
     -fx-background-insets: 0;
     -fx-background-radius: 3;
-    -fx-text-fill: -sl-chrome-text;
-    -fx-padding: 4 7 4 7;
+    -fx-text-fill: -sl-button-text;
+    -fx-padding: 3 6 3 6;
     -fx-cursor: hand;
-
     -fx-border-color: transparent;
-    -fx-border-width: 1;
     -fx-border-radius: 3;
 }
-
-.app-toolbar .button:hover,
-.app-toolbar .toggle-button:hover {
-    -fx-background-color: -sl-accent-hover;
-}
-
-.app-toolbar .button:pressed,
-.app-toolbar .toggle-button:pressed {
-    -fx-background-color: -sl-accent-pressed;
-}
-
-.app-toolbar .toggle-button:selected,
-.app-toolbar .toggle-button:selected:hover {
-    -fx-background-color: -sl-accent;
-}
-
 
 .app-toolbar .button:hover .glyph-icon,
 .app-toolbar .button:hover FontAwesomeIconView,
@@ -207,21 +51,16 @@
 .app-toolbar .toggle-button:pressed FontAwesomeIconView,
 .app-toolbar .toggle-button:selected .glyph-icon,
 .app-toolbar .toggle-button:selected FontAwesomeIconView {
-    -fx-fill: -sl-accent-text;
-    fill: -sl-accent-text;
-}
-
-.app-toolbar .button:disabled,
-.app-toolbar .toggle-button:disabled {
-    -fx-opacity: 0.45;
+    -fx-fill: -sl-button-text;
+    fill: -sl-button-text;
 }
 
 .app-toolbar .button .glyph-icon,
 .app-toolbar .toggle-button .glyph-icon,
 .app-toolbar .button FontAwesomeIconView,
 .app-toolbar .toggle-button FontAwesomeIconView {
-    -fx-fill: -sl-chrome-text;
-    fill: -sl-chrome-text;
+    -fx-fill: -sl-button-text;
+    fill: -sl-button-text;
 }
 
 .app-toolbar .separator .line {
@@ -232,41 +71,6 @@
 .app-toolbar .text-field {
     -fx-background-radius: 3;
 }
-
-
-.app-menubar .menu:focused {
-    -fx-background-color: -sl-accent-hover;
-}
-
-.app-toolbar .button:focused,
-.app-toolbar .toggle-button:focused,
-.status-bar .button:focused {
-    -fx-border-color: -sl-accent;
-    -fx-border-width: 1;
-    -fx-border-radius: 3;
-    -fx-text-fill: -sl-chrome-text;
-}
-
-.app-toolbar .button:focused,
-.status-bar .button:focused {
-    -fx-background-color: transparent;
-}
-
-
-.app-toolbar .button:hover,
-.app-toolbar .button:pressed,
-.status-bar .button:hover,
-.status-bar .button:pressed {
-    -fx-text-fill: -sl-accent-text;
-}
-
-.app-toolbar .toggle-button:hover,
-.app-toolbar .toggle-button:pressed,
-.app-toolbar .toggle-button:selected,
-.app-toolbar .toggle-button:selected:hover {
-    -fx-text-fill: -sl-accent-text;
-}
-
 
 .status-bar {
     -fx-padding: 2 10 2 10;
@@ -298,16 +102,10 @@
     -fx-background-color: transparent;
     -fx-background-insets: 0;
     -fx-background-radius: 3;
-    -fx-text-fill: -sl-chrome-text;
+    -fx-text-fill: -sl-button-text;
     -fx-cursor: hand;
-
     -fx-border-color: transparent;
-    -fx-border-width: 1;
     -fx-border-radius: 3;
-}
-
-.status-bar .button:hover {
-    -fx-background-color: -sl-accent-hover;
 }
 
 .status-memory-bar {
@@ -317,7 +115,6 @@
     -fx-min-height: 10;
     -fx-max-height: 10;
 }
-
 
 .status-memory-bar > .track {
     -fx-background-color: -sl-memory-track;
@@ -353,7 +150,6 @@
     -fx-text-fill: -sl-accent-text;
 }
 
-
 .section-title {
     -fx-font-weight: bold;
     -fx-font-size: 14px;
@@ -380,7 +176,6 @@
     -fx-text-fill: -sl-text-secondary;
 }
 
-
 .about-version {
     -fx-text-fill: -sl-text-muted;
 }
@@ -392,7 +187,6 @@
 .about-description {
     -fx-fill: -sl-text-secondary;
 }
-
 
 .about-contact-label {
     -fx-text-fill: -sl-text-secondary;
@@ -412,131 +206,49 @@
     -fx-text-fill: -sl-info;
 }
 
-
 .glyph-icon,
 FontAwesomeIconView {
     -fx-fill: -sl-text;
 }
 
-
 .button,
 .toggle-button {
-    -fx-background-color: -sl-surface;
+    -fx-background-color: transparent;
     -fx-background-radius: 3;
-    -fx-border-color: -sl-border;
-    -fx-border-radius: 3;
-    -fx-border-width: 1;
-    -fx-text-fill: -sl-text;
-    -fx-padding: 5 12 5 12;
-    -fx-cursor: hand;
-}
-
-.button:hover,
-.toggle-button:hover {
-    -fx-background-color: -sl-surface-sunken;
-}
-
-.button:pressed,
-.toggle-button:pressed {
-    -fx-background-color: -sl-border-soft;
-}
-
-.button:focused,
-.toggle-button:focused {
-    -fx-border-color: -sl-accent;
-}
-
-.button:disabled,
-.toggle-button:disabled {
-    -fx-opacity: 0.6;
-}
-
-
-.button:focused,
-.toggle-button:focused {
-    -fx-background-color: -sl-surface;
-    -fx-text-fill: -sl-text;
-    -fx-border-color: -sl-accent;
-}
-
-
-.button:default {
-    -fx-background-color: -sl-brand;
-    -fx-text-fill: -sl-on-brand;
     -fx-border-color: transparent;
-}
-
-.button:default:hover {
-    -fx-background-color: -sl-brand-hover;
-}
-
-.button:default:pressed {
-    -fx-background-color: -sl-brand-pressed;
-}
-
-.button:default:focused {
-    -fx-background-color: -sl-brand;
-    -fx-text-fill: -sl-on-brand;
-    -fx-border-color: -sl-accent;
+    -fx-border-radius: 3;
+    -fx-text-fill: -sl-button-text;
+    -fx-padding: 4 11 4 11;
+    -fx-cursor: hand;
 }
 
 .button:default .glyph-icon,
 .button:default FontAwesomeIconView {
-    -fx-fill: -sl-on-brand;
+    -fx-fill: -sl-button-text;
 }
 
 .btn-primary {
-    -fx-background-color: -sl-brand;
-    -fx-text-fill: -sl-on-brand;
+    -fx-background-color: transparent;
+    -fx-text-fill: -sl-button-text;
     -fx-font-weight: bold;
     -fx-background-radius: 3;
     -fx-border-color: transparent;
-    -fx-padding: 5 16;
+    -fx-padding: 4 15;
     -fx-cursor: hand;
 }
 
-.btn-primary:hover {
-    -fx-background-color: -sl-brand-hover;
-}
-
-.btn-primary:pressed {
-    -fx-background-color: -sl-brand-pressed;
-}
-
-.btn-primary:disabled {
-    -fx-opacity: 0.6;
-}
-
-.btn-primary:focused {
-    -fx-background-color: -sl-brand;
-    -fx-text-fill: -sl-on-brand;
-    -fx-border-color: -sl-accent;
-}
-
 .btn-danger-outline {
-    -fx-base: -sl-danger-soft;
-    -fx-text-fill: -sl-danger;
-    -fx-border-color: -sl-danger;
+    -fx-text-fill: -sl-button-danger;
+    -fx-border-color: transparent;
     -fx-border-radius: 3;
     -fx-background-radius: 3;
     -fx-cursor: hand;
 }
 
-.btn-danger-outline:hover {
-    -fx-base: -sl-danger-soft-hover;
-}
-
-.btn-danger-outline:focused {
-    -fx-base: -sl-danger-soft;
-    -fx-text-fill: -sl-danger;
-    -fx-border-color: -sl-danger;
-}
-
 .btn-compact {
     -fx-font-size: 10px;
-    -fx-padding: 2 5;
+    -fx-padding: 1 4;
 }
-
 
 .loading-overlay {
     -fx-background-color: -sl-overlay;
@@ -561,7 +273,6 @@ FontAwesomeIconView {
     -fx-font-size: 13px;
     -fx-text-fill: -sl-text-muted;
 }
-
 
 .detail-container {
     -fx-border-color: -sl-border-strong;

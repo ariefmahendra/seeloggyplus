@@ -66,6 +66,9 @@ class FileManagerDialogHostTest {
         assertSame(stage, dialog.getOwner());
         assertFalse(dialog.getIcons().isEmpty(), "the dialog must get the application icon");
         assertNotNull(dialog.getScene());
+        org.junit.jupiter.api.Assertions.assertTrue(dialog.isResizable());
+        org.junit.jupiter.api.Assertions.assertTrue(dialog.getMinWidth() >= 560);
+        org.junit.jupiter.api.Assertions.assertTrue(dialog.getMinHeight() >= 360);
     }
 
     @Test
@@ -92,6 +95,9 @@ class FileManagerDialogHostTest {
         Stage dialog = presenter.lastStage();
         assertEquals("Find in Files", dialog.getTitle());
         assertEquals(Modality.WINDOW_MODAL, dialog.getModality());
+        org.junit.jupiter.api.Assertions.assertTrue(dialog.isResizable());
+        org.junit.jupiter.api.Assertions.assertTrue(dialog.getMinWidth() >= 800);
+        org.junit.jupiter.api.Assertions.assertTrue(dialog.getMinHeight() >= 560);
         TextField rootPathField = (TextField) dialog.getScene().lookup("#rootPathField");
         assertEquals("/var/log", rootPathField.getText());
     }

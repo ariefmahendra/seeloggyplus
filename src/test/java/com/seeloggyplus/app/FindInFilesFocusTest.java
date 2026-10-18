@@ -97,7 +97,11 @@ class FindInFilesFocusTest {
         WaitForAsyncUtils.waitForFxEvents();
 
         final Node snapshotNode = root.lookup(selector);
-        Image image = WaitForAsyncUtils.asyncFx(() -> snapshotNode.snapshot(null, null)).get();
+        Image image = WaitForAsyncUtils.asyncFx(() -> {
+            var parameters = new javafx.scene.SnapshotParameters();
+            parameters.setFill(com.seeloggyplus.shared.ui.RenderedColors.background(snapshotNode));
+            return snapshotNode.snapshot(parameters, null);
+        }).get();
         double contrast = renderedContrast(image);
         assertTrue(contrast >= MIN_CONTRAST,
                 String.format("%s focused [%s]: text contrast too low: %.2f:1 (needs >= %.1f)",

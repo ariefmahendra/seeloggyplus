@@ -346,7 +346,7 @@ class SearchResultPanelBehaviorTest {
             panel.setDarkMode(true);
             panel.setDarkMode(true);
         });
-        assertEquals(Color.web("#1e2226"), backgroundFill(panel));
+        assertEquals(com.seeloggyplus.shared.ui.ThemePalette.color("-sl-surface", AppTheme.Theme.DARK), backgroundFill(panel));
         assertEquals(SelectionColors.background(true), privateField(panel, "selectionColor"));
 
         onFxThread(() -> panel.setDarkMode(false));
@@ -370,7 +370,7 @@ class SearchResultPanelBehaviorTest {
 
             root.getStyleClass().add("theme-dark");
             assertNotNull(panel.getScene());
-            assertEquals(Color.web("#1e2226"), backgroundFill(panel));
+            assertEquals(com.seeloggyplus.shared.ui.ThemePalette.color("-sl-surface", AppTheme.Theme.DARK), backgroundFill(panel));
 
             root.getStyleClass().remove("theme-dark");
             assertEquals(Color.WHITE, backgroundFill(panel));

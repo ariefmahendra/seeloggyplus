@@ -65,21 +65,22 @@ class FilePathBreadcrumbTest {
                     Button button = (Button) node;
                     assertTrue(button.getHeight() >= 28);
                     var fg = (javafx.scene.paint.Color) button.getTextFill();
-                    var bg = (javafx.scene.paint.Color) bar.getBackground().getFills().getFirst().getFill();
+                    var bg = com.seeloggyplus.shared.ui.RenderedColors.background(bar);
                     assertTrue(contrast(fg, bg) >= 4.5, theme.name());
                     assertNotNull(bar.getBorder());
                     var border = (javafx.scene.paint.Color) bar.getBorder().getStrokes().getFirst().getTopStroke();
+                    border=com.seeloggyplus.shared.ui.RenderedColors.over(border,bg);
                     assertTrue(contrast(border, bg) < 2.0, theme.name() + ": border should blend with the container");
                     button.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("hover"), true);
                     root.applyCss();
-                    var hover = (javafx.scene.paint.Color) button.getBackground().getFills().getFirst().getFill();
+                    var hover = com.seeloggyplus.shared.ui.RenderedColors.background(button);
                     assertTrue(contrast((javafx.scene.paint.Color) button.getTextFill(), hover) >= 4.5, theme.name());
                     assertTrue(contrast(bg, hover) < 1.5, theme.name() + ": hover should be subtle");
                     button.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("hover"), false);
                     root.applyCss();
                     button.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("pressed"), true);
                     root.applyCss();
-                    var pressed = (javafx.scene.paint.Color) button.getBackground().getFills().getFirst().getFill();
+                    var pressed = com.seeloggyplus.shared.ui.RenderedColors.background(button);
                     assertTrue(contrast((javafx.scene.paint.Color) button.getTextFill(), pressed) >= 4.5, theme.name());
                     button.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("pressed"), false);
                     root.applyCss();
@@ -88,7 +89,7 @@ class FilePathBreadcrumbTest {
                     if (button.getText().equals("var")) { button.fire(); assertEquals("/var", destination.get()); }
                 }
             }
-            AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+            AppTheme.setTheme(AppTheme.Theme.LIGHT);
         }).get();
     }
     @Test void manualEditorCanBeOpenedAndDismissed() throws Exception {
@@ -167,7 +168,7 @@ class FilePathBreadcrumbTest {
                         if (open) arrow.show();
                         root.applyCss(); root.layout();
                         var image = arrow.snapshot(null, null);
-                        var background = (javafx.scene.paint.Color) arrow.getBackground().getFills().getFirst().getFill();
+                        var background = com.seeloggyplus.shared.ui.RenderedColors.background(arrow);
                         int visiblePixels = 0;
                         for (int y = 5; y < image.getHeight() - 5; y++) {
                             for (int x = 5; x < image.getWidth() - 5; x++) {
@@ -178,7 +179,7 @@ class FilePathBreadcrumbTest {
                         arrow.hide();
                     }
                 }
-            } finally { AppTheme.setTheme(AppTheme.Theme.GRAPHITE); }
+            } finally { AppTheme.setTheme(AppTheme.Theme.LIGHT); }
         }).get();
     }
 
@@ -208,7 +209,7 @@ class FilePathBreadcrumbTest {
                     assertTrue(overflow.getItems().stream().anyMatch(item -> item.getText().equals("workspace")));
                     overflow.hide();
                 }
-            } finally { AppTheme.setTheme(AppTheme.Theme.GRAPHITE); }
+            } finally { AppTheme.setTheme(AppTheme.Theme.LIGHT); }
         }).get();
     }
 
@@ -244,8 +245,48 @@ class FilePathBreadcrumbTest {
                     assertEquals(width, bar.getWidth(), 0.01);
                     bar.finishEditing(); root.applyCss(); root.layout();
                 }
-            } finally { AppTheme.setTheme(AppTheme.Theme.GRAPHITE); }
+            } finally { AppTheme.setTheme(AppTheme.Theme.LIGHT); }
         }).get();
+    }
+
+    @Test void folderPopupUsesThemeAndReadableCompactRows() throws Exception {
+        try {
+            for (var theme : AppTheme.Theme.values()) {
+                WaitForAsyncUtils.asyncFx(() -> {
+                    AppTheme.setTheme(theme);
+                    var folders = java.util.stream.IntStream.range(0, 80)
+                            .mapToObj(i -> new FilePathBreadcrumb.Folder("Folder " + i, "/folder" + i)).toList();
+                    var bar = new FilePathBreadcrumb(new TextField("/var/log"), path -> {},
+                            path -> CompletableFuture.completedFuture(folders));
+                    stage.setScene(AppTheme.scene(new VBox(bar))); stage.show();
+                    stage.getScene().getRoot().applyCss(); stage.getScene().getRoot().layout();
+                    ((MenuButton) bar.lookup(".path-children")).show();
+                }).get();
+                WaitForAsyncUtils.waitForFxEvents();
+                WaitForAsyncUtils.asyncFx(() -> {
+                    var button = (MenuButton) stage.getScene().lookup(".path-children");
+                    var popup = button.getItems().getFirst().getParentPopup();
+                    var root = popup.getScene().getRoot(); root.applyCss(); root.layout();
+                    var menu = (javafx.scene.layout.Region) popup.getSkin().getNode();
+                    var background = com.seeloggyplus.shared.ui.RenderedColors.background(menu);
+                    assertEquals(com.seeloggyplus.shared.ui.ThemePalette.color("-sl-popup-bg", theme), background);
+                    assertTrue(menu.getBackground().getFills().getFirst().getRadii().getTopLeftHorizontalRadius() >= 6);
+                    for (var node : root.lookupAll(".menu-item")) {
+                        var row = (javafx.scene.layout.Region) node;
+                        var label = (Label) row.lookup(".label");
+                        assertTrue(row.getHeight() >= 28);
+                        assertTrue(contrast((javafx.scene.paint.Color) label.getTextFill(), background) >= 4.5);
+                        row.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("focused"), true);
+                        root.applyCss();
+                        var selected = com.seeloggyplus.shared.ui.RenderedColors.background(row);
+                        assertEquals(com.seeloggyplus.shared.ui.ThemePalette.color("-sl-selection-bg", theme), selected);
+                        assertTrue(contrast((javafx.scene.paint.Color) label.getTextFill(), selected) >= 4.5);
+                        row.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("focused"), false);
+                    }
+                    button.hide();
+                }).get();
+            }
+        } finally { WaitForAsyncUtils.asyncFx(() -> AppTheme.setTheme(AppTheme.Theme.LIGHT)).get(); }
     }
 
     private static double contrast(javafx.scene.paint.Color a, javafx.scene.paint.Color b) {

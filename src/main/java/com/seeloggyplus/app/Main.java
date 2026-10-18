@@ -1,5 +1,7 @@
 package com.seeloggyplus.app;
 
+import com.seeloggyplus.shared.ui.ThemedAlerts;
+
 import com.seeloggyplus.features.settings.infrastructure.PreferenceServiceImpl;
 import com.seeloggyplus.shared.model.Preference;
 import com.seeloggyplus.shared.settings.PreferenceService;
@@ -72,6 +74,8 @@ public class Main extends Application {
             for (Preference preference : preferenceService.getListPreferences()) {
                 startupPreferences.put(preference.getCode(), preference.getValue());
             }
+            ThemePreferenceMigration.normalize(startupPreferences, preferenceService);
+            StartupSplash.show(AppTheme.Theme.fromPreference(startupPreferences.get("app_theme")));
         } catch (Exception e) {
             startupFailure = e;
         }
@@ -88,7 +92,9 @@ public class Main extends Application {
 
             AppTheme.setTheme(getStartupPreference("app_theme")
                     .map(AppTheme.Theme::fromPreference)
-                    .orElse(AppTheme.Theme.GRAPHITE));
+                    .orElse(AppTheme.Theme.LIGHT));
+
+            AppTheme.installWindowDecoration();
 
             updateStartupStatus("Loading interface...");
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
@@ -136,12 +142,16 @@ public class Main extends Application {
             if (Files.isDirectory(location)) {
                 return;
             }
+            com.seeloggyplus.features.update.infrastructure.UpdateInstaller.ensureUnixExecutables(location.getParent());
             UpdateLayout layout =
                     new UpdateLayout(
                             UpdateLayout.installationRoot());
             SilentLauncherInstaller.ensure(layout.root());
             if (RootLauncherInstaller.heal(layout.root())) {
                 logger.info("Repaired the console-free launcher in {}", layout.root());
+            }
+            if (RootLauncherInstaller.healUnix(layout.root())) {
+                logger.info("Repaired the installation-relative launcher in {}", layout.root());
             }
         } catch (Exception e) {
             logger.debug("Could not ensure the launch scripts", e);
@@ -234,8 +244,7 @@ public class Main extends Application {
 
     private void showErrorAndExit(String message) {
         StartupSplash.close();
-        Alert alert = new Alert(
-                Alert.AlertType.ERROR);
+        Alert alert = ThemedAlerts.create(Alert.AlertType.ERROR);
         alert.setTitle("Application Error");
         alert.setHeaderText("Failed to Start Application");
         alert.setContentText(message);
@@ -245,6 +254,7 @@ public class Main extends Application {
 
     @Override
     public void stop() throws Exception {
+        AppTheme.disposeWindowDecoration();
         cleanup();
         super.stop();
         System.exit(0);

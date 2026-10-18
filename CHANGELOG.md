@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-18
+
+SeeLoggyPlus 0.8.0 refreshes the desktop interface with compact Light and Dark themes,
+improves file navigation and text selection, and moves Help to the published documentation website.
+
+### Added
+- Responsive folder breadcrumbs with subfolder menus and hidden-parent navigation.
+- Character-level log selection and copying, with consistent selection highlights.
+- Shared server groups between Server Management and the File Manager.
+- Online Help at https://seeloggyplus-doc.vercel.app/, with English and Indonesian guides.
+
+### Changed
+- Refreshed Light and Dark palettes, compact controls, rounded panels, readable icons and input fields.
+- Preferences organized into General, Log Viewer and SSH pages.
+- Theme-aware startup splash, dialogs, file browser menus and window decorations.
+- Recent files load in the background to keep the interface responsive.
+- Portable packages use clean launcher defaults instead of workspace-specific Java or memory settings.
+
+### Fixed
+- Long log lines remain readable and searchable beyond the previous read window.
+- View Refresh reloads the active file, and search reports when the scan limit truncates match counts.
+- Remote locations restore after their dependencies are ready; file table keyboard navigation remains available.
+- Subfolder menus, download directory fields and breadcrumb arrows follow the selected theme.
+- Linux launchers resolve relative data and settings from the installation directory.
+- Windows launchers accept an empty Java override and Java paths containing spaces. Known older launcher scripts are repaired after upgrade without overwriting user configuration.
+- Linux launchers and bundled runtimes retain executable permissions after installation and update.
+
+### Tests
+- Headless application regression suite and release build.
+- Database migration, stored-credential and theme-preference compatibility checks.
+- Real portable package installation using the released 0.7.0 updater, including checksum rejection, health confirmation and rollback.
+- Bilingual documentation checks, production build and browser tests.
+
+### Upgrade notes
+- No database schema change is required from 0.7.0: the schema remains at version 4.
+- Existing servers, groups, favourites, history, parsing configurations and supported preferences are retained.
+- The retired Graphite preference becomes Light; existing Light and Dark preferences remain unchanged.
+- Keep the entire data directory together, including seeloggyplus.db, .keystore and known_hosts. Close the app before making a backup.
+- For a manual upgrade, extract into a new writable folder and copy the complete data directory and your launcher.properties into it before starting. Do not copy the old current pointer or versions directory over the new package.
+- Packages no longer include offline HTML help. F1 / Help Contents opens the website and needs internet; local log viewing remains available offline.
+- Windows and Linux packages are available with a bundled runtime or without one (Java 21 or newer required).
+- If an automatic download fails verification, the active installation remains unchanged.
+
+
 ## [0.7.0] - 2026-10-04
 
 Feature release that adds an animated startup splash, adaptive log tabs and
@@ -351,7 +395,7 @@ in the CI `test` job before publishing, so 0.6.2 ships the complete 0.6 feature 
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.7.0...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.8.0...HEAD
 [0.7.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.5...0.7.0
 [0.6.5]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.4...0.6.5
 [0.6.4]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.3...0.6.4
@@ -366,3 +410,5 @@ in the CI `test` job before publishing, so 0.6.2 ships the complete 0.6 feature 
 [0.4.1]: https://github.com/ariefmahendra/seeloggyplus/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/ariefmahendra/seeloggyplus/releases/tag/0.3.0
+
+[0.8.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.7.0...0.8.0

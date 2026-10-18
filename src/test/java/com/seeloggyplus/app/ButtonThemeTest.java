@@ -51,7 +51,7 @@ class ButtonThemeTest {
     }
 
     @Test
-    @DisplayName("plain buttons use the theme surface/text/border in all three themes")
+    @DisplayName("plain buttons use the theme surface/text/border in both themes")
     void plainButtonsAreThemed() {
         onFxThread(() -> {
             Button dialogButton = new Button("Cancel");
@@ -72,7 +72,7 @@ class ButtonThemeTest {
                 assertNotNull(background, mode + ": button background must be themed");
                 assertEquals(1, background.getFills().size(),
                         mode + ": button must not keep the default Modena gradient");
-                Color surface = toColor(background.getFills().get(0).getFill());
+                Color surface = com.seeloggyplus.shared.ui.RenderedColors.background(dialogButton);
                 assertNotNull(surface, mode + ": button background must resolve to a colour");
 
                 Color text = (Color) dialogButton.getTextFill();
@@ -90,8 +90,8 @@ class ButtonThemeTest {
     }
 
     @Test
-    @DisplayName("primary buttons keep the brand accent with readable text")
-    void primaryButtonsUseBrandTokens() {
+    @DisplayName("primary buttons blend with their surface and keep readable text")
+    void primaryButtonsBlendWithTheirSurface() {
         onFxThread(() -> {
             Button primary = new Button("Open");
             primary.getStyleClass().add("btn-primary");
@@ -106,15 +106,19 @@ class ButtonThemeTest {
                 root.layout();
                 WaitForAsyncUtils.waitForFxEvents();
 
-                Color background = toColor(primary.getBackground().getFills().get(0).getFill());
+                Color background = com.seeloggyplus.shared.ui.RenderedColors.background(primary);
                 Color text = (Color) primary.getTextFill();
                 assertNotNull(background, theme + ": primary background must resolve");
                 assertNotNull(text, theme + ": primary text must resolve");
                 assertTrue(contrast(text, background) >= 4.5,
                         theme + ": primary button text must be readable on the accent");
 
-                assertTrue(luminance(background) < 0.6,
-                        theme + ": primary button must not use the plain light surface");
+                primary.pseudoClassStateChanged(PseudoClass.getPseudoClass("focused"), false);
+                primary.pseudoClassStateChanged(PseudoClass.getPseudoClass("hover"), false);
+                root.applyCss();
+                assertEquals(0, toColor(primary.getBackground().getFills().getFirst().getFill()).getOpacity(), 0.001,
+                        theme + " " + primary.getPseudoClassStates());
+                assertNoVisibleOutline(primary, theme + " primary");
             }
         });
     }
@@ -226,9 +230,65 @@ class ButtonThemeTest {
         });
     }
 
+    @Test
+    void flatButtonsBlendAtRestAndKeepStableInteractiveStates() {
+        onFxThread(() -> {
+            Button plain = new Button("Cancel");
+            Button primary = new Button("Save"); primary.setDefaultButton(true);
+            primary.getStyleClass().add("btn-primary");
+            Button secondary = new Button("Later"); secondary.getStyleClass().add("btn-secondary");
+            Button danger = new Button("Delete"); danger.getStyleClass().add("btn-danger-outline");
+            ToggleButton toggle = new ToggleButton("Tail");
+            var menu = new javafx.scene.control.MenuButton("Actions");
+            var split = new javafx.scene.control.SplitMenuButton(new javafx.scene.control.MenuItem("Open"));
+            split.setText("Open");
+            VBox root = new VBox(8, plain, primary, secondary, danger, toggle, menu, split);
+            stage.setScene(AppTheme.scene(root)); stage.show(); root.requestFocus();
+            for (var theme : AppTheme.Theme.values()) {
+                useTheme(theme); root.applyCss(); root.layout();
+                for (var control : new javafx.scene.control.Labeled[] {plain, primary, secondary, danger, toggle, menu, split}) {
+                    control.pseudoClassStateChanged(PseudoClass.getPseudoClass("focused"), false);
+                    root.applyCss(); root.layout();
+                    assertEquals(0, ((Color) control.getBackground().getFills().getFirst().getFill()).getOpacity(), 0.001, theme + " idle " + control);
+                    assertNoVisibleOutline(control, "flat button");
+                    double width = control.getWidth(), height = control.getHeight();
+                    for (String state : new String[] { "hover", "pressed", "focused" }) {
+                        var pseudo = PseudoClass.getPseudoClass(state);
+                        control.pseudoClassStateChanged(pseudo, true);
+                        control.pseudoClassStateChanged(PseudoClass.getPseudoClass("keyboard-focus"), state.equals("focused"));
+                        root.applyCss(); root.layout();
+                        if (state.equals("focused")) {
+                            assertEquals(0, ((Color)control.getBackground().getFills().getFirst().getFill()).getOpacity(), .001);
+                            var ring = control.getBorder().getStrokes().getFirst();
+                            assertEquals(1, ring.getWidths().getTop());
+                            assertTrue(contrast((Color)ring.getTopStroke(), com.seeloggyplus.shared.ui.RenderedColors.background(control)) >= 3);
+                        } else {
+                            assertTrue(((Color) control.getBackground().getFills().getFirst().getFill()).getOpacity() > 0, theme + state);
+                            assertNoVisibleOutline(control, state);
+                        }
+                        assertReadable(control, theme + state);
+                        assertEquals(width, control.getWidth(), 0.01);
+                        assertEquals(height, control.getHeight(), 0.01);
+                        control.pseudoClassStateChanged(pseudo, false);
+                        control.pseudoClassStateChanged(PseudoClass.getPseudoClass("keyboard-focus"), false);
+                    }
+                }
+                toggle.setSelected(true); root.applyCss(); root.layout();
+                assertTrue(((Color) toggle.getBackground().getFills().getFirst().getFill()).getOpacity() > 0);
+                toggle.setSelected(false);
+                plain.setDisable(true);
+                plain.pseudoClassStateChanged(PseudoClass.getPseudoClass("hover"), true);
+                root.applyCss();
+                assertEquals(0, ((Color) plain.getBackground().getFills().getFirst().getFill()).getOpacity(), 0.001);
+                plain.setDisable(false);
+                plain.pseudoClassStateChanged(PseudoClass.getPseudoClass("hover"), false);
+            }
+        });
+    }
+
     private static void assertReadable(Labeled control, String label) {
         assertNotNull(control.getBackground(), label + ": background must resolve");
-        Color background = toColor(control.getBackground().getFills().get(0).getFill());
+        Color background = com.seeloggyplus.shared.ui.RenderedColors.background(control);
         Color text = control.getTextFill() instanceof Color c ? c : null;
         assertNotNull(background, label + ": background must be a colour");
         assertNotNull(text, label + ": text fill must be a colour");
@@ -251,8 +311,8 @@ class ButtonThemeTest {
     }
 
     @Test
-    @DisplayName("dark-filled controls (selected toggle, primary/empty-state button, memory track) draw no outline")
-    void darkFilledControlsHaveNoOutline() {
+    @DisplayName("flat controls and the themed memory track draw no outline")
+    void flatControlsHaveNoOutline() {
         onFxThread(() -> {
             Button primary = new Button("Open File...");
             primary.getStyleClass().add("empty-state-button");
@@ -273,15 +333,18 @@ class ButtonThemeTest {
 
             assertNoVisibleOutline(primary, "empty-state button");
             assertNoVisibleOutline(selectedToggle, "selected toggle");
-            assertTrue(luminance(toColor(primary.getBackground().getFills().get(0).getFill())) < 0.3,
-                    "empty-state button must be a dark, filled button");
+            assertEquals(0, toColor(primary.getBackground().getFills().getFirst().getFill()).getOpacity(), 0.001,
+                    "empty-state button must blend with its background");
 
             Node track = memory.lookup(".track");
             assertNotNull(track, "memory bar track must exist");
             assertNoVisibleOutline((Region) track, "memory bar track");
             Color trackFill = toColor(((Region) track).getBackground().getFills().get(0).getFill());
             assertNotNull(trackFill);
-            assertTrue(luminance(trackFill) < 0.4, "memory bar track must stay a flat dark tone");
+            assertEquals(com.seeloggyplus.shared.ui.ThemePalette.color("-sl-memory-track",AppTheme.getTheme()),trackFill);
+            var bar=(Region)memory.lookup(".bar");
+            assertTrue(contrast(com.seeloggyplus.shared.ui.RenderedColors.background(bar),trackFill)>=3,
+                    "memory progress must remain distinguishable from its track");
         });
     }
 

@@ -1,5 +1,9 @@
 package com.seeloggyplus.features.servers.presentation;
 
+import com.seeloggyplus.shared.ui.DialogWindowSupport;
+
+import com.seeloggyplus.shared.ui.ThemedAlerts;
+
 import com.seeloggyplus.features.servers.application.ServerManagementService;
 import com.seeloggyplus.features.servers.infrastructure.ServerManagementServiceImpl;
 import com.seeloggyplus.shared.model.SSHServerModel;
@@ -91,6 +95,17 @@ public class ServerManagementDialogController {
     @FXML
     private Label detailLastUsedLabel;
 
+    @FXML private javafx.scene.layout.VBox groupSidebar;
+    @FXML private javafx.scene.layout.VBox detailsPanel;
+    @FXML private SplitPane serverSplitPane;
+    @FXML private ToggleButton detailsButton;
+    @FXML private Label serverCountLabel;
+    @FXML private Label selectionLabel;
+    @FXML private Label detailConnectionLabel;
+    private com.seeloggyplus.shared.settings.PreferenceService preferenceService;
+    private boolean restoringColumns;
+    private static final String VISIBLE_COLUMNS = "server_management_visible_columns";
+
     private ServerManagementService serverService;
     private SSHServiceFactory sshServiceFactory;
     private ObservableList<SSHServerModel> allServers;
@@ -119,6 +134,20 @@ public class ServerManagementDialogController {
         allServers = FXCollections.observableArrayList();
         filteredServers = FXCollections.observableArrayList();
 
+        SplitPane.setResizableWithParent(groupSidebar, false);
+        serverSplitPane.widthProperty().addListener((obs, old, width) -> {
+            if (old.doubleValue() == 0 && width.doubleValue() > 0) {
+                serverSplitPane.setDividerPositions(201 / width.doubleValue());
+            }
+        });
+        detailsPanel.visibleProperty().bind(detailsButton.selectedProperty());
+        detailsPanel.managedProperty().bind(detailsPanel.visibleProperty());
+        clearSearchButton.disableProperty().bind(searchField.textProperty().isEmpty());
+        for (Label label : List.of(detailNameLabel, detailConnectionLabel, detailPathLabel, selectionLabel)) {
+            Tooltip tooltip = new Tooltip();
+            tooltip.textProperty().bind(label.textProperty());
+            label.setTooltip(tooltip);
+        }
         setupGroups();
         setupTableColumns();
         setupEventHandlers();
@@ -229,6 +258,8 @@ public class ServerManagementDialogController {
         if (groupMutationRunning) return;
         String parent = selectedGroupPath == null || selectedGroupPath.isEmpty() ? null : selectedGroupPath;
         TextInputDialog dialog = new TextInputDialog();
+        DialogWindowSupport.styleDialog(dialog, groupTree == null || groupTree.getScene() == null
+                ? null : groupTree.getScene().getWindow());
         dialog.setTitle("New group");
         dialog.setHeaderText(parent == null ? "Create a server group" : "Create a group inside '" + parent + "'");
         dialog.setContentText("Group name:");
@@ -242,6 +273,8 @@ public class ServerManagementDialogController {
         String path = selectedGroupPath;
         if (groupMutationRunning || path == null || path.isEmpty()) return;
         TextInputDialog dialog = new TextInputDialog(leafName(path));
+        DialogWindowSupport.styleDialog(dialog, groupTree == null || groupTree.getScene() == null
+                ? null : groupTree.getScene().getWindow());
         dialog.setTitle("Rename group");
         dialog.setHeaderText("Rename group '" + path + "'");
         dialog.setContentText("Group name:");
@@ -256,7 +289,7 @@ public class ServerManagementDialogController {
     private void promptDeleteGroup() {
         String path = selectedGroupPath;
         if (groupMutationRunning || path == null || path.isEmpty()) return;
-        Alert dialog = new Alert(Alert.AlertType.CONFIRMATION);
+        Alert dialog = ThemedAlerts.create(Alert.AlertType.CONFIRMATION);
         dialog.setTitle("Delete group");
         dialog.setHeaderText("Delete group '" + path + "'?");
         dialog.setContentText("Nested groups are deleted as well. Servers become ungrouped. No server is deleted.");
@@ -272,6 +305,8 @@ public class ServerManagementDialogController {
         choices.add(ungrouped);
         choices.addAll(groupNames);
         ChoiceDialog<String> dialog = new ChoiceDialog<>(selected.getGroupName() == null ? ungrouped : selected.getGroupName(), choices);
+        DialogWindowSupport.styleDialog(dialog, groupTree == null || groupTree.getScene() == null
+                ? null : groupTree.getScene().getWindow());
         dialog.setTitle("Move to group");
         dialog.setHeaderText("Move '" + selected.getName() + "' to a group");
         dialog.setContentText("Group:");
@@ -350,6 +385,30 @@ public class ServerManagementDialogController {
             return new SimpleStringProperty("-");
         });
 
+        serverTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        for (TableColumn<SSHServerModel, ?> column : serverTable.getColumns()) {
+            column.setId(column == nameColumn ? "nameColumn" : column == hostColumn ? "hostColumn"
+                    : column == portColumn ? "portColumn" : column == usernameColumn ? "usernameColumn"
+                    : column == groupColumn ? "groupColumn" : column == defaultPathColumn ? "defaultPathColumn" : "lastUsedColumn");
+            column.visibleProperty().addListener((obs, old, visible) -> saveColumnVisibility());
+        }
+        for (TableColumn<SSHServerModel, String> column : List.of(nameColumn, hostColumn, portColumn, usernameColumn, groupColumn, defaultPathColumn, lastUsedColumn)) {
+            column.setCellFactory(table -> new TableCell<>() {
+                @Override protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty ? null : item);
+                    setTooltip(empty || item == null ? null : new Tooltip(item));
+                }
+            });
+        }
+        Runnable resizeName = () -> nameColumn.setPrefWidth(Math.max(160, serverTable.getWidth() - 22
+                - serverTable.getVisibleLeafColumns().stream().filter(column -> column != nameColumn)
+                .mapToDouble(TableColumn::getWidth).sum()));
+        serverTable.widthProperty().addListener((obs, old, width) -> resizeName.run());
+        for (var column : serverTable.getColumns()) {
+            if (column != nameColumn) column.widthProperty().addListener((obs, old, width) -> resizeName.run());
+            column.visibleProperty().addListener((obs, old, visible) -> resizeName.run());
+        }
         serverTable.setItems(filteredServers);
 
         serverTable.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
@@ -473,6 +532,9 @@ public class ServerManagementDialogController {
                 .filter(server -> belongsToSelectedGroup(server.getGroupName()))
                 .filter(server -> search.isEmpty() || matchesSearch(server, search))
                 .toList());
+        serverTable.sort();
+        boolean active = !search.isEmpty() || selectedGroupPath != null;
+        serverCountLabel.setText(active ? filteredServers.size() + " of " + allServers.size() + " servers" : allServers.size() + " servers");
     }
 
     private boolean matchesSearch(SSHServerModel server, String search) {
@@ -583,7 +645,7 @@ public class ServerManagementDialogController {
             return;
         }
 
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        Alert alert = ThemedAlerts.create(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Delete Server");
         alert.setHeaderText("Delete SSH Server Configuration?");
         alert.setContentText(String.format("Are you sure you want to delete '%s'?\nThis action cannot be undone.",
@@ -598,6 +660,10 @@ public class ServerManagementDialogController {
     }
 
     private void updateDetailsPanel(SSHServerModel server) {
+        detailsButton.setDisable(server == null);
+        selectionLabel.setText(server == null ? "No selection" : server.getName());
+        detailConnectionLabel.setText(server == null ? "-" : server.getUsername() + "@" + server.getHost() + ":" + server.getPort());
+        if (server == null) detailsButton.setSelected(false);
         if (server == null) {
             detailNameLabel.setText("-");
             detailHostLabel.setText("-");
@@ -642,12 +708,45 @@ public class ServerManagementDialogController {
 
     private void showError(String title, String message) {
         Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+            Alert alert = ThemedAlerts.create(Alert.AlertType.ERROR);
             alert.setTitle("Error");
             alert.setHeaderText(title);
             alert.setContentText(message);
             dialogPresenter.present(alert);
         });
+    }
+
+    public void setPreferenceService(com.seeloggyplus.shared.settings.PreferenceService service) {
+        preferenceService = service;
+        if (service == null) return;
+        service.getPreferencesByCode(VISIBLE_COLUMNS).filter(value -> !value.isBlank()).ifPresent(value -> {
+            var ids = java.util.Set.of(value.split(","));
+            if (serverTable.getColumns().stream().noneMatch(column -> ids.contains(column.getId()))) return;
+            restoringColumns = true;
+            try {
+                serverTable.getColumns().forEach(column -> column.setVisible(ids.contains(column.getId())));
+            } finally { restoringColumns = false; }
+        });
+    }
+
+    private void saveColumnVisibility() {
+        if (preferenceService == null || restoringColumns) return;
+        String value = serverTable.getColumns().stream().filter(TableColumn::isVisible)
+                .map(TableColumn::getId).collect(java.util.stream.Collectors.joining(","));
+        preferenceService.saveOrUpdatePreferences(new com.seeloggyplus.shared.model.Preference(VISIBLE_COLUMNS, value));
+    }
+
+    public void configureWindow(Stage stage) {
+        var owner = stage.getOwner();
+        var screens = owner == null ? List.<javafx.stage.Screen>of() : javafx.stage.Screen.getScreensForRectangle(owner.getX(), owner.getY(), 1, 1);
+        var bounds = (screens.isEmpty() ? javafx.stage.Screen.getPrimary() : screens.getFirst()).getVisualBounds();
+        stage.setResizable(true);
+        stage.setMinWidth(Math.min(800, bounds.getWidth()));
+        stage.setMinHeight(Math.min(520, bounds.getHeight()));
+        stage.setWidth(Math.min(1000, bounds.getWidth()));
+        stage.setHeight(Math.min(640, bounds.getHeight()));
+        stage.setX(bounds.getMinX() + (bounds.getWidth() - stage.getWidth()) / 2);
+        stage.setY(bounds.getMinY() + (bounds.getHeight() - stage.getHeight()) / 2);
     }
 
     public void setSshServiceFactory(SSHServiceFactory factory) {

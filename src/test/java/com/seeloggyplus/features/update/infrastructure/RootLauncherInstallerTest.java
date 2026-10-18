@@ -28,6 +28,30 @@ class RootLauncherInstallerTest {
     @TempDir
     Path tempDir;
 
+    @Test void repairsKnownLegacyParserWithoutChangingUserConfiguration() throws Exception {
+        String packaged = Files.readString(Path.of("launcher.bat"));
+        Path root = installWithStagedLauncher(packaged);
+        Files.writeString(root.resolve("launcher.bat"), JAVAW_LAUNCHER + "set VALUE=!VALUE: =!\n");
+        Files.writeString(root.resolve("launcher.properties"), "max.memory.gb=2\njava.home=C:\\Program Files\\Java\n");
+        assertTrue(RootLauncherInstaller.heal(root));
+        assertEquals(packaged, Files.readString(root.resolve("launcher.bat")));
+        assertEquals("max.memory.gb=2\njava.home=C:\\Program Files\\Java\n", Files.readString(root.resolve("launcher.properties")));
+        assertFalse(RootLauncherInstaller.heal(root));
+    }
+
+    @Test void repairsKnownUnixLauncherAndPreservesCustomScripts() throws Exception {
+        Path root = installWithStagedLauncher(JAVAW_LAUNCHER);
+        String packaged = Files.readString(Path.of("launcher.sh"));
+        Files.writeString(root.resolve("versions/1.0.0/launcher.sh"), packaged);
+        Files.writeString(root.resolve("launcher.sh"), "SCRIPT_DIR=old\nAPP_JAR=old\n");
+        assertTrue(RootLauncherInstaller.healUnix(root));
+        assertEquals(packaged, Files.readString(root.resolve("launcher.sh")));
+        assertFalse(RootLauncherInstaller.healUnix(root));
+        Files.writeString(root.resolve("launcher.sh"), "exec custom-launcher\n");
+        assertFalse(RootLauncherInstaller.healUnix(root));
+        assertEquals("exec custom-launcher\n", Files.readString(root.resolve("launcher.sh")));
+    }
+
     @Test
     @DisplayName("replaces a legacy foreground launcher with the staged javaw launcher")
     void healsLegacyLauncher() throws Exception {

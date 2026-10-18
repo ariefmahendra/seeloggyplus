@@ -71,6 +71,7 @@ public class UpdateInstaller {
                     throw new UpdateException("Staged jar checksum mismatch");
                 }
             }
+            ensureUnixExecutables(target);
             return new StagedUpdate(target, jar, version);
         } catch (UpdateException e) {
             deleteQuietly(temp);
@@ -80,6 +81,15 @@ public class UpdateInstaller {
             deleteQuietly(temp);
             deleteQuietly(target);
             throw new UpdateException("Failed to stage update: " + e.getMessage(), e);
+        }
+    }
+
+    public static void ensureUnixExecutables(Path directory) throws IOException {
+        if (Files.getFileAttributeView(directory, java.nio.file.attribute.PosixFileAttributeView.class) == null) return;
+        for (String name : new String[] {"launcher.sh", "jre/bin/java", "jre/bin/keytool", "jre/lib/jspawnhelper"}) {
+            Path file = directory.resolve(name);
+            if (Files.isRegularFile(file)) Files.setPosixFilePermissions(file,
+                    java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
         }
     }
 

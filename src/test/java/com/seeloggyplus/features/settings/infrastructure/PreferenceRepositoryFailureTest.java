@@ -65,8 +65,8 @@ class PreferenceRepositoryFailureTest {
         createTable();
         PreferenceRepositoryImpl repository = new PreferenceRepositoryImpl(connection);
 
-        repository.savePreferences(new Preference("theme", "graphite"));
-        assertEquals("graphite", repository.getPreferencesByCode("theme").orElseThrow());
+        repository.savePreferences(new Preference("theme", "light"));
+        assertEquals("light", repository.getPreferencesByCode("theme").orElseThrow());
 
         repository.saveOrUpdatePreferences(new Preference("theme", "dark"));
         assertEquals("dark", repository.getPreferencesByCode("theme").orElseThrow());

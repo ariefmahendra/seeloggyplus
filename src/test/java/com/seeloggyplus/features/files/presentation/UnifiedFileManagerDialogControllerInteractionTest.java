@@ -118,7 +118,7 @@ class UnifiedFileManagerDialogControllerInteractionTest {
             try {
                 for (AppTheme.Theme theme : AppTheme.Theme.values()) {
                     AppTheme.setTheme(theme); root.applyCss(); root.layout();
-                    for (String id : List.of("backButton", "forwardButton", "upButton", "homeButton", "refreshButton", "goButton", "findInFilesButton")) {
+                    for (String id : List.of("backButton", "forwardButton", "upButton", "homeButton", "refreshButton", "findInFilesButton")) {
                         var button = (javafx.scene.control.Button) root.lookup("#" + id);
                         button.setDisable(false);
                         double height = button.getHeight(), width = button.getWidth();
@@ -126,8 +126,7 @@ class UnifiedFileManagerDialogControllerInteractionTest {
                             button.pseudoClassStateChanged(PseudoClass.getPseudoClass(state), true);
                             button.pseudoClassStateChanged(PseudoClass.getPseudoClass("focused"), true);
                             root.applyCss(); root.layout();
-                            var bg = (javafx.scene.paint.Color) button.getBackground().getFills().getFirst().getFill();
-                            if (bg.getOpacity() == 0) bg = (javafx.scene.paint.Color) toolbar.getBackground().getFills().getFirst().getFill();
+                            var bg = com.seeloggyplus.shared.ui.RenderedColors.background(button);
                             assertTrue(colourContrast((javafx.scene.paint.Color) button.getTextFill(), bg) >= 4.5, theme + id + state);
                             if (button.getGraphic() instanceof de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView icon) {
                                 assertTrue(colourContrast((javafx.scene.paint.Color) icon.getFill(), bg) >= 3.0, theme + id + state + " icon");
@@ -140,7 +139,7 @@ class UnifiedFileManagerDialogControllerInteractionTest {
                         }
                     }
                 }
-            } finally { AppTheme.setTheme(AppTheme.Theme.GRAPHITE); }
+            } finally { AppTheme.setTheme(AppTheme.Theme.LIGHT); }
         });
     }
 
@@ -275,6 +274,23 @@ class UnifiedFileManagerDialogControllerInteractionTest {
     }
 
     @Test
+    void favoriteAreaDoesNotExposeSelectedServerGroupActions() {
+        ListView<FavoriteFolder> list = getField(controller, "favoritesListView");
+        onFx(() -> {
+            assertTrue(list.getContextMenu().getItems().stream()
+                    .noneMatch(item -> java.util.Set.of("Rename group...", "Delete group", "Move to group...").contains(item.getText())));
+            for (String field : new String[]{"favoritesPane", "favoritesBox"}) {
+                Node target = getField(controller, field);
+                Event.fireEvent(target, contextMenuEvent());
+                assertTrue(javafx.stage.Window.getWindows().stream()
+                        .noneMatch(window -> window instanceof javafx.scene.control.ContextMenu menu
+                                && menu.isShowing() && menu.getItems().stream()
+                                .anyMatch(item -> "New group...".equals(item.getText()))), field);
+            }
+        });
+    }
+
+    @Test
     void favoriteRemoveMenuItemRemovesFavorite() throws Exception {
         favorites.favorites.clear();
         favorites.removed.clear();
@@ -379,7 +395,7 @@ class UnifiedFileManagerDialogControllerInteractionTest {
     }
 
     @Test
-    void iconColumnRendersPlainFileIcon() throws Exception {
+    void nameColumnRendersPlainFileIcon() throws Exception {
         FileInfo plain = new FileInfo();
         plain.setName("data.cfg");
         plain.setPath(HOME + "data.cfg");

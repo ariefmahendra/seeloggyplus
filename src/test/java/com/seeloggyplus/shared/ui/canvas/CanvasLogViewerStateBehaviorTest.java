@@ -41,6 +41,7 @@ class CanvasLogViewerStateBehaviorTest {
     @Start
     void start(Stage stage) {
         this.stage = stage;
+        AppTheme.setTheme(AppTheme.Theme.LIGHT);
     }
 
     @Test
@@ -312,6 +313,37 @@ class CanvasLogViewerStateBehaviorTest {
     }
 
     @Test
+    void growingTheViewportFillsTheNewlyVisibleLines() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = new CanvasLogViewer();
+            stage.setScene(AppTheme.scene(viewer));
+            stage.show();
+            viewer.resize(420, 200);
+            viewer.setTailBuffer(tailLines(100));
+            viewer.getVScrollBar().setValue(0);
+            viewer.redraw();
+
+            viewer.resize(420, 320);
+            viewer.redraw();
+
+            String[] cache;
+            int visible;
+            try {
+                cache = (String[]) privateField(viewer, "lineCache");
+                visible = privateInt(viewer, "visibleLineCount");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            assertTrue(visible > 1, "the taller viewport must expose more rows");
+            for (int i = 0; i < visible; i++) {
+                assertNotNull(cache[i],
+                        "row " + i + " must be cached after the viewport grows, otherwise it renders blank");
+            }
+        });
+    }
+
+    @Test
     void statusUpdatesReportTopLineAndPercentage() {
         onFxThread(() -> {
             CanvasLogViewer viewer = new CanvasLogViewer();
@@ -474,21 +506,6 @@ class CanvasLogViewerStateBehaviorTest {
             assertEquals(privateField(viewer, "textColor"),
                     invoke(viewer, "levelTextColor", new Class<?>[] { int.class }, 9));
 
-            assertEquals(privateField(viewer, "fatalBar"),
-                    invoke(viewer, "levelBarColor", new Class<?>[] { int.class }, 1));
-            assertEquals(privateField(viewer, "errorBar"),
-                    invoke(viewer, "levelBarColor", new Class<?>[] { int.class }, 2));
-            assertEquals(privateField(viewer, "warnBar"),
-                    invoke(viewer, "levelBarColor", new Class<?>[] { int.class }, 3));
-            assertNull(invoke(viewer, "levelBarColor", new Class<?>[] { int.class }, 4));
-
-            assertEquals(privateField(viewer, "fatalTint"),
-                    invoke(viewer, "levelTintColor", new Class<?>[] { int.class }, 1));
-            assertEquals(privateField(viewer, "errorTint"),
-                    invoke(viewer, "levelTintColor", new Class<?>[] { int.class }, 2));
-            assertEquals(privateField(viewer, "warnTint"),
-                    invoke(viewer, "levelTintColor", new Class<?>[] { int.class }, 3));
-            assertNull(invoke(viewer, "levelTintColor", new Class<?>[] { int.class }, 4));
         });
     }
 
@@ -547,7 +564,7 @@ class CanvasLogViewerStateBehaviorTest {
 
             viewer.setDarkMode(true);
             viewer.setDarkMode(true);
-            assertEquals(Color.web("#1e2226"), backgroundFill(viewer));
+            assertEquals(Color.web("#191a1c"), backgroundFill(viewer));
 
             viewer.setDarkMode(false);
             assertEquals(Color.web("#ffffff"), backgroundFill(viewer));

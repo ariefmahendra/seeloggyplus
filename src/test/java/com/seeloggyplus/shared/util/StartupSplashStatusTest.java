@@ -1,6 +1,8 @@
 package com.seeloggyplus.shared.util;
 
 import org.junit.jupiter.api.Test;
+import com.seeloggyplus.shared.ui.AppTheme;
+import java.awt.Color;
 
 import javax.imageio.ImageIO;
 import java.awt.GraphicsEnvironment;
@@ -31,9 +33,42 @@ class StartupSplashStatusTest {
     }
 
     @Test
+    void contentUsesTheSelectedPaletteAndFitsTheSplash() {
+        for (var theme : AppTheme.Theme.values()) {
+            var content = StartupSplash.createContent(theme, "Loading interface...", StartupSplash.loadFrames(theme).getFirst());
+            assertEquals(480, content.getWidth());
+            assertEquals(230, content.getHeight());
+            var image = new BufferedImage(480, 230, BufferedImage.TYPE_INT_RGB);
+            var graphics = image.createGraphics();
+            try {
+            content.paint(graphics);
+            } finally {
+                graphics.dispose();
+            }
+            Color expected = Color.decode(theme == AppTheme.Theme.DARK ? "#26282c" : "#e9eaee");
+            assertEquals(expected.getRGB(), image.getRGB(0, 10));
+            assertEquals(expected.getRGB(), image.getRGB(32, 153));
+        }
+    }
+
+    @Test
+    void missingThemeFallsBackToLight() {
+        var content = StartupSplash.createContent(null, "Starting...", StartupSplash.loadFrames(null).getFirst());
+        var image = new BufferedImage(480, 230, BufferedImage.TYPE_INT_RGB);
+        var graphics = image.createGraphics();
+        try {
+            content.paint(graphics);
+        } finally {
+            graphics.dispose();
+        }
+        assertEquals(Color.decode("#e9eaee").getRGB(), image.getRGB(0, 10));
+    }
+
+    @Test
     void statusAndRepeatedCloseAreSafeDuringHeadlessStartup() {
         assertTrue(GraphicsEnvironment.isHeadless(), "Startup tests must remain headless");
         assertDoesNotThrow(() -> {
+            StartupSplash.show(AppTheme.Theme.DARK);
             StartupSplash.showStatus("Preparing workspace...");
             StartupSplash.showStatus("Loading interface...");
             StartupSplash.close();
@@ -43,7 +78,7 @@ class StartupSplashStatusTest {
     }
 
     private static BufferedImage splashFrame() throws Exception {
-        try (var resource = StartupSplashStatusTest.class.getResourceAsStream("/images/startup-splash.gif")) {
+        try (var resource = StartupSplashStatusTest.class.getResourceAsStream("/images/startup-splash-light.gif")) {
             assertNotNull(resource);
             return ImageIO.read(resource);
         }
@@ -63,7 +98,8 @@ class StartupSplashStatusTest {
     private static void paint(BufferedImage image, String status) {
         var graphics = image.createGraphics();
         try {
-            StartupSplash.paintStatus(graphics, status);
+            var content = StartupSplash.createContent(AppTheme.Theme.LIGHT, status, StartupSplash.loadFrames(AppTheme.Theme.LIGHT).getFirst());
+            content.paint(graphics);
         } finally {
             graphics.dispose();
         }

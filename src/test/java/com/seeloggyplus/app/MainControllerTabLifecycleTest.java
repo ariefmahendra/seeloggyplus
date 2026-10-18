@@ -233,7 +233,7 @@ class MainControllerTabLifecycleTest {
         Platform.runLater(root::applyCss);
         WaitForAsyncUtils.waitForFxEvents();
         assertEquals(Color.web("#2f855a"), dot.getFill(),
-                "graphite live indicator must use the live token");
+                "light live indicator must use the live token");
 
         Platform.runLater(() -> AppTheme.setDark(true));
         WaitForAsyncUtils.waitForFxEvents();

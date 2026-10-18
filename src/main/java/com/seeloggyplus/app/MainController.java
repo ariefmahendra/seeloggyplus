@@ -1,5 +1,9 @@
 package com.seeloggyplus.app;
 
+import com.seeloggyplus.shared.ui.ThemedAlerts;
+
+import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
+
 import com.seeloggyplus.features.recent.infrastructure.RecentConfigServiceImpl;
 import com.seeloggyplus.features.recent.application.RecentFileService;
 import com.seeloggyplus.shared.ui.canvas.CanvasLogViewer;
@@ -56,6 +60,7 @@ import javafx.geometry.Side;
 import javafx.application.Platform;
 import javafx.scene.shape.Circle;
 import javafx.concurrent.Task;
+import com.seeloggyplus.shared.ui.RoundedPanelSupport;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
@@ -103,7 +108,7 @@ public class MainController {
     private static final double MIN_LOG_TAB_CONTENT_WIDTH = 60;
     private static final double MAX_LOG_TAB_CONTENT_WIDTH = 220;
 
-    private static final double LOG_TAB_HORIZONTAL_PADDING = 20;
+    private static final double LOG_TAB_HORIZONTAL_PADDING = 29;
     private static final double LOG_TAB_OVERFLOW_RESERVE = 40;
     private double tabHeaderScrollAccumulator = 0;
     private long lastTabHeaderSwitchAt = 0;
@@ -167,6 +172,8 @@ public class MainController {
     @FXML
     private StackPane logContainer;
     @FXML
+    private VBox logIsland;
+    @FXML
     private TabPane logTabPane;
     @FXML
     private VBox emptyStatePane;
@@ -201,6 +208,8 @@ public class MainController {
 
     @FXML
     private Label statusLabel;
+    @FXML
+    private Label selectionStatusLabel;
     @FXML
     private Label updateStatusLabel;
     @FXML
@@ -344,6 +353,18 @@ public class MainController {
         updateFeature.reconcileUpdateStartup();
         updateFeature.scheduleAutoUpdateCheck();
         updateFeature.showWhatsNewIfNeeded();
+
+        if (logIsland != null && emptyStatePane != null && logContainer != null) {
+            logIsland.minHeightProperty().bind(Bindings.createDoubleBinding(
+                    () -> emptyStatePane.isManaged()
+                            ? Math.max(120, Math.ceil(emptyStatePane.prefHeight(logContainer.getWidth()))) : 120,
+                    emptyStatePane.managedProperty(), logContainer.widthProperty(),
+                    emptyStatePane.getChildren().getFirst().layoutBoundsProperty()));
+        }
+
+        RoundedPanelSupport.apply(recentPanel);
+        RoundedPanelSupport.apply(logContainer);
+        RoundedPanelSupport.apply(detailPane);
 
         if (centerRoot != null && centerClip != null) {
             centerClip.widthProperty().bind(centerRoot.widthProperty());
@@ -651,6 +672,7 @@ public class MainController {
         }
 
         searchResultPanel = new SearchResultPanel();
+        RoundedPanelSupport.apply(searchResultPanel);
         searchResultPanel.setOnLineSelected((listIndex, globalLine, content) -> {
             if (canvasLogViewer != null) {
                 canvasLogViewer.jumpToLine(globalLine);
@@ -673,7 +695,6 @@ public class MainController {
 
         VBox.setVgrow(searchSplit, Priority.ALWAYS);
         logParent.getChildren().set(logIdx, searchSplit);
-        logParent.setMinHeight(0);
         this.searchSplitPane = searchSplit;
 
         setupDragAndDrop();
@@ -1819,8 +1840,13 @@ public class MainController {
             dialog.initModality(Modality.WINDOW_MODAL);
             dialog.initOwner(mainStage);
             dialog.setScene(AppTheme.scene(root));
-            dialog.setMaximized(true);
-            dialog.setOnShown(e -> dialog.setMaximized(true));
+            var screens = javafx.stage.Screen.getScreensForRectangle(
+                    mainStage.getX() + mainStage.getWidth() / 2, mainStage.getY() + mainStage.getHeight() / 2, 1, 1);
+            var bounds = (screens.isEmpty() ? javafx.stage.Screen.getPrimary() : screens.getFirst()).getVisualBounds();
+            dialog.setMinWidth(Math.min(800, bounds.getWidth()));
+            dialog.setMinHeight(Math.min(520, bounds.getHeight()));
+            dialog.setWidth(Math.min(1000, bounds.getWidth()));
+            dialog.setHeight(Math.min(640, bounds.getHeight()));
 
             controller.setHost(new FileManagerDialogHost(dialog, preferenceService, sshServiceFactory,
                     this::showError, DialogPresenter.showAndWait()));
@@ -2207,12 +2233,14 @@ public class MainController {
             Parent root = loader.load();
             ServerManagementDialogController serverController = loader.getController();
             serverController.setSshServiceFactory(sshServiceFactory);
+            serverController.setPreferenceService(preferenceService);
 
             Stage dialog = new Stage();
             dialog.setTitle("SSH Server Management");
             dialog.initOwner(mainStage);
             dialog.initModality(Modality.APPLICATION_MODAL);
             addAppIcon(dialog);
+            serverController.configureWindow(dialog);
             DialogWindowSupport.restoreWindow(mainStage, wasMaximized, oldX, oldY, oldWidth, oldHeight, root, dialog);
 
             logger.info("Server management dialog closed");
@@ -2237,9 +2265,14 @@ public class MainController {
             dialog.initModality(Modality.WINDOW_MODAL);
             addAppIcon(dialog);
             dialog.setScene(AppTheme.scene(root));
-            dialog.setResizable(false);
-            dialog.setWidth(550);
-            dialog.setHeight(480);
+            dialog.setResizable(true);
+            var screens = javafx.stage.Screen.getScreensForRectangle(mainStage.getX(), mainStage.getY(), 1, 1);
+            var bounds = (screens.isEmpty() ? javafx.stage.Screen.getPrimary() : screens.getFirst()).getVisualBounds();
+            dialog.setMinWidth(Math.min(600, bounds.getWidth()));
+            dialog.setMinHeight(Math.min(420, bounds.getHeight()));
+            dialog.setWidth(Math.min(660, bounds.getWidth()));
+            dialog.setHeight(Math.min(460, bounds.getHeight()));
+            dialog.setOnHidden(event -> controller.discardChanges());
 
             dialog.showAndWait();
         } catch (IOException e) {
@@ -2493,23 +2526,10 @@ public class MainController {
 
     private void handleHelpContents() {
         try {
-            File appDir = new File(System.getProperty("user.dir"));
-            File helpFile = new File(appDir, "help/index.html");
-
-            if (!helpFile.exists()) {
-                URL helpUrl = getClass().getResource("/help/index.html");
-                if (helpUrl != null) {
-                    Desktop.getDesktop().browse(helpUrl.toURI());
-                    return;
-                }
-                showError("Help Not Found", "Help file not found at: " + helpFile.getAbsolutePath());
-                return;
-            }
-
-            Desktop.getDesktop().browse(helpFile.toURI());
+            DocumentationLinks.open(uri -> Desktop.getDesktop().browse(uri));
         } catch (Exception e) {
             logger.error("Failed to open help", e);
-            showError("Help Error", "Could not open help: " + e.getMessage());
+            showError("Help Error", "Could not open documentation. Visit " + DocumentationLinks.HOME + " in your browser. Details: " + e.getMessage());
         }
     }
 
@@ -3349,7 +3369,7 @@ public class MainController {
 
     private void showError(String title, String message) {
         Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+            Alert alert = ThemedAlerts.create(Alert.AlertType.ERROR);
             alert.setTitle("Error");
             alert.setHeaderText(title);
             alert.setContentText(message);
@@ -3363,7 +3383,7 @@ public class MainController {
 
     static Alert createRemotePathError(String remotePath) {
         boolean missing = remotePath == null || remotePath.isBlank();
-        Alert alert = new Alert(Alert.AlertType.ERROR);
+        Alert alert = ThemedAlerts.create(Alert.AlertType.ERROR);
         alert.setTitle("Unable to monitor log");
         alert.setHeaderText("Unable to monitor log from server");
         alert.setContentText(missing ? RemoteLogPaths.MISSING_LOCATION_MESSAGE : RemoteLogPaths.LOCAL_LOCATION_MESSAGE);
@@ -3378,15 +3398,13 @@ public class MainController {
         pane.setExpandableContent(details);
         pane.setPrefWidth(520);
         pane.getStyleClass().add("remote-path-error");
-        pane.getStylesheets().setAll(AppTheme.sceneStylesheets(AppTheme.getTheme()));
-        AppTheme.applyThemeState(pane, AppTheme.getTheme());
         alert.setOnShown(event -> addDialogIcon(pane.getScene().getWindow()));
         return alert;
     }
 
     private void showInfo(String title, String message) {
         Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            Alert alert = ThemedAlerts.create(Alert.AlertType.INFORMATION);
             alert.setTitle("Information");
             alert.setHeaderText(title);
             alert.setContentText(message);
@@ -3625,11 +3643,20 @@ public class MainController {
         HBox graphicBox = new HBox(4);
         graphicBox.setAlignment(Pos.CENTER_LEFT);
 
+        FontAwesomeIconView fileIcon = new FontAwesomeIconView();
+        fileIcon.setGlyphName(session.getSessionType() == LogSession.SessionType.LOCAL ? "FILE_TEXT" : "SERVER");
+        fileIcon.setSize("12");
+        fileIcon.getStyleClass().add("log-tab-icon");
+
         Circle liveDot = new Circle(3.5);
         liveDot.getStyleClass().add("tab-live-indicator");
         liveDot.setVisible(session.isTailModeEnabled());
         liveDot.setManaged(session.isTailModeEnabled());
         session.setLiveIndicatorDot(liveDot);
+
+        StackPane iconBox = new StackPane(fileIcon, liveDot);
+        iconBox.getStyleClass().add("log-tab-icon-container");
+        StackPane.setAlignment(liveDot, Pos.TOP_RIGHT);
 
         Label badge = new Label();
         badge.getStyleClass().add("tab-badge-unread");
@@ -3637,7 +3664,7 @@ public class MainController {
         badge.setManaged(false);
         session.setUnreadBadgeLabel(badge);
 
-        graphicBox.getChildren().addAll(liveDot, badge);
+        graphicBox.getChildren().addAll(iconBox, badge);
         graphicBox.setOnMouseClicked(event -> {
             if (event.getButton() == MouseButton.MIDDLE) {
                 event.consume();
@@ -3759,6 +3786,22 @@ public class MainController {
                 isProgrammaticUpdate = false;
             }
         });
+
+        viewer.setOnSelectionChanged(summary -> {
+            if (session == tabSessionManager.getActive()) {
+                updateSelectionStatus(summary);
+            }
+        });
+    }
+
+    private void updateSelectionStatus(String summary) {
+        if (selectionStatusLabel == null) {
+            return;
+        }
+        boolean visible = summary != null && !summary.isEmpty();
+        selectionStatusLabel.setText(visible ? "Selected: " + summary : "");
+        selectionStatusLabel.setVisible(visible);
+        selectionStatusLabel.setManaged(visible);
     }
 
     private void onTabSelected(Tab oldTab, Tab newTab) {
@@ -3941,6 +3984,7 @@ public class MainController {
             updateBottomBarLineCount(null);
         }
 
+        updateSelectionStatus(canvasLogViewer == null ? null : canvasLogViewer.getSelectionSummary());
         updateEmptyState();
     }
 

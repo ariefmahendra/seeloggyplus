@@ -64,7 +64,7 @@ class AdaptiveLogTabsTest {
         robot.interact(() -> {
             new ArrayList<>(sessions.values()).forEach(LogSession::close);
             sessions.clear();
-            AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+            AppTheme.setTheme(AppTheme.Theme.LIGHT);
         });
     }
 
@@ -206,7 +206,7 @@ class AdaptiveLogTabsTest {
             assertEquals(width, header(i).getWidth(), 1, "Available space should be shared proportionally");
             total += header(i).getWidth();
         }
-        assertTrue(total < pane.getWidth(), "Tabs should fit before the readable minimum requires overflow");
+        assertTrue(total < pane.getWidth(), "Tabs should fit before the readable minimum requires overflow: total="+total+", pane="+pane.getWidth()+", min="+pane.getTabMinWidth()+", header="+width);
     }
 
     private Object invoke(String name, Class<?>[] types, Object... args) {

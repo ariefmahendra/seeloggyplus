@@ -12,9 +12,7 @@ import javafx.scene.layout.Background;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.Paint;
-import javafx.scene.paint.Stop;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
@@ -24,7 +22,6 @@ import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -180,22 +177,7 @@ class InputContrastTest {
     }
 
     private static List<Color> backgroundColors(Region field) {
-        List<Color> result = new ArrayList<>();
-        Background background = field.getBackground();
-        if (background == null) {
-            return result;
-        }
-        for (var fill : background.getFills()) {
-            Paint paint = fill.getFill();
-            if (paint instanceof Color color) {
-                result.add(color);
-            } else if (paint instanceof LinearGradient gradient) {
-                for (Stop stop : gradient.getStops()) {
-                    result.add(stop.getColor());
-                }
-            }
-        }
-        return result;
+        return List.of(com.seeloggyplus.shared.ui.RenderedColors.background(field));
     }
 
     private static double contrastRatio(Color a, Color b) {

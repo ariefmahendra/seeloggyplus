@@ -35,7 +35,7 @@ class MainViewIconsTest {
 
     @AfterEach
     void resetTheme(FxRobot robot) {
-        robot.interact(() -> AppTheme.setTheme(AppTheme.Theme.GRAPHITE));
+        robot.interact(() -> AppTheme.setTheme(AppTheme.Theme.LIGHT));
     }
 
     @Test

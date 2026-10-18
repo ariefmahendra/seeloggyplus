@@ -31,6 +31,10 @@
 .file-path-breadcrumb .path-children > .arrow-button,
 .file-path-breadcrumb .path-overflow > .arrow-button {
     -fx-padding: 0;
+    visibility: hidden;
+    -fx-min-width: 0;
+    -fx-pref-width: 0;
+    -fx-max-width: 0;
 }
 .file-path-breadcrumb .path-children > .arrow-button > .arrow,
 .file-path-breadcrumb .path-overflow > .arrow-button > .arrow {
@@ -45,6 +49,7 @@
 .file-path-breadcrumb .path-children > .label,
 .file-path-breadcrumb .path-overflow > .label {
     -fx-padding: 0;
+    -fx-alignment: center;
 }
 .file-path-breadcrumb .path-chevron {
     -fx-fill: null;

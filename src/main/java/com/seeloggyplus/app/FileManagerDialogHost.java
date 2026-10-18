@@ -59,6 +59,7 @@ public class FileManagerDialogHost implements FileManagerHost {
             searchDialog.initModality(Modality.WINDOW_MODAL);
             searchDialog.initOwner(owner);
             searchDialog.setScene(AppTheme.scene(searchRoot));
+            DialogWindowSupport.setMinimumContentSize(searchDialog, 800, 560);
             dialogPresenter.present(searchDialog);
 
             FileInfo chosen = searchController.getChosenFile();
@@ -95,6 +96,7 @@ public class FileManagerDialogHost implements FileManagerHost {
             Stage stage = new Stage();
             AppIcons.apply(stage);
             stage.setTitle("Log Preview");
+            DialogWindowSupport.setMinimumContentSize(stage, 560, 360);
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.initOwner(owner);
             DialogWindowSupport.restoreWindow(restoreStage, wasMaximized, oldX, oldY, oldWidth, oldHeight,

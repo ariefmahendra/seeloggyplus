@@ -72,6 +72,18 @@ class LogPreviewDialogControllerTest {
     }
 
     @Test
+    void emptyFileStopsLoadingAndShowsAnEmptyState() throws Exception {
+        Path log = writeLog("empty.log");
+        onFx(() -> controller.loadFile(localFile(log), null));
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> !progressIndicator().isVisible());
+        onFx(() -> {
+            assertTrue(listView().getItems().isEmpty());
+            assertEquals("No lines to preview", label("previewStateLabel").getText());
+            assertFalse(progressIndicator().isManaged());
+        });
+    }
+
+    @Test
     void previewHonoursTheConfiguredLineLimit() throws Exception {
         Map<String, String> prefs = new HashMap<>();
         prefs.put("lp_line_limit", "2");

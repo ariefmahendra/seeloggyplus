@@ -41,25 +41,6 @@ class PopupThemeTest {
     }
 
     @Test
-    @DisplayName("Graphite dropdown popups are light with readable dark text")
-    void graphiteDropdownIsLight() {
-        onFxThread(() -> {
-            useTheme(AppTheme.Theme.GRAPHITE);
-            ListView<String> list = buildPopup();
-
-            Color surface = popupSurface(list);
-            assertNotNull(surface);
-            assertTrue(luminance(surface) > 0.7,
-                    "Graphite dropdown background must be light, was " + surface);
-
-            Color text = firstCellTextFill(list);
-            assertNotNull(text);
-            assertTrue(luminance(text) < 0.4,
-                    "Graphite dropdown text must stay dark on the light surface, was " + text);
-        });
-    }
-
-    @Test
     @DisplayName("Dark theme still renders a dark dropdown surface")
     void darkDropdownStaysDark() {
         onFxThread(() -> {
@@ -123,15 +104,15 @@ class PopupThemeTest {
                 assertTrue(luminance(surface) < 0.3, "Dark dropdown must stay dark");
             } else {
                 assertTrue(luminance(surface) > 0.7,
-                        theme + ": Graphite/Light dropdown fields must be light");
+                        theme + ": Light dropdown fields must be light");
             }
         }
     }
 
     @Test
-    @DisplayName("dropdown selection is a neutral light highlight, not dark/blue, in Graphite and Light")
-    void selectedItemUsesNeutralHighlight() {
-        for (AppTheme.Theme theme : new AppTheme.Theme[]{AppTheme.Theme.GRAPHITE, AppTheme.Theme.LIGHT}) {
+    @DisplayName("dropdown selection follows Islands palettes with readable text")
+    void selectedItemUsesThemeHighlight() {
+        for (AppTheme.Theme theme : AppTheme.Theme.values()) {
             AtomicReference<ListView<String>> listRef =
                     new AtomicReference<>();
             AtomicReference<ListCell<?>> cellRef =
@@ -153,14 +134,9 @@ class PopupThemeTest {
                 WaitForAsyncUtils.waitForFxEvents();
             });
 
-            Color selected = firstFill(cell.getBackground());
+            Color selected = com.seeloggyplus.shared.ui.RenderedColors.background(cell);
             assertNotNull(selected, theme + ": selected popup item must have a background");
-            assertTrue(luminance(selected) > 0.7,
-                    theme + ": selected dropdown item must stay light, was " + selected);
-            double maxChannel = Math.max(selected.getRed(), Math.max(selected.getGreen(), selected.getBlue()));
-            double minChannel = Math.min(selected.getRed(), Math.min(selected.getGreen(), selected.getBlue()));
-            assertTrue(maxChannel - minChannel < 0.1,
-                    theme + ": selected dropdown item must be neutral (not blue), was " + selected);
+            assertEquals(Color.web(theme == AppTheme.Theme.LIGHT ? "#d0dffe" : "#2a4371"), selected, "Islands selection");
 
             Color text = (Color) cell.getTextFill();
             assertNotNull(text);

@@ -20,7 +20,7 @@ Use the format `type(scope): summary`, e.g.:
 
 ```
 fix(log-viewer): arrow keys navigate the log via scene-level routing
-feat(ui): enterprise graphite theme with dark mode
+feat(ui): islands light and dark themes
 docs(ui): record defect fixes and regression tests
 test(ui): add contrast tests for input fields
 ```
@@ -116,11 +116,34 @@ release-notes file as the body.
    - runs the test suite,
    - builds the portable packages for Windows/Linux (with and without JRE),
    - merges the update manifests,
-   - **creates the GitHub Release**, using the matching `CHANGELOG.md` section as the
+   - **creates the GitHub Release**, using `docs/release-notes/<version>.md` as the
      release body, and attaches the artifacts,
    - publishes `update-manifest.json` to `gh-pages`.
 8. Verify the release page and its notes. A ready-to-use narrative per version also
    lives in `docs/release-notes/<version>.md` for manual publishing.
+
+## Online documentation and compatibility gate
+
+Help Contents opens https://seeloggyplus-doc.vercel.app/. Offline help is no longer
+included. Update both English and Indonesian guides and changelogs in
+the sibling seeloggyplus-doc repository, and deploy its main branch to Vercel.
+
+Generate documentation screenshots headlessly with:
+
+```powershell
+.\gradlew.bat --no-daemon test --tests "*DocumentationScreenshotGeneratorTest" -PdocumentationScreenshotsDir=build/documentation-screenshots
+```
+
+Before tagging, test both real portable packages against the released 0.7.0 jar:
+
+```powershell
+.\gradlew.bat --no-daemon verifyReleaseCompatibility -PlegacyJar=build/release-compatibility/seeloggyplus.jar
+```
+
+The gate downloads through the old updater, checks legacy ZIP whitelists, preserves
+synthetic database records, credentials, trusted hosts and launcher settings, and
+exercises activation, checksum rejection, health confirmation and rollback.
+Run it on Windows and Linux before publishing. Never publish when this gate fails.
 
 ## One-off / manual release (if CI is unavailable)
 

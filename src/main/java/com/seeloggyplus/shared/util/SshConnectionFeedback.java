@@ -1,7 +1,8 @@
 package com.seeloggyplus.shared.util;
 
+import com.seeloggyplus.shared.ui.ThemedAlerts;
+
 import com.seeloggyplus.shared.model.SSHServerModel;
-import com.seeloggyplus.shared.ui.AppTheme;
 import javafx.scene.control.Alert;
 import javafx.scene.control.TextArea;
 
@@ -56,7 +57,7 @@ public final class SshConnectionFeedback {
 
     public static Alert createAlert(String detail, SSHServerModel server) {
         Feedback feedback = describe(detail, server != null && server.usesKeyAuth());
-        Alert alert = new Alert(Alert.AlertType.ERROR);
+        Alert alert = ThemedAlerts.create(Alert.AlertType.ERROR);
         alert.setTitle("Connection problem");
         alert.setHeaderText(feedback.title());
         alert.setContentText(feedback.message());
@@ -68,12 +69,12 @@ public final class SshConnectionFeedback {
         details.setWrapText(true);
         details.setPrefColumnCount(48);
         details.setPrefRowCount(5);
+        details.setMinHeight(110);
+        details.setPrefHeight(120);
         var pane = alert.getDialogPane();
         pane.setExpandableContent(details);
         pane.setPrefWidth(520);
         pane.getStyleClass().add("ssh-connection-feedback");
-        pane.getStylesheets().setAll(AppTheme.sceneStylesheets(AppTheme.getTheme()));
-        AppTheme.applyThemeState(pane, AppTheme.getTheme());
         return alert;
     }
 }

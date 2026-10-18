@@ -39,7 +39,7 @@ class FeedbackUiSmokeTest {
             for (String name : new String[]{"ServerManagementDialog", "PreferencesDialog", "UnifiedFileManagerDialog"}) {
                 robot.interact(() -> {
                     try {
-                        AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+                        AppTheme.setTheme(AppTheme.Theme.LIGHT);
                         Parent root = FXMLLoader.load(getClass().getResource("/fxml/" + name + ".fxml"));
                         loaded.set(root);
                         stage.setScene(AppTheme.scene(root)); stage.sizeToScene(); stage.show();

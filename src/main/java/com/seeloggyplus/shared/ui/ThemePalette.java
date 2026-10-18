@@ -15,7 +15,6 @@ import java.util.regex.Pattern;
 
 public final class ThemePalette {
 
-    private static final String BASE_STYLESHEET = "/style/theme.css";
     private static final Pattern TOKEN = Pattern.compile("(-sl-[a-z0-9-]+)\\s*:\\s*([^;]+);");
     private static final Map<Theme, Map<String, Color>> CACHE = new EnumMap<>(Theme.class);
 
@@ -23,7 +22,7 @@ public final class ThemePalette {
     }
 
     public static Color color(String token, Theme theme) {
-        Map<String, Color> palette = palette(theme == null ? Theme.GRAPHITE : theme);
+        Map<String, Color> palette = palette(theme == null ? Theme.LIGHT : theme);
         Color color = palette.get(token);
         if (color == null) {
             throw new IllegalArgumentException("Unknown theme token: " + token);
@@ -37,10 +36,7 @@ public final class ThemePalette {
             return cached;
         }
         Map<String, Color> palette = new HashMap<>();
-        merge(read(BASE_STYLESHEET), palette);
-        if (theme.stylesheet() != null) {
-            merge(read(theme.stylesheet()), palette);
-        }
+        merge(read(theme.stylesheet()), palette);
         Map<String, Color> immutable = Map.copyOf(palette);
         CACHE.put(theme, immutable);
         return immutable;

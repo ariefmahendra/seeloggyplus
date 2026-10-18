@@ -14,15 +14,21 @@ import static org.junit.jupiter.api.Assertions.*;
 class StartupSplashTest {
 
     @Test
-    void nativeSplashImageIsEmbeddedAndHasReadableBranding() throws Exception {
-        try (var input = getClass().getResourceAsStream("/images/startup-splash.gif")) {
-            assertNotNull(input, "The native splash must live inside the JAR for blue/green installations");
+    void splashImagesHaveReadableBrandingForBothThemes() throws Exception {
+        for (String theme : new String[]{"light", "dark"}) {
+            assertReadableSplash(theme);
+        }
+    }
+
+    private void assertReadableSplash(String themeName) throws Exception {
+        try (var input = getClass().getResourceAsStream("/images/startup-splash-" + themeName + ".gif")) {
+            assertNotNull(input, "Both themed splashes must live inside the JAR for blue/green installations");
             var image = ImageIO.read(input);
             assertNotNull(image);
             assertEquals(480, image.getWidth());
             assertEquals(230, image.getHeight());
 
-            String theme = Files.readString(Path.of("src/main/resources/style/theme.css"));
+            String theme = Files.readString(Path.of("src/main/resources/style/theme-" + themeName + ".css"));
             Color background = token(theme, "-sl-chrome");
             Color foreground = token(theme, "-sl-chrome-text");
             assertEquals(background.getRGB(), image.getRGB(0, 10));
@@ -39,22 +45,28 @@ class StartupSplashTest {
             assertTrue(textPixels > 100, "The splash must render visible application branding");
             Color segment = new Color(image.getRGB(60, 188));
             Color track = new Color(image.getRGB(400, 188));
-            assertEquals(token(theme, "-sl-accent-text"), segment);
-            assertEquals(token(theme, "-sl-chrome-hover"), track);
+            assertEquals(token(theme, "-sl-chrome-text"), segment);
+            assertEquals(token(theme, "-sl-border"), track);
             assertTrue(contrast(segment, track) >= 4.5, "The moving segment must remain clearly visible on its track");
         }
     }
 
     @Test
-    void loadingBarMovesInALoopingAnimationWhileBrandingStaysStable() throws Exception {
-        try (var resource = getClass().getResourceAsStream("/images/startup-splash.gif")) {
+    void loadingBarsAnimateWithoutFlickeringForBothThemes() throws Exception {
+        for (String theme : new String[]{"light", "dark"}) {
+            assertAnimatedSplash(theme);
+        }
+    }
+
+    private void assertAnimatedSplash(String themeName) throws Exception {
+        try (var resource = getClass().getResourceAsStream("/images/startup-splash-" + themeName + ".gif")) {
             assertNotNull(resource);
             try (var input = ImageIO.createImageInputStream(resource)) {
                 var reader = ImageIO.getImageReadersByFormatName("gif").next();
                 try {
                     reader.setInput(input);
                     int frames = reader.getNumImages(true);
-                    assertTrue(frames >= 12, "The native splash needs enough frames for a smooth loading bar");
+                    assertTrue(frames >= 12, "The splash needs enough frames for a smooth loading bar");
                     var first = reader.read(0);
                     var middle = reader.read(frames / 2);
                     boolean barMoved = false;
@@ -91,16 +103,6 @@ class StartupSplashTest {
                 }
             }
         }
-    }
-
-    @Test
-    void splashIsConfiguredBeforeMainForBothJarAndDevLaunches() throws Exception {
-        String build = Files.readString(Path.of("build.gradle"));
-        var manifestEntries = Pattern.compile("'SplashScreen-Image'\\s*:\\s*'images/startup-splash.gif'")
-                .matcher(build);
-        assertEquals(2, manifestEntries.results().count(), "Both jar and fatJar need a native splash manifest entry");
-        assertTrue(build.contains("-splash:"), "runDev must show the same early startup feedback");
-        assertFalse(build.contains("startup-splash.png"), "The retired static splash must not be generated or launched");
     }
 
     @Test

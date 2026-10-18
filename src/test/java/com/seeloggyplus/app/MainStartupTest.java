@@ -42,7 +42,7 @@ class MainStartupTest {
         robot.interact(() -> {
             stage.setOnCloseRequest(null);
             stage.hide();
-            AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+            AppTheme.setTheme(AppTheme.Theme.LIGHT);
         });
         var service = new PreferenceServiceImpl();
         originalPreferences.forEach((code, value) ->
@@ -74,7 +74,7 @@ class MainStartupTest {
 
         assertFalse(stage.isShowing(), "Background preparation must not open JavaFX windows");
         assertEquals(List.of("Preparing workspace...", "Loading preferences..."), phases);
-        assertEquals(AppTheme.Theme.GRAPHITE, AppTheme.getTheme(),
+        assertEquals(AppTheme.Theme.LIGHT, AppTheme.getTheme(),
                 "The theme must be applied on the JavaFX thread, not in init()");
 
         var field = Main.class.getDeclaredField("preferenceService");

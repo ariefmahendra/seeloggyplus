@@ -37,11 +37,17 @@ public class LogPreviewDialogController {
     private ProgressIndicator progressIndicator;
     @FXML
     private Button closeButton;
+    @FXML
+    private Label previewStateLabel;
 
     private final ObservableList<LogLine> logLines = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
+        Tooltip pathTooltip = new Tooltip();
+        pathTooltip.textProperty().bind(fileNameLabel.textProperty());
+        fileNameLabel.setTooltip(pathTooltip);
+        progressIndicator.managedProperty().bind(progressIndicator.visibleProperty());
         logListView.setItems(logLines);
         logListView.setCellFactory(lv -> new LogLineCell());
 
@@ -86,6 +92,8 @@ public class LogPreviewDialogController {
     public void loadFile(FileInfo fileInfo, SSHService sshService) {
         fileNameLabel.setText(String.format("Preview: %s (first %d lines)", fileInfo.getPath(), previewLineLimit));
         progressIndicator.setVisible(true);
+        previewStateLabel.setText("Loading file content...");
+        logLines.clear();
 
         Task<List<String>> loadTask = new Task<>() {
             @Override
@@ -119,6 +127,7 @@ public class LogPreviewDialogController {
             }
             logLines.setAll(convertedLines);
             progressIndicator.setVisible(false);
+            previewStateLabel.setText(lines.isEmpty() ? "No lines to preview" : "");
         });
 
         loadTask.setOnFailed(e -> {

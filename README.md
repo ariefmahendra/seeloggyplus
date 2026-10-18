@@ -11,11 +11,12 @@ SeeLoggyPlus is a high-performance, JavaFX-based desktop log viewer designed for
 *   **Find in Files (SSH)**: Search a keyword across every file under a remote folder, preview the matches with context, then Open & Jump or Tail the file.
 *   **Live Tail Mode**: Stream logs in real-time with Smart Follow. Scrolling up pauses auto-follow; scrolling back to the bottom resumes it automatically.
 *   **Smart Search & Filtering**: Instantly filter logs with text, case-sensitive, and regex searches. A Search Result Panel lists every match with click-to-jump, and F3 / Shift+F3 navigate between matches.
+*   **Text Selection & Copy**: Drag in the log viewer to select exact characters, even across lines, then copy with `Ctrl+C` or the right-click menu. The status bar reports how many lines and characters are selected.
 *   **Embedded Prettifiers**: Automatically format and syntax-highlight JSON and XML content found within your log entries.
 *   **Recent Log Files**: Entries are grouped per server (or Local), searchable, and the file you reopen moves back to the top of its group with its last Open/Tail mode preserved.
 *   **High Performance**: Canvas-based rendering, background indexing, and multi-threaded downloads keep the UI responsive even with multi-gigabyte log files.
 *   **Secure SSH**: Password or private-key authentication (credentials stored encrypted), with host-key verification through `known_hosts` — unknown keys must be trusted by the user, changed keys are always refused.
-*   **Themes & Preferences**: Graphite (default), Light, and Dark themes; configurable font, tail window size, memory limit, download options, and more.
+*   **Themes & Preferences**: Islands Light (default) and Dark themes; configurable font, tail window size, memory limit, download options, and more.
 *   **Self-Update**: The app checks for updates, can download them automatically in the background, and shows a "What's New" dialog after upgrading.
 
 ---
@@ -58,7 +59,7 @@ The full suite runs headless (Monocle) and is safe to run locally:
 
 ### Building the Portable Distribution
 
-The portable zip contains the application jar, the launcher scripts (`launcher.bat`, `launcher.sh`), `launcher.properties`, and the offline help files.
+The portable zip contains the application jar, the launcher scripts (`launcher.bat`, `launcher.sh`), `launcher.properties`, and launcher documentation. Help Contents (F1) opens https://seeloggyplus-doc.vercel.app/ in your browser and requires internet access.
 
 ```bash
 # On Windows
@@ -115,6 +116,12 @@ Java is selected in this order: `java.home` in `launcher.properties` → the bun
 *   When a search is active, the **Search Result Panel** appears on the right; click a result to jump to that line.
 *   Use `F3` / `Shift+F3` to move between matches, and `Escape` in the search field to clear the filter.
 
+### Selecting & Copying Text
+
+*   Drag with the left mouse button to select exact characters; a plain click selects the whole line and `Shift`+click extends the selection by whole lines.
+*   `Ctrl+C` or the right-click **Copy Selection** entry copies the selected text (partial lines included).
+*   The status bar shows the selection size (`Selected: 3 lines, 120 chars`) and clears it when you click without dragging.
+
 ### Detail Panel
 
 Click a log line to see its full content in the bottom panel. The panel toolbar offers:
@@ -134,7 +141,9 @@ Click a log line to see its full content in the bottom panel. The panel toolbar 
 | `Ctrl+G` | Go To Line... |
 | `Ctrl+F` | Focus the search field |
 | `Ctrl+R` | Reload the current file or tail session |
+| `F5` | Refresh (reload) the current file or tail session |
 | `F3` / `Shift+F3` | Next / previous search match |
+| `Ctrl+C` | Copy the selected text (or the whole current line) |
 | `Ctrl+B` | Show/hide the Recent Log Files panel |
 | `Ctrl+J` | Show/hide the Detail panel |
 | `Ctrl+M` | Server Management |
@@ -145,7 +154,7 @@ Click a log line to see its full content in the bottom panel. The panel toolbar 
 
 **Settings → Preferences...** has three tabs:
 
-*   **General**: font size and family, theme (Graphite/Light/Dark), file double-click action, and maximum memory (restart required).
+*   **General**: font size and family, theme (Light/Dark), file double-click action, and maximum memory (restart required).
 *   **Log Viewer**: tail window size, preview line limit, and auto-prettify JSON/XML.
 *   **SSH**: download threads, connection timeout, and the download directory (with **Open Folder** and **Clean Downloads** helpers).
 

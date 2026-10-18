@@ -11,8 +11,7 @@ permissions:
 
 jobs:
   test:
-    # Self-hosted runner (PICONOS). Override with repo variable RUNNER_LABELS if needed.
-    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted","Linux","X64","PIKACU"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,6 +22,11 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -30,13 +34,24 @@ jobs:
         if: runner.os != 'Windows'
         run: chmod +x gradlew
 
+      - name: Validate release metadata
+        shell: bash
+        run: |
+          python scripts/test_verify_release.py
+          VERSION=$(sed -n 's/^version=//p' gradle.properties | tr -d '\r')
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then VERSION="$GITHUB_REF_NAME"; fi
+          python scripts/verify_release.py "$VERSION"
+
       - name: Run tests (Linux, headless Monocle)
         if: runner.os == 'Linux'
-        run: ./gradlew test --stacktrace -PheadlessTest
+        run: ./gradlew --no-daemon test --stacktrace -PheadlessTest
 
       - name: Run tests (non-Linux)
         if: runner.os != 'Linux'
-        run: ./gradlew test --stacktrace
+        run: ./gradlew --no-daemon test --stacktrace
+
+      - name: Build application
+        run: ./gradlew --no-daemon build
 
       - name: Show failing tests
         if: failure()
@@ -71,7 +86,7 @@ jobs:
       matrix:
         include:
           - platform: linux
-            runner: '["self-hosted"]'
+            runner: '["self-hosted","Linux","X64","PIKACU"]'
           - platform: win
             runner: '["windows-latest"]'
     runs-on: ${{ fromJSON(matrix.runner) }}
@@ -85,6 +100,11 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -95,11 +115,19 @@ jobs:
       - name: Build platform packages and manifest
         shell: bash
         run: |
-          ./gradlew packagePlatform generatePlatformManifest \
+          ./gradlew --no-daemon packagePlatform generatePlatformManifest \
             -Pplatform=${{ matrix.platform }} \
             -PupdateBaseUrl="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name || github.run_id }}" \
             -PminSupported="${{ vars.MIN_SUPPORTED }}" \
             -PreleaseNotesUrl="https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+
+      - name: Verify real packages with the released 0.7.0 updater
+        shell: bash
+        run: |
+          mkdir -p build/release-compatibility
+          curl --fail --location --retry 3 "https://github.com/${{ github.repository }}/releases/download/0.7.0/seeloggyplus-Portable-${{ matrix.platform }}.zip" --output build/release-compatibility/legacy.zip
+          python -c "import zipfile; z=zipfile.ZipFile('build/release-compatibility/legacy.zip'); open('build/release-compatibility/seeloggyplus.jar','wb').write(z.read('seeloggyplus/seeloggyplus.jar'))"
+          ./gradlew --no-daemon verifyReleaseCompatibility -Pplatform=${{ matrix.platform }} -PlegacyJar=build/release-compatibility/seeloggyplus.jar
 
       - name: Upload platform artifacts
         uses: actions/upload-artifact@v4
@@ -113,7 +141,7 @@ jobs:
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted","Linux","X64","PIKACU"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -123,6 +151,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -139,7 +172,10 @@ jobs:
           path: build/distributions
 
       - name: Merge manifests
-        run: ./gradlew mergeManifests
+        run: ./gradlew --no-daemon mergeManifests
+
+      - name: Validate complete release manifest
+        run: python scripts/verify_release.py ${{ github.ref_name }} --distributions build/distributions
 
       - name: Show merged manifest
         shell: bash
@@ -177,6 +213,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body_path: release-body.md
+          fail_on_unmatched_files: true
+          prerelease: false
           files: |
             build/distributions/seeloggyplus-Portable-linux.zip
             build/distributions/seeloggyplus-Portable-linux-jre.zip

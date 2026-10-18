@@ -41,6 +41,7 @@ class CanvasLogViewerInteractionTest {
     @Start
     void start(Stage stage) {
         this.stage = stage;
+        AppTheme.setTheme(AppTheme.Theme.LIGHT);
     }
 
     @Test
@@ -607,6 +608,46 @@ class CanvasLogViewerInteractionTest {
 
             assertEquals(nearText, farRight);
             assertTrue(nearText.getBrightness() < otherRow.getBrightness());
+        });
+    }
+
+    @Test
+    void selectionSummaryDescribesTheSelectedText() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setTailBuffer(tailLines(10));
+            viewer.getVScrollBar().setValue(0);
+            AtomicReference<String> latest = new AtomicReference<>();
+            viewer.setOnSelectionChanged(latest::set);
+            Canvas canvas = canvasOf(viewer);
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    rowY(1), MouseButton.PRIMARY, 1, false, true));
+            assertEquals("1 line, 6 chars", latest.get());
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 2), rowY(1), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
+                    charX(viewer, 6), rowY(1), MouseButton.PRIMARY, 1, false, true));
+            assertEquals("1 line, 4 chars", latest.get());
+
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_PRESSED,
+                    charX(viewer, 1), rowY(0), MouseButton.PRIMARY, 1, false, true));
+            Event.fireEvent(canvas, mouseEvent(canvas, MouseEvent.MOUSE_DRAGGED,
+                    charX(viewer, 3), rowY(2), MouseButton.PRIMARY, 1, false, true));
+            assertEquals("3 lines, 14 chars", latest.get());
+
+            viewer.resetView();
+            assertNull(latest.get());
+        });
+    }
+
+    @Test
+    void selectionSummaryIsNullWithoutAnySelection() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setTailBuffer(tailLines(3));
+            assertNull(viewer.getSelectionSummary());
         });
     }
 

@@ -24,8 +24,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(ApplicationExtension.class)
 class ToolbarToggleIconThemeTest {
 
-    private static final Color CHROME_TEXT = Color.web("#d7dbe0");
-
     private Parent root;
     private MainController controller;
     private Stage stage;
@@ -69,14 +67,23 @@ class ToolbarToggleIconThemeTest {
     }
 
     private void assertIconColour(ToggleButton button, boolean selected, String mode) {
-        button.setSelected(selected);
+        try {
+            Field guard = MainController.class.getDeclaredField("isProgrammaticUpdate");
+            guard.setAccessible(true);
+            guard.setBoolean(controller, true);
+            try { button.setSelected(selected); } finally { guard.setBoolean(controller, false); }
+        } catch (ReflectiveOperationException error) { throw new AssertionError(error); }
+        assertEquals(selected, button.isSelected());
         root.applyCss();
         root.layout();
         WaitForAsyncUtils.waitForFxEvents();
 
         FontAwesomeIconView icon = (FontAwesomeIconView) button.getGraphic();
         assertNotNull(icon, "toolbar toggle must have an icon");
-        assertEquals(CHROME_TEXT, icon.getFill(),
+        Color expected = com.seeloggyplus.shared.ui.ThemePalette.color(
+                mode.equals("dark") && selected ? "-sl-text-inverse" : "-sl-chrome-text",
+                mode.equals("dark") ? AppTheme.Theme.DARK : AppTheme.Theme.LIGHT);
+        assertEquals(expected, icon.getFill(),
                 "toolbar toggle icon must use the chrome text colour (" + mode
                         + ", selected=" + selected + "), was " + icon.getFill());
     }

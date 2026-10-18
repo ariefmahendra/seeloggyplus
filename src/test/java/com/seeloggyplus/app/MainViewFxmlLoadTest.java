@@ -85,10 +85,10 @@ public class MainViewFxmlLoadTest {
                 for (AppTheme.Theme theme : AppTheme.Theme.values()) {
                     AppTheme.setTheme(theme); root.applyCss(); root.layout();
                     var label = (javafx.scene.control.Label) root.lookup("#statusLabel");
-                    Color expected = theme == AppTheme.Theme.LIGHT ? Color.web("#1f2329") : Color.web("#d7dbe0");
+                    Color expected = theme == AppTheme.Theme.DARK ? Color.web("#d1d3d9") : Color.BLACK;
                     assertEquals(expected, label.getTextFill(), theme.name());
                 }
-            } finally { stage.close(); AppTheme.setTheme(AppTheme.Theme.GRAPHITE); }
+            } finally { stage.close(); AppTheme.setTheme(AppTheme.Theme.LIGHT); }
         }).get();
     }
 
@@ -339,7 +339,7 @@ public class MainViewFxmlLoadTest {
 
     @Test
     public void testToggleButtonIconFollowsTheThemeColours() throws Exception {
-        Field tailButtonField = MainController.class.getDeclaredField("tailButton");
+        Field tailButtonField = MainController.class.getDeclaredField("followTailButton");
         tailButtonField.setAccessible(true);
         ToggleButton tailButton = (ToggleButton) tailButtonField.get(controller);
         assertNotNull(tailButton);
@@ -355,17 +355,17 @@ public class MainViewFxmlLoadTest {
 
             tailButton.setSelected(false);
             root.applyCss();
-            assertEquals(Color.web("#1f2329"), icon.getFill(),
+            assertEquals(Color.BLACK, icon.getFill(),
                     "A toolbar icon must follow the light chrome text token");
 
             tailButton.setSelected(true);
             root.applyCss();
-            assertEquals(Color.web("#1f2329"), icon.getFill(),
+            assertEquals(Color.BLACK, icon.getFill(),
                     "A selected toolbar icon must keep following the light chrome text token");
 
             AppTheme.setDark(true);
             root.applyCss();
-            assertEquals(Color.web("#d7dbe0"), icon.getFill(),
+            assertEquals(Color.WHITE, icon.getFill(),
                     "Switching to dark must move the icon to the dark chrome text token");
 
             AppTheme.setDark(false);

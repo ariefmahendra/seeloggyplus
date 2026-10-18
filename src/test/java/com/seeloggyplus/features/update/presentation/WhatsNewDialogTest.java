@@ -67,7 +67,7 @@ class WhatsNewDialogTest {
     }
 
     @Test
-    @DisplayName("renders correctly in Graphite, Light and Dark")
+    @DisplayName("renders correctly in Light and Dark")
     void rendersInAllThemes() throws Exception {
         for (AppTheme.Theme theme : AppTheme.Theme.values()) {
             onFxThread(() -> {

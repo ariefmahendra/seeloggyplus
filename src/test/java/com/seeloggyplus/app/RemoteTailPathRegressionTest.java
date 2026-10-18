@@ -75,7 +75,7 @@ class RemoteTailPathRegressionTest {
             dismissErrors();
             new ArrayList<>(sessions.values()).forEach(LogSession::close);
             sessions.clear();
-            AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+            AppTheme.setTheme(AppTheme.Theme.LIGHT);
         });
         WaitForAsyncUtils.waitForFxEvents();
     }

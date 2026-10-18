@@ -44,7 +44,7 @@ class TreeDropIndicatorTest {
     @DisplayName("drop-target highlight keeps the exact same cell height")
     void highlightDoesNotResizeTheCell() {
         onFxThread(() -> {
-            AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+            AppTheme.setTheme(AppTheme.Theme.LIGHT);
             TreeView<String> tree = new TreeView<>();
             TreeItem<String> root = new TreeItem<>("root");
             TreeItem<String> group = new TreeItem<>("Production");

@@ -1,5 +1,7 @@
 package com.seeloggyplus.app;
 
+import com.seeloggyplus.shared.ui.ThemedAlerts;
+
 import com.seeloggyplus.shared.model.Preference;
 import com.seeloggyplus.features.settings.infrastructure.PreferenceServiceImpl;
 import com.seeloggyplus.shared.settings.PreferenceService;
@@ -64,22 +66,55 @@ public class PreferencesDialogController {
 
     @FXML
     private ComboBox<String> fileDoubleClickComboBox;
+    @FXML private javafx.scene.layout.BorderPane settingsRoot;
+    @FXML private ListView<String> settingsCategories;
+    @FXML private ScrollPane generalPage;
+    @FXML private ScrollPane logViewerPage;
+    @FXML private ScrollPane sshPage;
+    private AppTheme.Theme initialTheme;
+    private boolean changesSaved;
     private PreferenceService preferenceService;
     @Setter
     private Runnable onSaveCallback;
 
     @FXML
     public void initialize() {
+        initialTheme = AppTheme.getTheme();
         preferenceService = new PreferenceServiceImpl();
+        setupCategories();
 
         setupSpinners();
         setupFontFamilyComboBox();
         setupButtons();
+        settingsRoot.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.ESCAPE
+                    && !themeComboBox.isShowing() && !appFontFamilyComboBox.isShowing()
+                    && !fileDoubleClickComboBox.isShowing()) {
+                cancelButton.fire();
+                event.consume();
+            }
+        });
         loadPreferences();
         setupThemeSelector();
     }
 
-    private static final String THEME_GRAPHITE = "Graphite";
+    private void setupCategories() {
+        settingsCategories.setItems(FXCollections.observableArrayList("General", "Log Viewer", "SSH"));
+        settingsCategories.getSelectionModel().selectedIndexProperty().addListener((obs, oldValue, newValue) -> {
+            ScrollPane[] pages = { generalPage, logViewerPage, sshPage };
+            for (int index = 0; index < pages.length; index++) {
+                boolean active = index == newValue.intValue();
+                pages[index].setVisible(active);
+                pages[index].setManaged(active);
+            }
+        });
+        settingsCategories.getSelectionModel().selectFirst();
+    }
+
+    public void discardChanges() {
+        if (!changesSaved) AppTheme.setTheme(initialTheme);
+    }
+
     private static final String THEME_LIGHT = "Light";
     private static final String THEME_DARK = "Dark";
 
@@ -87,12 +122,11 @@ public class PreferencesDialogController {
         if (themeComboBox == null) {
             return;
         }
-        themeComboBox.setItems(FXCollections.observableArrayList(THEME_GRAPHITE, THEME_LIGHT, THEME_DARK));
-        AppTheme.Theme current = AppTheme.Theme.fromPreference(getPreference("app_theme", "graphite"));
+        themeComboBox.setItems(FXCollections.observableArrayList(THEME_LIGHT, THEME_DARK));
+        AppTheme.Theme current = AppTheme.Theme.fromPreference(getPreference("app_theme", "light"));
         themeComboBox.setValue(labelFor(current));
         themeComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
             AppTheme.Theme selected = themeForLabel(newVal);
-            savePreference("app_theme", selected.preferenceValue());
             AppTheme.setTheme(selected);
         });
     }
@@ -101,7 +135,6 @@ public class PreferencesDialogController {
         return switch (theme) {
             case LIGHT -> THEME_LIGHT;
             case DARK -> THEME_DARK;
-            case GRAPHITE -> THEME_GRAPHITE;
         };
     }
 
@@ -112,7 +145,7 @@ public class PreferencesDialogController {
         if (THEME_DARK.equals(label)) {
             return AppTheme.Theme.DARK;
         }
-        return AppTheme.Theme.GRAPHITE;
+        return AppTheme.Theme.LIGHT;
     }
 
     private void setupSpinners() {
@@ -142,7 +175,10 @@ public class PreferencesDialogController {
 
     private void setupButtons() {
         saveButton.setOnAction(e -> handleSave());
-        cancelButton.setOnAction(e -> closeDialog());
+        cancelButton.setOnAction(e -> {
+            discardChanges();
+            closeDialog();
+        });
         sshDownloadDirBrowseButton.setOnAction(e -> handleBrowseDownloadDir());
         sshOpenDownloadDirButton.setOnAction(e -> handleOpenDownloadDir());
         sshCleanDownloadsButton.setOnAction(e -> handleCleanDownloads());
@@ -208,6 +244,7 @@ public class PreferencesDialogController {
         savePreference("ssh_download_directory", sshDownloadDirField.getText() != null ? sshDownloadDirField.getText().trim() : "");
 
         savePreference("file_double_click_action", "Tail".equals(fileDoubleClickComboBox.getValue()) ? "TAIL" : "OPEN");
+        changesSaved = true;
         logger.info("Preferences saved.");
 
         if (onSaveCallback != null) {
@@ -303,7 +340,7 @@ public class PreferencesDialogController {
         long totalSize = 0;
         for (File f : files) totalSize += f.length();
 
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        Alert confirm = ThemedAlerts.create(Alert.AlertType.CONFIRMATION);
         confirm.setTitle("Clean Downloads");
         confirm.setHeaderText("Delete " + files.length + " file(s)?");
         confirm.setContentText(String.format("Total size: %s\nDirectory: %s",

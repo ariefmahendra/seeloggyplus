@@ -1,5 +1,9 @@
 package com.seeloggyplus.features.files.presentation;
 
+import com.seeloggyplus.shared.ui.DialogWindowSupport;
+
+import com.seeloggyplus.shared.ui.ThemedAlerts;
+
 import com.seeloggyplus.shared.dto.RemoteFileInfo;
 import com.seeloggyplus.features.files.domain.FavoriteFolder;
 import com.seeloggyplus.shared.model.FileInfo;
@@ -90,8 +94,6 @@ public class UnifiedFileManagerDialogController {
     @FXML
     private Button refreshButton;
     @FXML
-    private Button goButton;
-    @FXML
     private TextField pathField;
     private FilePathBreadcrumb pathBreadcrumb;
     @FXML
@@ -113,6 +115,11 @@ public class UnifiedFileManagerDialogController {
     private Button newGroupButton;
     @FXML
     private Button manageServersButton;
+    @FXML private javafx.scene.layout.HBox lastServerBox;
+    @FXML private SplitPane fileSplit;
+    private boolean restoringColumnVisibility;
+    @FXML private Label lastServerLabel;
+    @FXML private Button connectLastServerButton;
     @FXML
     private Button favoriteCurrentButton;
     @FXML
@@ -122,8 +129,6 @@ public class UnifiedFileManagerDialogController {
 
     @FXML
     private TableView<FileInfo> fileTable;
-    @FXML
-    private TableColumn<FileInfo, String> iconColumn;
     @FXML
     private TableColumn<FileInfo, String> nameColumn;
     @FXML
@@ -206,7 +211,8 @@ public class UnifiedFileManagerDialogController {
     private boolean suppressAutoRefresh = false;
     private boolean suppressSortSave = false;
     private boolean locationTreeReady;
-    private boolean pendingRemoteRestore;
+    private boolean restoringStartupLocation;
+    private String lastServerId;
     private String draggedLocationServerId;
     private String draggedLocationGroup;
     private OpenAction doubleClickAction = OpenAction.OPEN;
@@ -263,6 +269,7 @@ public class UnifiedFileManagerDialogController {
         setupFavoritesList();
         applyDoubleClickPreference();
         setupFileTable();
+        setupColumnLayout();
         setupEventHandlers();
         int pathIndex = pathToolbar.getChildren().indexOf(pathField);
         pathToolbar.getChildren().remove(pathField);
@@ -333,6 +340,13 @@ public class UnifiedFileManagerDialogController {
         if (locationsContainer != null) {
             ContextMenu rootMenu = buildLocationContextMenu(LocationItem.root());
             locationsContainer.setOnContextMenuRequested(event -> {
+                for (Node node = event.getTarget() instanceof Node target ? target : null;
+                        node != null; node = node.getParent()) {
+                    if (node == favoritesPane || node == favoritesBox || node == favoritesListView) {
+                        event.consume();
+                        return;
+                    }
+                }
                 rootMenu.show(locationsContainer, event.getScreenX(), event.getScreenY());
                 event.consume();
             });
@@ -432,11 +446,12 @@ public class UnifiedFileManagerDialogController {
                     setContextMenu(null);
                     return;
                 }
-                setText(item.getLabel());
+                setText(item.getLabel() + (isRememberedServer(item) ? " (Last used)" : ""));
                 FontAwesomeIconView icon = new FontAwesomeIconView(iconFor(item));
                 icon.setSize("16");
                 setGraphic(icon);
-                setTooltip(new Tooltip(item.getTooltip()));
+                setTooltip(new Tooltip(item.getTooltip() + (isRememberedServer(item)
+                        ? "\nLast used - " + (isCurrentServerConnected(item.getServer()) ? "Connected" : "Not connected") : "")));
                 setContextMenu(buildLocationContextMenu(item));
             }
         };
@@ -673,10 +688,10 @@ public class UnifiedFileManagerDialogController {
     }
 
     public void handleLocationClick(LocationItem location) {
-        if (location == null || !(location.isLocal() || location.isServer())
-                || isSameLocation(location, currentLocation)) {
-            return;
-        }
+        if (location == null || !(location.isLocal() || location.isServer())) return;
+        if (isSameLocation(location, currentLocation) && (location.isLocal()
+                || isCurrentServerConnected(location.getServer())
+                || currentConnectTask != null && !currentConnectTask.isDone())) return;
         handleLocationSelected(location);
     }
 
@@ -743,6 +758,8 @@ public class UnifiedFileManagerDialogController {
 
     private void promptNewGroup(String parentPath) {
         TextInputDialog dialog = new TextInputDialog();
+        DialogWindowSupport.styleDialog(dialog, locationTree == null || locationTree.getScene() == null
+                ? null : locationTree.getScene().getWindow());
         dialog.setTitle("New group");
         dialog.setHeaderText(parentPath == null || parentPath.isBlank()
                 ? "Create a server group"
@@ -763,6 +780,8 @@ public class UnifiedFileManagerDialogController {
     private void promptRenameGroup(String group) {
         String leaf = leafName(group);
         TextInputDialog dialog = new TextInputDialog(leaf);
+        DialogWindowSupport.styleDialog(dialog, locationTree == null || locationTree.getScene() == null
+                ? null : locationTree.getScene().getWindow());
         dialog.setTitle("Rename group");
         dialog.setHeaderText("Rename group '" + group + "'");
         dialog.setContentText("Group name:");
@@ -780,7 +799,7 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void promptDeleteGroup(String group) {
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        Alert alert = ThemedAlerts.create(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Delete group");
         alert.setHeaderText("Delete group '" + group + "'?");
         alert.setContentText("Nested groups are deleted as well. Servers become ungrouped. No server is deleted.");
@@ -802,6 +821,8 @@ public class UnifiedFileManagerDialogController {
         choices.addAll(serverManagementService.getGroupNames());
         ChoiceDialog<String> dialog = new ChoiceDialog<>(
             server.getGroupName() != null ? server.getGroupName() : ungrouped, choices);
+        DialogWindowSupport.styleDialog(dialog, locationTree == null || locationTree.getScene() == null
+                ? null : locationTree.getScene().getWindow());
         dialog.setTitle("Move to group");
         dialog.setHeaderText("Move '" + server.getName() + "' to a group");
         dialog.setContentText("Group:");
@@ -837,6 +858,7 @@ public class UnifiedFileManagerDialogController {
         } else if (selectedLocal) {
             selectNode(findLocalNode());
         }
+        refreshRememberedServer();
     }
 
     private void selectNode(TreeItem<LocationItem> node) {
@@ -953,6 +975,18 @@ public class UnifiedFileManagerDialogController {
         favoriteCurrentButton.setOnAction(e -> toggleCurrentFavorite());
 
         VBox.setVgrow(locationTree, Priority.ALWAYS);
+        SplitPane.setResizableWithParent(locationsContainer, false);
+        fileSplit.widthProperty().addListener(new javafx.beans.value.ChangeListener<Number>() {
+            @Override public void changed(javafx.beans.value.ObservableValue<? extends Number> value, Number oldWidth, Number width) {
+                if (width.doubleValue() <= 0) return;
+                fileSplit.setDividerPositions(200 / width.doubleValue());
+                fileSplit.widthProperty().removeListener(this);
+            }
+        });
+        progressIndicator.managedProperty().bind(progressIndicator.visibleProperty());
+        Tooltip statusTooltip = new Tooltip();
+        statusTooltip.textProperty().bind(statusLabel.textProperty());
+        statusLabel.setTooltip(statusTooltip);
     }
 
     private void setupFavoritesList() {
@@ -987,8 +1021,6 @@ public class UnifiedFileManagerDialogController {
             }
         });
         ContextMenu favContextMenu = new ContextMenu();
-        MenuItem newGroup = new MenuItem("New group...");
-        newGroup.setOnAction(event -> promptNewGroup(null));
         MenuItem removeFavMenuItem = new MenuItem("Remove Favorite");
         removeFavMenuItem.setOnAction(e -> {
             FavoriteFolder selected = favoritesListView.getSelectionModel().getSelectedItem();
@@ -999,7 +1031,11 @@ public class UnifiedFileManagerDialogController {
                 fileTable.refresh();
             }
         });
-        favContextMenu.getItems().addAll(newGroup, new SeparatorMenuItem(), removeFavMenuItem);
+        MenuItem newGroupMenuItem = new MenuItem("New group...");
+        newGroupMenuItem.setOnAction(event -> promptNewGroup(""));
+        favContextMenu.getItems().addAll(newGroupMenuItem, removeFavMenuItem);
+        favContextMenu.setOnShowing(event -> removeFavMenuItem.setDisable(
+                favoritesListView.getSelectionModel().getSelectedItem() == null));
         favoritesListView.setContextMenu(favContextMenu);
     }
 
@@ -1026,8 +1062,7 @@ public class UnifiedFileManagerDialogController {
             removeFromFavoritesMenuItem.setVisible(isAlreadyFavorite);
         });
 
-        iconColumn.setCellValueFactory(cellData -> new SimpleStringProperty(""));
-        iconColumn.setCellFactory(col -> new TableCell<>() {
+        nameColumn.setCellFactory(col -> new TableCell<>() {
             private final FontAwesomeIconView icon = new FontAwesomeIconView();
 
             {
@@ -1039,12 +1074,16 @@ public class UnifiedFileManagerDialogController {
                 super.updateItem(item, empty);
                 TableRow<?> row = getTableRow();
                 if (empty || row == null || row.getItem() == null) {
+                    setText(null);
+                    setTooltip(null);
                     setGraphic(null);
                     if (row != null && row.getStyle() != null && !row.getStyle().isEmpty()) {
                         row.setStyle("");
                     }
                 } else {
                     FileInfo file = (FileInfo) row.getItem();
+                    setText(item);
+                    setTooltip(new Tooltip(file.getName()));
                     String targetStyle = "";
                     icon.getStyleClass().removeAll("file-icon-folder", "file-icon-log", "file-icon-file");
                     if (file.isDirectory()) {
@@ -1159,13 +1198,48 @@ public class UnifiedFileManagerDialogController {
         });
     }
 
+    private void setupColumnLayout() {
+        fileTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        fileTable.widthProperty().addListener((obs, oldValue, newValue) -> resizeNameColumn());
+        for (TableColumn<FileInfo, ?> column : fileTable.getColumns()) {
+            if (column != nameColumn) column.widthProperty().addListener((obs, oldValue, newValue) -> resizeNameColumn());
+            column.visibleProperty().addListener((obs, oldValue, newValue) -> {
+                resizeNameColumn();
+                if (!restoringColumnVisibility && preferenceService != null) {
+                    String visible = fileTable.getColumns().stream().filter(TableColumn::isVisible)
+                            .map(TableColumn::getId).collect(Collectors.joining(","));
+                    preferenceService.saveOrUpdatePreferences(new Preference("file_manager_visible_columns", visible));
+                }
+            });
+        }
+    }
+
+    private void resizeNameColumn() {
+        double others = fileTable.getColumns().stream().filter(c -> c != nameColumn && c.isVisible())
+                .mapToDouble(TableColumn::getWidth).sum();
+        nameColumn.setPrefWidth(Math.max(nameColumn.getMinWidth(), fileTable.getWidth() - others - 34));
+    }
+
+    private void restoreColumnVisibility() {
+        String saved = preferenceService.getPreferencesByCode("file_manager_visible_columns").orElse("");
+        if (saved.isBlank()) return;
+        Set<String> ids = new HashSet<>(List.of(saved.split(",")));
+        if (fileTable.getColumns().stream().noneMatch(c -> ids.contains(c.getId()))) return;
+        restoringColumnVisibility = true;
+        try {
+            for (TableColumn<FileInfo, ?> column : fileTable.getColumns()) column.setVisible(ids.contains(column.getId()));
+        } finally {
+            restoringColumnVisibility = false;
+        }
+        resizeNameColumn();
+    }
+
     private void setupEventHandlers() {
         backButton.setOnAction(e -> navigateBack());
         forwardButton.setOnAction(e -> navigateForward());
         upButton.setOnAction(e -> navigateUp());
         homeButton.setOnAction(e -> navigateHome());
         refreshButton.setOnAction(e -> refreshCurrentPath());
-        goButton.setOnAction(e -> navigateTo(pathField.getText()));
 
         pathField.setOnAction(e -> { navigateTo(pathField.getText()); pathBreadcrumb.finishEditing(); });
 
@@ -1181,6 +1255,13 @@ public class UnifiedFileManagerDialogController {
 
         newGroupButton.setOnAction(e -> promptNewGroup());
         manageServersButton.setOnAction(e -> handleManageServers());
+        connectLastServerButton.setOnAction(event -> {
+            TreeItem<LocationItem> node = findServerNodeById(lastServerId);
+            if (node != null) {
+                selectNode(node);
+                handleLocationClick(node.getValue());
+            }
+        });
         if (findInFilesButton != null) {
             findInFilesButton.setOnAction(e -> handleFindInFiles());
         }
@@ -1214,7 +1295,7 @@ public class UnifiedFileManagerDialogController {
         currentPath = null;
         currentLocation = location;
         updateFindInFilesState();
-        if (preferenceService != null) {
+        if (preferenceService != null && !restoringStartupLocation) {
             String locId = location.getServer() == null ? "local" : location.getServer().getName();
             preferenceService.saveOrUpdatePreferences(new Preference("file_manager_last_location", locId));
         }
@@ -1233,6 +1314,7 @@ public class UnifiedFileManagerDialogController {
             activeSshService = createSshService();
             connectToRemote(location.getServer());
         }
+        updateLastServerState();
     }
 
     private void connectToRemote(SSHServerModel server) {
@@ -1275,6 +1357,7 @@ public class UnifiedFileManagerDialogController {
             }
         };
         currentConnectTask = connectTask;
+        updateLastServerState();
 
         connectTask.setOnSucceeded(e -> {
             if (connectTask != currentConnectTask) return;
@@ -1285,6 +1368,7 @@ public class UnifiedFileManagerDialogController {
                     .filter(p -> !p.isBlank())
                     .orElse(server.getDefaultPath() != null ? server.getDefaultPath() : "/");
                 navigateTo(lastPath);
+                updateLastServerState();
             } else {
                 updateStatus("Connection failed");
                 progressIndicator.setVisible(false);
@@ -1380,6 +1464,7 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void saveLastOpenedFile(FileInfo file) {
+        if (file != null) rememberCurrentServer();
         if (preferenceService != null && file != null) {
             preferenceService.saveOrUpdatePreferences(new Preference(lastFileKey(), file.getName()));
             if (currentPath != null) {
@@ -1424,30 +1509,79 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void restoreLastLocation() {
-        TreeItem<LocationItem> target = findLocalNode();
-        if (preferenceService != null) {
-            String lastLoc = preferenceService.getPreferencesByCode("file_manager_last_location").orElse("local");
-            if (!"local".equalsIgnoreCase(lastLoc) && !lastLoc.isBlank()) {
-                TreeItem<LocationItem> serverNode = findServerNodeByName(lastLoc);
-                if (serverNode != null) {
-                    target = serverNode;
+        refreshRememberedServer();
+        TreeItem<LocationItem> local = findLocalNode();
+        if (local == null || local.getValue() == null) return;
+        selectNode(local);
+        if (locationTreeReady) {
+            restoringStartupLocation = true;
+            try {
+                handleLocationSelected(local.getValue());
+            } finally {
+                restoringStartupLocation = false;
+            }
+        }
+    }
+
+    private void refreshRememberedServer() {
+        if (preferenceService == null || locationTree == null) return;
+        lastServerId = preferenceService.getPreferencesByCode("file_manager_last_server_id")
+                .filter(id -> !id.isBlank()).orElse(null);
+        if (lastServerId == null) {
+            String legacyName = preferenceService.getPreferencesByCode("file_manager_last_location").orElse("local");
+            TreeItem<LocationItem> node = "local".equalsIgnoreCase(legacyName) ? null : findServerNodeByName(legacyName);
+            if (node != null && node.getValue().getServer() != null) {
+                lastServerId = node.getValue().getServer().getId();
+                if (lastServerId != null) {
+                    preferenceService.saveOrUpdatePreferences(new Preference("file_manager_last_server_id", lastServerId));
                 }
             }
         }
-        if (target == null || target.getValue() == null) {
-            return;
-        }
-        selectNode(target);
-        LocationItem item = target.getValue();
+        updateLastServerState();
+    }
 
-        if (item.isServer() && sshServiceFactory == null) {
-            pendingRemoteRestore = true;
-            return;
-        }
+    private boolean isRememberedServer(LocationItem item) {
+        return lastServerId != null && item != null && item.isServer()
+                && lastServerId.equals(item.getServer().getId());
+    }
 
-        if (locationTreeReady && (item.isLocal() || item.isServer())) {
-            handleLocationSelected(item);
+    private boolean isCurrentServerConnected(SSHServerModel server) {
+        return server != null && currentLocation != null && currentLocation.isServer()
+                && Objects.equals(server.getId(), currentLocation.getServer().getId())
+                && activeSshService != null && activeSshService.isConnected();
+    }
+
+    private void updateLastServerState() {
+        if (lastServerBox == null || lastServerLabel == null || connectLastServerButton == null) return;
+        TreeItem<LocationItem> node = findServerNodeById(lastServerId);
+        SSHServerModel server = node == null ? null : node.getValue().getServer();
+        boolean visible = server != null && !isCurrentServerConnected(server);
+        lastServerBox.setVisible(visible);
+        lastServerBox.setManaged(visible);
+        if (server != null) {
+            boolean connecting = currentLocation != null && currentLocation.isServer()
+                    && Objects.equals(server.getId(), currentLocation.getServer().getId())
+                    && currentConnectTask != null && !currentConnectTask.isDone();
+            lastServerLabel.setText((connecting ? "Connecting: " : "Last: ") + server.getName());
+            lastServerLabel.setTooltip(new Tooltip("Last server: " + server.getName() + "\n"
+                    + (connecting ? "Connecting..." : "Not connected")));
+            connectLastServerButton.setDisable(sshServiceFactory == null || connecting);
         }
+        if (locationTree != null) locationTree.refresh();
+    }
+
+    private void rememberCurrentServer() {
+        if (currentLocation == null || !currentLocation.isServer()
+                || !isCurrentServerConnected(currentLocation.getServer())) return;
+        String id = currentLocation.getServer().getId();
+        if (id == null || id.isBlank()) return;
+        if (!Objects.equals(lastServerId, id)) {
+            lastServerId = id;
+            if (preferenceService != null) {
+                preferenceService.saveOrUpdatePreferences(new Preference("file_manager_last_server_id", id));
+            }
+        }
+        updateLastServerState();
     }
 
     private String sortKey() {
@@ -1582,6 +1716,7 @@ public class UnifiedFileManagerDialogController {
             itemCountLabel.setText(allFiles.size() + " items");
             updateNavigationButtons();
             restoreFileSelection();
+            rememberCurrentServer();
 
             if (!cachedEntry.isExpired()) {
                 logger.info("Cache HIT for path: {}", path);
@@ -1665,6 +1800,7 @@ public class UnifiedFileManagerDialogController {
                 itemCountLabel.setText(allFiles.size() + " items");
                 restoreFileSelection();
             }
+            rememberCurrentServer();
 
             progressIndicator.setVisible(false);
             fileTable.setCursor(Cursor.DEFAULT);
@@ -2058,7 +2194,6 @@ public class UnifiedFileManagerDialogController {
     }
 
     private void updateNavigationButtons() {
-        backButton.setText("Back"); forwardButton.setText("Forward"); upButton.setText("Up");
         backButton.setTooltip(new Tooltip(backHistory.isEmpty() ? "Back: no previous folder in this location" : "Back to " + backHistory.peek()));
         forwardButton.setTooltip(new Tooltip(forwardHistory.isEmpty() ? "Forward: no next folder" : "Forward to " + forwardHistory.peek()));
         upButton.setTooltip(new Tooltip("Up: parent folder (independent of history)"));
@@ -2120,7 +2255,7 @@ public class UnifiedFileManagerDialogController {
     private void showError(String title, String content) {
         Platform.runLater(() -> {
             suppressAutoRefresh = true;
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+            Alert alert = ThemedAlerts.create(Alert.AlertType.ERROR);
             addAppIcon(alert);
             alert.setTitle(title);
             alert.setContentText(content);
@@ -2170,10 +2305,7 @@ public class UnifiedFileManagerDialogController {
 
     public void setSshServiceFactory(SSHServiceFactory factory) {
         this.sshServiceFactory = factory;
-        if (pendingRemoteRestore) {
-            pendingRemoteRestore = false;
-            restoreLastLocation();
-        }
+        updateLastServerState();
     }
 
     public void setServerCatalog(ServerCatalog catalog) {
@@ -2189,6 +2321,7 @@ public class UnifiedFileManagerDialogController {
 
     public void setPreferenceService(PreferenceService service) {
         this.preferenceService = service;
+        if (service != null) restoreColumnVisibility();
         applyDoubleClickPreference();
         restoreLastLocation();
     }

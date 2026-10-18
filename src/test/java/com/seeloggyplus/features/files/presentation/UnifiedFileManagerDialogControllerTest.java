@@ -300,17 +300,14 @@ public class UnifiedFileManagerDialogControllerTest {
     }
 
     @Test
-    public void testNavigateViaGoButton(FxRobot robot) throws Exception {
+    public void testNavigateViaPathEnter(FxRobot robot) throws Exception {
         robot.interact(() -> {
-            if (stage.getWidth() < 1100) {
-                stage.setWidth(1100);
-            }
+            var breadcrumb = (FilePathBreadcrumb) stage.getScene().lookup(".file-path-breadcrumb");
+            breadcrumb.edit();
             pathField.setText(CUSTOM_DIR);
+            pathField.requestFocus();
         });
-        WaitForAsyncUtils.waitForFxEvents();
-        assertNotNull(robot.lookup("#goButton").tryQuery().orElse(null),
-                "Go button must be visible in the toolbar");
-        robot.clickOn("#goButton");
+        robot.press(javafx.scene.input.KeyCode.ENTER).release(javafx.scene.input.KeyCode.ENTER);
         Thread.sleep(200);
         WaitForAsyncUtils.waitForFxEvents();
         assertEquals(CUSTOM_DIR, pathField.getText());

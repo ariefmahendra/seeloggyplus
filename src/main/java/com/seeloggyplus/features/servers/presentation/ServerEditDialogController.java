@@ -1,5 +1,7 @@
 package com.seeloggyplus.features.servers.presentation;
 
+import com.seeloggyplus.shared.ui.ThemedAlerts;
+
 import com.seeloggyplus.shared.model.SSHServerModel;
 import com.seeloggyplus.features.servers.application.ServerManagementService;
 import com.seeloggyplus.shared.ui.SshConnectFlow;
@@ -208,7 +210,7 @@ public class ServerEditDialogController {
         }
         boolean keyAuth = isKeyAuthSelected();
         if (keyAuth && (keyPathField.getText() == null || keyPathField.getText().isBlank())) {
-            Alert warning = new Alert(Alert.AlertType.WARNING);
+            Alert warning = ThemedAlerts.create(Alert.AlertType.WARNING);
             warning.setTitle("Private Key Required");
             warning.setHeaderText("No private key file selected");
             warning.setContentText("Choose the private key file used for this server.");
@@ -225,7 +227,7 @@ public class ServerEditDialogController {
         testServer.setKeyPassphrase(keyPassphraseField.getText());
         String secret = keyAuth ? keyPassphraseField.getText() : passwordField.getText();
 
-        Alert progress = new Alert(Alert.AlertType.INFORMATION);
+        Alert progress = ThemedAlerts.create(Alert.AlertType.INFORMATION);
         progress.setTitle("Testing");
         progress.setHeaderText("Testing connection...");
         progress.setContentText("Please wait...");
@@ -250,7 +252,7 @@ public class ServerEditDialogController {
 
             Alert result;
             if (success) {
-                result = new Alert(Alert.AlertType.INFORMATION);
+                result = ThemedAlerts.create(Alert.AlertType.INFORMATION);
                 result.setTitle("Test Result");
                 result.setHeaderText("Connection Successful");
                 result.setContentText("Successfully connected to the server!");
@@ -294,7 +296,7 @@ public class ServerEditDialogController {
 
         boolean keyAuth = isKeyAuthSelected();
         if (keyAuth && (keyPathField.getText() == null || keyPathField.getText().isBlank())) {
-            Alert warning = new Alert(Alert.AlertType.WARNING);
+            Alert warning = ThemedAlerts.create(Alert.AlertType.WARNING);
             warning.setTitle("Private Key Required");
             warning.setHeaderText("No private key file selected");
             warning.setContentText("Choose the private key file used for this server.");

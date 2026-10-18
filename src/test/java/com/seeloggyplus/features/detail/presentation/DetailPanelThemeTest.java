@@ -4,6 +4,7 @@ import com.seeloggyplus.app.MainController;
 
 import com.seeloggyplus.features.detail.presentation.LogDetailPaneController;
 import com.seeloggyplus.shared.ui.AppTheme;
+import com.seeloggyplus.shared.ui.RenderedColors;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
@@ -82,7 +83,7 @@ class DetailPanelThemeTest {
 
             AppTheme.setDark(true);
             area.applyCss();
-            assertEquals(Color.web("#1e2226"), backgroundFill(area),
+            assertEquals(Color.web("#191a1c"), backgroundFill(area),
                     "dark theme detail background must be the dark surface");
 
             AppTheme.setDark(false);
@@ -101,14 +102,14 @@ class DetailPanelThemeTest {
 
             Text lightText = firstTextNode(area);
             assertNotNull(lightText, "detail area must render text nodes");
-            assertEquals(Color.web("#1f2329"), lightText.getFill(),
+            assertEquals(Color.web("#080808"), lightText.getFill(),
                     "light theme default detail text must be dark");
 
             AppTheme.setDark(true);
             area.applyCss();
             Text darkText = firstTextNode(area);
             assertNotNull(darkText);
-            assertEquals(Color.web("#d7dbe0"), darkText.getFill(),
+            assertEquals(Color.web("#bcbec4"), darkText.getFill(),
                     "dark theme default detail text must be light (not black)");
 
             AppTheme.setDark(false);
@@ -125,25 +126,44 @@ class DetailPanelThemeTest {
             FontAwesomeIconView icon = (FontAwesomeIconView) json.getGraphic();
             assertNotNull(icon, "prettify toggle must have an icon graphic");
 
-            json.setSelected(true);
-            mainRoot.applyCss();
-            assertEquals(Color.web("#ffffff"), icon.getFill(),
-                    "selected prettify icon must use the on-brand token");
-
-            json.setSelected(false);
-            mainRoot.applyCss();
-            assertEquals(Color.web("#1f2329"), icon.getFill(),
-                    "unselected prettify icon must use the text token");
+            for (var theme : AppTheme.Theme.values()) {
+                AppTheme.setTheme(theme);
+                json.setSelected(false);
+                mainRoot.applyCss();
+                Color restingBackground = RenderedColors.background(json);
+                for (boolean selected : new boolean[] {false, true}) {
+                    json.setSelected(selected);
+                    mainRoot.applyCss();
+                    Color expected = Color.web(theme == AppTheme.Theme.DARK ? "#d1d3d9" : "#000000");
+                    assertEquals(expected, icon.getFill(), "prettify icon theme " + theme);
+                    Color background = RenderedColors.background(json);
+                    double foregroundLight = luminance((Color) icon.getFill());
+                    double backgroundLight = luminance(background);
+                    assertTrue((Math.max(foregroundLight, backgroundLight) + .05)
+                            / (Math.min(foregroundLight, backgroundLight) + .05) >= 3,
+                            "prettify icon contrast " + theme + " selected=" + selected);
+                    if (selected) assertNotEquals(restingBackground, background, "selected format must remain visible");
+                }
+            }
         });
+    }
+
+    private static double luminance(Color color) {
+        return .2126 * linear(color.getRed()) + .7152 * linear(color.getGreen()) + .0722 * linear(color.getBlue());
+    }
+
+    private static double linear(double value) {
+        return value <= .04045 ? value / 12.92 : Math.pow((value + .055) / 1.055, 2.4);
     }
 
     @Test
     void selectedRowsHighlightIsUniformAcrossAllRows() {
         onFxThread(() -> {
             stage.setWidth(1200);
-            stage.setHeight(400);
+            stage.setHeight(700);
             stage.setScene(AppTheme.scene(mainRoot));
             stage.show();
+            ((javafx.scene.control.SplitPane) mainRoot.lookup("#verticalSplitPane")).setDividerPositions(.45);
             mainRoot.applyCss();
             mainRoot.layout();
 
@@ -164,6 +184,7 @@ class DetailPanelThemeTest {
             double bottom = rows.get(rows.size() - 1).getMaxY() - 1;
 
             WritableImage image = area.snapshot(null, null);
+            assertTrue(bottom < image.getHeight(), "all selected fixture rows must be visible before sampling");
             Color expected = image.getPixelReader().getColor((int) image.getWidth() - 25, (int) top);
             assertNotEquals(Color.WHITE, expected,
                     "the sampled column must sit inside the selection highlight");

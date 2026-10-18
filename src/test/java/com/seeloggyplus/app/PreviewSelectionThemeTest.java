@@ -55,30 +55,21 @@ class PreviewSelectionThemeTest {
             stage.setHeight(280);
             stage.show();
 
-            for (boolean dark : new boolean[] {false, true}) {
-                AppTheme.setDark(dark);
-                list.getSelectionModel().select(1);
-                root.applyCss();
-                root.layout();
-                WaitForAsyncUtils.waitForFxEvents();
-                String mode = dark ? "dark" : "light";
-
-                Region cell = selectedCell(list);
-                assertNotNull(cell, "preview must have a selected cell");
-
-                Color selection = firstFill(cell.getBackground());
-                assertEquals(SelectionColors.background(dark), selection,
-                        "preview selection [" + mode + "] must use the shared selection colour");
-
-                Label label = (Label) cell.lookup(".label");
-                assertNotNull(label, "preview cell must contain a text label");
-                Color text = label.getTextFill() instanceof Color c ? c : null;
-                assertNotNull(text, "preview text fill must be a colour");
-
-                Color surface = dark ? Color.web("#1e2226") : Color.WHITE;
-                assertTrue(contrast(text, surface) >= 4.5,
-                        String.format("preview selected text [%s] contrast too low: %.2f:1 (text=%s)",
-                                mode, contrast(text, surface), text));
+            root.setFocusTraversable(true);
+            for (var theme : AppTheme.Theme.values()) {
+                AppTheme.setTheme(theme);
+                for (boolean active : new boolean[]{false,true}) {
+                    list.getSelectionModel().select(1);
+                    list.pseudoClassStateChanged(PseudoClass.getPseudoClass("focused"),active);
+                    root.applyCss(); root.layout();
+                    Region cell=selectedCell(list);
+                    assertNotNull(cell);
+                    assertEquals(SelectionColors.background(theme,active),firstFill(cell.getBackground()),theme+" active="+active);
+                    Label label=(Label)cell.lookup(".label");
+                    assertNotNull(label);
+                    Color text=(Color)label.getTextFill();
+                    assertTrue(contrast(text,com.seeloggyplus.shared.ui.RenderedColors.background(cell))>=4.5,theme+" selected text contrast");
+                }
             }
 
             AppTheme.setDark(false);

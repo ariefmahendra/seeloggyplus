@@ -32,6 +32,7 @@ final class FilePathBreadcrumb extends StackPane {
         setMaxWidth(Double.MAX_VALUE);
         overflow.getStyleClass().add("path-overflow");
         overflow.setAccessibleText("Hidden parent folders");
+        themePopup(overflow);
         HBox dots = new HBox(3);
         dots.setAlignment(javafx.geometry.Pos.CENTER);
         for (int i = 0; i < 3; i++) {
@@ -149,6 +150,20 @@ final class FilePathBreadcrumb extends StackPane {
         super.layoutChildren();
     }
 
+    private void themePopup(MenuButton button) {
+        button.setOnShown(event -> {
+            if (button.getItems().isEmpty()) return;
+            ContextMenu popup = button.getItems().getFirst().getParentPopup();
+            if (popup == null) return;
+            com.seeloggyplus.shared.ui.AppTheme.install(popup.getScene());
+            if (!popup.getScene().getRoot().getStyleClass().contains("breadcrumb-popup"))
+                popup.getScene().getRoot().getStyleClass().add("breadcrumb-popup");
+            if (!popup.getSkin().getNode().getStyleClass().contains("breadcrumb-popup"))
+                popup.getSkin().getNode().getStyleClass().add("breadcrumb-popup");
+            popup.getScene().getRoot().applyCss();
+        });
+    }
+
     private void addSegment(String name, String path) {
         Button segment = new Button(name);
         segment.getStyleClass().add("path-segment");
@@ -163,6 +178,7 @@ final class FilePathBreadcrumb extends StackPane {
         arrow.setGraphic(chevron);
         arrow.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         arrow.getStyleClass().add("path-children");
+        themePopup(arrow);
         arrow.setMinSize(28, 30);
         arrow.setPrefSize(28, 30);
         arrow.setMaxSize(28, 30);

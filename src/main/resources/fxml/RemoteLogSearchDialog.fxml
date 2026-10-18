@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
@@ -8,12 +7,9 @@
 <BorderPane fx:id="rootPane"
             xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.seeloggyplus.features.search.presentation.RemoteLogSearchDialogController"
-            prefWidth="960" prefHeight="640">
+            prefWidth="960" prefHeight="640" minWidth="800" minHeight="560" styleClass="simple-dialog">
     <top>
-        <VBox spacing="8">
-            <padding>
-                <Insets top="12" right="12" bottom="8" left="12"/>
-            </padding>
+        <VBox fx:id="searchFormPanel" spacing="6" styleClass="search-dialog-form">
             <GridPane hgap="8" vgap="6">
                 <columnConstraints>
                     <ColumnConstraints minWidth="80"/>
@@ -28,7 +24,7 @@
                 <CheckBox fx:id="regexCheckBox" text="Regex" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
                 <CheckBox fx:id="caseSensitiveCheckBox" text="Case sensitive" GridPane.rowIndex="2" GridPane.columnIndex="3"/>
             </GridPane>
-            <HBox spacing="8" alignment="CENTER_LEFT">
+            <HBox spacing="6" alignment="CENTER_LEFT">
                 <Button fx:id="searchButton" text="Search" onAction="#handleSearch">
                     <graphic>
                         <FontAwesomeIconView glyphName="SEARCH"/>
@@ -36,73 +32,64 @@
                 </Button>
                 <Button fx:id="cancelSearchButton" text="Stop" onAction="#handleCancelSearch" disable="true"/>
                 <ProgressIndicator fx:id="progressIndicator" visible="false" prefWidth="18" prefHeight="18"/>
-                <Label fx:id="statusLabel" text="Searches every file under the folder"/>
+                <Label fx:id="statusLabel" text="Searches every file under the folder" wrapText="true" minWidth="0" maxWidth="Infinity" HBox.hgrow="ALWAYS" styleClass="text-secondary"/>
             </HBox>
         </VBox>
     </top>
 
-
     <center>
-        <SplitPane orientation="VERTICAL" dividerPositions="0.55">
-            <TableView fx:id="resultTable">
-                <columns>
-                    <TableColumn fx:id="fileColumn" text="FILE" prefWidth="360" minWidth="200"/>
-                    <TableColumn fx:id="lineColumn" text="LINE" prefWidth="90" minWidth="70"/>
-                    <TableColumn fx:id="contentColumn" text="CONTENT" prefWidth="480" minWidth="200"/>
-                </columns>
-                <placeholder>
-                    <VBox alignment="CENTER" spacing="10">
-                        <FontAwesomeIconView glyphName="SEARCH" size="40" styleClass="empty-state-icon"/>
-                        <Label text="No matching lines yet" styleClass="empty-state-subtitle"/>
-                    </VBox>
-                </placeholder>
-            </TableView>
+        <SplitPane fx:id="searchResultsSplit" orientation="VERTICAL" dividerPositions="0.55" minHeight="266">
+            <VBox fx:id="searchResultsPanel" minHeight="140" minWidth="0" spacing="6" styleClass="search-dialog-section">
+                <Label text="Search Results" styleClass="panel-title"/>
+                <TableView fx:id="resultTable" minHeight="0" minWidth="0" VBox.vgrow="ALWAYS">
+                    <columns>
+                        <TableColumn fx:id="fileColumn" text="FILE" prefWidth="360" minWidth="200"/>
+                        <TableColumn fx:id="lineColumn" text="LINE" prefWidth="90" minWidth="70"/>
+                        <TableColumn fx:id="contentColumn" text="CONTENT" prefWidth="480" minWidth="200"/>
+                    </columns>
+                    <placeholder>
+                        <VBox alignment="CENTER" spacing="10">
+                            <FontAwesomeIconView glyphName="SEARCH" size="24" styleClass="empty-state-icon"/>
+                            <Label text="No matching lines yet" styleClass="empty-state-subtitle"/>
+                        </VBox>
+                    </placeholder>
+                </TableView>
+            </VBox>
 
-            <VBox spacing="6">
-                <padding>
-                    <Insets top="6" right="4" bottom="4" left="4"/>
-                </padding>
-                <HBox spacing="10" alignment="CENTER_LEFT">
-                    <Label fx:id="previewLabel" text="Preview"/>
-                    <Region HBox.hgrow="ALWAYS"/>
+            <VBox fx:id="searchPreviewPanel" spacing="6" minHeight="120" minWidth="0" styleClass="search-dialog-section">
+                <HBox spacing="6" alignment="CENTER_LEFT">
+                    <Label fx:id="previewLabel" text="Preview" textOverrun="CENTER_ELLIPSIS" minWidth="0" maxWidth="Infinity" HBox.hgrow="ALWAYS" styleClass="panel-title"/>
                     <Label text="Context:"/>
                     <ComboBox fx:id="contextSelector" prefWidth="80"/>
                 </HBox>
-                <ListView fx:id="previewList" styleClass="preview-list" VBox.vgrow="ALWAYS"/>
+                <ListView fx:id="previewList" styleClass="preview-list" minHeight="0" minWidth="0" VBox.vgrow="ALWAYS"/>
             </VBox>
         </SplitPane>
     </center>
 
-
     <bottom>
-        <VBox>
-            <Separator/>
-            <HBox spacing="10" alignment="CENTER_RIGHT">
-                <padding>
-                    <Insets top="10" right="12" bottom="10" left="12"/>
-                </padding>
-                <Button fx:id="closeButton" text="Close" onAction="#handleClose"/>
-                <Button fx:id="copyPathButton" text="Copy Path" onAction="#handleCopyPath" disable="true">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="CLIPBOARD"/>
-                    </graphic>
-                </Button>
-                <Button fx:id="copyLineButton" text="Copy Line" onAction="#handleCopyLine" disable="true">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="CLIPBOARD"/>
-                    </graphic>
-                </Button>
-                <Button fx:id="tailButton" text="Tail" onAction="#handleTail" disable="true">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="TERMINAL"/>
-                    </graphic>
-                </Button>
-                <Button fx:id="openButton" text="Open &amp; Jump" onAction="#handleOpen" disable="true" defaultButton="true">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="CHECK"/>
-                    </graphic>
-                </Button>
-            </HBox>
-        </VBox>
+        <HBox spacing="6" alignment="CENTER_RIGHT" styleClass="simple-dialog-footer">
+            <Button fx:id="closeButton" text="Close" onAction="#handleClose"/>
+            <Button fx:id="copyPathButton" text="Copy Path" onAction="#handleCopyPath" disable="true">
+                <graphic>
+                    <FontAwesomeIconView glyphName="CLIPBOARD"/>
+                </graphic>
+            </Button>
+            <Button fx:id="copyLineButton" text="Copy Line" onAction="#handleCopyLine" disable="true">
+                <graphic>
+                    <FontAwesomeIconView glyphName="CLIPBOARD"/>
+                </graphic>
+            </Button>
+            <Button fx:id="tailButton" text="Tail" onAction="#handleTail" disable="true">
+                <graphic>
+                    <FontAwesomeIconView glyphName="TERMINAL"/>
+                </graphic>
+            </Button>
+            <Button fx:id="openButton" text="Open &amp; Jump" onAction="#handleOpen" disable="true" defaultButton="true">
+                <graphic>
+                    <FontAwesomeIconView glyphName="CHECK"/>
+                </graphic>
+            </Button>
+        </HBox>
     </bottom>
 </BorderPane>

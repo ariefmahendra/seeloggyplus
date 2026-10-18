@@ -1,5 +1,7 @@
 package com.seeloggyplus.features.recent.presentation;
 
+import com.seeloggyplus.shared.ui.ThemedAlerts;
+
 import com.seeloggyplus.features.recent.domain.RecentFilesDto;
 import com.seeloggyplus.shared.model.LogFile;
 import com.seeloggyplus.features.recent.domain.RecentFile;
@@ -326,7 +328,7 @@ public class RecentFilesPanelController {
         if (!selected.isEmpty()) {
             int count = selected.size();
 
-            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            Alert alert = ThemedAlerts.create(Alert.AlertType.CONFIRMATION);
             alert.setTitle("Remove Selected Recent Files");
             alert.setHeaderText("Remove " + count + " selected recent file(s)?");
             alert.setContentText("This action cannot be undone.");
@@ -355,7 +357,7 @@ public class RecentFilesPanelController {
             return;
         }
 
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        Alert alert = ThemedAlerts.create(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Clear Recent Files");
         alert.setHeaderText("Clear ALL recent files?");
         alert.setContentText("This action cannot be undone.");

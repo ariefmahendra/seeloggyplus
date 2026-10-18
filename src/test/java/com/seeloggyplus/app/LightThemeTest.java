@@ -79,18 +79,18 @@ class LightThemeTest {
     }
 
     @Test
-    @DisplayName("Graphite theme keeps dark chrome (unchanged default)")
-    void graphiteThemeKeepsDarkChrome() {
+    @DisplayName("Dark theme keeps dark chrome")
+    void darkThemeKeepsDarkChrome() {
         onFx(() -> {
             buildToolbarScene();
-            AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+            AppTheme.setTheme(AppTheme.Theme.DARK);
             root.applyCss();
             root.layout();
 
             Color chrome = backgroundFill(toolbar);
             assertNotNull(chrome);
             assertTrue(luminance(chrome) < 0.35,
-                    "graphite theme chrome must stay dark, was " + chrome);
+                    "dark theme chrome must stay dark, was " + chrome);
         });
     }
 
@@ -99,10 +99,10 @@ class LightThemeTest {
     void preferenceMapping() {
         assertEquals(AppTheme.Theme.DARK, AppTheme.Theme.fromPreference("dark"));
         assertEquals(AppTheme.Theme.LIGHT, AppTheme.Theme.fromPreference("light"));
-        assertEquals(AppTheme.Theme.GRAPHITE, AppTheme.Theme.fromPreference("graphite"));
-        assertEquals(AppTheme.Theme.GRAPHITE, AppTheme.Theme.fromPreference(""));
-        assertEquals(AppTheme.Theme.GRAPHITE, AppTheme.Theme.fromPreference(null));
-        assertEquals(AppTheme.Theme.GRAPHITE, AppTheme.Theme.fromPreference("unknown-value"));
+        assertEquals(AppTheme.Theme.LIGHT, AppTheme.Theme.fromPreference("graphite"));
+        assertEquals(AppTheme.Theme.LIGHT, AppTheme.Theme.fromPreference(""));
+        assertEquals(AppTheme.Theme.LIGHT, AppTheme.Theme.fromPreference(null));
+        assertEquals(AppTheme.Theme.LIGHT, AppTheme.Theme.fromPreference("unknown-value"));
     }
 
     private static Color backgroundFill(Region region) {

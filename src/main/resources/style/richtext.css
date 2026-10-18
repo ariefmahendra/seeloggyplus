@@ -43,8 +43,12 @@
 
 
 .selection {
-    -fx-fill: rgba(52, 58, 64, 0.18);
+    -fx-fill: -sl-selection-inactive-bg;
     -fx-stroke: transparent;
+}
+
+.styled-text-area:focused .selection {
+    -fx-fill: -sl-selection-bg;
 }
 
 

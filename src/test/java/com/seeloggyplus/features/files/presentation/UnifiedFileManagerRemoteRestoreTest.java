@@ -35,40 +35,190 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class UnifiedFileManagerRemoteRestoreTest {
 
     private UnifiedFileManagerDialogController controller;
+    private Parent root;
+    private Stage stage;
+    private final java.util.concurrent.atomic.AtomicInteger factoryCalls = new java.util.concurrent.atomic.AtomicInteger();
+    private final java.util.List<javafx.scene.control.Dialog<?>> dialogs = new java.util.ArrayList<>();
+    private final ConnectedSshService ssh = new ConnectedSshService();
+    private SSHServerModel server;
+    private SavedLocationPreference preferences;
+    private final String localPath = java.nio.file.Path.of(System.getProperty("user.home"), "last-local").toString();
 
     @Start
     void start(Stage stage) throws Exception {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/UnifiedFileManagerDialog.fxml"));
-        Parent root = loader.load();
+        this.stage = stage;
+        root = loader.load();
         controller = loader.getController();
         stage.setScene(AppTheme.scene(root));
         stage.show();
     }
 
     @Test
-    void productionWiringOrderRestoresRemoteLastLocation(FxRobot robot) throws Exception {
+    void startupRestoresLocalFolderWithoutConnectingToLastServer() throws Exception {
+        configure(false, false);
+        await(() -> localPath.equals(((javafx.scene.control.TextField) root.lookup("#pathField")).getText()));
+        assertEquals(0, factoryCalls.get());
+        assertEquals(0, ssh.connectCalls.get());
+        org.junit.jupiter.api.Assertions.assertNull(controller.getActiveServer());
+        org.junit.jupiter.api.Assertions.assertTrue(dialogs.isEmpty());
+        onFx(() -> {
+            var hint = (javafx.scene.control.Label) root.lookup("#lastServerLabel");
+            assertNotNull(hint);
+            org.junit.jupiter.api.Assertions.assertTrue(hint.getText().contains("prod"));
+            org.junit.jupiter.api.Assertions.assertTrue(hint.getTooltip().getText().contains("Not connected"));
+            org.junit.jupiter.api.Assertions.assertTrue(root.lookup("#lastServerBox").isVisible());
+        });
+    }
+
+    @Test
+    void explicitConnectRestoresRemoteFolderAndPreservesHistoryWhenReturningLocal() throws Exception {
+        configure(true, false);
+        onFx(() -> ((javafx.scene.control.Button) root.lookup("#connectLastServerButton")).fire());
+        await(() -> "/remembered/logs".equals(((javafx.scene.control.TextField) root.lookup("#pathField")).getText())
+                && "srv-prod".equals(preferences.getPreferencesByCode("file_manager_last_server_id").orElse(null))
+                && ssh.listedPaths.contains("/remembered/logs"));
+        assertEquals(1, factoryCalls.get());
+        assertEquals(1, ssh.connectCalls.get());
+        assertEquals("prod", controller.getActiveServer().getName());
+        onFx(() -> {
+            org.junit.jupiter.api.Assertions.assertFalse(root.lookup("#lastServerBox").isVisible());
+            controller.handleLocationClick(UnifiedFileManagerDialogController.LocationItem.local());
+        });
+        await(() -> controller.getActiveServer() == null && localPath.equals(((javafx.scene.control.TextField) root.lookup("#pathField")).getText()));
+        assertEquals("srv-prod", preferences.getPreferencesByCode("file_manager_last_server_id").orElse(null));
+        onFx(() -> org.junit.jupiter.api.Assertions.assertTrue(root.lookup("#lastServerBox").isVisible()));
+    }
+
+    @Test
+    void reconnectingToCachedServerUpdatesRememberedServer() throws Exception {
+        configure(true, false);
+        SSHServerModel other = new SSHServerModel("other", "other.example.com", 22, "deploy");
+        other.setId("srv-other"); other.setPassword("secret"); other.setDefaultPath("/other/logs");
+        onFx(() -> {
+            controller.setServerCatalog(new FakeCatalog(List.of(server, other)));
+            ((javafx.scene.control.Button) root.lookup("#connectLastServerButton")).fire();
+        });
+        await(() -> ssh.listedPaths.contains("/remembered/logs")
+                && !((javafx.scene.control.ProgressIndicator) root.lookup("#progressIndicator")).isVisible());
+        onFx(() -> controller.handleLocationClick(UnifiedFileManagerDialogController.LocationItem.of(other)));
+        await(() -> "srv-other".equals(preferences.getPreferencesByCode("file_manager_last_server_id").orElse(null)));
+        onFx(() -> controller.handleLocationClick(UnifiedFileManagerDialogController.LocationItem.of(server)));
+        await(() -> controller.getActiveServer() != null && "srv-prod".equals(controller.getActiveServer().getId())
+                && "srv-prod".equals(preferences.getPreferencesByCode("file_manager_last_server_id").orElse(null)));
+    }
+
+    @Test
+    void missingPasswordIsRequestedOnlyAfterExplicitConnect() throws Exception {
+        configure(false, false);
+        org.junit.jupiter.api.Assertions.assertTrue(dialogs.isEmpty());
+        onFx(() -> ((javafx.scene.control.Button) root.lookup("#connectLastServerButton")).fire());
+        await(() -> controller.getActiveServer() == null);
+        assertEquals(1, dialogs.size());
+        assertEquals(0, ssh.connectCalls.get());
+    }
+
+    @Test
+    void failedExplicitConnectionReturnsLocalAndKeepsRetryAvailable() throws Exception {
+        configure(true, false);
+        ssh.connectResult = false;
+        onFx(() -> ((javafx.scene.control.Button) root.lookup("#connectLastServerButton")).fire());
+        await(() -> controller.getActiveServer() == null && dialogs.size() == 1
+                && localPath.equals(((javafx.scene.control.TextField) root.lookup("#pathField")).getText()));
+        assertEquals("srv-prod", preferences.getPreferencesByCode("file_manager_last_server_id").orElse(null));
+        onFx(() -> {
+            org.junit.jupiter.api.Assertions.assertFalse(((javafx.scene.control.Button) root.lookup("#connectLastServerButton")).isDisabled());
+            ssh.connectResult = true;
+            ((javafx.scene.control.Button) root.lookup("#connectLastServerButton")).fire();
+        });
+        await(() -> controller.getActiveServer() != null && ssh.listedPaths.contains("/remembered/logs"));
+        assertEquals(2, ssh.connectCalls.get());
+    }
+
+    @Test
+    void preferencesInjectedBeforeCatalogStillRestoreLocalWithoutConnecting() throws Exception {
+        configure(true, true);
+        await(() -> localPath.equals(((javafx.scene.control.TextField) root.lookup("#pathField")).getText()));
+        org.junit.jupiter.api.Assertions.assertNull(controller.getActiveServer());
+        assertEquals(0, factoryCalls.get());
+        onFx(() -> org.junit.jupiter.api.Assertions.assertTrue(root.lookup("#lastServerBox").isVisible()));
+    }
+
+    @Test
+    void deletedRememberedServerIsIgnoredWithoutDialogs() throws Exception {
+        configure(true, false);
+        onFx(() -> controller.setServerCatalog(new FakeCatalog(List.of())));
+        assertEquals(0, factoryCalls.get());
+        org.junit.jupiter.api.Assertions.assertNull(controller.getActiveServer());
+        org.junit.jupiter.api.Assertions.assertTrue(dialogs.isEmpty());
+        onFx(() -> org.junit.jupiter.api.Assertions.assertFalse(root.lookup("#lastServerBox").isVisible()));
+    }
+
+    @Test
+    void rememberedServerUsesStableIdAfterRenameAndHintRemainsReadableAcrossThemes() throws Exception {
+        configure(true, false);
+        server.setName("renamed prod");
+        onFx(() -> controller.setServerCatalog(new FakeCatalog(List.of(server))));
+        onFx(() -> {
+            try {
+                for (AppTheme.Theme theme : AppTheme.Theme.values()) {
+                    AppTheme.setTheme(theme); root.applyCss(); root.layout();
+                    var hint = (javafx.scene.control.Label) root.lookup("#lastServerLabel");
+                    var connect = (javafx.scene.control.Button) root.lookup("#connectLastServerButton");
+                    org.junit.jupiter.api.Assertions.assertTrue(hint.getText().contains("renamed prod"));
+                    javafx.scene.paint.Color bg = (javafx.scene.paint.Color) ((javafx.scene.layout.Region) root).getBackground().getFills().getFirst().getFill();
+                    org.junit.jupiter.api.Assertions.assertTrue(contrast((javafx.scene.paint.Color) hint.getTextFill(), bg) >= 4.5, theme.name());
+                    javafx.scene.paint.Color buttonBg = com.seeloggyplus.shared.ui.RenderedColors.background(connect);
+                    org.junit.jupiter.api.Assertions.assertTrue(contrast((javafx.scene.paint.Color) connect.getTextFill(), buttonBg) >= 4.5, theme.name());
+                    org.junit.jupiter.api.Assertions.assertTrue(connect.getHeight() >= 24);
+                    org.junit.jupiter.api.Assertions.assertTrue(connect.getWidth() >= 60);
+                }
+            } finally { AppTheme.setTheme(AppTheme.Theme.LIGHT); }
+        });
+    }
+
+    private void configure(boolean savedPassword, boolean preferencesFirst) throws Exception {
         inject("localFileService", new NoOpLocalFileService());
         inject("favoriteFolderService", new NoOpFavoriteFolderService());
-
-        SSHServerModel server = new SSHServerModel("prod", "prod.example.com", 22, "deploy");
+        server = new SSHServerModel("prod", "prod.example.com", 22, "deploy");
         server.setId("srv-prod");
-        server.setPassword("secret");
+        if (savedPassword) server.setPassword("secret");
         server.setDefaultPath("/var/log");
-
-        ServerCatalog catalog = new FakeCatalog(List.of(server));
-        SavedLocationPreference preferences = new SavedLocationPreference(server.getName());
-        SSHServiceFactory factory = ConnectedSshService::new;
-
-        robot.interact(() -> {
-            controller.setServerCatalog(catalog);
-            controller.setPreferenceService(preferences);
+        preferences = new SavedLocationPreference("prod");
+        preferences.store.put("file_manager_last_path_local", localPath);
+        preferences.store.put("file_manager_last_path_prod", "/remembered/logs");
+        onFx(() -> {
+            controller.setDialogPresenter(new com.seeloggyplus.shared.ui.DialogPresenter() {
+                @Override public void present(Stage dialog) { }
+                @Override public <T> Optional<T> present(javafx.scene.control.Dialog<T> dialog) {
+                    dialogs.add(dialog);
+                    return Optional.empty();
+                }
+            });
+            if (preferencesFirst) controller.setPreferenceService(preferences);
+            controller.setServerCatalog(new FakeCatalog(List.of(server)));
+            if (!preferencesFirst) controller.setPreferenceService(preferences);
+            controller.setSshServiceFactory(() -> { factoryCalls.incrementAndGet(); return ssh; });
         });
-        robot.interact(() -> controller.setSshServiceFactory(factory));
-
-        assertNotNull(controller.getActiveServer(),
-                "remote last location must be restored once all dependencies are injected");
-        assertEquals("prod", controller.getActiveServer().getName());
     }
+
+    private void onFx(Runnable action) throws Exception {
+        org.testfx.util.WaitForAsyncUtils.asyncFx(action).get();
+        org.testfx.util.WaitForAsyncUtils.waitForFxEvents();
+    }
+
+    private void await(java.util.function.BooleanSupplier condition) throws Exception {
+        org.testfx.util.WaitForAsyncUtils.waitFor(5, java.util.concurrent.TimeUnit.SECONDS,
+                () -> org.testfx.util.WaitForAsyncUtils.asyncFx(condition::getAsBoolean).get());
+    }
+
+    private static double contrast(javafx.scene.paint.Color a, javafx.scene.paint.Color b) {
+        double x = luminance(a), y = luminance(b); return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);
+    }
+    private static double luminance(javafx.scene.paint.Color c) {
+        return 0.2126*linear(c.getRed())+0.7152*linear(c.getGreen())+0.0722*linear(c.getBlue());
+    }
+    private static double linear(double v) { return v <= 0.04045 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); }
 
     private void inject(String fieldName, Object value) throws Exception {
         Field field = UnifiedFileManagerDialogController.class.getDeclaredField(fieldName);
@@ -189,28 +339,20 @@ class UnifiedFileManagerRemoteRestoreTest {
     }
 
     static class ConnectedSshService extends SSHServiceImpl {
-        @Override
-        public boolean connect(String host, int port, String username, String password) {
-            return true;
+        volatile boolean connected;
+        volatile boolean connectResult = true;
+        final java.util.concurrent.atomic.AtomicInteger connectCalls = new java.util.concurrent.atomic.AtomicInteger();
+        final List<String> listedPaths = new java.util.concurrent.CopyOnWriteArrayList<>();
+        @Override public boolean connect(String host, int port, String username, String password) {
+            connectCalls.incrementAndGet(); connected = connectResult; return connectResult;
         }
-
-        @Override
-        public boolean connect(String host, int port, String username, String password, long ttlMillis) {
-            return true;
+        @Override public boolean connect(String host, int port, String username, String password, long ttlMillis) {
+            return connect(host, port, username, password);
         }
-
-        @Override
-        public void disconnect() {
-        }
-
-        @Override
-        public boolean isConnected() {
-            return true;
-        }
-
-        @Override
-        public List<RemoteFileInfo> listFiles(String remotePath) throws IOException {
-            return List.of();
+        @Override public boolean isConnected() { return connected; }
+        @Override public void disconnect() { connected = false; }
+        @Override public List<RemoteFileInfo> listFiles(String remotePath) throws IOException {
+            listedPaths.add(remotePath); return List.of();
         }
     }
 }

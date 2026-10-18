@@ -7,6 +7,9 @@ import com.seeloggyplus.shared.ui.DialogPresenter;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.paint.Color;
+import com.seeloggyplus.shared.ui.RenderedColors;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.Dialog;
@@ -63,6 +66,52 @@ class UnifiedFileManagerDialogPresenterTest {
     }
 
     @Test
+    void groupNamePromptsMatchTheCurrentThemeAndKeepCompactControls() {
+        for (var theme : AppTheme.Theme.values()) {
+            onFx(() -> AppTheme.setTheme(theme));
+            presenter.responder = dialog -> {
+                TextInputDialog input = (TextInputDialog) dialog;
+                try {
+                    input.getEditor().setText("Group");
+                    input.show();
+                    var pane = input.getDialogPane();
+                    pane.applyCss();
+                    pane.layout();
+                    assertEquals(Color.web(theme == AppTheme.Theme.LIGHT ? "#ffffff" : "#191a1c"),
+                            RenderedColors.background(pane));
+                    assertEquals(root.getScene().getWindow(), input.getOwner());
+                    assertEquals(28, input.getEditor().getHeight(), .01);
+                    assertEquals(28, ((Button) pane.lookupButton(ButtonType.OK)).getHeight(), .01);
+                    org.junit.jupiter.api.Assertions.assertNull(input.getGraphic());
+                    assertTrue(contrast((Color) ((javafx.scene.text.Text) input.getEditor().lookup(".text")).getFill(), RenderedColors.background(input.getEditor())) >= 4.5);
+                } finally {
+                    input.close();
+                }
+                return Optional.empty();
+            };
+            try {
+                invoke("promptNewGroup", new Class<?>[]{String.class}, "Parent");
+                invoke("promptRenameGroup", new Class<?>[]{String.class}, "Parent/Old");
+            } finally {
+                onFx(() -> AppTheme.setTheme(AppTheme.Theme.LIGHT));
+            }
+        }
+    }
+
+    private static double contrast(Color a, Color b) {
+        double x = luminance(a), y = luminance(b);
+        return (Math.max(x, y) + .05) / (Math.min(x, y) + .05);
+    }
+
+    private static double luminance(Color c) {
+        return .2126 * linear(c.getRed()) + .7152 * linear(c.getGreen()) + .0722 * linear(c.getBlue());
+    }
+
+    private static double linear(double value) {
+        return value <= .04045 ? value / 12.92 : Math.pow((value + .055) / 1.055, 2.4);
+    }
+
+    @Test
     @DisplayName("New group ignores blank and cancelled input")
     void newGroupPromptIgnoresBlankInput() {
         presenter.responder = dialog -> Optional.of("   ");
@@ -96,6 +145,43 @@ class UnifiedFileManagerDialogPresenterTest {
         presenter.responder = dialog -> Optional.empty();
         invoke("promptDeleteGroup", new Class<?>[]{String.class}, "Kept");
         assertEquals(List.of("Gone"), catalog.deleted);
+    }
+
+    @Test
+    void moveToGroupDialogUsesFlatThemeAndCompactDropdown() {
+        SSHServerModel server = new SSHServerModel("Alpha", "alpha.example.com", 22, "user");
+        server.setId("srv-theme");
+        server.setGroupName("prod");
+        onFx(() -> catalog.groups.add("prod"));
+        for (var theme : AppTheme.Theme.values()) {
+            onFx(() -> AppTheme.setTheme(theme));
+            presenter.responder = dialog -> {
+                ChoiceDialog<?> choice = (ChoiceDialog<?>) dialog;
+                try {
+                    choice.show();
+                    var pane = choice.getDialogPane();
+                    pane.applyCss(); pane.layout();
+                    assertEquals(Color.web(theme == AppTheme.Theme.LIGHT ? "#ffffff" : "#191a1c"),
+                            RenderedColors.background(pane));
+                    org.junit.jupiter.api.Assertions.assertNull(choice.getGraphic());
+                    assertEquals(root.getScene().getWindow(), choice.getOwner());
+                    var dropdown = (javafx.scene.control.ComboBox<?>) pane.lookup(".combo-box");
+                    assertEquals("prod", dropdown.getValue());
+                    assertEquals(28, dropdown.getHeight(), .01);
+                    var label = (javafx.scene.control.ListCell<?>) dropdown.lookup(".list-cell");
+                    assertTrue(contrast((Color) label.getTextFill(), RenderedColors.background(dropdown)) >= 4.5);
+                    assertEquals(28, ((Button) pane.lookupButton(ButtonType.OK)).getHeight(), .01);
+                } finally {
+                    choice.close();
+                }
+                return Optional.empty();
+            };
+            try {
+                invoke("promptMoveServerToGroup", new Class<?>[]{SSHServerModel.class}, server);
+            } finally {
+                onFx(() -> AppTheme.setTheme(AppTheme.Theme.LIGHT));
+            }
+        }
     }
 
     @Test

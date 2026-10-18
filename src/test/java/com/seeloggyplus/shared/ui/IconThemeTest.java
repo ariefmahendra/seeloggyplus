@@ -44,12 +44,12 @@ class IconThemeTest {
             stage.show();
             root.applyCss();
 
-            assertEquals(Color.web("#1f2329"), icon.getFill(),
+            assertEquals(ThemePalette.color("-sl-text", AppTheme.Theme.LIGHT), icon.getFill(),
                     "light theme default icon must be dark");
 
             AppTheme.setDark(true);
             root.applyCss();
-            assertEquals(Color.web("#d7dbe0"), icon.getFill(),
+            assertEquals(ThemePalette.color("-sl-text", AppTheme.Theme.DARK), icon.getFill(),
                     "dark theme default icon must be light (contrasting)");
 
             AppTheme.setDark(false);

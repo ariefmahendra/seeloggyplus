@@ -53,7 +53,7 @@ public final class SshConnectFlow {
             @Override
             public boolean confirmUnknownHostKey(HostKeyVerificationException problem) {
                 return runOnFxAndWait(() -> {
-                    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                    Alert alert = ThemedAlerts.create(Alert.AlertType.CONFIRMATION);
                     alert.setTitle("Unknown SSH Host");
                     alert.setHeaderText("The authenticity of host '" + problem.getHost() + ":"
                             + problem.getPort() + "' can't be established.");
@@ -70,7 +70,7 @@ public final class SshConnectFlow {
             @Override
             public void showHostKeyProblem(HostKeyVerificationException problem) {
                 runOnFxAndWait(() -> {
-                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    Alert alert = ThemedAlerts.create(Alert.AlertType.ERROR);
                     alert.setTitle("SSH Host Key Problem");
                     alert.setHeaderText(problem.getReason() == HostKeyVerificationException.Reason.CHANGED
                             ? "Host key verification failed! The server key changed."

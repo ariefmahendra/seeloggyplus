@@ -40,18 +40,15 @@ class ThemeComponentParityTest {
     private static final PseudoClass HOVER = PseudoClass.getPseudoClass("hover");
     private static final PseudoClass FOCUSED = PseudoClass.getPseudoClass("focused");
 
-    private record Palette(Color chrome, Color accent, Color accentHover, Color accentText, Color primary) {
+    private record Palette(Color chrome, Color accent, Color accentHover, Color accentText, Color soft, Color text) {
     }
 
-    private static final Palette GRAPHITE =
-            new Palette(Color.web("#2b3138"), Color.web("#4a535e"), Color.web("#3a424b"),
-                    Color.web("#d7dbe0"), Color.web("#343a40"));
     private static final Palette LIGHT =
-            new Palette(Color.web("#e9ecef"), Color.web("#2563eb"), Color.web("#1d4ed8"),
-                    Color.web("#ffffff"), Color.web("#2563eb"));
+            new Palette(Color.web("#e9eaee"), Color.web("#3871e1"), Color.web("#2f5eb9"),
+                    Color.web("#ffffff"), Color.web("#f7f8f9"), Color.web("#000000"));
     private static final Palette DARK =
-            new Palette(Color.web("#23282d"), Color.web("#434b53"), Color.web("#343b42"),
-                    Color.web("#d7dbe0"), Color.web("#3a424b"));
+            new Palette(Color.web("#26282c"), Color.web("#3871e1"), Color.web("#2f5eb9"),
+                    Color.web("#ffffff"), Color.web("#212326"), Color.web("#d1d3d9"));
 
     private Stage stage;
     private Parent root;
@@ -98,7 +95,7 @@ class ThemeComponentParityTest {
     }
 
     @Test
-    @DisplayName("Toolbar interactive states (selected / hover) use the theme accent")
+    @DisplayName("Toolbar interactive states use soft theme surfaces")
     void toolbarInteractiveStatesFollowTheme() {
         onFx(() -> {
             FontAwesomeIconView icon = new FontAwesomeIconView();
@@ -112,18 +109,18 @@ class ThemeComponentParityTest {
             forAllThemes((theme, palette) -> {
                 toggle.setSelected(true);
                 apply();
-                assertEquals(palette.accent(), backgroundFill(toggle),
-                        "selected toolbar toggle must use the accent [" + theme + "]");
-                assertEquals(palette.accentText(), icon.getFill(),
-                        "selected toolbar icon must use the accent text [" + theme + "]");
+                assertEquals(Color.web(theme == AppTheme.Theme.DARK ? "#2e4d89" : "#d0dffe"), backgroundFill(toggle),
+                        "selected toolbar toggle must use the soft surface [" + theme + "]");
+                assertEquals(theme == AppTheme.Theme.DARK ? Color.WHITE : palette.text(), icon.getFill(),
+                        "selected toolbar icon must use the theme text [" + theme + "]");
 
                 toggle.setSelected(false);
                 toggle.pseudoClassStateChanged(HOVER, true);
                 apply();
-                assertEquals(palette.accentHover(), backgroundFill(toggle),
-                        "hovered toolbar toggle must use the accent hover [" + theme + "]");
-                assertEquals(palette.accentText(), icon.getFill(),
-                        "hovered toolbar icon must use the accent text [" + theme + "]");
+                assertEquals(com.seeloggyplus.shared.ui.ThemePalette.color("-sl-button-hover", theme), backgroundFill(toggle),
+                        "hovered toolbar toggle must use the soft surface [" + theme + "]");
+                assertEquals(palette.text(), icon.getFill(),
+                        "hovered toolbar icon must use the theme text [" + theme + "]");
                 toggle.pseudoClassStateChanged(HOVER, false);
                 apply();
             });
@@ -133,7 +130,7 @@ class ThemeComponentParityTest {
     }
 
     @Test
-    @DisplayName("Toolbar focus ring uses the theme accent")
+    @DisplayName("Keyboard toolbar focus uses a thin theme ring without replacing the surface")
     void toolbarFocusRingFollowsTheme() {
         onFx(() -> {
             Button refresh = (Button) root.lookup("#refreshButton");
@@ -141,10 +138,14 @@ class ThemeComponentParityTest {
 
             forAllThemes((theme, palette) -> {
                 refresh.pseudoClassStateChanged(FOCUSED, true);
+                refresh.pseudoClassStateChanged(PseudoClass.getPseudoClass("keyboard-focus"), true);
                 apply();
-                assertEquals(palette.accent(), borderStroke(refresh),
-                        "focused toolbar button border must use the accent [" + theme + "]");
+                assertEquals(com.seeloggyplus.shared.ui.ThemePalette.color("-sl-focus-ring-panel", theme), borderStroke(refresh));
+                assertEquals(1, refresh.getBorder().getStrokes().getFirst().getWidths().getTop());
+                assertEquals(Color.TRANSPARENT, backgroundFill(refresh));
+                assertEquals(palette.text(), refresh.getTextFill());
                 refresh.pseudoClassStateChanged(FOCUSED, false);
+                refresh.pseudoClassStateChanged(PseudoClass.getPseudoClass("keyboard-focus"), false);
                 apply();
             });
         });
@@ -177,7 +178,7 @@ class ThemeComponentParityTest {
     }
 
     @Test
-    @DisplayName("Primary buttons use the theme brand colour")
+    @DisplayName("Primary buttons blend at rest and remain readable on hover")
     void primaryButtonsFollowBrand() {
         onFx(() -> {
             Scene scene = root.getScene();
@@ -190,15 +191,22 @@ class ThemeComponentParityTest {
 
             forAllThemes((theme, palette) -> {
                 apply();
-                assertEquals(palette.primary(), backgroundFill(primary),
-                        "primary button must use the theme primary colour [" + theme + "]");
+                assertEquals(Color.TRANSPARENT, backgroundFill(primary),
+                        "primary button must blend at rest [" + theme + "]");
+                assertEquals(palette.text(), primary.getTextFill());
+                primary.pseudoClassStateChanged(HOVER, true);
+                apply();
+                assertNotEquals(Color.TRANSPARENT, backgroundFill(primary));
+                assertEquals(palette.text(), primary.getTextFill());
+                primary.pseudoClassStateChanged(HOVER, false);
+                apply();
             });
             ((Pane) stageRoot).getChildren().remove(holder);
         });
     }
 
     @Test
-    @DisplayName("Menu bar active (hover/showing) state uses the theme accent")
+    @DisplayName("Menu bar active state uses a soft highlight with readable chrome text")
     void menuBarActiveStateFollowsTheme() {
         onFx(() -> {
             MenuBar bar = new MenuBar();
@@ -217,12 +225,12 @@ class ThemeComponentParityTest {
             forAllThemes((theme, palette) -> {
                 menuNode.pseudoClassStateChanged(HOVER, true);
                 apply();
-                assertEquals(palette.accentHover(), backgroundFill((Region) menuNode),
-                        "active menu item background must use the accent [" + theme + "]");
+                assertEquals(com.seeloggyplus.shared.ui.ThemePalette.color("-sl-button-hover", theme), backgroundFill((Region) menuNode),
+                        "active menu item background must use a soft highlight [" + theme + "]");
                 Label label = (Label) menuNode.lookup(".label");
                 assertNotNull(label, "menu item must have a label");
-                assertEquals(palette.accentText(), label.getTextFill(),
-                        "active menu label must use the accent text [" + theme + "]");
+                assertEquals(palette.text(), label.getTextFill(),
+                        "active menu label must use readable chrome text [" + theme + "]");
                 menuNode.pseudoClassStateChanged(HOVER, false);
                 apply();
             });
@@ -237,10 +245,9 @@ class ThemeComponentParityTest {
     }
 
     private void forAllThemes(ThemeCheck check) {
-        runTheme(AppTheme.Theme.GRAPHITE, GRAPHITE, check);
         runTheme(AppTheme.Theme.LIGHT, LIGHT, check);
         runTheme(AppTheme.Theme.DARK, DARK, check);
-        AppTheme.setTheme(AppTheme.Theme.GRAPHITE);
+        AppTheme.setTheme(AppTheme.Theme.LIGHT);
         apply();
     }
 

@@ -60,20 +60,15 @@ public class CanvasLogViewer extends GridPane {
     private Color lineNumColor;
     private Color lineNumBg;
     private Color selectionColor;
+    private final javafx.beans.value.ChangeListener<javafx.scene.Node> selectionFocusListener = (owner, previous, current) -> render();
     private Color fatalText;
     private Color errorText;
     private Color warnText;
     private Color infoText;
     private Color debugText;
     private Color traceText;
-    private Color fatalBar;
-    private Color errorBar;
-    private Color warnBar;
-    private Color fatalTint;
-    private Color errorTint;
-    private Color warnTint;
     private Color highlightBg;
-    private AppTheme.Theme paletteTheme = AppTheme.Theme.GRAPHITE;
+    private AppTheme.Theme paletteTheme = AppTheme.getTheme();
 
     private static final Pattern LEVEL_PATTERN = Pattern.compile("\\b(ERROR|FATAL|WARN|WARNING|INFO|DEBUG|TRACE)\\b",
             Pattern.CASE_INSENSITIVE);
@@ -121,6 +116,7 @@ public class CanvasLogViewer extends GridPane {
     private static final double SCROLL_LERP = 0.55;
     private static final double SCROLL_SNAP_THRESHOLD = 0.3;
     public static final int MATCH_SCAN_LIMIT = 50000;
+    public static final int SELECTION_CHAR_SCAN_LIMIT = 100;
     private AnimationTimer scrollAnimator;
 
     @Setter
@@ -135,6 +131,44 @@ public class CanvasLogViewer extends GridPane {
 
     @Setter
     private StatusUpdateHandler onStatusUpdate;
+
+    @Setter
+    private Consumer<String> onSelectionChanged;
+
+    public String getSelectionSummary() {
+        if (!hasSelectionRange()) {
+            if (selectedLine < 0) {
+                return null;
+            }
+            return "1 line";
+        }
+
+        long first = selectionStartViewLine;
+        long last = selectionEndViewLine;
+        long lines = last - first + 1;
+        int scanned = (int) Math.min(lines, SELECTION_CHAR_SCAN_LIMIT);
+        long chars = 0;
+        for (long view = first; view < first + scanned; view++) {
+            String line = getLineContent(toGlobalLine(view));
+            int length = line == null ? 0 : line.length();
+            int from = Math.min(selectionStartCharAt(view), length);
+            int to = Math.max(from, selectionEndCharAt(view, length));
+            chars += (to - from);
+        }
+
+        StringBuilder summary = new StringBuilder();
+        summary.append(lines).append(lines == 1 ? " line" : " lines");
+        if (lines <= SELECTION_CHAR_SCAN_LIMIT) {
+            summary.append(", ").append(chars).append(chars == 1 ? " char" : " chars");
+        }
+        return summary.toString();
+    }
+
+    private void fireSelectionChanged() {
+        if (onSelectionChanged != null) {
+            onSelectionChanged.accept(getSelectionSummary());
+        }
+    }
 
     public CanvasLogViewer() {
         Text text = new Text("A");
@@ -192,10 +226,12 @@ public class CanvasLogViewer extends GridPane {
         setPrefSize(Region.USE_COMPUTED_SIZE, Region.USE_COMPUTED_SIZE);
         setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        applyPalette(AppTheme.Theme.GRAPHITE);
+        applyPalette(AppTheme.getTheme());
 
         sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (oldScene != null) oldScene.focusOwnerProperty().removeListener(selectionFocusListener);
             if (newScene != null) {
+                newScene.focusOwnerProperty().addListener(selectionFocusListener);
                 Parent themeRoot = newScene.getRoot();
                 if (themeRoot != null) {
                     themeRoot.getStyleClass().addListener(
@@ -214,6 +250,7 @@ public class CanvasLogViewer extends GridPane {
         selectionEndViewLine = -1;
         selectionEndChar = 0;
         selectionWholeLine = false;
+        fireSelectionChanged();
     }
 
     private void clearSelectionState() {
@@ -252,6 +289,7 @@ public class CanvasLogViewer extends GridPane {
         selectionEndViewLine = viewIndex;
         selectionEndChar = lineLengthAt(viewIndex);
         selectionWholeLine = true;
+        fireSelectionChanged();
     }
 
     private void selectWholeLineRange(long anchorLine, long caretLine) {
@@ -264,6 +302,7 @@ public class CanvasLogViewer extends GridPane {
         selectionEndViewLine = Math.max(anchorLine, caretLine);
         selectionEndChar = lineLengthAt(selectionEndViewLine);
         selectionWholeLine = true;
+        fireSelectionChanged();
     }
 
     private void setCharSelection(long anchorLine, int anchorChar, long caretLine, int caretChar) {
@@ -280,6 +319,7 @@ public class CanvasLogViewer extends GridPane {
             selectionEndChar = anchorChar;
         }
         selectionWholeLine = false;
+        fireSelectionChanged();
     }
 
     private boolean isViewLineSelected(long viewIndex) {
@@ -588,6 +628,7 @@ public class CanvasLogViewer extends GridPane {
     private String[] lineCache = new String[0];
     private int[] lineLevelCache = new int[0];
     private long lineCacheStartLine = -1;
+    private int lineCacheRows = 0;
 
     private static int detectLevelCode(String line) {
         if (line == null || line.isEmpty()) return 0;
@@ -620,54 +661,30 @@ public class CanvasLogViewer extends GridPane {
         };
     }
 
-    private Color levelBarColor(int code) {
-        return switch (code) {
-            case 1 -> fatalBar;
-            case 2 -> errorBar;
-            case 3 -> warnBar;
-            default -> null;
-        };
-    }
-
-    private Color levelTintColor(int code) {
-        return switch (code) {
-            case 1 -> fatalTint;
-            case 2 -> errorTint;
-            case 3 -> warnTint;
-            default -> null;
-        };
-    }
-
     private void applyPalette(AppTheme.Theme theme) {
         this.paletteTheme = theme;
         bgColor = ThemePalette.color("-sl-surface", theme);
-        textColor = ThemePalette.color("-sl-text", theme);
+        textColor = ThemePalette.color("-sl-log-text", theme);
         lineNumColor = ThemePalette.color("-sl-canvas-line-number", theme);
         lineNumBg = ThemePalette.color("-sl-canvas-line-number-bg", theme);
-        selectionColor = SelectionColors.background(theme == AppTheme.Theme.DARK);
+        selectionColor = SelectionColors.background(theme);
         fatalText = ThemePalette.color("-sl-level-fatal-fg", theme);
         errorText = ThemePalette.color("-sl-level-error-fg", theme);
         warnText = ThemePalette.color("-sl-level-warn-fg", theme);
         infoText = ThemePalette.color("-sl-level-info-fg", theme);
-        debugText = ThemePalette.color("-sl-syntax-trace", theme);
-        traceText = ThemePalette.color("-sl-syntax-trace", theme);
-        fatalBar = ThemePalette.color("-sl-level-fatal-bar", theme);
-        errorBar = ThemePalette.color("-sl-level-error-bar", theme);
-        warnBar = ThemePalette.color("-sl-level-warn-bar", theme);
-        fatalTint = ThemePalette.color("-sl-level-fatal-tint", theme);
-        errorTint = ThemePalette.color("-sl-level-error-tint", theme);
-        warnTint = ThemePalette.color("-sl-level-warn-tint", theme);
+        debugText = ThemePalette.color("-sl-level-debug-fg", theme);
+        traceText = ThemePalette.color("-sl-level-trace-fg", theme);
         highlightBg = ThemePalette.color("-sl-canvas-highlight", theme);
         setBackground(new Background(new BackgroundFill(bgColor, CornerRadii.EMPTY, Insets.EMPTY)));
         render();
     }
 
     public void setDarkMode(boolean dark) {
-        setTheme(dark ? AppTheme.Theme.DARK : AppTheme.Theme.GRAPHITE);
+        setTheme(dark ? AppTheme.Theme.DARK : AppTheme.Theme.LIGHT);
     }
 
     public void setTheme(AppTheme.Theme theme) {
-        AppTheme.Theme target = theme == null ? AppTheme.Theme.GRAPHITE : theme;
+        AppTheme.Theme target = theme == null ? AppTheme.Theme.LIGHT : theme;
         if (this.paletteTheme == target) {
             return;
         }
@@ -678,13 +695,13 @@ public class CanvasLogViewer extends GridPane {
         Scene scene = getScene();
         Parent themeRoot = scene == null ? null : scene.getRoot();
         if (themeRoot == null) {
-            setTheme(AppTheme.Theme.GRAPHITE);
+            setTheme(AppTheme.Theme.LIGHT);
         } else if (themeRoot.getStyleClass().contains("theme-dark")) {
             setTheme(AppTheme.Theme.DARK);
         } else if (themeRoot.getStyleClass().contains("theme-light")) {
             setTheme(AppTheme.Theme.LIGHT);
         } else {
-            setTheme(AppTheme.Theme.GRAPHITE);
+            setTheme(AppTheme.Theme.LIGHT);
         }
     }
 
@@ -707,8 +724,9 @@ public class CanvasLogViewer extends GridPane {
             lineLevelCache = new int[linesToRender + 10];
             lineCacheStartLine = -1;
         }
-        if (lineCacheStartLine != currentTopLine) {
+        if (lineCacheStartLine != currentTopLine || lineCacheRows < linesToRender) {
             lineCacheStartLine = currentTopLine;
+            lineCacheRows = linesToRender;
             for (int i = 0; i < linesToRender; i++) {
                 long viewIndex = currentTopLine + i;
                 if (viewIndex >= effectiveLineCount) {
@@ -766,13 +784,6 @@ public class CanvasLogViewer extends GridPane {
             double y = PADDING + i * LINE_HEIGHT - scrollOffsetY;
             if (y + LINE_HEIGHT < 0 || y > height) continue;
 
-            int level = (i < lineLevelCache.length) ? lineLevelCache[i] : 0;
-            Color bar = levelBarColor(level);
-            if (bar != null) {
-                gc.setFill(bar);
-                gc.fillRect(leftMargin - 5, y, 5, LINE_HEIGHT);
-            }
-
             gc.setFill(lineNumColor);
             String lineNumStr = String.valueOf(actualLineIndex + 1);
             double numX = leftMargin - 10 - lineNumStr.length() * charWidth;
@@ -794,12 +805,6 @@ public class CanvasLogViewer extends GridPane {
 
         boolean isSelected = isViewLineSelected(viewIndex);
 
-        Color tint = levelTintColor(levelCode);
-        if (tint != null) {
-            gc.setFill(tint);
-            gc.fillRect(drawX, y, canvasWidth - leftMargin + currentScrollX, LINE_HEIGHT);
-        }
-
         if (isSelected) {
             int selStart = Math.max(0, Math.min(selectionStartCharAt(viewIndex), line.length()));
             int selEnd = Math.max(selStart, selectionEndCharAt(viewIndex, line.length()));
@@ -807,7 +812,7 @@ public class CanvasLogViewer extends GridPane {
             double selX = drawX + selStart * charWidth;
             double selW = toRowEnd ? (canvasWidth - selX) : (selEnd - selStart) * charWidth;
             if (selW > 0) {
-                gc.setFill(selectionColor);
+                gc.setFill(SelectionColors.active(this) ? selectionColor : SelectionColors.background(paletteTheme, false));
                 gc.fillRect(selX, y, selW, LINE_HEIGHT);
             }
         }
@@ -825,7 +830,7 @@ public class CanvasLogViewer extends GridPane {
             }
         }
 
-        gc.setFill(textColor);
+        gc.setFill(levelTextColor(levelCode));
         if (visStart > 0 || visEnd < line.length()) {
             String visibleText = line.substring(visStart, visEnd);
             gc.fillText(visibleText, drawX + visStart * charWidth, y + 2);
@@ -833,16 +838,12 @@ public class CanvasLogViewer extends GridPane {
             gc.fillText(line, drawX, y + 2);
         }
 
-        if (levelCode != 0) {
-            CharSequence scan = line.length() > 120 ? line.substring(0, 120) : line;
-            Matcher lm = LEVEL_PATTERN.matcher(scan);
-            if (lm.find()) {
-                int s = Math.max(lm.start(), visStart);
-                int e = Math.min(lm.end(), visEnd);
-                if (s < e) {
-                    gc.setFill(levelTextColor(levelCode));
-                    gc.fillText(line.substring(s, e), drawX + s * charWidth, y + 2);
-                }
+        if (isSelected) {
+            int start = Math.max(visStart, selectionStartCharAt(viewIndex));
+            int end = Math.min(visEnd, selectionEndCharAt(viewIndex, line.length()));
+            if (start < end) {
+                gc.setFill(textColor);
+                gc.fillText(line.substring(start, end), drawX + start * charWidth, y + 2);
             }
         }
     }

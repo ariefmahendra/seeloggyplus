@@ -7,12 +7,8 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
-import javafx.scene.layout.Background;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.LinearGradient;
-import javafx.scene.paint.Paint;
-import javafx.scene.paint.Stop;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +31,7 @@ class LabelContrastTest {
     private static final String[] FXMLS = {
             "/fxml/MainView.fxml",
             "/fxml/PreferencesDialog.fxml",
+            "/fxml/ServerManagementDialog.fxml",
             "/fxml/ServerEditDialog.fxml",
             "/fxml/UnifiedFileManagerDialog.fxml",
             "/fxml/RemoteLogSearchDialog.fxml",
@@ -55,11 +52,10 @@ class LabelContrastTest {
     }
 
     @Test
-    void allLabelsContrastInBothThemes() {
+    void allLabelsContrastInEveryTheme() {
         onFxThread(() -> {
             for (String fxml : FXMLS) {
-                assertLabelsContrast(fxml, false);
-                assertLabelsContrast(fxml, true);
+                for (var theme : AppTheme.Theme.values()) assertLabelsContrast(fxml, theme);
             }
             AppTheme.setDark(false);
         });
@@ -115,9 +111,10 @@ class LabelContrastTest {
         });
     }
 
-    private void assertLabelsContrast(String fxml, boolean dark) {
+    private void assertLabelsContrast(String fxml, AppTheme.Theme theme) {
         try {
-            AppTheme.setDark(dark);
+            AppTheme.setTheme(theme);
+            boolean dark = theme == AppTheme.Theme.DARK;
             Parent root = FXMLLoader.load(getClass().getResource(fxml));
             Scene scene = AppTheme.scene(root);
             stage.setScene(scene);
@@ -125,11 +122,24 @@ class LabelContrastTest {
             root.applyCss();
             root.layout();
 
-            String mode = dark ? "dark" : "light";
+            String mode = theme.name().toLowerCase();
             assertLabelNodesContrast(fxml + " [" + mode + "]", root, dark);
+            snapshot(root, fxml, mode);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static void snapshot(Parent root, String fxml, String theme) throws Exception {
+        var image = root.snapshot(null, null);
+        int width = (int) image.getWidth(), height = (int) image.getHeight();
+        int[] pixels = new int[width * height];
+        image.getPixelReader().getPixels(0, 0, width, height, javafx.scene.image.PixelFormat.getIntArgbInstance(), pixels, 0, width);
+        var png = new java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        png.setRGB(0, 0, width, height, pixels, 0, width);
+        var path = java.nio.file.Path.of("build", "test-snapshots", "flat-" + fxml.substring(fxml.lastIndexOf('/') + 1).replace(".fxml", "") + "-" + theme + ".png");
+        java.nio.file.Files.createDirectories(path.getParent());
+        javax.imageio.ImageIO.write(png, "png", path.toFile());
     }
 
     private static void assertLabelNodesContrast(String context, Parent root, boolean dark) {
@@ -150,38 +160,7 @@ class LabelContrastTest {
     }
 
     private static Color effectiveBackground(Node node, boolean dark) {
-        Node cur = node.getParent();
-        while (cur != null) {
-            if (cur instanceof Region region) {
-                Background background = region.getBackground();
-                if (background != null) {
-                    var fills = background.getFills();
-
-                    for (int i = fills.size() - 1; i >= 0; i--) {
-                        Color color = toColor(fills.get(i).getFill());
-                        if (color != null && color.getOpacity() > 0.5) {
-                            return color;
-                        }
-                    }
-                }
-            }
-            cur = cur.getParent();
-        }
-        return dark ? Color.web("#1e2226") : Color.WHITE;
-    }
-
-    private static Color toColor(Paint paint) {
-        if (paint instanceof Color color) {
-            return color;
-        }
-        if (paint instanceof LinearGradient gradient && !gradient.getStops().isEmpty()) {
-            for (Stop stop : gradient.getStops()) {
-                if (stop.getColor().getOpacity() > 0.5) {
-                    return stop.getColor();
-                }
-            }
-        }
-        return null;
+        return com.seeloggyplus.shared.ui.RenderedColors.background(node.getParent());
     }
 
     private static double contrast(Color a, Color b) {

@@ -1,53 +1,79 @@
 .root {
+    -sl-toggle-selected-pressed-bg: #a7c5ff;
+    -sl-focus-ring: #3871e1;
+    -sl-focus-ring-panel: #3871e1;
+    -sl-focus-ring-chrome: #3871e1;
+    -sl-tab-selected-hover-bg: #d0dffe;
+    -sl-tab-selected-pressed-bg: #bdd3ff;
+    -sl-window-bg: #e9eaee;
+    -sl-panel-bg: #ffffff;
+    -sl-input-bg: #f7f8f9;
+    -sl-log-text: #080808;
+    -sl-popup-bg: #f7f8f9;
+    -sl-selection-inactive-bg: #e9eaee;
+    -sl-selection-text: #000000;
+    -sl-tab-selected-bg: #e3ebfe;
+    -sl-tab-selected-border: #a7c5ff;
+    -sl-tab-inactive-bg: #e9eaee;
+    -sl-toggle-selected-bg: #d0dffe;
+    -sl-toggle-selected-hover-bg: #bdd3ff;
 
-    -sl-chrome: #e9ecef;
-    -sl-chrome-hover: #dee2e6;
-    -sl-chrome-pressed: #ced4da;
-    -sl-chrome-text: #1f2329;
-    -sl-chrome-text-muted: #5c636a;
+    -sl-button-hover: rgba(0,0,0,0.070588);
+    -sl-button-pressed: rgba(0,0,0,0.12549);
+    -sl-button-text: #000000;
+    -sl-button-danger: #a03325;
+    -sl-button-danger-hover: rgba(220, 60, 60, 0.08);
+    -sl-button-danger-pressed: rgba(220, 60, 60, 0.14);
 
 
-    -sl-brand: #2563eb;
-    -sl-brand-hover: #1d4ed8;
-    -sl-brand-pressed: #1e40af;
-    -sl-brand-soft: #dbeafe;
-    -sl-brand-faint: rgba(37, 99, 235, 0.22);
+    -sl-chrome: #e9eaee;
+    -sl-chrome-hover: rgba(0,0,0,0.070588);
+    -sl-chrome-pressed: rgba(0,0,0,0.12549);
+    -sl-chrome-text: #000000;
+    -sl-chrome-text-muted: #5f6269;
+
+
+    -sl-brand: #3871e1;
+    -sl-brand-hover: #2f5eb9;
+    -sl-brand-pressed: #2f5eb9;
+    -sl-brand-soft: #f7f8ff;
+    -sl-brand-faint: rgba(56,113,225,0.18);
     -sl-on-brand: #ffffff;
 
 
-    -sl-accent: #2563eb;
-    -sl-accent-hover: #1d4ed8;
-    -sl-accent-pressed: #1e40af;
+    -sl-accent: #3871e1;
+    -sl-accent-hover: #2f5eb9;
+    -sl-accent-pressed: #2e4d89;
     -sl-accent-text: #ffffff;
 
 
-    -sl-bg: #f1f3f5;
+    -sl-bg: #e9eaee;
     -sl-surface: #ffffff;
-    -sl-surface-alt: #f8f9fa;
-    -sl-surface-sunken: #e9ecef;
+    -sl-surface-alt: #ffffff;
+    -sl-surface-sunken: #f7f8f9;
     -sl-overlay: rgba(0, 0, 0, 0.45);
 
 
-    -sl-border: #ced4da;
-    -sl-border-soft: #e9ecef;
-    -sl-border-strong: #adb5bd;
+    -sl-border: #d1d3d9;
+    -sl-border-soft: #e9eaee;
+    -sl-border-strong: #b5b7bd;
 
 
-    -sl-text: #1f2329;
-    -sl-text-secondary: #495057;
-    -sl-text-muted: #6c757d;
-    -sl-text-faint: #828a91;
+    -sl-text: #000000;
+    -sl-text-secondary: #5f6269;
+    -sl-text-muted: #5f6269;
+    -sl-text-faint: #73767c;
     -sl-text-inverse: #ffffff;
-    -sl-text-version: #aeb6bf;
-    -sl-text-section: #343a40;
+    -sl-text-version: #5f6269;
+    -sl-text-section: #5f6269;
 
 
-    -sl-preview-target: #dbeafe;
-    -sl-selection-bg: rgba(52, 58, 64, 0.18);
-    -sl-canvas-line-number: #6c757d;
-    -sl-canvas-line-number-bg: #f1f3f5;
+    -sl-preview-target: #e3ebfe;
+    -sl-selection-bg: #d0dffe;
+    -sl-canvas-line-number: #5f6269;
+    -sl-canvas-line-number-bg: #ffffff;
     -sl-canvas-highlight: #ffff00;
-    -sl-canvas-hover: #e6f0ff;
+    -sl-canvas-hover: #f7f8f9;
 
 
     -sl-success: #2f855a;
@@ -56,19 +82,19 @@
     -sl-danger-hover: #a03325;
     -sl-danger-soft: #fbeeed;
     -sl-danger-soft-hover: #f6dedb;
-    -sl-info: #2b6cb0;
+    -sl-info: #2f5eb9;
     -sl-live: #2f855a;
 
     -sl-chrome-success: #2f855a;
     -sl-chrome-warning: #b45309;
     -sl-chrome-danger: #c0392b;
-    -sl-memory-track: #ced4da;
+    -sl-memory-track: #d1d3d9;
 
 
-    -sl-scroll-track: #f1f3f5;
-    -sl-scroll-thumb: #c1c7cd;
-    -sl-scroll-thumb-hover: #98a1a9;
-    -sl-scroll-thumb-pressed: #6b7480;
+    -sl-scroll-track: #ffffff;
+    -sl-scroll-thumb: #c3c5cb;
+    -sl-scroll-thumb-hover: #b5b7bd;
+    -sl-scroll-thumb-pressed: #9fa2a8;
 
 
     -sl-level-fatal-bg: #fde8e8;
@@ -78,7 +104,7 @@
     -sl-level-warn-bg: #fdf3e3;
     -sl-level-warn-fg: #92400e;
     -sl-level-info-bg: #e8f0fe;
-    -sl-level-info-fg: #1d4ed8;
+    -sl-level-info-fg: #426588;
     -sl-level-debug-bg: #eef0f2;
     -sl-level-debug-fg: #4b5563;
     -sl-level-trace-bg: #f4f5f6;
@@ -101,21 +127,21 @@
     -sl-syntax-warn: #92400e;
     -sl-syntax-info: #2b6cb0;
     -sl-syntax-debug: #2f855a;
-    -sl-syntax-trace: #6c757d;
-    -sl-syntax-default: #1f2329;
-    -sl-syntax-selection: #1d4ed8;
+    -sl-syntax-trace: #5f6269;
+    -sl-syntax-default: #080808;
+    -sl-syntax-selection: #465d73;
     -sl-syntax-selected-line: #e9ecef;
     -sl-syntax-json-key: #0b5563;
     -sl-syntax-json-string: #2f855a;
     -sl-syntax-json-number: #b45309;
     -sl-syntax-json-boolean: #6b21a8;
-    -sl-syntax-json-null: #6c757d;
+    -sl-syntax-json-null: #5f6269;
     -sl-syntax-json-punct: #343a40;
     -sl-syntax-xml-tag: #1e3a8a;
     -sl-syntax-xml-attr: #b45309;
     -sl-syntax-xml-equals: #343a40;
     -sl-syntax-xml-value: #2f855a;
-    -sl-syntax-xml-comment: #6c757d;
+    -sl-syntax-xml-comment: #5f6269;
     -sl-syntax-xml-decl: #0f766e;
     -sl-syntax-xml-cdata: #9d174d;
 }

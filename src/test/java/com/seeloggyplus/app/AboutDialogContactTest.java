@@ -48,7 +48,7 @@ class AboutDialogContactTest {
 
     @AfterEach
     void resetTheme() {
-        onFxThread(() -> AppTheme.setTheme(AppTheme.Theme.GRAPHITE));
+        onFxThread(() -> AppTheme.setTheme(AppTheme.Theme.LIGHT));
     }
 
     @Test

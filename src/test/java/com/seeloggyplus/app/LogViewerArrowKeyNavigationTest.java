@@ -96,6 +96,52 @@ class LogViewerArrowKeyNavigationTest {
         });
     }
 
+    @Test
+    void selectionStatusLabelFollowsTheCanvasSelection() {
+        onFxThread(() -> {
+            try {
+                TabPane pane = getField("logTabPane");
+                LogSession session = new LogSession("selection.log", LogSession.SessionType.LOCAL);
+                for (int i = 0; i < 20; i++) {
+                    session.getLiveTailList().add(new LogEntry(i + 1, "line " + (i + 1)));
+                }
+                Method createTab = MainController.class.getDeclaredMethod("createTabForSession", LogSession.class);
+                createTab.setAccessible(true);
+                Tab tab = (Tab) createTab.invoke(controller, session);
+                pane.getTabs().add(tab);
+                pane.getSelectionModel().select(tab);
+
+                CanvasLogViewer viewer = session.getCanvasLogViewer();
+                assertNotNull(viewer, "session must have a canvas viewer");
+                setField("canvasLogViewer", viewer);
+                viewer.setFollowTail(false);
+                viewer.getVScrollBar().setValue(0);
+
+                Method activate = MainController.class.getDeclaredMethod("onActiveSessionChanged", LogSession.class);
+                activate.setAccessible(true);
+                activate.invoke(controller, session);
+                root.applyCss();
+                root.layout();
+                WaitForAsyncUtils.waitForFxEvents();
+
+                javafx.scene.control.Label selection = getField("selectionStatusLabel");
+                assertNotNull(selection, "the status bar must expose a selection label");
+                assertFalse(selection.isVisible(), "no selection must keep the label hidden");
+
+                viewer.selectLine(2);
+                assertEquals("1 line, 6 chars", viewer.getSelectionSummary(),
+                        "selectLine must select the whole line");
+                assertTrue(selection.isVisible(), "a selection must reveal the label");
+                assertEquals("Selected: 1 line, 6 chars", selection.getText());
+
+                viewer.clearFilter();
+                assertFalse(selection.isVisible(), "clearing the selection must hide the label again");
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
     private static void fireKey(Node target, KeyCode code) {
         KeyEvent event = new KeyEvent(target, target, KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
         Event.fireEvent(target, event);

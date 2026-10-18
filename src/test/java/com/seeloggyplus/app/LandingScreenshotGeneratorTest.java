@@ -57,9 +57,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(ApplicationExtension.class)
 class LandingScreenshotGeneratorTest {
 
-    private static final int WINDOW_WIDTH = 1440;
-    private static final int WINDOW_HEIGHT = 900;
-    private static final double SCALE = 2;
+    private static final int WINDOW_WIDTH = 1024;
+    private static final int WINDOW_HEIGHT = 576;
+    private static final double SCALE = 2880.0 / WINDOW_WIDTH;
 
     private Stage stage;
 
@@ -428,6 +428,7 @@ class LandingScreenshotGeneratorTest {
         AtomicReference<WritableImage> imageRef = new AtomicReference<>();
         robot.interact(() -> {
             node.applyCss();
+            assertEquals(1024, node.getLayoutBounds().getWidth(), 1, "Landing captures use a compact logical window");
             if (node instanceof Parent parent) {
                 for (int pass = 0; pass < 2; pass++) {
                     parent.layout();
@@ -442,8 +443,8 @@ class LandingScreenshotGeneratorTest {
 
         WritableImage image = imageRef.get();
         assertNotNull(image, fileName + " must be rendered");
-        assertTrue(image.getWidth() > 400 && image.getHeight() > 200,
-                fileName + " must have a usable size");
+        assertEquals(2880, image.getWidth(), 1, fileName + " must preserve retina resolution");
+        assertEquals(1620, image.getHeight(), 1, fileName + " must preserve the full window ratio");
 
         int width = (int) image.getWidth();
         int height = (int) image.getHeight();
