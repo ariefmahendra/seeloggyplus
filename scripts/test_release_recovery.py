@@ -34,6 +34,11 @@ class RecoveryTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 module.validate(run, self.jobs, "0.8.0", "abc")
 
+    def test_fetch_tagged_text_decodes_base64(self):
+        import base64
+        fake_fetch = lambda endpoint: {"content": base64.b64encode(b"line1\r\nline2\n").decode()}
+        self.assertEqual(module.fetch_tagged_text("file.txt", "0.8.0", fetch=fake_fetch), "line1\nline2\n")
+
 
 if __name__ == "__main__":
     unittest.main()
