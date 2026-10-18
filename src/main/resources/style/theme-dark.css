@@ -1,81 +1,92 @@
-/* ============================================================
-   SeeLoggyPlus — Dark Theme (Phase 7)
-   ------------------------------------------------------------
-   Overrides the design tokens in theme.css. This stylesheet is
-   loaded AFTER theme.css + components.css, so its `.root` token
-   values win. Popup windows inherit it because it is installed
-   at Scene level (see AppTheme).
-   Dark class on the scene root: `theme-dark`.
-   ============================================================ */
-
 .root {
-    /* ---- Chrome ------------------------------------------------ */
-    -sl-chrome: #23282d;
-    -sl-chrome-hover: #343b42;
-    -sl-chrome-pressed: #434b53;
-    -sl-chrome-text: #d7dbe0;
-    -sl-chrome-text-muted: #a0a8b0;
+    -sl-toggle-selected-pressed-bg: #233558;
+    -sl-focus-ring: #71a1fe;
+    -sl-focus-ring-panel: #71a1fe;
+    -sl-focus-ring-chrome: #71a1fe;
+    -sl-tab-selected-hover-bg: #2a4371;
+    -sl-tab-selected-pressed-bg: #2e4d89;
+    -sl-window-bg: #26282c;
+    -sl-panel-bg: #191a1c;
+    -sl-input-bg: #212326;
+    -sl-log-text: #bcbec4;
+    -sl-popup-bg: #26282c;
+    -sl-selection-inactive-bg: #33353b;
+    -sl-selection-text: #d1d3d9;
+    -sl-tab-selected-bg: #233558;
+    -sl-tab-selected-border: #2e4d89;
+    -sl-tab-inactive-bg: #26282c;
+    -sl-toggle-selected-bg: #2e4d89;
+    -sl-toggle-selected-hover-bg: #2f5eb9;
 
-    /* ---- Accent (lighter graphite for dark surfaces) ----------- */
-    -sl-brand: #4a535e;
-    -sl-brand-hover: #5a636e;
-    -sl-brand-pressed: #3a424b;
-    -sl-brand-soft: #2a3036;
-    -sl-brand-faint: rgba(120, 132, 144, 0.35);
+    -sl-button-hover: rgba(255,255,255,0.090196);
+    -sl-button-pressed: rgba(255,255,255,0.160784);
+    -sl-button-text: #d1d3d9;
+    -sl-button-danger: #f87171;
+    -sl-button-danger-hover: rgba(220, 60, 60, 0.08);
+    -sl-button-danger-pressed: rgba(220, 60, 60, 0.14);
+
+    -sl-chrome: #26282c;
+    -sl-chrome-hover: rgba(255,255,255,0.090196);
+    -sl-chrome-pressed: rgba(255,255,255,0.160784);
+    -sl-chrome-text: #d1d3d9;
+    -sl-chrome-text-muted: #9fa2a8;
+
+    -sl-brand: #3871e1;
+    -sl-brand-hover: #2f5eb9;
+    -sl-brand-pressed: #2f5eb9;
+    -sl-brand-soft: #233558;
+    -sl-brand-faint: rgba(56,113,225,0.18);
     -sl-on-brand: #ffffff;
 
-    /* ---- Interaction (hover / selected / pressed / focus) ------ */
-    -sl-accent: #434b53;
-    -sl-accent-hover: #343b42;
-    -sl-accent-pressed: #23282d;
-    -sl-accent-text: #d7dbe0;
+    -sl-accent: #3871e1;
+    -sl-accent-hover: #2f5eb9;
+    -sl-accent-pressed: #2e4d89;
+    -sl-accent-text: #ffffff;
 
-    /* ---- Surfaces ---------------------------------------------- */
-    -sl-bg: #171a1d;
-    -sl-surface: #1e2226;
-    -sl-surface-alt: #24292e;
-    -sl-surface-sunken: #262b30;
+    -sl-bg: #26282c;
+    -sl-surface: #191a1c;
+    -sl-surface-alt: #191a1c;
+    -sl-surface-sunken: #212326;
     -sl-overlay: rgba(0, 0, 0, 0.55);
 
-    /* ---- Borders ----------------------------------------------- */
-    -sl-border: #3a424b;
-    -sl-border-soft: #2b3138;
-    -sl-border-strong: #4a535e;
+    -sl-border: #33353b;
+    -sl-border-soft: #26282c;
+    -sl-border-strong: #40434a;
 
-    /* ---- Text -------------------------------------------------- */
-    -sl-text: #d7dbe0;
-    -sl-text-secondary: #b8c0c8;
-    -sl-text-muted: #9aa3ac;
-    -sl-text-faint: #6f787f;
+    -sl-text: #d1d3d9;
+    -sl-text-secondary: #9fa2a8;
+    -sl-text-muted: #9fa2a8;
+    -sl-text-faint: #73767c;
     -sl-text-inverse: #ffffff;
-    -sl-text-version: #aeb6bf;
-    -sl-text-section: #b8c0c8;
+    -sl-text-version: #9fa2a8;
+    -sl-text-section: #9fa2a8;
 
-    -sl-preview-target: #2a3036;
-    -sl-selection-bg: rgba(110, 168, 254, 0.28);
+    -sl-preview-target: #233558;
+    -sl-selection-bg: #2a4371;
+    -sl-canvas-line-number: #9fa2a8;
+    -sl-canvas-line-number-bg: #191a1c;
+    -sl-canvas-highlight: rgba(250, 204, 21, 0.35);
+    -sl-canvas-hover: #212326;
 
-    /* ---- Semantic ---------------------------------------------- */
     -sl-success: #4ade80;
     -sl-warning: #fbbf24;
     -sl-danger: #f87171;
     -sl-danger-hover: #ef4444;
     -sl-danger-soft: #3a2426;
     -sl-danger-soft-hover: #4a2a28;
-    -sl-info: #6ea8fe;
+    -sl-info: #71a1fe;
     -sl-live: #4ade80;
 
     -sl-chrome-success: #4ade80;
     -sl-chrome-warning: #fbbf24;
     -sl-chrome-danger: #fca5a5;
-    -sl-memory-track: #4a535e;
+    -sl-memory-track: #33353b;
 
-    /* ---- Scrollbar --------------------------------------------- */
-    -sl-scroll-track: #1e2226;
-    -sl-scroll-thumb: #4a535e;
-    -sl-scroll-thumb-hover: #5a636e;
-    -sl-scroll-thumb-pressed: #6b7480;
+    -sl-scroll-track: #191a1c;
+    -sl-scroll-thumb: #4c4f56;
+    -sl-scroll-thumb-hover: #5f6269;
+    -sl-scroll-thumb-pressed: #73767c;
 
-    /* ---- Log levels -------------------------------------------- */
     -sl-level-fatal-bg: #3a2426;
     -sl-level-fatal-fg: #ff8a80;
     -sl-level-error-bg: #3a2426;
@@ -83,45 +94,50 @@
     -sl-level-warn-bg: #3a3420;
     -sl-level-warn-fg: #fbbf24;
     -sl-level-info-bg: #1e2b3d;
-    -sl-level-info-fg: #6ea8fe;
+    -sl-level-info-fg: #8eabc4;
     -sl-level-debug-bg: #2a3036;
     -sl-level-debug-fg: #9aa3ac;
     -sl-level-trace-bg: #24292e;
     -sl-level-trace-fg: #9aa3ac;
+
+    -sl-level-fatal-bar: #ef4444;
+    -sl-level-error-bar: #ef4444;
+    -sl-level-warn-bar: #f59e0b;
+    -sl-level-fatal-tint: rgba(239, 68, 68, 0.12);
+    -sl-level-error-tint: rgba(239, 68, 68, 0.10);
+    -sl-level-warn-tint: rgba(245, 158, 11, 0.10);
 
     -sl-row-error-bg: #2e2022;
     -sl-row-error-sel: #3a2426;
     -sl-row-warn-bg: #2e2a1e;
     -sl-row-warn-sel: #3a3420;
 
-    /* ---- Syntax highlighting ----------------------------------- */
     -sl-syntax-error: #f87171;
     -sl-syntax-warn: #fbbf24;
     -sl-syntax-info: #6ea8fe;
     -sl-syntax-debug: #4ade80;
-    -sl-syntax-trace: #9aa3ac;
-    -sl-syntax-default: #d7dbe0;
+    -sl-syntax-trace: #9fa2a8;
+    -sl-syntax-default: #bcbec4;
     -sl-syntax-selection: #6ea8fe;
     -sl-syntax-selected-line: #2a3036;
     -sl-syntax-json-key: #7dd3fc;
     -sl-syntax-json-string: #86efac;
     -sl-syntax-json-number: #fdba74;
     -sl-syntax-json-boolean: #d8b4fe;
-    -sl-syntax-json-null: #9aa3ac;
+    -sl-syntax-json-null: #9fa2a8;
     -sl-syntax-json-punct: #cbd5e1;
     -sl-syntax-xml-tag: #93c5fd;
     -sl-syntax-xml-attr: #fdba74;
     -sl-syntax-xml-equals: #cbd5e1;
     -sl-syntax-xml-value: #86efac;
-    -sl-syntax-xml-comment: #9aa3ac;
+    -sl-syntax-xml-comment: #9fa2a8;
     -sl-syntax-xml-decl: #5eead4;
     -sl-syntax-xml-cdata: #f9a8d4;
 
-    /* ---- Modena base so default controls turn dark -------------- */
-    -fx-base: #2b3138;
-    -fx-background: #1e2226;
-    -fx-control-inner-background: #262b30;
-    -fx-control-inner-background-alt: #2b3138;
+    -fx-base: #26282c;
+    -fx-background: #191a1c;
+    -fx-control-inner-background: #212326;
+    -fx-control-inner-background-alt: #191a1c;
 
     -fx-accent: -sl-brand;
     -fx-focus-color: -sl-brand;
@@ -129,55 +145,8 @@
     -fx-highlight-fill: -sl-selection-bg;
     -fx-highlight-text-fill: -sl-text;
 
-    /* Selected row/item when the control is NOT focused must stay dark so the
-       theme-coloured text and icons remain visible. */
-    -fx-selection-bar-non-focused: #2f353c;
-    -fx-selection-bar-text: #d7dbe0;
-}
-
-/* Literal component overrides that are not token-driven */
-.btn-danger-outline:hover {
-    -fx-base: #4a2a28;
-}
-
-/* RichTextFX selection highlight (must match SelectionColors.DARK_BACKGROUND) */
-.root.theme-dark .styled-text-area .selection {
-    -fx-fill: rgba(110, 168, 254, 0.28);
-}
-
-/* Update dialog banner: use dark chrome tone instead of the lighter brand gradient */
-.update-dialog-header {
-    -fx-background-color: linear-gradient(to right, -sl-chrome, -sl-chrome-hover);
-}
-
-/* Primary / default buttons: darker graphite so they match the dark surfaces */
-.btn-primary {
-    -fx-background-color: #3a424b;
-}
-
-.btn-primary:hover {
-    -fx-background-color: #434b53;
-}
-
-.btn-primary:pressed {
-    -fx-background-color: #2b3138;
-}
-
-.button:default {
-    -fx-background-color: #3a424b;
-    -fx-text-fill: #eef1f4;
-    -fx-border-color: #4a535e;
-    -fx-border-width: 1;
-    -fx-border-radius: 3;
-    -fx-background-radius: 3;
-}
-
-.button:default:hover {
-    -fx-background-color: #434b53;
-}
-
-.button:default:pressed {
-    -fx-background-color: #2b3138;
+    -fx-selection-bar-non-focused: -sl-selection-inactive-bg;
+    -fx-selection-bar-text: -sl-selection-text;
 }
 
 .match-highlight {

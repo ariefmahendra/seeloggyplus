@@ -1,29 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-
-<BorderPane fx:id="rootPane"
+<?import java.net.URL?>
+<BorderPane
             xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.seeloggyplus.controller.UpdateDialogController"
-            styleClass="update-dialog"
+            fx:controller="com.seeloggyplus.features.update.presentation.UpdateDialogController"
+            styleClass="update-dialog, simple-dialog"
             prefWidth="600" prefHeight="440">
 
+    <stylesheets>
+        <URL value="@../style/components.css" />
+    </stylesheets>
     <top>
-        <VBox styleClass="update-dialog-header">
+        <VBox spacing="4" styleClass="update-dialog-header">
             <Label fx:id="titleLabel" text="Update Available" styleClass="update-dialog-title"/>
-            <Label fx:id="versionLabel" text="" styleClass="update-dialog-version"/>
+            <Label fx:id="versionLabel" styleClass="update-dialog-version"/>
         </VBox>
     </top>
 
     <center>
-        <VBox spacing="12" styleClass="update-dialog-body">
-            <HBox spacing="8" alignment="CENTER_LEFT" styleClass="update-dialog-meta">
+        <VBox spacing="8" styleClass="update-dialog-body">
+            <HBox spacing="8" alignment="CENTER_LEFT">
                 <Label text="Package:" styleClass="update-dialog-field"/>
                 <Label fx:id="assetLabel" text="-" styleClass="update-dialog-value"/>
                 <Region HBox.hgrow="ALWAYS"/>
-                <Label fx:id="sizeLabel" text="" styleClass="update-dialog-value"/>
+                <Label fx:id="sizeLabel" styleClass="update-dialog-value"/>
             </HBox>
 
             <Label text="Release notes" styleClass="update-dialog-section"/>
@@ -34,12 +36,12 @@
             <ProgressBar fx:id="progressBar" prefWidth="Infinity" visible="false" managed="false"
                          styleClass="update-dialog-progress"/>
 
-            <Label fx:id="statusLabel" text="" wrapText="true" styleClass="update-dialog-status"/>
+            <Label fx:id="statusLabel" wrapText="true" styleClass="update-dialog-status"/>
         </VBox>
     </center>
 
     <bottom>
-        <HBox spacing="10" alignment="CENTER_RIGHT" styleClass="update-dialog-actions">
+        <HBox spacing="6" alignment="CENTER_RIGHT" styleClass="update-dialog-actions">
             <Button fx:id="closeButton" text="Close" onAction="#handleClose" styleClass="btn-secondary"/>
             <Button fx:id="skipButton" text="Skip this version" onAction="#handleSkip" styleClass="btn-secondary"/>
             <Button fx:id="laterButton" text="Later" onAction="#handleLater" styleClass="btn-secondary"/>
@@ -48,5 +50,4 @@
                     defaultButton="true" styleClass="btn-primary"/>
         </HBox>
     </bottom>
-
 </BorderPane>

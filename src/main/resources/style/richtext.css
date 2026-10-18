@@ -1,6 +1,3 @@
-/* RichTextFX Styling
-   Requires theme.css (design tokens) to be loaded on the scene root. */
-
 .log-area {
     -fx-background-color: -sl-surface;
 }
@@ -9,7 +6,15 @@
     -fx-background-color: -sl-surface;
 }
 
-/* Keywords */
+.styled-text-area.detail-area .paragraph-box {
+    -fx-padding: 0;
+}
+
+.styled-text-area.detail-area .paragraph-text {
+    -fx-line-spacing: 0;
+}
+
+
 .error {
     -fx-fill: -sl-syntax-error;
     -fx-font-weight: bold;
@@ -36,20 +41,22 @@
     -fx-fill: -sl-syntax-default;
 }
 
-/* Selection highlight background (RichTextFX draws it via this path).
-   Light literal; theme-dark.css overrides with a higher-specificity rule.
-   Must match SelectionColors.LIGHT_BACKGROUND / .DARK_BACKGROUND. */
+
 .selection {
-    -fx-fill: rgba(52, 58, 64, 0.18);
+    -fx-fill: -sl-selection-inactive-bg;
     -fx-stroke: transparent;
 }
 
-/* Line Highlighting */
+.styled-text-area:focused .selection {
+    -fx-fill: -sl-selection-bg;
+}
+
+
 .selected-line {
     -fx-background-color: -sl-syntax-selected-line;
 }
 
-/* JSON Syntax Highlighting */
+
 .json-key {
     -fx-fill: -sl-syntax-json-key;
     -fx-font-weight: bold;
@@ -74,7 +81,7 @@
     -fx-font-weight: bold;
 }
 
-/* XML Syntax Highlighting */
+
 .xml-tag {
     -fx-fill: -sl-syntax-xml-tag;
     -fx-font-weight: bold;

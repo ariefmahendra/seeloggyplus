@@ -1,8 +1,3 @@
-/* ============================================================
-   SeeLoggyPlus — Component Styles
-   Requires theme.css (design tokens) to be loaded first.
-   ============================================================ */
-
 .small-combo-box .list-cell {
     -fx-font-size: 12px;
 }
@@ -11,16 +6,10 @@
     -fx-font-size: 12px;
 }
 
-/* ============================================
-   TableView Styling
-   ============================================ */
-
-/* Ensure table cells align to top for multi-line content */
 .table-view .table-cell {
     -fx-alignment: TOP_LEFT;
 }
 
-/* Flat, muted column headers (compact enterprise look) */
 .table-view .column-header-background {
     -fx-background-color: -sl-surface-sunken;
     -fx-border-color: transparent transparent -sl-border transparent;
@@ -46,10 +35,6 @@
     -fx-background-color: -sl-text-muted;
 }
 
-/* 
-   Headerless Mode for Raw View 
-   Hides the column header area completely to mimic a text editor
-*/
 .header-hidden .column-header-background {
     -fx-max-height: 0;
     -fx-pref-height: 0;
@@ -63,9 +48,6 @@
     visibility: hidden;
 }
 
-/* ============================================
-   TabPane: rectangular tabs + graphite accent
-   ============================================ */
 .tab-pane {
     -fx-open-tab-animation: NONE;
     -fx-close-tab-animation: NONE;
@@ -121,8 +103,6 @@
     -fx-background-color: -sl-surface;
 }
 
-/* Suppress the focus ring that appears on the tab header when focus changes
-   (e.g. after clicking a log line in the canvas). */
 .tab-pane > .tab-header-area > .headers-region > .tab .focus-indicator,
 .tab-pane > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
     -fx-border-color: transparent;
@@ -130,7 +110,6 @@
     -fx-background-color: transparent;
 }
 
-/* In-tab status indicators (created in MainController) */
 .tab-live-indicator {
     -fx-fill: -sl-live;
 }
@@ -144,9 +123,6 @@
     -fx-font-weight: bold;
 }
 
-/* ============================================
-   ScrollBar: Sleek modern scrollbar (clean & professional)
-   ============================================ */
 .scroll-bar {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
@@ -187,8 +163,6 @@
     -fx-background-color: -sl-scroll-thumb-pressed;
 }
 
-/* Keep the up/down (and left/right) step buttons visible so a single line/row
-   can be moved at a time by clicking them. */
 .scroll-bar .increment-button,
 .scroll-bar .decrement-button {
     -fx-background-color: transparent;
@@ -208,10 +182,6 @@
     -fx-background-insets: 0;
 }
 
-
-/* ============================================
-   Empty State Styling
-   ============================================ */
 .empty-state-pane {
     -fx-background-color: -sl-surface-alt;
     -fx-padding: 40px;
@@ -233,55 +203,36 @@
 }
 
 .empty-state-button {
-    -fx-background-color: -sl-brand;
-    -fx-text-fill: -sl-on-brand;
+    -fx-background-color: transparent;
+    -fx-text-fill: -sl-button-text;
     -fx-font-weight: bold;
     -fx-background-radius: 3;
     -fx-border-color: transparent;
     -fx-cursor: hand;
 }
 
-.empty-state-button:hover {
-    -fx-background-color: -sl-brand-hover;
-}
-
-.empty-state-button:focused {
-    -fx-background-color: -sl-brand;
-    -fx-text-fill: -sl-on-brand;
-    -fx-border-color: -sl-accent;
-}
-
 .empty-state-button .glyph-icon,
 .empty-state-button FontAwesomeIconView,
 .empty-state-button > .graphic > .glyph-icon {
-    -fx-fill: -sl-on-brand;
-    fill: -sl-on-brand;
+    -fx-fill: -sl-button-text;
+    fill: -sl-button-text;
 }
 
-/* ============================================
-   Toggle Button Active Icon Styling
-   ============================================ */
 .toggle-button:selected {
-    -fx-background-color: -sl-brand;
-    -fx-text-fill: -sl-on-brand;
-    /* No leftover outline: selected toggles must look flat and clean. */
     -fx-border-color: transparent;
 }
 
 .toggle-button:selected .glyph-icon,
 .toggle-button:selected FontAwesomeIconView {
-    -fx-fill: -sl-on-brand;
-    fill: -sl-on-brand;
+    -fx-fill: -sl-button-text;
+    fill: -sl-button-text;
 }
 
 .toggle-button:selected > .graphic > .glyph-icon {
-    -fx-fill: -sl-on-brand;
-    fill: -sl-on-brand;
+    -fx-fill: -sl-button-text;
+    fill: -sl-button-text;
 }
 
-/* ============================================
-   Remote Log Search: keyword highlight
-   ============================================ */
 .match-highlight {
     -fx-background-color: yellow;
     -fx-text-fill: black;
@@ -296,35 +247,34 @@
     -fx-background-color: -sl-preview-target;
 }
 
-/* ============================================
-   Update dialog
-   ============================================ */
 .update-dialog {
     -fx-background-color: -sl-surface;
 }
 
 .update-dialog-header {
-    -fx-background-color: linear-gradient(to right, -sl-brand-hover, -sl-brand);
-    -fx-padding: 18 22 16 22;
+    -fx-background-color: -sl-surface;
+    -fx-padding: 12;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
 }
 
 .update-dialog-title {
-    -fx-font-size: 20px;
+    -fx-font-size: 16px;
     -fx-font-weight: bold;
-    -fx-text-fill: -sl-text-inverse;
+    -fx-text-fill: -sl-text;
 }
 
 .update-dialog-version {
     -fx-font-size: 13px;
-    -fx-text-fill: -sl-text-version;
+    -fx-text-fill: -sl-text-secondary;
 }
 
 .update-dialog-body {
-    -fx-padding: 18 22 8 22;
+    -fx-padding: 12;
 }
 
 .update-dialog-field {
-    -fx-text-fill: -sl-text-muted;
+    -fx-text-fill: -sl-text-secondary;
     -fx-font-weight: bold;
 }
 
@@ -335,13 +285,13 @@
 .update-dialog-section {
     -fx-font-size: 13px;
     -fx-font-weight: bold;
-    -fx-text-fill: -sl-text-section;
+    -fx-text-fill: -sl-text;
 }
 
 .update-dialog-notes {
     -fx-font-family: 'Consolas', 'Menlo', 'DejaVu Sans Mono', monospace;
     -fx-font-size: 12px;
-    -fx-control-inner-background: -sl-surface-alt;
+    -fx-control-inner-background: -sl-surface;
 }
 
 .update-dialog-status {
@@ -353,12 +303,11 @@
 }
 
 .update-dialog-actions {
-    -fx-padding: 12 22 16 22;
+    -fx-padding: 8 12;
+    -fx-border-color: -sl-border-soft transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
 }
 
-/* ============================================
-   Remote Log Search: easier-to-grab scrollbars & divider
-   ============================================ */
 .remote-log-search-dialog .scroll-bar:vertical {
     -fx-pref-width: 16px;
     -fx-min-width: 16px;
@@ -378,22 +327,28 @@
     -fx-min-width: 44px;
 }
 
-/* Selected / highlighted preview line: use the shared (translucent) selection
-   colour and keep theme text colours so it stays readable in both themes.
-   Scoped to the preview list so it cannot leak onto the Context dropdown. */
 .remote-log-search-dialog .preview-list .list-cell:selected,
 .remote-log-search-dialog .preview-list .list-cell:filled:selected {
+    -fx-background-color: -sl-selection-inactive-bg;
+}
+
+.remote-log-search-dialog .preview-list:focused .list-cell:selected,
+.remote-log-search-dialog .preview-list:focused .list-cell:filled:selected {
     -fx-background-color: -sl-selection-bg;
 }
 
 .remote-log-search-dialog .preview-list .list-cell:selected .label,
 .remote-log-search-dialog .preview-list .list-cell:selected .text {
-    -fx-text-fill: -sl-text;
-    -fx-fill: -sl-text;
+    -fx-text-fill: -sl-selection-text;
+    -fx-fill: -sl-selection-text;
 }
 
 .remote-log-search-dialog .preview-list .list-cell:selected .preview-line-number {
-    -fx-text-fill: -sl-text-muted;
+    -fx-text-fill: -sl-selection-text;
+}
+
+.remote-log-search-dialog .preview-list .preview-target-line .preview-line-number {
+    -fx-text-fill: -sl-text-secondary;
 }
 
 .remote-log-search-dialog .split-pane-divider {
@@ -406,96 +361,39 @@
     -fx-background-color: -sl-text-faint;
 }
 
-/* Remote log-location errors: readable explanation and optional diagnostic details. */
-.remote-path-error,
-.ssh-connection-feedback {
-    -fx-background-color: -sl-surface;
-}
-
-/* Log tabs share the available width; truncate names rather than shrinking text. */
 .log-tab-pane > .tab-header-area > .headers-region > .tab .tab-label {
     -fx-text-fill: -sl-text-secondary;
     -fx-text-overrun: ellipsis;
 }
 
-.remote-path-error .header-panel,
-.ssh-connection-feedback .header-panel {
-    -fx-background-color: -sl-surface-alt;
-}
-
-.remote-path-error .label,
-.ssh-connection-feedback .label {
-    -fx-text-fill: -sl-text;
-}
-
-.remote-path-error .details-button,
-.ssh-connection-feedback .details-button {
-    -fx-text-fill: -sl-text-secondary;
-}
-
-.remote-path-error .text-area,
-.ssh-connection-feedback .text-area {
-    -fx-text-fill: -sl-text;
-    -fx-control-inner-background: -sl-surface;
-}
-
-.remote-path-error .text-area .content,
-.ssh-connection-feedback .text-area .content {
-    -fx-background-color: -sl-surface;
-}
-
-/* ============================================
-   Button hierarchy
-   ============================================ */
 .compact-actions .button,
 .compact-actions .toggle-button,
 .unified-file-manager-dialog .button,
 .unified-file-manager-dialog .toggle-button {
-    -fx-padding: 4 7;
+    -fx-padding: 3 6;
 }
 
 .btn-secondary {
-    -fx-background-color: -sl-surface-alt;
-    -fx-text-fill: -sl-text;
-    -fx-border-color: -sl-border;
+    -fx-background-color: transparent;
+    -fx-text-fill: -sl-button-text;
+    -fx-border-color: transparent;
     -fx-border-radius: 3;
     -fx-background-radius: 3;
     -fx-cursor: hand;
 }
 
-.btn-secondary:hover {
-    -fx-background-color: -sl-surface-sunken;
-}
-
-.btn-secondary:pressed {
-    -fx-background-color: -sl-border-soft;
-}
-
-.btn-secondary:disabled {
-    -fx-opacity: 0.6;
-}
-
-/* ============================================
-   Form controls: consistent radius
-   ============================================ */
 .text-field,
 .password-field,
 .text-area,
-.combo-box,
-.choice-box,
-.spinner {
+.choice-box {
     -fx-background-radius: 3;
     -fx-border-radius: 3;
 }
 
-/* Placeholder text must follow the theme (Modena derives a too-dark colour
-   in dark mode, making placeholder text invisible). */
 .text-input {
     -fx-prompt-text-fill: -sl-text-secondary;
 }
 
-/* Single, clean focus border (Modena draws a focus ring + border + inner,
-   which renders as an ugly double border). */
 .text-field:focused,
 .password-field:focused,
 .text-area:focused {
@@ -506,9 +404,6 @@
     -fx-border-width: 0;
 }
 
-/* ============================================
-   Toolbars & split pane
-   ============================================ */
 .tool-bar {
     -fx-padding: 3 6 3 6;
 }
@@ -523,9 +418,6 @@
     -fx-background-color: -sl-text-faint;
 }
 
-/* ============================================
-   Tooltips
-   ============================================ */
 .tooltip {
     -fx-background-color: -sl-chrome;
     -fx-text-fill: -sl-chrome-text;
@@ -534,12 +426,6 @@
     -fx-padding: 4 8 4 8;
 }
 
-/* ============================================
-   Colored icons (theme-independent, readable on light & dark)
-   Higher specificity than the default `.glyph-icon` rule.
-   ============================================ */
-/* Theme-tone icons: they follow the active theme like the rest of the UI.
-   Shape already distinguishes folders/logs/files; colour stays neutral. */
 FontAwesomeIconView.favorite-star {
     -fx-fill: -sl-warning;
 }
@@ -556,9 +442,6 @@ FontAwesomeIconView.file-icon-file {
     -fx-fill: -sl-text-muted;
 }
 
-/* ============================================
-   Search result panel & navigator
-   ============================================ */
 .search-results-header {
     -fx-font-weight: bold;
     -fx-font-size: 11px;
@@ -571,10 +454,6 @@ FontAwesomeIconView.file-icon-file {
     -fx-padding: 0 5 0 0;
 }
 
-/* ============================================
-   Menus & context menus (popup windows)
-   These inherit the stylesheet only when it is installed on the Scene.
-   ============================================ */
 .context-menu {
     -fx-background-color: -sl-surface;
     -fx-border-color: -sl-border;
@@ -592,26 +471,100 @@ FontAwesomeIconView.file-icon-file {
 }
 
 .context-menu .menu-item:focused {
-    -fx-background-color: -sl-brand;
+    -fx-background-color: -sl-selection-bg;
 }
 
 .context-menu .menu-item:focused .label {
-    -fx-text-fill: -sl-on-brand;
+    -fx-text-fill: -sl-selection-text;
+}
+
+.context-menu .menu-item:focused .left-container > .check,
+.context-menu .menu-item:focused .right-container > .arrow {
+    -fx-background-color: -sl-selection-text;
 }
 
 .context-menu .separator .line {
     -fx-border-color: -sl-border-soft;
 }
 
-/* Compact action button next to a form field (e.g. Browse for a key file):
-   keeps its own height instead of stretching to the field height. */
+.context-menu.breadcrumb-popup {
+    -fx-background-color: -sl-popup-bg;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-padding: 6;
+}
+
+.breadcrumb-popup .menu-item {
+    -fx-min-height: 28;
+    -fx-padding: 7 10;
+    -fx-background-radius: 5;
+}
+
+.breadcrumb-popup .scroll-arrow {
+    -fx-background-color: -sl-popup-bg;
+}
+
+.breadcrumb-popup .scroll-arrow .menu-up-arrow,
+.breadcrumb-popup .scroll-arrow .menu-down-arrow {
+    -fx-background-color: -sl-text-secondary;
+}
+
+.main-view .log-tab-pane .tab-down-button {
+    -sl-chrome-text: -sl-text-secondary;
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 6;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-min-width: 28;
+    -fx-pref-width: 25;
+    -fx-max-width: 28;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-cursor: hand;
+}
+
+.main-view .log-tab-pane .tab-down-button:hover {
+    -fx-background-color: -sl-button-hover;
+}
+
+.main-view .log-tab-pane .tab-down-button:pressed {
+    -fx-background-color: -sl-button-pressed;
+}
+
+.main-view .log-tab-pane .tab-down-button > .arrow {
+    -fx-background-color: -sl-chrome-text;
+    -fx-background-insets: 0;
+    -fx-effect: null;
+    -fx-padding: 0;
+    -fx-shape: "M 0 1.5 A 1.5 1.5 0 1 0 3 1.5 A 1.5 1.5 0 1 0 0 1.5 Z M 0 7.5 A 1.5 1.5 0 1 0 3 7.5 A 1.5 1.5 0 1 0 0 7.5 Z M 0 13.5 A 1.5 1.5 0 1 0 3 13.5 A 1.5 1.5 0 1 0 0 13.5 Z";
+    -fx-min-width: 3;
+    -fx-pref-width: 3;
+    -fx-max-width: 3;
+    -fx-min-height: 15;
+    -fx-pref-height: 15;
+    -fx-max-height: 15;
+}
+
+.main-view .context-menu {
+    -fx-background-color: -sl-popup-bg;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: -sl-border-soft;
+    -fx-padding: 6;
+}
+
+.main-view .context-menu .menu-item {
+    -fx-background-radius: 6;
+    -fx-padding: 6 10;
+}
+
 .browse-button {
-    -fx-padding: 4 10 4 10;
+    -fx-padding: 3 9 3 9;
     -fx-font-size: 12px;
 }
 
-/* Scrollable dialog forms (e.g. Server Edit): keep the dialog surface visible
-   behind the scroll pane and never hide the action row. */
 .dialog-form-scroll {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
@@ -622,7 +575,6 @@ FontAwesomeIconView.file-icon-file {
     -fx-background-color: transparent;
 }
 
-/* Collapsible panel sections (e.g. Favorite folders in File Management). */
 .titled-pane > .title {
     -fx-background-color: -sl-surface-alt;
     -fx-border-color: -sl-border;
@@ -649,7 +601,6 @@ FontAwesomeIconView.file-icon-file {
     -fx-padding: 4;
 }
 
-/* "What's New" dialog: themed surface, accent badge and notes area. */
 .whats-new-dialog {
     -fx-background-color: -sl-surface;
 }
@@ -690,11 +641,6 @@ FontAwesomeIconView.file-icon-file {
     -fx-background-color: transparent;
 }
 
-/* Dropdown fields (ComboBox / ChoiceBox / ChoiceDialog) look like normal form
-   fields in every theme: light surface with dark text on Graphite/Light, and
-   only the Dark theme renders them dark. The dropdown list uses a neutral
-   light highlight instead of the dark accent / blue accent. */
-.combo-box,
 .choice-box {
     -fx-background-color: -sl-surface;
     -fx-background-radius: 3;
@@ -703,60 +649,56 @@ FontAwesomeIconView.file-icon-file {
     -fx-border-radius: 3;
 }
 
-.combo-box .list-cell,
 .choice-box .label {
     -fx-background-color: transparent;
     -fx-text-fill: -sl-text;
 }
 
-.combo-box:focused,
 .choice-box:focused {
     -fx-background-color: -sl-surface;
     -fx-border-color: -sl-accent;
 }
 
-.combo-box:focused .list-cell,
 .choice-box:focused .label {
     -fx-text-fill: -sl-text;
 }
 
-.combo-box .arrow,
 .choice-box .arrow {
     -fx-background-color: -sl-text-secondary;
 }
 
-.combo-box-popup .list-view,
 .choice-box-popup .list-view {
     -fx-background-color: -sl-surface;
     -fx-border-color: -sl-border;
     -fx-border-width: 1;
 }
 
-.combo-box-popup .list-cell,
 .choice-box-popup .list-cell {
     -fx-background-color: -sl-surface;
     -fx-text-fill: -sl-text;
     -fx-padding: 4 10 4 10;
 }
 
-.combo-box-popup .list-cell:filled:hover,
 .choice-box-popup .list-cell:filled:hover,
-.combo-box-popup .list-cell:filled:selected,
 .choice-box-popup .list-cell:filled:selected {
     -fx-background-color: -sl-surface-sunken;
     -fx-text-fill: -sl-text;
 }
 
-/* Icons on chrome must not inherit the dark text of the content surface. */
-.app-toolbar > .glyph-icon, .app-toolbar > FontAwesomeIconView,
-.status-bar .glyph-icon, .status-bar FontAwesomeIconView,
+.app-toolbar > .glyph-icon,
+.app-toolbar > FontAwesomeIconView,
+.status-bar .glyph-icon,
+.status-bar FontAwesomeIconView,
 .menu-bar > .container > .menu-button .glyph-icon,
 .menu-bar > .container > .menu-button FontAwesomeIconView {
     -fx-fill: -sl-chrome-text;
 }
-.btn-primary .glyph-icon, .btn-primary FontAwesomeIconView {
-    -fx-fill: -sl-on-brand;
+
+.btn-primary .glyph-icon,
+.btn-primary FontAwesomeIconView {
+    -fx-fill: -sl-button-text;
 }
+
 .list-cell:filled:selected .glyph-icon,
 .tree-cell:filled:selected .glyph-icon,
 .table-row-cell:filled:selected .glyph-icon,
@@ -765,26 +707,34 @@ FontAwesomeIconView.file-icon-file {
 .table-row-cell:filled:selected FontAwesomeIconView {
     -fx-fill: -sl-accent-text;
 }
+
 .recent-files-list .list-cell .server-label {
     -fx-text-fill: -sl-text;
 }
+
 .recent-files-list .list-cell:selected .server-label {
     -fx-text-fill: -sl-accent-text;
 }
 
-/* Keep selection visible when keyboard focus moves to search or another pane. */
-.table-view, .list-view, .tree-view {
+.table-view,
+.list-view,
+.tree-view {
     -fx-selection-bar: -sl-accent;
     -fx-selection-bar-non-focused: -sl-accent;
     -fx-selection-bar-text: -sl-accent-text;
 }
-.table-row-cell:filled:selected, .list-cell:filled:selected, .tree-cell:filled:selected {
+
+.table-row-cell:filled:selected,
+.list-cell:filled:selected,
+.tree-cell:filled:selected {
     -fx-background-color: -sl-accent;
     -fx-text-fill: -sl-accent-text;
 }
+
 .table-row-cell:filled:selected .table-cell,
 .table-row-cell:filled:selected .label,
-.list-cell:filled:selected .label, .tree-cell:filled:selected .label {
+.list-cell:filled:selected .label,
+.tree-cell:filled:selected .label {
     -fx-text-fill: -sl-accent-text;
 }
 
@@ -793,9 +743,6 @@ FontAwesomeIconView.file-icon-file {
     -fx-border-width: 2;
 }
 
-/* Drop indicator when dragging a server onto a group folder in the location tree.
-   Uses background layers (no border) so the cell keeps exactly the same size
-   while dragging: an accent bar on the left plus a soft fill for the row. */
 .tree-cell:drop-target {
     -fx-background-color: -sl-info, -sl-brand-soft;
     -fx-background-insets: 0, 0 0 0 3;
@@ -844,4 +791,1743 @@ FontAwesomeIconView.file-icon-file {
 
 .app-toolbar .check-box {
     -fx-text-fill: -sl-chrome-text;
+}
+
+.unified-file-manager-dialog .app-toolbar > .button:hover {
+    -fx-background-insets: 0;
+}
+
+.unified-file-manager-dialog .app-toolbar > .button:pressed {
+    -fx-background-insets: 0;
+}
+
+.unified-file-manager-dialog .app-toolbar > .button:hover .glyph-icon,
+.unified-file-manager-dialog .app-toolbar > .button:pressed .glyph-icon,
+.unified-file-manager-dialog .app-toolbar > .button:hover FontAwesomeIconView,
+.unified-file-manager-dialog .app-toolbar > .button:pressed FontAwesomeIconView {
+    -fx-fill: -sl-button-text;
+}
+
+.preferences-dialog {
+    -fx-background-color: -sl-surface;
+}
+
+.settings-sidebar {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: transparent -sl-border-soft transparent transparent;
+    -fx-padding: 12 10 10 10;
+}
+
+.settings-sidebar-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -sl-text;
+    -fx-padding: 0 4 0 4;
+}
+
+.settings-sidebar .list-view {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+}
+
+.settings-sidebar .list-cell {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 2 0 2 0;
+    -fx-text-fill: -sl-text;
+    -fx-padding: 7 10 7 10;
+    -fx-background-radius: 5;
+}
+
+.settings-sidebar .list-cell:filled:hover {
+    -fx-background-color: -sl-surface-sunken;
+}
+
+.settings-sidebar .list-cell:filled:selected {
+    -fx-background-color: -sl-brand-soft;
+    -fx-text-fill: -sl-text;
+    -fx-font-weight: bold;
+}
+
+.settings-sidebar .list-cell:empty {
+    -fx-background-color: -sl-surface;
+}
+
+.settings-scroll,
+.settings-scroll > .viewport {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+}
+
+.settings-page {
+    -fx-padding: 14 18 14 18;
+}
+
+.settings-page-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -sl-text;
+}
+
+.settings-section-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -sl-text;
+}
+
+.settings-section {
+    -fx-border-color: -sl-border-soft transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 10 0 0 0;
+}
+
+.settings-row-title {
+    -fx-text-fill: -sl-text;
+}
+
+.settings-description {
+    -fx-font-size: 11px;
+    -fx-text-fill: -sl-text-secondary;
+}
+
+.preferences-dialog .text-field,
+.preferences-dialog .button {
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+}
+
+.preferences-dialog #sshDownloadDirField {
+    -fx-background-color: -sl-input-bg;
+    -fx-background-insets: 0;
+    -fx-background-radius: 5;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 5;
+    -fx-padding: 3 8;
+    -fx-text-fill: -sl-text;
+    -fx-prompt-text-fill: -sl-text-secondary;
+    -fx-effect: null;
+}
+
+.preferences-dialog #sshDownloadDirField:focused {
+    -fx-border-color: -sl-focus-ring;
+}
+
+.preferences-dialog .button {
+    -fx-background-radius: 5;
+    -fx-padding: 3 9;
+}
+
+.settings-footer {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: -sl-border-soft transparent transparent transparent;
+    -fx-padding: 4 12 4 12;
+}
+
+.settings-footer .button {
+    -fx-min-width: 68;
+}
+
+.app-toolbar,
+.app-menubar,
+.status-bar,
+.file-path-breadcrumb {
+    -sl-button-text: -sl-chrome-text;
+    -sl-button-danger: -sl-chrome-danger;
+}
+.button,
+.toggle-button,
+.menu-button,
+.split-menu-button {
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+}
+.button:default,
+.btn-primary {
+    -fx-font-weight: bold;
+}
+.menu-button,
+.split-menu-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 3;
+    -fx-text-fill: -sl-button-text;
+    -fx-padding: 4 11;
+    -fx-cursor: hand;
+}
+.menu-button > .label,
+.split-menu-button > .label,
+.split-menu-button > .arrow-button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-text-fill: -sl-button-text;
+}
+.split-menu-button {
+    -fx-padding: 0;
+}
+.split-menu-button > .label {
+    -fx-padding: 4 11;
+}
+.split-menu-button > .arrow-button {
+    -fx-padding: 5 8;
+}
+.menu-button .arrow,
+.split-menu-button .arrow {
+    -fx-background-color: -sl-button-text;
+}
+
+.btn-danger-outline .glyph-icon,
+.btn-danger-outline FontAwesomeIconView {
+    -fx-fill: -sl-button-danger;
+}
+
+.theme-light .app-toolbar,
+.theme-light .app-menubar,
+.theme-light .status-bar {
+    -sl-button-danger: -sl-danger-hover;
+}
+.unified-file-manager-dialog {
+    -fx-background-color: -sl-surface;
+}
+.unified-file-manager-dialog .file-manager-path-toolbar {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 4 10;
+    -fx-min-height: 38;
+    -fx-pref-height: 38;
+}
+.unified-file-manager-dialog .file-manager-path-toolbar .separator:vertical .line {
+    -fx-border-color: -sl-border-soft;
+    -fx-border-width: 0 1 0 0;
+}
+.unified-file-manager-dialog .button,
+.unified-file-manager-dialog .toggle-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 5;
+    -fx-text-fill: -sl-button-text;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-padding: 3 7;
+}
+.unified-file-manager-dialog .button .glyph-icon,
+.unified-file-manager-dialog .button FontAwesomeIconView,
+.unified-file-manager-dialog .toggle-button .glyph-icon,
+.unified-file-manager-dialog .toggle-button FontAwesomeIconView {
+    -fx-fill: -sl-button-text;
+}
+.unified-file-manager-dialog .file-manager-icon-button {
+    -fx-min-width: 28;
+    -fx-pref-width: 28;
+    -fx-max-width: 28;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-padding: 3;
+}
+.unified-file-manager-dialog .file-path-breadcrumb {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-padding: 1 4;
+    -fx-min-width: 180;
+    -sl-button-text: -sl-text;
+    -sl-button-hover: -sl-surface-sunken;
+}
+.unified-file-manager-dialog .file-path-breadcrumb .path-segment,
+.unified-file-manager-dialog .file-path-breadcrumb .path-children,
+.unified-file-manager-dialog .file-path-breadcrumb .path-overflow,
+.unified-file-manager-dialog .file-path-breadcrumb > .text-field,
+.unified-file-manager-dialog .file-path-breadcrumb > .text-field:focused {
+    -fx-background-color: -sl-surface;
+    -fx-text-fill: -sl-text;
+    -fx-min-height: 26;
+    -fx-pref-height: 26;
+    -fx-max-height: 26;
+}
+.unified-file-manager-dialog .file-path-breadcrumb .path-segment:hover,
+.unified-file-manager-dialog .file-path-breadcrumb .path-segment:pressed,
+.unified-file-manager-dialog .file-path-breadcrumb .path-segment:focused,
+.unified-file-manager-dialog .file-path-breadcrumb .path-children:hover,
+.unified-file-manager-dialog .file-path-breadcrumb .path-children:showing,
+.unified-file-manager-dialog .file-path-breadcrumb .path-children:focused,
+.unified-file-manager-dialog .file-path-breadcrumb .path-overflow:hover,
+.unified-file-manager-dialog .file-path-breadcrumb .path-overflow:showing,
+.unified-file-manager-dialog .file-path-breadcrumb .path-overflow:focused {
+    -fx-background-color: -sl-surface-sunken;
+    -fx-text-fill: -sl-text;
+}
+.unified-file-manager-dialog .file-path-breadcrumb .path-chevron {
+    -fx-stroke: -sl-text-secondary;
+}
+.unified-file-manager-dialog .file-path-breadcrumb .path-overflow-dot {
+    -fx-fill: -sl-text-secondary;
+}
+.unified-file-manager-dialog .file-manager-path-toolbar > .text-field {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+}
+.unified-file-manager-dialog .file-manager-path-toolbar > .text-field:focused {
+    -fx-border-color: -sl-accent;
+}
+.unified-file-manager-dialog > .split-pane {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+.unified-file-manager-dialog > .split-pane > .split-pane-divider {
+    -fx-background-color: -sl-border-soft;
+    -fx-padding: 0 0.5 0 0.5;
+}
+.unified-file-manager-dialog .locations-container {
+    -fx-background-color: -sl-surface;
+}
+.file-manager-location-header .section-title {
+    -fx-padding: 0 4;
+}
+.unified-file-manager-dialog .locations-container .tree-view,
+.unified-file-manager-dialog .locations-container .list-view {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+}
+.unified-file-manager-dialog .locations-container .tree-cell,
+.unified-file-manager-dialog .locations-container .list-cell {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 2 0 2 0;
+    -fx-text-fill: -sl-text;
+    -fx-padding: 6 8 6 8;
+    -fx-background-radius: 5;
+}
+.unified-file-manager-dialog .locations-container .tree-cell:filled:hover,
+.unified-file-manager-dialog .locations-container .list-cell:filled:hover {
+    -fx-background-color: -sl-surface-sunken;
+}
+.unified-file-manager-dialog .locations-container .tree-cell:filled:selected,
+.unified-file-manager-dialog .locations-container .list-cell:filled:selected {
+    -fx-background-color: -sl-brand-soft;
+    -fx-text-fill: -sl-text;
+    -fx-font-weight: bold;
+}
+.unified-file-manager-dialog .locations-container .tree-cell:filled:selected .glyph-icon,
+.unified-file-manager-dialog .locations-container .tree-cell:filled:selected FontAwesomeIconView,
+.unified-file-manager-dialog .locations-container .list-cell:filled:selected .glyph-icon,
+.unified-file-manager-dialog .locations-container .list-cell:filled:selected FontAwesomeIconView {
+    -fx-fill: -sl-text-secondary;
+}
+.unified-file-manager-dialog .locations-container .tree-cell > .tree-disclosure-node > .arrow,
+.unified-file-manager-dialog .locations-container .tree-cell:filled:selected > .tree-disclosure-node > .arrow {
+    -fx-background-color: -sl-text-secondary;
+}
+.unified-file-manager-dialog .locations-container .tree-cell:drop-target {
+    -fx-background-color: -sl-info, -sl-brand-soft;
+    -fx-background-insets: 0, 0 0 0 3;
+    -fx-background-radius: 0;
+}
+.unified-file-manager-dialog .locations-container .tree-cell:drop-before {
+    -fx-background-color: -sl-info, -sl-surface;
+    -fx-background-insets: 0, 2 0 0 0;
+    -fx-background-radius: 0;
+}
+.unified-file-manager-dialog .locations-container .tree-cell:drop-after {
+    -fx-background-color: -sl-info, -sl-surface;
+    -fx-background-insets: 0, 0 0 2 0;
+    -fx-background-radius: 0;
+}
+.unified-file-manager-dialog .locations-container .tree-cell:drop-ungroup {
+    -fx-background-color: -sl-info, -sl-surface;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 0;
+}
+.unified-file-manager-dialog .locations-container .titled-pane > .title {
+    -fx-background-color: transparent;
+    -fx-border-color: -sl-border-soft transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-padding: 8 4 4 4;
+}
+.unified-file-manager-dialog .locations-container .titled-pane > .content {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 4 0 0 0;
+}
+.file-manager-footer {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: -sl-border-soft transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 4 10;
+}
+.file-manager-footer .label {
+    -fx-text-fill: -sl-text-secondary;
+}
+.file-manager-footer .button {
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-padding: 3 7;
+}
+.unified-file-manager-dialog .table-view {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+    -fx-table-cell-border-color: transparent;
+}
+.unified-file-manager-dialog .table-view .column-header-background {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
+}
+.unified-file-manager-dialog .table-view .column-header,
+.unified-file-manager-dialog .table-view .filler,
+.unified-file-manager-dialog .table-view .show-hide-columns-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+.unified-file-manager-dialog .table-row-cell {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-cell-size: 28;
+}
+.unified-file-manager-dialog .table-row-cell:empty {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: transparent;
+}
+.unified-file-manager-dialog .table-row-cell:filled:hover {
+    -fx-background-color: -sl-surface-alt;
+}
+.unified-file-manager-dialog .table-row-cell:filled:selected {
+    -fx-background-color: -sl-brand-soft;
+    -fx-text-fill: -sl-text;
+}
+.unified-file-manager-dialog .table-row-cell:filled:selected .table-cell,
+.unified-file-manager-dialog .table-row-cell:filled:selected .label {
+    -fx-text-fill: -sl-text;
+}
+.unified-file-manager-dialog .table-row-cell:filled:selected .glyph-icon,
+.unified-file-manager-dialog .table-row-cell:filled:selected FontAwesomeIconView {
+    -fx-fill: -sl-text-secondary;
+}
+.unified-file-manager-dialog .table-cell {
+    -fx-alignment: CENTER_LEFT;
+    -fx-padding: 3 8;
+    -fx-border-color: transparent;
+}
+.unified-file-manager-dialog .table-cell .glyph-icon {
+    -fx-font-size: 14px;
+}
+
+.server-management-dialog {
+    -fx-background-color: -sl-surface;
+}
+.server-management-dialog .server-toolbar {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 4 10;
+    -fx-min-height: 38;
+    -fx-pref-height: 38;
+}
+.server-management-dialog .server-toolbar .separator:vertical .line {
+    -fx-border-color: -sl-border-soft;
+    -fx-border-width: 0 1 0 0;
+}
+.server-management-dialog .button,
+.server-management-dialog .toggle-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 5;
+    -fx-text-fill: -sl-button-text;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-padding: 3 7;
+}
+.server-management-dialog .button .glyph-icon,
+.server-management-dialog .toggle-button .glyph-icon {
+    -fx-fill: -sl-button-text;
+}
+.server-management-dialog .server-icon-button {
+    -fx-min-width: 28;
+    -fx-pref-width: 28;
+    -fx-max-width: 28;
+    -fx-padding: 3;
+}
+.server-management-dialog .server-toolbar .text-field {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+}
+.server-management-dialog .server-toolbar .text-field:focused {
+    -fx-border-color: -sl-accent;
+}
+.server-management-dialog > .split-pane {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+.server-management-dialog > .split-pane > .split-pane-divider {
+    -fx-background-color: -sl-border-soft;
+    -fx-padding: 0 0.5 0 0.5;
+}
+.server-management-dialog .server-group-sidebar {
+    -fx-background-color: -sl-surface;
+}
+.server-management-dialog .server-group-header .section-title {
+    -fx-padding: 0 4;
+}
+.server-management-dialog .tree-view {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+}
+.server-management-dialog .tree-cell {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 2 0 2 0;
+    -fx-text-fill: -sl-text;
+    -fx-padding: 7 8 7 8;
+    -fx-background-radius: 5;
+}
+.server-management-dialog .tree-cell:filled:hover {
+    -fx-background-color: -sl-surface-sunken;
+}
+.server-management-dialog .tree-cell:filled:selected {
+    -fx-background-color: -sl-brand-soft;
+    -fx-text-fill: -sl-text;
+    -fx-font-weight: bold;
+}
+.server-management-dialog .tree-cell:filled:selected .glyph-icon,
+.server-management-dialog .tree-cell:filled:selected FontAwesomeIconView {
+    -fx-fill: -sl-text-secondary;
+}
+.server-management-dialog .tree-cell > .tree-disclosure-node > .arrow,
+.server-management-dialog .tree-cell:filled:selected > .tree-disclosure-node > .arrow {
+    -fx-background-color: -sl-text-secondary;
+}
+.server-management-dialog .table-view {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+    -fx-table-cell-border-color: transparent;
+}
+.server-management-dialog .table-view .column-header-background {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
+}
+.server-management-dialog .table-view .column-header,
+.server-management-dialog .table-view .filler,
+.server-management-dialog .table-view .show-hide-columns-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+.server-management-dialog .table-row-cell {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-cell-size: 28;
+}
+.server-management-dialog .table-row-cell:empty {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: transparent;
+}
+.server-management-dialog .table-row-cell:filled:hover {
+    -fx-background-color: -sl-surface-alt;
+}
+.server-management-dialog .table-row-cell:filled:selected {
+    -fx-background-color: -sl-brand-soft;
+    -fx-text-fill: -sl-text;
+}
+.server-management-dialog .table-row-cell:filled:selected .table-cell,
+.server-management-dialog .table-row-cell:filled:selected .label {
+    -fx-text-fill: -sl-text;
+}
+.server-management-dialog .table-cell {
+    -fx-alignment: CENTER_LEFT;
+    -fx-padding: 3 8;
+    -fx-border-color: transparent;
+}
+.server-management-dialog .server-footer {
+    -fx-background-color: -sl-surface;
+    -fx-padding: 4 10;
+    -fx-border-color: -sl-border-soft transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+.server-management-dialog .server-footer .label {
+    -fx-text-fill: -sl-text-secondary;
+}
+.server-management-dialog .server-details {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: -sl-border-soft transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+.server-edit-dialog {
+    -fx-background-color: -sl-surface;
+}
+.server-edit-dialog .dialog-form-scroll,
+.server-edit-dialog .dialog-form-scroll > .viewport {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+}
+.server-edit-dialog .server-edit-body {
+    -fx-padding: 14 16 14 16;
+}
+.server-edit-dialog .server-edit-label {
+    -fx-text-fill: -sl-text;
+    -fx-font-weight: bold;
+    -fx-font-size: 11.5px;
+}
+.server-edit-dialog .server-edit-error {
+    -fx-text-fill: -sl-danger;
+    -fx-font-size: 11px;
+}
+.server-edit-dialog .text-field,
+.server-edit-dialog .password-field,
+.server-edit-dialog .choice-box {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+}
+.server-edit-dialog .text-field:focused,
+.server-edit-dialog .password-field:focused,
+.server-edit-dialog .choice-box:focused {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-border-color: -sl-accent;
+    -fx-border-width: 1;
+}
+.server-edit-dialog .button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 5;
+    -fx-text-fill: -sl-button-text;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-padding: 3 9;
+}
+.server-edit-dialog .button .glyph-icon,
+.server-edit-dialog .button FontAwesomeIconView {
+    -fx-fill: -sl-button-text;
+}
+.server-edit-dialog .server-edit-icon-button {
+    -fx-min-width: 28;
+    -fx-pref-width: 28;
+    -fx-max-width: 28;
+    -fx-padding: 3;
+}
+.server-edit-dialog .server-edit-footer {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: -sl-border-soft transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 6 12;
+}
+
+.main-view .app-menubar {
+    -fx-padding: 1 6;
+}
+.main-view .app-menubar,
+.main-view .app-toolbar,
+.main-view .status-bar {
+    -sl-chrome: -sl-window-bg;
+    -sl-chrome-hover: -sl-surface-sunken;
+    -sl-chrome-pressed: -sl-border;
+    -sl-chrome-text: -sl-text;
+    -sl-chrome-text-muted: -sl-text-secondary;
+}
+.main-view .app-toolbar {
+    -sl-focus-ring: -sl-focus-ring-panel;
+    -fx-background-color: -sl-chrome;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 4 8;
+    -fx-spacing: 4;
+}
+.main-view .app-toolbar .button,
+.main-view .app-toolbar .toggle-button {
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-min-width: 28;
+    -fx-padding: 3 5;
+    -fx-font-size: 11px;
+    -fx-background-radius: 4;
+}
+.main-view .app-toolbar .text-field {
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-padding: 4 8;
+    -fx-font-size: 12px;
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-border-color: -sl-border-soft;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-border-width: 1;
+}
+.main-view .app-toolbar .text-field:focused {
+    -fx-border-color: -sl-accent;
+}
+.main-view .app-toolbar .separator:vertical .line {
+    -fx-border-color: -sl-border-soft;
+}
+.main-view .status-bar {
+    -fx-padding: 2 8;
+    -fx-background-color: -sl-chrome;
+    -fx-border-color: -sl-border-soft transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+.main-view .status-bar .status-link:hover {
+    -fx-text-fill: -sl-text;
+    -fx-underline: true;
+}
+.main-view .status-bar .button {
+    -fx-min-height: 22;
+    -fx-pref-height: 22;
+    -fx-max-height: 22;
+    -fx-padding: 1 5;
+    -fx-font-size: 11px;
+}
+.main-view .empty-state-pane {
+    -fx-padding: 16;
+    -fx-background-color: -sl-surface;
+}
+.main-view .empty-state-title {
+    -fx-font-size: 16px;
+    -fx-text-fill: -sl-text;
+}
+.main-view .empty-state-subtitle {
+    -fx-font-size: 12px;
+}
+.main-view .empty-state-button {
+    -fx-padding: 4 12;
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+}
+.main-view .loading-card {
+    -fx-padding: 16;
+    -fx-min-width: 240;
+    -fx-max-width: 320;
+    -fx-border-color: -sl-border-soft;
+    -fx-border-radius: 4;
+    -fx-effect: null;
+}
+.main-view .loading-title {
+    -fx-font-size: 15px;
+}
+.main-view .loading-subtitle {
+    -fx-font-size: 12px;
+}
+
+.main-view #leftPanel,
+.main-view #bottomPanel {
+    -fx-background-color: -sl-surface;
+    -fx-padding: 6 8;
+    -fx-spacing: 6;
+    -fx-border-width: 0;
+}
+.main-view .split-pane {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+}
+.main-view .split-pane:horizontal > .split-pane-divider {
+    -fx-padding: 0 3;
+    -fx-background-color: -sl-bg, -sl-border-soft;
+    -fx-background-insets: 0, 0 2 0 3;
+    -fx-cursor: H_RESIZE;
+    -fx-border-width: 0;
+}
+.main-view .split-pane:vertical > .split-pane-divider {
+    -fx-padding: 0 3;
+    -fx-background-color: -sl-bg, -sl-border-soft;
+    -fx-background-insets: 0, 2 0 3 0;
+    -fx-cursor: V_RESIZE;
+    -fx-border-width: 0;
+}
+.main-view .split-pane > .split-pane-divider:hover {
+    -fx-background-color: -sl-bg, -sl-border;
+}
+.main-view .split-pane:horizontal > .split-pane-divider:hover {
+    -fx-background-insets: 0, 0 2;
+}
+.main-view .split-pane:vertical > .split-pane-divider:hover {
+    -fx-background-insets: 0, 2 0;
+}
+.main-view .detail-container,
+.main-view .detail-container > .virtualized-scroll-pane {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+}
+.main-view #recentFilesTreeView,
+.main-view #recentFilesTreeView:focused {
+    -fx-background-color: -sl-surface;
+    -fx-control-inner-background: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+}
+
+.main-view #recentFilesTreeView .tree-cell {
+    -fx-background-color: transparent;
+    -fx-background-radius: 6;
+    -fx-background-insets: 1 2;
+    -fx-border-width: 0;
+}
+
+.main-view #recentFilesTreeView .tree-cell:filled:hover {
+    -fx-background-color: -sl-surface-sunken;
+}
+
+.main-view #recentFilesTreeView .tree-cell:filled:selected {
+    -fx-background-color: -sl-selection-inactive-bg;
+    -fx-text-fill: -sl-selection-text;
+}
+
+.main-view #recentFilesTreeView:focused .tree-cell:filled:selected {
+    -fx-background-color: -sl-selection-bg;
+}
+
+.main-view #recentFilesTreeView .tree-cell:filled:selected .label {
+    -fx-text-fill: -sl-selection-text;
+}
+
+.main-view #recentFilesTreeView .tree-cell > .tree-disclosure-node > .arrow {
+    -fx-background-color: -sl-text-secondary;
+}
+
+.main-view #recentFilesTreeView .tree-cell:filled:selected > .tree-disclosure-node > .arrow {
+    -fx-background-color: -sl-selection-text;
+}
+
+.main-view #recentFilesFilterField {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+    -fx-border-color: -sl-border-soft;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-padding: 4 8;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-font-size: 12px;
+}
+.main-view #recentFilesFilterField:focused {
+    -fx-border-color: -sl-accent;
+}
+.main-view #leftPanel .separator:horizontal .line {
+    -fx-border-color: -sl-border-soft;
+    -fx-border-width: 1 0 0 0;
+}
+.main-view .log-tab-pane > .tab-header-area {
+    -fx-padding: 6 8;
+}
+.main-view .log-tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: -sl-surface;
+    -fx-border-width: 0;
+}
+.main-view .log-tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-background-insets: 0 3 0 0;
+    -fx-border-insets: 0 3 0 0;
+    -fx-border-width: 1;
+    -fx-border-color: transparent;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-padding: 4 12;
+}
+.main-view .log-tab-pane > .tab-header-area > .headers-region > .tab:hover {
+    -fx-background-color: -sl-surface-sunken;
+}
+.main-view .log-tab-pane > .tab-header-area > .headers-region > .tab .tab-label {
+    -fx-font-weight: normal;
+    -fx-text-fill: -sl-text-secondary;
+}
+.main-view .log-tab-pane > .tab-header-area > .headers-region > .tab:selected .tab-label {
+    -fx-text-fill: -sl-text;
+}
+.main-view .log-tab-pane .log-tab-icon {
+    -fx-fill: -sl-text-secondary;
+    fill: -sl-text-secondary;
+}
+.main-view .log-tab-pane .log-tab-icon-container {
+    -fx-min-width: 16;
+    -fx-pref-width: 16;
+    -fx-max-width: 16;
+    -fx-min-height: 16;
+    -fx-pref-height: 16;
+    -fx-max-height: 16;
+}
+.main-view .log-tab-pane .tab-live-indicator {
+    -fx-stroke: -sl-surface;
+    -fx-stroke-width: 1;
+}
+.main-view .log-tab-pane .tab-badge-unread {
+    -fx-background-color: -sl-level-error-bg;
+    -fx-text-fill: -sl-level-error-fg;
+}
+.main-view .log-tab-pane > .tab-header-area > .headers-region > .tab .tab-close-button {
+    -fx-background-color: -sl-text-secondary;
+    -fx-cursor: HAND;
+}
+.main-view .log-tab-pane > .tab-header-area > .headers-region > .tab .tab-close-button:hover {
+    -fx-background-color: -sl-text;
+}
+
+.main-view .app-toolbar .text-field, .main-view #recentFilesFilterField {
+    -fx-background-color: -sl-input-bg;
+}
+
+.main-view .log-tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: -sl-tab-selected-bg;
+    -fx-border-color: -sl-border;
+}
+
+.theme-light .app-menubar,
+.theme-light .app-toolbar,
+.theme-light .status-bar {
+    -fx-border-width: 0;
+}
+
+.theme-light .context-menu,
+.theme-light .tooltip {
+    -fx-background-color: -sl-popup-bg;
+}
+
+.theme-light .tooltip {
+    -fx-text-fill: -sl-text;
+}
+
+.theme-light .table-view,
+.theme-light .tree-view,
+.theme-light .list-view {
+    -fx-selection-bar: -sl-selection-bg; -fx-selection-bar-non-focused: -sl-selection-inactive-bg; -fx-selection-bar-text: -sl-selection-text;
+}
+
+.theme-light .table-row-cell:filled:selected,
+.theme-light .tree-cell:filled:selected,
+.theme-light .list-cell:filled:selected {
+    -fx-background-color: -sl-selection-inactive-bg; -fx-text-fill: -sl-selection-text;
+}
+
+.theme-light .table-view:focused .table-row-cell:filled:selected,
+.theme-light .tree-view:focused .tree-cell:filled:selected,
+.theme-light .list-view:focused .list-cell:filled:selected {
+    -fx-background-color: -sl-selection-bg;
+}
+
+.theme-light .table-row-cell:filled:selected .label,
+.theme-light .tree-cell:filled:selected .label,
+.theme-light .list-cell:filled:selected .label,
+.theme-light .table-row-cell:filled:selected .table-cell {
+    -fx-text-fill: -sl-selection-text;
+}
+
+.theme-light .table-row-cell:filled:selected .glyph-icon,
+.theme-light .tree-cell:filled:selected .glyph-icon,
+.theme-light .list-cell:filled:selected .glyph-icon {
+    -fx-fill: -sl-selection-text;
+}
+
+.theme-light .text-input {
+    -fx-highlight-fill: -sl-selection-bg; -fx-highlight-text-fill: -sl-text;
+}
+
+.theme-dark .app-menubar,
+.theme-dark .app-toolbar,
+.theme-dark .status-bar {
+    -fx-border-width: 0;
+}
+
+.theme-dark .context-menu,
+.theme-dark .tooltip {
+    -fx-background-color: -sl-popup-bg;
+}
+
+.theme-dark .tooltip {
+    -fx-text-fill: -sl-text;
+}
+
+.theme-dark .table-view,
+.theme-dark .tree-view,
+.theme-dark .list-view {
+    -fx-selection-bar: -sl-selection-bg; -fx-selection-bar-non-focused: -sl-selection-inactive-bg; -fx-selection-bar-text: -sl-selection-text;
+}
+
+.theme-dark .table-row-cell:filled:selected,
+.theme-dark .tree-cell:filled:selected,
+.theme-dark .list-cell:filled:selected {
+    -fx-background-color: -sl-selection-inactive-bg; -fx-text-fill: -sl-selection-text;
+}
+
+.theme-dark .table-view:focused .table-row-cell:filled:selected,
+.theme-dark .tree-view:focused .tree-cell:filled:selected,
+.theme-dark .list-view:focused .list-cell:filled:selected {
+    -fx-background-color: -sl-selection-bg;
+}
+
+.theme-dark .table-row-cell:filled:selected .label,
+.theme-dark .tree-cell:filled:selected .label,
+.theme-dark .list-cell:filled:selected .label,
+.theme-dark .table-row-cell:filled:selected .table-cell {
+    -fx-text-fill: -sl-selection-text;
+}
+
+.theme-dark .table-row-cell:filled:selected .glyph-icon,
+.theme-dark .tree-cell:filled:selected .glyph-icon,
+.theme-dark .list-cell:filled:selected .glyph-icon {
+    -fx-fill: -sl-selection-text;
+}
+
+.theme-dark .text-input {
+    -fx-highlight-fill: -sl-selection-bg; -fx-highlight-text-fill: -sl-text;
+}
+
+.theme-dark .app-toolbar .toggle-button:selected .glyph-icon,
+.theme-dark .app-toolbar .toggle-button:selected FontAwesomeIconView {
+    -fx-fill: -sl-text-inverse;
+    fill: -sl-text-inverse;
+}
+
+.theme-light .locations-container .tree-cell:filled:selected,
+.theme-light .locations-container .list-cell:filled:selected {
+    -fx-background-color: -sl-selection-inactive-bg; -fx-text-fill: -sl-selection-text;
+}
+
+.theme-light .locations-container .tree-view:focused .tree-cell:filled:selected,
+.theme-light .locations-container .list-view:focused .list-cell:filled:selected {
+    -fx-background-color: -sl-selection-bg;
+}
+
+.theme-dark .locations-container .tree-cell:filled:selected,
+.theme-dark .locations-container .list-cell:filled:selected {
+    -fx-background-color: -sl-selection-inactive-bg; -fx-text-fill: -sl-selection-text;
+}
+
+.theme-dark .locations-container .tree-view:focused .tree-cell:filled:selected,
+.theme-dark .locations-container .list-view:focused .list-cell:filled:selected {
+    -fx-background-color: -sl-selection-bg;
+}
+
+.main-view #centerRoot {
+    -fx-background-color: -sl-bg;
+    -fx-padding: 6;
+}
+.main-view .workspace-island {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 10;
+    -fx-border-width: 0;
+}
+
+.remote-log-search-dialog,
+.log-preview-dialog {
+    -fx-background-color: -sl-surface;
+    -fx-padding: 0;
+}
+
+.remote-log-search-dialog .search-dialog-form {
+    -fx-padding: 12;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.remote-log-search-dialog .search-dialog-section {
+    -fx-padding: 8 12;
+}
+
+.remote-log-search-dialog .button,
+.remote-log-search-dialog .text-field,
+.log-preview-dialog .button {
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+}
+
+.remote-log-search-dialog .button,
+.log-preview-dialog .button {
+    -fx-padding: 3 9;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+}
+
+.remote-log-search-dialog .text-field {
+    -fx-background-color: -sl-input-bg;
+}
+
+.remote-log-search-dialog .table-view,
+.remote-log-search-dialog .preview-list,
+.log-preview-dialog .list-view {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+}
+
+.remote-log-search-dialog .table-view .table-row-cell:empty,
+.remote-log-search-dialog .preview-list .list-cell:empty,
+.log-preview-dialog .list-view .list-cell:empty {
+    -fx-background-color: -sl-surface;
+}
+
+.remote-log-search-dialog .split-pane {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+}
+
+.remote-log-search-dialog .split-pane:vertical > .split-pane-divider {
+    -fx-padding: 0 3;
+    -fx-background-color: -sl-surface, -sl-border-soft;
+    -fx-background-insets: 0, 2 0 3 0;
+    -fx-cursor: V_RESIZE;
+}
+
+.remote-log-search-dialog .split-pane:vertical > .split-pane-divider:hover {
+    -fx-background-color: -sl-surface, -sl-border;
+    -fx-background-insets: 0, 2 0;
+}
+
+.log-preview-dialog .preview-dialog-header {
+    -fx-padding: 12;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.remote-log-search-dialog .panel-title,
+.log-preview-dialog .panel-title {
+    -fx-font-size: 11px;
+}
+
+.root .button,
+.root .toggle-button,
+.root .menu-button,
+.root .split-menu-button {
+    -fx-border-width: 1;
+    -fx-border-insets: 0;
+    -fx-border-style: solid inside;
+    -fx-border-color: transparent;
+}
+
+.root .button:hover,
+.root .toggle-button:hover,
+.root .menu-button:hover,
+.root .menu-button:showing,
+.root .split-menu-button:hover,
+.root .split-menu-button:showing {
+    -fx-background-color: -sl-button-hover;
+}
+
+.root .button:pressed,
+.root .button:armed,
+.root .toggle-button:pressed,
+.root .toggle-button:armed,
+.root .menu-button:pressed,
+.root .menu-button:armed,
+.root .split-menu-button:pressed,
+.root .split-menu-button:armed {
+    -fx-background-color: -sl-button-pressed;
+}
+
+.root .toggle-button:selected {
+    -fx-background-color: -sl-toggle-selected-bg;
+    -fx-text-fill: -sl-selection-text;
+}
+
+.root .toggle-button:selected .glyph-icon,
+.root .toggle-button:selected FontAwesomeIconView {
+    -fx-fill: -sl-selection-text;
+    fill: -sl-selection-text;
+}
+
+.theme-dark .app-toolbar .toggle-button:selected {
+    -fx-text-fill: -sl-text-inverse;
+}
+
+.root .toggle-button:selected:hover {
+    -fx-background-color: -sl-toggle-selected-hover-bg;
+}
+
+.root .toggle-button:selected:pressed,
+.root .toggle-button:selected:armed {
+    -fx-background-color: -sl-toggle-selected-pressed-bg;
+}
+
+.root .button:disabled,
+.root .button:disabled:hover,
+.root .button:disabled:pressed,
+.root .button:disabled:armed,
+.root .toggle-button:disabled,
+.root .toggle-button:disabled:hover,
+.root .toggle-button:disabled:pressed,
+.root .toggle-button:disabled:armed,
+.root .menu-button:disabled,
+.root .menu-button:disabled:hover,
+.root .menu-button:disabled:pressed,
+.root .menu-button:disabled:armed,
+.root .split-menu-button:disabled,
+.root .split-menu-button:disabled:hover,
+.root .split-menu-button:disabled:pressed,
+.root .split-menu-button:disabled:armed {
+    -fx-background-color: transparent;
+    -fx-opacity: 0.45;
+    -fx-effect: null;
+}
+
+.root .toggle-button:disabled:selected,
+.root .toggle-button:disabled:selected:hover,
+.root .toggle-button:disabled:selected:pressed,
+.root .toggle-button:disabled:selected:armed {
+    -fx-background-color: -sl-toggle-selected-bg;
+}
+
+.app-toolbar {
+    -sl-focus-ring: -sl-focus-ring-chrome;
+}
+
+.root .button:keyboard-focus:focused,
+.root .toggle-button:keyboard-focus:focused,
+.root .menu-button:keyboard-focus:focused,
+.root .split-menu-button:keyboard-focus:focused {
+    -fx-border-color: -sl-focus-ring;
+}
+
+.root .button:keyboard-focus:disabled,
+.root .toggle-button:keyboard-focus:disabled,
+.root .menu-button:keyboard-focus:disabled,
+.root .split-menu-button:keyboard-focus:disabled {
+    -fx-border-color: transparent;
+    -fx-effect: null;
+}
+
+.root .btn-danger-outline:hover {
+    -fx-background-color: -sl-button-danger-hover;
+    -fx-text-fill: -sl-button-danger;
+}
+
+.root .btn-danger-outline:pressed,
+.root .btn-danger-outline:armed {
+    -fx-background-color: -sl-button-danger-pressed;
+    -fx-text-fill: -sl-button-danger;
+}
+
+.root .btn-danger-outline:disabled,
+.root .btn-danger-outline:disabled:hover,
+.root .btn-danger-outline:disabled:pressed,
+.root .btn-danger-outline:disabled:armed {
+    -fx-background-color: transparent;
+}
+
+.main-view .log-tab-pane > .tab-header-area > .headers-region > .tab:selected:hover {
+    -fx-background-color: -sl-tab-selected-hover-bg;
+}
+
+.main-view .log-tab-pane > .tab-header-area > .headers-region > .tab:selected:pressed {
+    -fx-background-color: -sl-tab-selected-pressed-bg;
+}
+
+.root .app-menubar .menu-button {
+    -fx-border-width: 0;
+}
+
+.root .app-menubar .menu:hover,
+.root .app-menubar .menu:showing,
+.root .app-menubar .menu:focused {
+    -fx-background-color: -sl-button-hover;
+}
+
+.root .app-menubar .menu:hover > .label,
+.root .app-menubar .menu:showing > .label,
+.root .app-menubar .menu:focused > .label {
+    -fx-text-fill: -sl-chrome-text;
+}
+
+.root .check-box {
+    -fx-text-fill: -sl-button-text;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-label-padding: 0 0 0 6;
+    -fx-cursor: hand;
+}
+
+.root .check-box > .box {
+    -fx-background-color: -sl-input-bg;
+    -fx-background-insets: 0;
+    -fx-background-radius: 3;
+    -fx-border-color: -sl-text-faint;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
+    -fx-border-insets: 0;
+    -fx-padding: 3;
+    -fx-min-width: 16;
+    -fx-pref-width: 16;
+    -fx-max-width: 16;
+    -fx-min-height: 16;
+    -fx-pref-height: 16;
+    -fx-max-height: 16;
+    -fx-effect: null;
+}
+
+.root .check-box > .box > .mark {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-min-width: 8;
+    -fx-pref-width: 8;
+    -fx-max-width: 8;
+    -fx-min-height: 8;
+    -fx-pref-height: 8;
+    -fx-max-height: 8;
+}
+
+.root .check-box:hover > .box {
+    -fx-background-color: -sl-input-bg, -sl-button-hover;
+    -fx-background-insets: 0, 1;
+}
+
+.root .check-box:pressed > .box,
+.root .check-box:armed > .box {
+    -fx-background-color: -sl-input-bg, -sl-button-pressed;
+    -fx-background-insets: 0, 1;
+}
+
+.root .check-box:selected > .box,
+.root .check-box:indeterminate > .box {
+    -fx-background-color: -sl-accent;
+    -fx-background-insets: 0;
+    -fx-border-color: -sl-accent;
+}
+
+.root .check-box:selected:hover > .box,
+.root .check-box:indeterminate:hover > .box {
+    -fx-background-color: -sl-accent-hover;
+    -fx-border-color: -sl-accent-hover;
+}
+
+.root .check-box:selected:pressed > .box,
+.root .check-box:selected:armed > .box,
+.root .check-box:indeterminate:pressed > .box,
+.root .check-box:indeterminate:armed > .box {
+    -fx-background-color: -sl-accent-pressed;
+    -fx-border-color: -sl-accent-pressed;
+}
+
+.root .check-box:selected > .box > .mark,
+.root .check-box:indeterminate > .box > .mark {
+    -fx-background-color: -sl-on-brand;
+}
+
+.root .check-box:indeterminate > .box > .mark {
+    -fx-min-height: 2;
+    -fx-pref-height: 2;
+    -fx-max-height: 2;
+}
+
+.root .check-box:keyboard-focus:focused > .box {
+    -fx-border-color: -sl-focus-ring;
+    -fx-border-radius: 5;
+    -fx-border-insets: -2;
+}
+
+.root .check-box:disabled {
+    -fx-opacity: 0.45;
+}
+
+.root .check-box:disabled > .box,
+.root .check-box:disabled:hover > .box,
+.root .check-box:disabled:pressed > .box,
+.root .check-box:disabled:armed > .box,
+.root .check-box:disabled:keyboard-focus:focused > .box {
+    -fx-background-color: -sl-input-bg;
+    -fx-background-insets: 0;
+    -fx-border-color: -sl-text-faint;
+    -fx-border-radius: 3;
+    -fx-border-insets: 0;
+}
+
+.root .check-box:disabled:selected > .box,
+.root .check-box:disabled:selected:hover > .box,
+.root .check-box:disabled:selected:pressed > .box,
+.root .check-box:disabled:selected:armed > .box,
+.root .check-box:disabled:indeterminate > .box,
+.root .check-box:disabled:indeterminate:hover > .box,
+.root .check-box:disabled:indeterminate:pressed > .box,
+.root .check-box:disabled:indeterminate:armed > .box,
+.root .check-box:disabled:selected:keyboard-focus:focused > .box,
+.root .check-box:disabled:indeterminate:keyboard-focus:focused > .box {
+    -fx-background-color: -sl-accent;
+    -fx-border-color: -sl-accent;
+}
+
+.root .combo-box,
+.root Spinner.spinner {
+    -fx-background-color: -sl-input-bg;
+    -fx-background-insets: 0;
+    -fx-background-radius: 5;
+    -fx-border-color: -sl-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 5;
+    -fx-border-insets: 0;
+    -fx-padding: 0;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-effect: null;
+}
+
+.root .combo-box:hover {
+    -fx-background-color: -sl-input-bg, -sl-button-hover;
+    -fx-background-insets: 0, 1;
+}
+
+.root .combo-box:pressed,
+.root .combo-box:armed,
+.root .combo-box:showing {
+    -fx-background-color: -sl-input-bg, -sl-button-pressed;
+    -fx-background-insets: 0, 1;
+}
+
+.root .combo-box > .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -sl-text;
+    -fx-padding: 3 8;
+}
+
+.root .combo-box > .arrow-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0 8;
+}
+
+.root .combo-box .arrow,
+.root Spinner.spinner .increment-arrow,
+.root Spinner.spinner .decrement-arrow {
+    -fx-background-color: -sl-text-secondary;
+}
+
+.root Spinner.spinner > .text-field,
+.root Spinner.spinner > .text-field:focused {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 4 0 0 4;
+    -fx-border-width: 0;
+    -fx-padding: 3 7;
+    -fx-text-fill: -sl-text;
+    -fx-min-height: 0;
+    -fx-pref-height: 26;
+    -fx-max-height: 26;
+}
+
+.root Spinner.spinner > .increment-arrow-button,
+.root Spinner.spinner > .decrement-arrow-button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+    -fx-padding: 2 6;
+}
+
+.root Spinner.spinner > .increment-arrow-button {
+    -fx-background-radius: 0 4 0 0;
+}
+
+.root Spinner.spinner > .decrement-arrow-button {
+    -fx-background-radius: 0 0 4 0;
+}
+
+.root Spinner.spinner > .increment-arrow-button:hover,
+.root Spinner.spinner > .decrement-arrow-button:hover {
+    -fx-background-color: -sl-button-hover;
+}
+
+.root Spinner.spinner > .increment-arrow-button:pressed,
+.root Spinner.spinner > .decrement-arrow-button:pressed {
+    -fx-background-color: -sl-button-pressed;
+}
+
+.root .combo-box:keyboard-focus:focused,
+.root Spinner.spinner:keyboard-focus:focused,
+.root Spinner.spinner:keyboard-focus:contains-focus {
+    -fx-border-color: -sl-focus-ring;
+}
+
+.root .combo-box:disabled,
+.root .combo-box:disabled:hover,
+.root .combo-box:disabled:pressed,
+.root .combo-box:disabled:armed,
+.root .combo-box:disabled:showing,
+.root Spinner.spinner:disabled,
+.root Spinner.spinner:disabled:keyboard-focus:focused {
+    -fx-background-color: -sl-input-bg;
+    -fx-background-insets: 0;
+    -fx-border-color: -sl-border;
+    -fx-opacity: 0.45;
+}
+
+.root Spinner.spinner:disabled > .increment-arrow-button,
+.root Spinner.spinner:disabled > .decrement-arrow-button,
+.root Spinner.spinner:disabled > .increment-arrow-button:hover,
+.root Spinner.spinner:disabled > .decrement-arrow-button:hover,
+.root Spinner.spinner:disabled > .increment-arrow-button:pressed,
+.root Spinner.spinner:disabled > .decrement-arrow-button:pressed {
+    -fx-background-color: transparent;
+    -fx-opacity: 1;
+}
+
+.root Spinner.spinner:disabled > .text-field {
+    -fx-opacity: 1;
+}
+
+.combo-box-popup > .list-view,
+.combo-box-popup .list-view {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 10;
+    -fx-border-color: -sl-border-soft;
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+    -fx-padding: 6;
+    -fx-effect: null;
+}
+
+.combo-box-popup .list-view .virtual-flow,
+.combo-box-popup .list-view .clipped-container,
+.combo-box-popup .list-view .sheet {
+    -fx-background-color: transparent;
+}
+
+.combo-box-popup .list-view .list-cell {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-background-radius: 6;
+    -fx-border-width: 0;
+    -fx-padding: 4 10;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-text-fill: -sl-text;
+}
+
+.combo-box-popup .list-view .list-cell:filled:hover {
+    -fx-background-color: -sl-surface, -sl-button-hover;
+}
+
+.combo-box-popup .list-view .list-cell:filled:selected,
+.combo-box-popup .list-view:focused .list-cell:filled:selected,
+.combo-box-popup .list-view .list-cell:filled:selected:hover {
+    -fx-background-color: -sl-selection-bg;
+    -fx-text-fill: -sl-selection-text;
+}
+
+.combo-box-popup .list-view .list-cell:empty {
+    -fx-background-color: transparent;
+}
+
+.root.simple-dialog,
+.root.embedded-panel {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 0;
+    -fx-border-width: 0;
+    -fx-effect: null;
+}
+
+.simple-dialog .button {
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+}
+
+.simple-dialog .simple-dialog-footer {
+    -fx-padding: 8 12;
+    -fx-border-color: -sl-border-soft transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
+.about-dialog-header {
+    -fx-padding: 12;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.about-dialog-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -sl-text;
+}
+
+.about-dialog-body {
+    -fx-padding: 12;
+}
+
+.about-dialog .about-version,
+.about-dialog .about-copyright {
+    -fx-text-fill: -sl-text-secondary;
+}
+
+.about-dialog .button,
+.update-dialog .button {
+    -fx-padding: 3 9;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-min-width: 68;
+}
+
+.update-dialog .update-dialog-notes,
+.update-dialog .update-dialog-notes .scroll-pane,
+.update-dialog .update-dialog-notes .viewport,
+.update-dialog .update-dialog-notes .content {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 0;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-text-fill: -sl-text;
+}
+
+.root.embedded-panel .detail-container {
+    -fx-border-width: 0;
+}
+
+.message-dialog {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 0;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-effect: null;
+}
+.message-dialog:header .header-panel {
+    -fx-background-color: -sl-surface;
+    -fx-padding: 16 16 12 16;
+}
+.message-dialog:header .header-panel .label {
+    -fx-text-fill: -sl-text;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-wrap-text: true;
+}
+.message-dialog > .content {
+    -fx-padding: 0 16 16 16;
+}
+.message-dialog .label {
+    -fx-text-fill: -sl-text;
+    -fx-font-size: 12px;
+}
+.message-dialog .message-scroll,
+.message-dialog .message-scroll > .viewport {
+    -fx-background-color: -sl-surface;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+}
+.message-dialog .message-text {
+    -fx-text-fill: -sl-text;
+    -fx-padding: 0;
+}
+.message-dialog .message-icon {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+.message-dialog .message-icon-glyph {
+    -fx-fill: -sl-chrome-text;
+}
+.message-dialog .message-error {
+    -fx-fill: -sl-danger;
+}
+.message-dialog .message-warning {
+    -fx-fill: -sl-warning;
+}
+.message-dialog > .button-bar {
+    -fx-background-color: -sl-surface;
+    -fx-padding: 0;
+    -fx-border-color: -sl-border-soft transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+.message-dialog > .button-bar .button {
+    -fx-min-width: 80;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+    -fx-padding: 3 12;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+}
+.message-dialog .details-button {
+    -fx-text-fill: -sl-text-secondary;
+}
+.message-dialog .text-area {
+    -fx-text-fill: -sl-text;
+    -fx-control-inner-background: -sl-input-bg;
+    -fx-background-color: -sl-input-bg;
+    -fx-background-insets: 0;
+    -fx-border-color: -sl-border-soft;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-padding: 6;
+    -fx-max-height: 240;
+}
+.message-dialog .text-area .content {
+    -fx-background-color: -sl-input-bg;
+    -fx-background-radius: 0;
+}
+
+.message-dialog > .button-bar > .container {
+    -fx-padding: 8 12;
+}
+.message-dialog > .button-bar > .container > .details-button.more,
+.message-dialog > .button-bar > .container > .details-button.less {
+    -fx-graphic: null;
+}
+
+.message-dialog.text-input-dialog,
+.message-dialog.choice-dialog {
+    -fx-graphic: null;
+}
+.message-dialog .text-field {
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-max-height: 28;
+}
+
+.unified-file-manager-dialog .file-manager-progress {
+    -fx-progress-color: -sl-accent;
+    -fx-accent: -sl-accent;
+    -fx-padding: 0;
 }

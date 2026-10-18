@@ -1,20 +1,16 @@
 package com.seeloggyplus.bugfix;
 
-import com.seeloggyplus.util.AppTheme;
+import com.seeloggyplus.shared.ui.AppTheme;
 
-import com.seeloggyplus.model.FileInfo;
-import com.seeloggyplus.model.Preference;
-import com.seeloggyplus.model.SSHServerModel;
-import com.seeloggyplus.service.LocalFileService;
-import com.seeloggyplus.service.PreferenceService;
-import com.seeloggyplus.service.ServerManagementService;
+import com.seeloggyplus.shared.model.FileInfo;
+import com.seeloggyplus.shared.model.Preference;
+import com.seeloggyplus.features.files.application.LocalFileService;
+import com.seeloggyplus.shared.settings.PreferenceService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
-import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.*;
@@ -27,26 +23,20 @@ import org.testfx.util.WaitForAsyncUtils;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogController;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.regex.Pattern;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 
-/**
- * Bug Condition Exploration Tests — Task 1 (BEFORE any fix)
- *
- * These tests are EXPECTED TO FAIL on unfixed code.
- * Failure = bug confirmed. Passing = bug not properly reproduced.
- *
- * Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8,
- *            1.10, 1.11, 1.12, 1.13, 1.14, 1.15
- */
 @ExtendWith(ApplicationExtension.class)
 public class BugExplorationTest {
-
-    // -------------------------------------------------------------------------
-    // Shared helpers
-    // -------------------------------------------------------------------------
 
     @SuppressWarnings("unchecked")
     private static <T> T getField(Object obj, String name) throws Exception {
@@ -67,19 +57,6 @@ public class BugExplorationTest {
         m.invoke(obj, args);
     }
 
-    // =========================================================================
-    // BUG 1 & 3 — Status icon stale after loadServers()
-    // =========================================================================
-    /**
-     * Validates: Requirements 1.1, 1.2, 1.5, 1.6
-     *
-     * Setup: SSHSessionManager has an active session for server X.
-     * Action: Call loadServers() (dialog-open) and then via Refresh button path.
-     * Assert: statusColumn cell for server X shows the CHECK icon (✓).
-     *
-     * EXPECTED ON UNFIXED CODE: FAIL — cell shows ✗ because serverTable.refresh()
-     * is never called after filterServers(), so the cell factory is not re-evaluated.
-     */
     @Nested
     @DisplayName("Bug 1 & 3 — Status icon stale after loadServers")
     class Bug1And3StatusIconStale {
@@ -87,31 +64,19 @@ public class BugExplorationTest {
         @Test
         @DisplayName("serverTable.refresh() must be called after filterServers() in loadServers().setOnSucceeded")
         public void serverTableRefreshMustBeCalledAfterFilterServers() throws Exception {
-            // Bug 1 & 3 root cause: loadServers().setOnSucceeded does NOT call
-            // serverTable.refresh() after filterServers(). The cell factory for statusColumn
-            // reads SSHSessionManager.getActiveSessionKeys() live, but without refresh()
-            // the cell is never re-evaluated after the list is repopulated.
-            //
-            // Exploration approach: assert the EXPECTED correct behaviour — that
-            // serverTable.refresh() IS called after filterServers() in loadServers().
-            // On unfixed code this FAILS because the call is absent.
-
-            java.io.File implFile = new java.io.File(
-                "src/main/java/com/seeloggyplus/controller/ServerManagementDialogController.java");
+            File implFile = new File(
+                "src/main/java/com/seeloggyplus/features/servers/presentation/ServerManagementDialogController.java");
             assertTrue(implFile.exists(), "ServerManagementDialogController.java must exist");
 
-            String content = java.nio.file.Files.readString(implFile.toPath());
+            String content = Files.readString(implFile.toPath());
 
-            // Find loadServers() method
             int loadIdx = content.indexOf("private void loadServers()");
             if (loadIdx == -1) loadIdx = content.indexOf("void loadServers()");
             assertNotEquals(-1, loadIdx, "loadServers() method must exist in controller");
 
-            // Find setOnSucceeded block inside loadServers
             int onSucceededIdx = content.indexOf("setOnSucceeded", loadIdx);
             assertNotEquals(-1, onSucceededIdx, "loadServers() must have setOnSucceeded handler");
 
-            // Find the end of the setOnSucceeded lambda block
             int lambdaStart = content.indexOf('{', onSucceededIdx);
             int lambdaEnd = lambdaStart;
             int depth = 0;
@@ -121,7 +86,6 @@ public class BugExplorationTest {
             }
             String lambda = content.substring(lambdaStart, lambdaEnd + 1);
 
-            // Assert that filterServers() is called (it is) AND serverTable.refresh() follows it
             boolean hasFilterServers   = lambda.contains("filterServers(");
             boolean hasTableRefresh    = lambda.contains("serverTable.refresh()");
 
@@ -141,22 +105,6 @@ public class BugExplorationTest {
         }
     }
 
-    // =========================================================================
-    // BUG 2 — File manager auto-sort not applied after load
-    // =========================================================================
-    /**
-     * Validates: Requirements 1.3, 1.4
-     *
-     * Setup: A directory with mixed files and folders, varied modified timestamps.
-     * Action: Load them into an ObservableList + SortedList bound to a TableView
-     *         comparator (as in setupFileTable) — no sort order set.
-     * Assert: First non-".." rows are directories sorted by modified descending,
-     *         followed by files sorted by modified descending.
-     *
-     * EXPECTED ON UNFIXED CODE: FAIL — SortedList comparator is bound to
-     * fileTable.comparatorProperty() which is null by default, so ordering is
-     * the insertion order (filesystem order, random/alphabetic, no grouping).
-     */
     @Nested
     @DisplayName("Bug 2 — File manager auto-sort not applied")
     class Bug2AutoSortMissing {
@@ -164,41 +112,32 @@ public class BugExplorationTest {
         @Test
         @DisplayName("After load, directories must come first sorted by modified desc, then files")
         public void defaultSortMustGroupDirsThenFiles() {
-            // Build a mixed list with deliberate non-sorted order
             long base = System.currentTimeMillis();
             List<FileInfo> input = new ArrayList<>();
-            input.add(makeFile("zfile.log",   false, base - 1000)); // file, older
-            input.add(makeFile("adir",        true,  base - 500));  // dir, newer
-            input.add(makeFile("mfile.txt",   false, base - 2000)); // file, oldest
-            input.add(makeFile("bdir",        true,  base - 200));  // dir, newest
-            input.add(makeFile("cfile.java",  false, base - 300));  // file, newest
-            input.add(makeFile("..",          true,  0));            // parent nav entry
+            input.add(makeFile("zfile.log",   false, base - 1000));
+            input.add(makeFile("adir",        true,  base - 500));
+            input.add(makeFile("mfile.txt",   false, base - 2000));
+            input.add(makeFile("bdir",        true,  base - 200));
+            input.add(makeFile("cfile.java",  false, base - 300));
+            input.add(makeFile("..",          true,  0));
 
-            // Replicate FIXED setupFileTable() logic:
-            // SortedList gets the defaultSort comparator (equivalent to table comparator being null
-            // → map(c -> c != null ? c : defaultSort) → defaultSort applied)
             ObservableList<FileInfo> allFiles = FXCollections.observableArrayList(input);
-            javafx.collections.transformation.FilteredList<FileInfo> filteredFiles =
-                    new javafx.collections.transformation.FilteredList<>(allFiles, p -> true);
-            javafx.collections.transformation.SortedList<FileInfo> sortedData =
-                    new javafx.collections.transformation.SortedList<>(filteredFiles);
-            // FIXED: fallback comparator — directories first, then modified desc, tie-break name asc
-            // ponytail: in production this is bound via fileTable.comparatorProperty().map(c -> c != null ? c : defaultSort)
-            // Here we directly set defaultSort (equivalent: table comparator is null → fallback kicks in)
+            FilteredList<FileInfo> filteredFiles =
+                    new FilteredList<>(allFiles, p -> true);
+            SortedList<FileInfo> sortedData =
+                    new SortedList<>(filteredFiles);
+
             Comparator<FileInfo> defaultSort = Comparator
                     .comparing((FileInfo f) -> f.getName().equals("..") ? 0 : (f.isDirectory() ? 1 : 2))
-                    .thenComparing(f -> f.getModified() != null ? f.getModified() : java.time.LocalDateTime.MIN,
+                    .thenComparing(f -> f.getModified() != null ? f.getModified() : LocalDateTime.MIN,
                                    Comparator.reverseOrder())
                     .thenComparing(f -> f.getName().toLowerCase());
             sortedData.setComparator(defaultSort);
 
-            // Get actual order (what the user sees)
             List<String> actualOrder = sortedData.stream()
                     .map(FileInfo::getName)
                     .toList();
 
-            // Expected order: ".." first, then dirs (bdir, adir by modified desc),
-            // then files (cfile, zfile, mfile by modified desc)
             List<String> expectedOrder = List.of("..", "bdir", "adir", "cfile.java", "zfile.log", "mfile.txt");
 
             assertEquals(expectedOrder, actualOrder,
@@ -218,19 +157,6 @@ public class BugExplorationTest {
         }
     }
 
-    // =========================================================================
-    // BUG 4 — Fat JAR missing dependsOn processResources → "DEV" version
-    // =========================================================================
-    /**
-     * Validates: Requirements 1.7, 1.8
-     *
-     * Action: Read build.gradle and check that fatJar task has dependsOn processResources.
-     * If fatJar already has the dependency, also run ./gradlew fatJar and inspect the JAR.
-     *
-     * EXPECTED ON UNFIXED CODE: FAIL — fatJar task in build.gradle does NOT have
-     * dependsOn processResources (or generateVersionProperties), so version.properties
-     * is absent or contains "DEV" in the resulting JAR.
-     */
     @Nested
     @DisplayName("Bug 4 — Fat JAR contains DEV version")
     class Bug4DevVersionInFatJar {
@@ -238,17 +164,14 @@ public class BugExplorationTest {
         @Test
         @DisplayName("build.gradle fatJar task must declare dependsOn processResources")
         public void fatJarMustDependOnProcessResources() throws Exception {
-            java.io.File buildGradle = new java.io.File("build.gradle");
+            File buildGradle = new File("build.gradle");
             assertTrue(buildGradle.exists(), "build.gradle must exist at project root");
 
-            String content = java.nio.file.Files.readString(buildGradle.toPath());
+            String content = Files.readString(buildGradle.toPath());
 
-            // Extract the fatJar task block
-            // Find 'tasks.register(\'fatJar'' and scan until matching closing brace
             int fatJarIdx = content.indexOf("tasks.register('fatJar'");
             assertNotEquals(-1, fatJarIdx, "fatJar task must exist in build.gradle");
 
-            // Find the closing brace of the fatJar block
             int braceDepth = 0;
             int blockStart = content.indexOf('{', fatJarIdx);
             int blockEnd = blockStart;
@@ -275,13 +198,12 @@ public class BugExplorationTest {
         @Test
         @DisplayName("AboutDialogController must not have its own static VERSION initializer (DRY violation)")
         public void aboutDialogControllerMustNotDuplicateVersionReader() throws Exception {
-            java.io.File aboutController = new java.io.File(
-                "src/main/java/com/seeloggyplus/controller/AboutDialogController.java");
+            File aboutController = new File(
+                "src/main/java/com/seeloggyplus/app/AboutDialogController.java");
             assertTrue(aboutController.exists(), "AboutDialogController.java must exist");
 
-            String content = java.nio.file.Files.readString(aboutController.toPath());
+            String content = Files.readString(aboutController.toPath());
 
-            // On unfixed code: has private static final String VERSION + static initializer
             boolean hasDuplicateVersionField = content.contains("private static final String VERSION");
             boolean hasDuplicateStaticInit   = content.contains("static {") &&
                                                content.contains("version.properties");
@@ -296,21 +218,6 @@ public class BugExplorationTest {
         }
     }
 
-    // =========================================================================
-    // BUG 5 — downloadFileConcurrent hangs indefinitely (no timeout)
-    // =========================================================================
-    /**
-     * Validates: Requirements 1.10, 1.11, 1.12
-     *
-     * Setup: Mock SSH Session that allows max 1 concurrent SFTP channel (2nd openChannel
-     *        blocks indefinitely). File size ≥ 5 MB so concurrent path is taken.
-     *        threadCount = 2 so one thread hangs on channel.connect().
-     * Action: Call downloadFileConcurrent() with threadCount=2 on a ≥5 MB file.
-     * Assert: The call returns within 40 seconds (not hang).
-     *
-     * EXPECTED ON UNFIXED CODE: FAIL (timeout) — channel.connect() has no timeout,
-     * latch.await() has no timeout → the call blocks indefinitely.
-     */
     @Nested
     @DisplayName("Bug 5 — downloadFileConcurrent hangs on concurrent SFTP channels")
     class Bug5DownloadHang {
@@ -319,41 +226,37 @@ public class BugExplorationTest {
         @DisplayName("downloadFileConcurrent with threadCount=2 must return within 40 seconds")
         @Timeout(value = 45, unit = TimeUnit.SECONDS)
         public void concurrentDownloadMustNotHang() throws Exception {
-            // We test SSHServiceImpl.downloadFileConcurrent() indirectly by checking
-            // the bug condition: latch.await() has no timeout in the unfixed code.
-            //
-            // Direct approach: read the source code to confirm the bug exists.
-            // This is the correct exploration test for a method that would hang forever.
-            java.io.File implFile = new java.io.File(
-                "src/main/java/com/seeloggyplus/service/impl/SSHServiceImpl.java");
+            File implFile = new File(
+                "src/main/java/com/seeloggyplus/features/ssh/infrastructure/SSHServiceImpl.java");
             assertTrue(implFile.exists(), "SSHServiceImpl.java must exist");
 
-            String content = java.nio.file.Files.readString(implFile.toPath());
+            String content = Files.readString(implFile.toPath());
 
-            // Find downloadFileConcurrent method body
             int methodIdx = content.indexOf("boolean downloadFileConcurrent(");
             if (methodIdx == -1) methodIdx = content.indexOf("public boolean downloadFileConcurrent(");
             assertNotEquals(-1, methodIdx, "downloadFileConcurrent method must exist");
 
             int methodEnd = findMethodEnd(content, methodIdx);
 
-            // Assert expected CORRECT behavior — these assertions FAIL on unfixed code:
-
-            // Bug A: channel.connect() inside the concurrent block MUST have a timeout.
-            // Fixed: channel.connect(30_000). Unfixed: channel.connect() — no arg = hang.
-            boolean connectHasTimeout = content.substring(methodIdx, methodEnd)
-                    .contains("channel.connect(30_000)");
+            String concurrentBody = content.substring(methodIdx, methodEnd);
+            int resumableIdx = content.indexOf("boolean downloadFileResumable(");
+            String resumableBody = resumableIdx >= 0
+                    ? content.substring(resumableIdx, findMethodEnd(content, resumableIdx))
+                    : "";
+            boolean connectHasTimeout = concurrentBody.contains("channel.connect(30_000)")
+                    || resumableBody.contains("channel.connect(30_000)");
             assertTrue(connectHasTimeout,
                 "BUG 5 CONFIRMED: channel.connect() is called without a 30-second timeout " +
-                "inside downloadFileConcurrent(). Counter-example: isBugCondition_B5 = true — " +
+                "inside the concurrent download path. Counter-example: isBugCondition_B5 = true — " +
                 "with threadCount=2 on a server allowing max 1 concurrent SFTP channel, " +
                 "channel.connect() for thread-2 blocks indefinitely. " +
                 "Fix requires: channel.connect(30_000)."
             );
+            assertFalse(Pattern.compile("channel\\.connect\\(\\s*\\)")
+                            .matcher(concurrentBody).find(),
+                "downloadFileConcurrent() must not call channel.connect() without a timeout");
 
-            // Bug B: latch.await() MUST have a timeout argument.
-            // Fixed: latch.await(timeoutSec, TimeUnit.SECONDS). Unfixed: latch.await() — hangs.
-            boolean latchNoArg = content.substring(methodIdx, methodEnd).contains("latch.await()");
+            boolean latchNoArg = concurrentBody.contains("latch.await()");
             int latchIdx = content.indexOf("latch.await()", methodIdx);
             assertFalse(latchNoArg,
                 "BUG 5 CONFIRMED: latch.await() is called without a timeout inside " +
@@ -364,7 +267,6 @@ public class BugExplorationTest {
             );
         }
 
-        /** Scan forward from methodStart to find the closing brace of the method */
         private int findMethodEnd(String src, int methodStart) {
             int braceDepth = 0;
             int blockStart = src.indexOf('{', methodStart);
@@ -379,34 +281,17 @@ public class BugExplorationTest {
             return src.length();
         }
 
-        /** Approximate 1-based line number for a character offset */
         private int lineOf(String src, int idx) {
             return (int) src.substring(0, idx).chars().filter(c -> c == '\n').count() + 1;
         }
     }
 
-    // =========================================================================
-    // BUG 6 — File manager does not restore last directory
-    // =========================================================================
-    /**
-     * Validates: Requirements 1.13, 1.14, 1.15
-     *
-     * Setup: Mock PreferenceService (in-memory). Mock LocalFileService returning
-     *        home = "/home/testuser".
-     * Action: Navigate to "/tmp/test-dir" (saves pref if fixed). Simulate
-     *         dialog reopen by calling handleLocationSelected(local) again.
-     * Assert: currentPath starts at "/tmp/test-dir".
-     *
-     * EXPECTED ON UNFIXED CODE: FAIL — handleLocationSelected() calls
-     * navigateTo(localFileService.getHomeDirectory()) unconditionally, ignoring
-     * any stored last-path preference. currentPath = home directory.
-     */
     @Nested
     @ExtendWith(ApplicationExtension.class)
     @DisplayName("Bug 6 — File manager does not restore last directory")
     class Bug6NoLastDirectory {
 
-        private com.seeloggyplus.controller.UnifiedFileManagerDialogController controller;
+        private UnifiedFileManagerDialogController controller;
         private TextField pathField;
 
         @Start
@@ -427,14 +312,12 @@ public class BugExplorationTest {
             final String HOME_DIR     = "/home/testuser";
             final String LAST_DIR     = "/tmp/test-dir";
 
-            // ---- inject mock LocalFileService ----
             LocalFileService mockLocal = new LocalFileService() {
                 @Override public String getHomeDirectory() { return HOME_DIR; }
                 @Override public List<FileInfo> listFiles(String path) { return List.of(); }
             };
             setField(controller, "localFileService", mockLocal);
 
-            // ---- inject mock PreferenceService (in-memory) ----
             Map<String, String> prefStore = new HashMap<>();
             PreferenceService mockPrefs = new PreferenceService() {
                 @Override public void savePreferences(Preference p) { prefStore.put(p.getCode(), p.getValue()); }
@@ -445,16 +328,12 @@ public class BugExplorationTest {
                 @Override public List<Preference> getListPreferences() { return List.of(); }
                 @Override public void saveOrUpdatePreferences(Preference p) { prefStore.put(p.getCode(), p.getValue()); }
             };
-            // ponytail: preferenceService field may not exist yet on unfixed code
-            // (it's added as part of the fix). Inject only if the field exists.
+
             try {
                 setField(controller, "preferenceService", mockPrefs);
             } catch (NoSuchFieldException e) {
-                // Field doesn't exist yet — this is normal on unfixed code.
-                // The test will still fail because path won't be restored.
             }
 
-            // ---- clear directory cache ----
             Field cacheField = controller.getClass().getDeclaredField("directoryCache");
             cacheField.setAccessible(true);
             ((Map<?, ?>) cacheField.get(controller)).clear();
@@ -463,11 +342,10 @@ public class BugExplorationTest {
                     .filter(c -> c.getSimpleName().equals("LocationItem"))
                     .findFirst()
                     .orElseThrow();
-            java.lang.reflect.Method localFactory = locationItemClass.getDeclaredMethod("local");
+            Method localFactory = locationItemClass.getDeclaredMethod("local");
             localFactory.setAccessible(true);
             Object localItem = localFactory.invoke(null);
 
-            // Ensure controller starts at local drive
             Platform.runLater(() -> {
                 try {
                     invoke(controller, "handleLocationSelected",
@@ -477,7 +355,6 @@ public class BugExplorationTest {
             Thread.sleep(500);
             WaitForAsyncUtils.waitForFxEvents();
 
-            // Step 1: Navigate to LAST_DIR (simulates user navigation)
             Platform.runLater(() -> {
                 try {
                     invoke(controller, "navigateTo", new Class[]{String.class}, LAST_DIR);
@@ -486,8 +363,6 @@ public class BugExplorationTest {
             Thread.sleep(500);
             WaitForAsyncUtils.waitForFxEvents();
 
-            // Step 2: Simulate dialog reopen — call handleLocationSelected(local) again
-            // This resets the location and should restore from preference.
             Platform.runLater(() -> {
                 try {
                     Object reopenItem = localFactory.invoke(null);
@@ -498,12 +373,9 @@ public class BugExplorationTest {
             Thread.sleep(500);
             WaitForAsyncUtils.waitForFxEvents();
 
-            // Assert: currentPath should be LAST_DIR (restored from preference)
-            // On unfixed code: currentPath = HOME_DIR (ignores preference)
-            // ponytail: normalize LAST_DIR for comparison — on Windows, /tmp/test-dir becomes D:\tmp\test-dir
             String normalizedLastDir;
             try {
-                normalizedLastDir = java.nio.file.Paths.get(LAST_DIR).toAbsolutePath().normalize().toString();
+                normalizedLastDir = Paths.get(LAST_DIR).toAbsolutePath().normalize().toString();
             } catch (Exception e) {
                 normalizedLastDir = LAST_DIR;
             }
@@ -518,5 +390,4 @@ public class BugExplorationTest {
             );
         }
     }
-
-} // end BugExplorationTest
+}

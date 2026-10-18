@@ -6,12 +6,24 @@ applies_to: "**"
 # SeeLoggyPlus — Agent Rules
 
 JavaFX 21 desktop log viewer for local and SSH files. Single Gradle project.
-Entrypoints: `com.seeloggyplus.Main` (JavaFX `Application`) and
-`com.seeloggyplus.Launcher` (fat jar / `runDev`). Full release checklist:
+Entrypoints: `com.seeloggyplus.app.Main` (JavaFX `Application`) and
+`com.seeloggyplus.app.Launcher` (fat jar / `runDev`). Full release checklist:
 `docs/RELEASING.md`.
 
 Rule strength: **MUST** = never skip; **SHOULD** = default, deviate only with a
 clear reason; **NEVER** = stop and choose another path.
+
+## 0. Skills & source style
+
+- Project-local skills live in `.agents/skills/` (lockfile `skills-lock.json`).
+  Before analysis or code changes, load the relevant skill and mention it briefly:
+  `codebase-design` (refactors/interface design), `java-junit` (tests),
+  `systematic-debugging` (bugs), and the `javafx-*` skills by area.
+- Repository rules override skill defaults (for example: no full-suite runs during
+  feature work, tests always headless).
+- Sources carry no comments: Java, FXML, CSS, XML, and Gradle/script sources MUST
+  NOT contain comments. Rationale belongs here, in `docs/`, tests, or commit
+  messages.
 
 ## 1. Commands
 
@@ -24,7 +36,7 @@ MUST run all Gradle commands through the wrapper with `--no-daemon` on Windows
 | Feature compilation | `.\gradlew.bat --no-daemon classes testClasses` |
 | Build artifacts without running tests | `.\gradlew.bat --no-daemon assemble` |
 | Full tests (release or explicit request; always headless) | `.\gradlew.bat --no-daemon test` |
-| Selected tests | `.\gradlew.bat --no-daemon test --tests "com.seeloggyplus.controller.FooTest"` (repeat `--tests`) |
+| Selected tests | `.\gradlew.bat --no-daemon test --tests "com.seeloggyplus.app.FooTest"` (repeat `--tests`) |
 | Dev app (+ hot reload, sets `seeloggyplus.dev`) | `.\gradlew.bat --no-daemon runDev` |
 | Packages/manifests | `fatJar`, `packagePortableNoJre`, `packagePortableWithJre`, `packagePlatform`, `generatePlatformManifest`, `mergeManifests`, `buildUpdateArtifacts` |
 
@@ -71,7 +83,7 @@ them windowed or optional.
 1. Launch detached (never foreground):
    `Start-Process cmd.exe -ArgumentList '/c','gradlew.bat --no-daemon runDev > run-dev.log 2>&1' -WindowStyle Hidden`
 2. Always stop: `powershell -ExecutionPolicy Bypass -File scripts/stop-app.ps1`
-   (the `runDev` process is `com.seeloggyplus.Main`; do not match only `Launcher`).
+   (the `runDev` process is `com.seeloggyplus.app.Main`; do not match only `Launcher`).
 3. Delete the log file afterwards; logs must not survive at the repo root.
 
 ## 4. Test-JVM isolation (WHY tests behave differently)
@@ -85,9 +97,29 @@ them windowed or optional.
 
 ## 5. Architecture
 
-- Packages: `controller` (FXML controllers), `service`+`service.impl`,
-  `repository`+`repository.impl`, `model`, `ui` (`canvas`, `search`, `cell`),
-  `update` (self-update), `config` (DB + migrator), `util`.
+- Packages: `app` (entrypoints + shell/FXML controllers), `shared.model`,
+  `shared.dto`, `shared.logs.port` (public log contracts only), `shared.progress`
+  (generic I/O progress callbacks), `shared.settings`, `shared.servers`, `shared.tail`,
+  `shared.database` (config + migrator only), `shared.util`, `shared.ssh`,
+  `shared.ui` (+`shared.ui.canvas`), `shared.session`, and
+  `features.<name>.{domain,application,infrastructure,presentation}` (for example
+  `features.search`, `features.settings`, `features.servers`, `features.update`,
+  `features.recent`, `features.ssh`).
+- Log use cases live in `features.logs.application`; internal repository/detection
+  ports in `features.logs.application.port`; JDBC, file I/O and Grok adapters in
+  `features.logs.infrastructure.{persistence,io,parsing}`. Shared log contracts
+  MUST NOT contain implementations or repository ports. `app.composition.LogServices`
+  wires log dependencies; consumers use public ports, not feature implementations.
+  Repositories borrow an injected connection; they do not own or close it. The
+  existing shared database connection policy is unchanged by this separation.
+- Ports in `shared`, implementations in features: `shared.settings.PreferenceService`
+  is a port implemented by `features.settings.infrastructure.PreferenceServiceImpl`;
+  the server registry contract is `shared.servers.ServerCatalog`, implemented by
+  `features.servers.infrastructure.ServerManagementServiceImpl` and extended by
+  `features.servers.application.ServerManagementService`; the SSH ports
+  (`shared.ssh.SSHService`, `shared.ssh.SSHSessionManager`,
+  `shared.ssh.SSHServiceFactory`) are implemented by
+  `features.ssh.infrastructure.{SSHServiceImpl,SSHSessionManagerImpl}`.
 - Data dir = system property `seeloggyplus.dataDir` (default `.data`):
   SQLite `seeloggyplus.db`, `.keystore`, `known_hosts` (SSH trust-on-first-use),
   `updates/` staging.
@@ -114,7 +146,7 @@ them windowed or optional.
 ## 7. Theme & contrast (MUST)
 
 - Colours only via `-sl-*` tokens; the token set must match across
-  Graphite/Light/Dark (`ThemeTokensTest`).
+  Light/Dark (`ThemeTokensTest`).
 - Chrome icons/text use `-sl-chrome-text` / `-sl-accent-text`.
 - MUST NOT lower thresholds in `IconContrastTest` / `LabelContrastTest`.
 
@@ -133,7 +165,7 @@ them windowed or optional.
 Applies when changing the `update` package, packaging tasks, launchers, or the install
 layout. Self-update breakage strands users on old versions.
 
-1. `com.seeloggyplus.update.SelfUpdateEndToEndTest` stays green: real package through
+1. `com.seeloggyplus.features.update.infrastructure.SelfUpdateEndToEndTest` stays green: real package through
    download → stage → activate → health → rollback; a failed download leaves the
    installation untouched.
 2. Package entries must stay installable by OLD installers: the E2E pins them to the
@@ -165,3 +197,5 @@ Full checklist: `docs/RELEASING.md`. Sequence:
 6. Published description needs fixing: edit `CHANGELOG.md` + the notes file, push, then
    `gh release edit X.Y.Z --notes-file docs/release-notes/X.Y.Z.md` (or the GitHub API
    via `git credential fill`).
+
+Online documentation is published at https://seeloggyplus-doc.vercel.app/. Offline help is removed in 0.8.0; website guides and README are the user-documentation sources of truth. DocumentationScreenshotGeneratorTest replaces the offline screenshot generator.

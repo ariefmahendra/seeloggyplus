@@ -1,0 +1,84 @@
+.file-path-breadcrumb {
+    -fx-background-color: derive(-sl-chrome, 4%);
+    -fx-background-radius: 5;
+    -fx-padding: 3 6 3 6;
+    -fx-border-color: -sl-chrome-pressed;
+    -fx-border-width: 1;
+    -fx-border-radius: 5;
+    -fx-cursor: hand;
+}
+.file-path-breadcrumb .path-segment,
+.file-path-breadcrumb .path-children,
+.file-path-breadcrumb .path-overflow {
+    -fx-background-color: derive(-sl-chrome, 4%);
+    -fx-text-fill: -sl-chrome-text;
+    -fx-border-width: 0;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+    -fx-min-height: 30;
+    -fx-padding: 3 8 3 8;
+    -fx-background-radius: 4;
+}
+.file-path-breadcrumb .path-segment:hover,
+.file-path-breadcrumb .path-segment:pressed,
+.file-path-breadcrumb .path-children:hover,
+.file-path-breadcrumb .path-children:showing,
+.file-path-breadcrumb .path-overflow:hover,
+.file-path-breadcrumb .path-overflow:showing {
+    -fx-background-color: -sl-chrome-hover;
+    -fx-text-fill: -sl-chrome-text;
+}
+.file-path-breadcrumb .path-children > .arrow-button,
+.file-path-breadcrumb .path-overflow > .arrow-button {
+    -fx-padding: 0;
+    visibility: hidden;
+    -fx-min-width: 0;
+    -fx-pref-width: 0;
+    -fx-max-width: 0;
+}
+.file-path-breadcrumb .path-children > .arrow-button > .arrow,
+.file-path-breadcrumb .path-overflow > .arrow-button > .arrow {
+    -fx-padding: 0;
+    -fx-shape: "";
+}
+
+.file-path-breadcrumb .path-children,
+.file-path-breadcrumb .path-overflow {
+    -fx-padding: 3 5 3 5;
+}
+.file-path-breadcrumb .path-children > .label,
+.file-path-breadcrumb .path-overflow > .label {
+    -fx-padding: 0;
+    -fx-alignment: center;
+}
+.file-path-breadcrumb .path-chevron {
+    -fx-fill: null;
+    -fx-stroke: -sl-chrome-text;
+    -fx-stroke-width: 1.8;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+
+.file-path-breadcrumb .path-overflow-dot {
+    -fx-fill: -sl-chrome-text;
+}
+
+.file-path-breadcrumb .path-segment:focused,
+.file-path-breadcrumb .path-children:focused,
+.file-path-breadcrumb .path-overflow:focused {
+    -fx-background-color: -sl-chrome-hover;
+    -fx-text-fill: -sl-chrome-text;
+    -fx-background-insets: 0;
+}
+.file-path-breadcrumb > .text-field,
+.file-path-breadcrumb > .text-field:focused {
+    -fx-min-height: 30;
+    -fx-pref-height: 30;
+    -fx-max-height: 30;
+    -fx-padding: 3 8 3 8;
+    -fx-background-color: derive(-sl-chrome, 4%);
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+    -fx-border-width: 0;
+    -fx-text-fill: -sl-chrome-text;
+}

@@ -1,46 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ListView?>
-<?import javafx.scene.control.ProgressIndicator?>
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.VBox?>
-
-<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.seeloggyplus.controller.LogPreviewDialogController"
-            prefWidth="700" prefHeight="500">
-
-    <top>
-        <VBox alignment="CENTER_LEFT" spacing="5">
-            <padding>
-                <Insets top="10" right="10" bottom="10" left="10"/>
-            </padding>
-            <Label text="Preview:" styleClass="text-bold"/>
-            <Label fx:id="fileNameLabel" text="/path/to/some/file.log"/>
-        </VBox>
-    </top>
-
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.seeloggyplus.features.preview.presentation.LogPreviewDialogController"
+            prefWidth="700" prefHeight="500" minWidth="560" minHeight="360" styleClass="log-preview-dialog, simple-dialog">
     <center>
-        <ListView fx:id="logListView" BorderPane.alignment="CENTER">
-            <placeholder>
-                <VBox alignment="CENTER" spacing="10">
-                    <ProgressIndicator fx:id="progressIndicator"/>
-                    <Label text="Loading file content..."/>
-                </VBox>
-            </placeholder>
-        </ListView>
+        <VBox fx:id="previewPanel" minWidth="0" minHeight="0">
+            <VBox spacing="4" styleClass="preview-dialog-header">
+                <Label text="Log Preview" styleClass="panel-title"/>
+                <Label fx:id="fileNameLabel" text="No file selected" textOverrun="CENTER_ELLIPSIS" minWidth="0" maxWidth="Infinity" styleClass="text-secondary"/>
+            </VBox>
+            <ListView fx:id="logListView" minWidth="0" minHeight="0" VBox.vgrow="ALWAYS">
+                <placeholder>
+                    <VBox alignment="CENTER" spacing="8">
+                        <ProgressIndicator fx:id="progressIndicator" visible="false" managed="false" minWidth="24" minHeight="24" maxWidth="24" maxHeight="24" prefWidth="24" prefHeight="24"/>
+                        <Label fx:id="previewStateLabel" text="No file selected" wrapText="true" styleClass="text-secondary"/>
+                    </VBox>
+                </placeholder>
+            </ListView>
+        </VBox>
     </center>
-
     <bottom>
-        <HBox alignment="CENTER_RIGHT" spacing="10">
-            <padding>
-                <Insets top="10" right="10" bottom="10" left="10"/>
-            </padding>
-            <Button fx:id="closeButton" text="Close" defaultButton="true"/>
+        <HBox alignment="CENTER_RIGHT" spacing="6" styleClass="simple-dialog-footer">
+            <Button fx:id="closeButton" text="Close" defaultButton="true" cancelButton="true"/>
         </HBox>
     </bottom>
-
 </BorderPane>

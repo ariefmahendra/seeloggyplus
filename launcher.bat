@@ -1,64 +1,49 @@
 @echo off
-REM SeeLoggy+ Launcher for Windows
-REM This script reads configuration from launcher.properties and starts the application
-
 setlocal enabledelayedexpansion
 set "SCRIPT_DIR=%~dp0"
 set "CONSOLE_MODE=0"
 if /i "%~1"=="--console" set "CONSOLE_MODE=1"
 cd /d "%SCRIPT_DIR%"
 
-REM Default values
 set DEFAULT_MEM=4
 set MAX_MEM=%DEFAULT_MEM%
 set CUSTOM_JAVA_HOME=
 
-REM Config file path
 set "CONFIG_FILE=%SCRIPT_DIR%launcher.properties"
 
-REM Read configuration from properties file if it exists
 if exist "%CONFIG_FILE%" (
     for /f "tokens=1,2 delims==" %%a in ('type "%CONFIG_FILE%"') do (
-        set KEY=%%a
-        set VALUE=%%b
+        set "KEY=%%a"
+        set "VALUE=%%b"
         
-        REM Trim whitespace
         set KEY=!KEY: =!
-        set VALUE=!VALUE: =!
         
-        if /i "!KEY!"=="max.memory.gb" set MAX_MEM=!VALUE!
-        if /i "!KEY!"=="java.home" set CUSTOM_JAVA_HOME=!VALUE!
+        if /i "!KEY!"=="max.memory.gb" if defined VALUE set "MAX_MEM=!VALUE: =!"
+        if /i "!KEY!"=="java.home" if defined VALUE set "CUSTOM_JAVA_HOME=!VALUE!"
     )
 )
 
-REM Determine which Java to use
 set JAVA_CMD=java
 set SCRIPT_DIR=%~dp0
 
 if not "!CUSTOM_JAVA_HOME!"=="" (
-    REM Use custom Java path from config
     set JAVA_CMD=!CUSTOM_JAVA_HOME!\bin\java.exe
     echo Using custom Java: !JAVA_CMD!
 ) else if exist "%SCRIPT_DIR%jre\bin\java.exe" (
-    REM Use bundled JRE
     set JAVA_CMD=%SCRIPT_DIR%jre\bin\java.exe
     echo Using bundled JRE: !JAVA_CMD!
 ) else if not "%JAVA_HOME%"=="" (
-    REM Use JAVA_HOME environment variable
     set JAVA_CMD=%JAVA_HOME%\bin\java.exe
     echo Using JAVA_HOME: %JAVA_HOME%
 ) else (
-    REM Use java from PATH
     echo Using Java from PATH
 )
 
-REM Apply a staged update if requested (blue/green layout)
 if "%~1"=="--apply-update" if not "%~2"=="" (
     > "%SCRIPT_DIR%current" echo %~2
     echo Applied update version %~2
 )
 
-REM Resolve the application jar (blue/green layout aware)
 set APP_JAR=%SCRIPT_DIR%seeloggyplus.jar
 if exist "%SCRIPT_DIR%current" (
     set /p CURRENT_VER=<"%SCRIPT_DIR%current"
@@ -69,11 +54,9 @@ if exist "%SCRIPT_DIR%current" (
 
 echo Starting SeeLoggy+ with %MAX_MEM%GB max memory...
 
-REM Launch application (JavaFX modules are already bundled in fat JAR)
 if "!CONSOLE_MODE!"=="1" (
     "!JAVA_CMD!" -Xmx%MAX_MEM%g -jar "!APP_JAR!"
 ) else (
-    REM javaw keeps the application independent of any console window.
     set "JAVA_CMD=!JAVA_CMD:java.exe=javaw.exe!"
     if "!JAVA_CMD!"=="java" set "JAVA_CMD=javaw"
     start "" "!JAVA_CMD!" -Xmx%MAX_MEM%g -jar "!APP_JAR!"

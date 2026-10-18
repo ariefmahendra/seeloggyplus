@@ -1,19 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
-
-<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.seeloggyplus.controller.UnifiedFileManagerDialogController"
-            prefWidth="900" prefHeight="600" styleClass="unified-file-manager-dialog">
-    
-    <!-- Top: Navigation & Search -->
+<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.features.files.presentation.UnifiedFileManagerDialogController" prefWidth="1000" prefHeight="640" styleClass="unified-file-manager-dialog, simple-dialog">
     <top>
         <VBox>
-            <ToolBar styleClass="app-toolbar">
-                <Button fx:id="backButton" disable="true">
+            <HBox fx:id="pathToolbar" styleClass="file-manager-path-toolbar" spacing="6" alignment="CENTER_LEFT">
+                <Button fx:id="backButton" disable="true" styleClass="file-manager-icon-button" accessibleText="Back">
                     <graphic>
                         <FontAwesomeIconView glyphName="ARROW_LEFT" size="12"/>
                     </graphic>
@@ -21,8 +15,7 @@
                         <Tooltip text="Back"/>
                     </tooltip>
                 </Button>
-                
-                <Button fx:id="forwardButton" disable="true">
+                <Button fx:id="forwardButton" disable="true" styleClass="file-manager-icon-button" accessibleText="Forward">
                     <graphic>
                         <FontAwesomeIconView glyphName="ARROW_RIGHT" size="12"/>
                     </graphic>
@@ -30,8 +23,7 @@
                         <Tooltip text="Forward"/>
                     </tooltip>
                 </Button>
-                
-                <Button fx:id="upButton" disable="true">
+                <Button fx:id="upButton" disable="true" styleClass="file-manager-icon-button" accessibleText="Parent folder">
                     <graphic>
                         <FontAwesomeIconView glyphName="ARROW_UP" size="12"/>
                     </graphic>
@@ -39,10 +31,7 @@
                         <Tooltip text="Up to parent directory"/>
                     </tooltip>
                 </Button>
-                
-                <Separator orientation="VERTICAL"/>
-                
-                <Button fx:id="homeButton">
+                <Button fx:id="homeButton" styleClass="file-manager-icon-button" accessibleText="Home folder">
                     <graphic>
                         <FontAwesomeIconView glyphName="HOME" size="12"/>
                     </graphic>
@@ -50,8 +39,7 @@
                         <Tooltip text="Home directory"/>
                     </tooltip>
                 </Button>
-                
-                <Button fx:id="refreshButton">
+                <Button fx:id="refreshButton" styleClass="file-manager-icon-button" accessibleText="Refresh">
                     <graphic>
                         <FontAwesomeIconView glyphName="REFRESH" size="12"/>
                     </graphic>
@@ -59,42 +47,31 @@
                         <Tooltip text="Refresh"/>
                     </tooltip>
                 </Button>
-                
                 <Separator orientation="VERTICAL"/>
-                
-                <Label text="Path:"/>
                 <TextField fx:id="pathField" HBox.hgrow="ALWAYS" promptText="/"/>
-                <Button fx:id="goButton" text="Go"/>
-                
                 <Separator orientation="VERTICAL"/>
-                
-                <TextField fx:id="searchField" promptText="Search files..." prefWidth="200"/>
-
-                <Separator orientation="VERTICAL"/>
-
-                <Button fx:id="findInFilesButton" text="Find in Files" disable="true">
+                <TextField fx:id="searchField" promptText="Filter files..." prefWidth="180" minWidth="140" maxWidth="180" accessibleText="Filter files by name"/>
+                <Button fx:id="findInFilesButton" disable="true" accessibleText="Find text in files" styleClass="file-manager-icon-button">
                     <graphic>
-                        <FontAwesomeIconView glyphName="SEARCH"/>
+                        <FontAwesomeIconView glyphName="SEARCH" size="12"/>
                     </graphic>
                     <tooltip>
                         <Tooltip text="Search text inside all remote files under the current folder"/>
                     </tooltip>
                 </Button>
-            </ToolBar>
+            </HBox>
         </VBox>
     </top>
-    
-    <!-- Center: Split Pane (Locations | Files) -->
     <center>
-        <SplitPane dividerPositions="0.25">
-            <!-- Left: Locations -->
-            <VBox fx:id="locationsContainer" styleClass="locations-container" spacing="5">
+        <SplitPane dividerPositions="0.2" fx:id="fileSplit">
+            <VBox fx:id="locationsContainer" styleClass="locations-container" spacing="8" prefWidth="200" minWidth="160" maxWidth="320">
                 <padding>
-                    <Insets top="10" right="5" bottom="10" left="10"/>
+                    <Insets top="12" right="10" bottom="10" left="10"/>
                 </padding>
-                <Label text="Locations" styleClass="section-title"/>
-                <HBox spacing="4" alignment="CENTER_LEFT">
-                    <Button fx:id="newGroupButton">
+                <HBox spacing="4" alignment="CENTER_LEFT" styleClass="file-manager-location-header">
+                    <Label text="Locations" styleClass="section-title" minWidth="0"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="newGroupButton" styleClass="file-manager-icon-button">
                         <graphic>
                             <FontAwesomeIconView glyphName="FOLDER_OPEN" size="12"/>
                         </graphic>
@@ -102,7 +79,7 @@
                             <Tooltip text="New group (inside the selected group)"/>
                         </tooltip>
                     </Button>
-                    <Button fx:id="favoriteCurrentButton">
+                    <Button fx:id="favoriteCurrentButton" styleClass="file-manager-icon-button">
                         <graphic>
                             <FontAwesomeIconView glyphName="STAR" size="12"/>
                         </graphic>
@@ -110,8 +87,7 @@
                             <Tooltip text="Favorite this folder"/>
                         </tooltip>
                     </Button>
-                    <Region HBox.hgrow="ALWAYS"/>
-                    <Button fx:id="manageServersButton">
+                    <Button fx:id="manageServersButton" styleClass="file-manager-icon-button">
                         <graphic>
                             <FontAwesomeIconView glyphName="COG" size="12"/>
                         </graphic>
@@ -120,29 +96,27 @@
                         </tooltip>
                     </Button>
                 </HBox>
+                <HBox fx:id="lastServerBox" spacing="4" visible="false" managed="false" alignment="CENTER_LEFT">
+                    <Label fx:id="lastServerLabel" wrapText="false" minWidth="0" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="connectLastServerButton" text="Connect" minHeight="28" prefHeight="28" maxHeight="28" maxWidth="64" minWidth="64"/>
+                </HBox>
                 <StackPane VBox.vgrow="ALWAYS">
                     <TreeView fx:id="locationTree" showRoot="false"/>
-                    <Label fx:id="locationDropHint" styleClass="location-drop-hint" visible="false"
-                           mouseTransparent="true" wrapText="true" maxWidth="Infinity" StackPane.alignment="BOTTOM_CENTER"/>
+                    <Label fx:id="locationDropHint" styleClass="location-drop-hint" visible="false" mouseTransparent="true" wrapText="true" maxWidth="Infinity" StackPane.alignment="BOTTOM_CENTER"/>
                 </StackPane>
                 <TitledPane fx:id="favoritesPane" text="Favorite folders" expanded="false" maxHeight="220">
-                    <content>
-                        <VBox fx:id="favoritesBox" spacing="4"/>
-                    </content>
+                    <VBox fx:id="favoritesBox" spacing="4"/>
                 </TitledPane>
             </VBox>
-            
-            <!-- Right: File Browser -->
             <VBox>
-                <TableView fx:id="fileTable" VBox.vgrow="ALWAYS">
+                <TableView fx:id="fileTable" VBox.vgrow="ALWAYS" fixedCellSize="28" tableMenuButtonVisible="true">
                     <columns>
-                        <TableColumn fx:id="iconColumn" text="" prefWidth="40" minWidth="40" maxWidth="40" sortable="false"/>
-                        <TableColumn fx:id="nameColumn" text="NAME" prefWidth="350" minWidth="150"/>
-                        <TableColumn fx:id="sizeColumn" text="SIZE" prefWidth="100" minWidth="80"/>
-                        <TableColumn fx:id="typeColumn" text="TYPE" prefWidth="100" minWidth="80"/>
-                        <TableColumn fx:id="modifiedColumn" text="MODIFIED" prefWidth="150" minWidth="120"/>
-                        <TableColumn fx:id="permissionsColumn" text="PERMISSIONS" prefWidth="100" minWidth="90"/>
-                        <TableColumn fx:id="ownerColumn" text="OWNER" prefWidth="100" minWidth="80"/>
+                        <TableColumn fx:id="nameColumn" text="NAME" prefWidth="350" minWidth="180"/>
+                        <TableColumn fx:id="sizeColumn" text="SIZE" prefWidth="88" minWidth="72"/>
+                        <TableColumn fx:id="typeColumn" text="TYPE" prefWidth="90" minWidth="70" visible="false"/>
+                        <TableColumn fx:id="modifiedColumn" text="MODIFIED" prefWidth="145" minWidth="130"/>
+                        <TableColumn fx:id="permissionsColumn" text="PERMISSIONS" prefWidth="110" minWidth="90" visible="false"/>
+                        <TableColumn fx:id="ownerColumn" text="OWNER" prefWidth="100" minWidth="80" visible="false"/>
                     </columns>
                     <placeholder>
                         <VBox alignment="CENTER" spacing="10">
@@ -154,48 +128,31 @@
             </VBox>
         </SplitPane>
     </center>
-    
-    <!-- Bottom: Status & Actions -->
     <bottom>
-        <VBox>
-            <Separator/>
-            <HBox spacing="10" alignment="CENTER_LEFT">
-                <padding>
-                    <Insets top="5" right="10" bottom="5" left="10"/>
-                </padding>
-                <Label fx:id="statusLabel" text="Ready"/>
-                <Region HBox.hgrow="ALWAYS"/>
-                <Label fx:id="itemCountLabel" text="0 items"/>
-                <Separator orientation="VERTICAL"/>
-                <ProgressIndicator fx:id="progressIndicator" visible="false" prefWidth="20" prefHeight="20"/>
-            </HBox>
-            
-            <HBox spacing="10" alignment="CENTER_RIGHT">
-                <padding>
-                    <Insets top="10" right="10" bottom="10" left="10"/>
-                </padding>
-                <Button text="Cancel" fx:id="cancelButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="TIMES" size="12"/>
-                    </graphic>
-                </Button>
-                <Button text="Preview" fx:id="previewButton" disable="true">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="EYE" size="12"/>
-                    </graphic>
-                </Button>
-                <Button text="Tail" fx:id="tailButton" disable="true" onAction="#handleTail">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="TERMINAL" size="12"/>
-                    </graphic>
-                </Button>
-                <Button text="Open" fx:id="openButton" defaultButton="true" disable="true">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="CHECK" size="12"/>
-                    </graphic>
-                </Button>
-            </HBox>
-        </VBox>
+        <HBox styleClass="file-manager-footer" spacing="8" alignment="CENTER_LEFT" fx:id="fileManagerFooter">
+            <Label fx:id="statusLabel" text="Ready" minWidth="0" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
+            <Label fx:id="itemCountLabel" text="0 items" maxWidth="110"/>
+            <ProgressIndicator fx:id="progressIndicator" styleClass="file-manager-progress" visible="false" managed="false" minWidth="16" prefWidth="16" maxWidth="16" minHeight="16" prefHeight="16" maxHeight="16"/>
+            <Button text="Cancel" fx:id="cancelButton" cancelButton="true">
+                <graphic>
+                    <FontAwesomeIconView glyphName="TIMES" size="12"/>
+                </graphic>
+            </Button>
+            <Button text="Preview" fx:id="previewButton" disable="true">
+                <graphic>
+                    <FontAwesomeIconView glyphName="EYE" size="12"/>
+                </graphic>
+            </Button>
+            <Button text="Tail" fx:id="tailButton" disable="true" onAction="#handleTail">
+                <graphic>
+                    <FontAwesomeIconView glyphName="TERMINAL" size="12"/>
+                </graphic>
+            </Button>
+            <Button text="Open" fx:id="openButton" defaultButton="true" disable="true">
+                <graphic>
+                    <FontAwesomeIconView glyphName="CHECK" size="12"/>
+                </graphic>
+            </Button>
+        </HBox>
     </bottom>
-    
 </BorderPane>

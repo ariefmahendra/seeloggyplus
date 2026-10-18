@@ -11,8 +11,7 @@ permissions:
 
 jobs:
   test:
-    # Self-hosted runner (PICONOS). Override with repo variable RUNNER_LABELS if needed.
-    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted","Linux","X64","PIKACU"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,6 +22,25 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Python
+        if: runner.os == 'Windows'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Select Python runtime
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then PYTHON=python; else PYTHON=python3; fi
+          "$PYTHON" --version
+          "$PYTHON" -c "import sys; assert sys.version_info >= (3, 8), 'Python 3.8 or newer is required'"
+          echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
+
+      - name: Prepare Linux fonts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: '"$PYTHON" scripts/setup_ci_fonts.py'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -30,13 +48,30 @@ jobs:
         if: runner.os != 'Windows'
         run: chmod +x gradlew
 
+      - name: Validate release metadata
+        shell: bash
+        run: |
+          "$PYTHON" scripts/test_verify_release.py
+          "$PYTHON" scripts/test_release_publication.py
+          "$PYTHON" scripts/test_ci_fonts.py
+          VERSION=$(sed -n 's/^version=//p' gradle.properties | tr -d '\r')
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then VERSION="$GITHUB_REF_NAME"; fi
+          "$PYTHON" scripts/verify_release.py "$VERSION"
+
+      - name: Verify JavaFX native startup (Linux, headless Monocle)
+        if: runner.os == 'Linux'
+        run: ./gradlew --no-daemon test --tests "com.seeloggyplus.app.AboutDialogContactTest" --tests "com.seeloggyplus.shared.ui.ThemedAlertsTest" --stacktrace -PheadlessTest
+
       - name: Run tests (Linux, headless Monocle)
         if: runner.os == 'Linux'
-        run: ./gradlew test --stacktrace -PheadlessTest
+        run: ./gradlew --no-daemon test --stacktrace -PheadlessTest
 
       - name: Run tests (non-Linux)
         if: runner.os != 'Linux'
-        run: ./gradlew test --stacktrace
+        run: ./gradlew --no-daemon test --stacktrace
+
+      - name: Build application
+        run: ./gradlew --no-daemon build
 
       - name: Show failing tests
         if: failure()
@@ -71,7 +106,7 @@ jobs:
       matrix:
         include:
           - platform: linux
-            runner: '["self-hosted"]'
+            runner: '["self-hosted","Linux","X64","PIKACU"]'
           - platform: win
             runner: '["windows-latest"]'
     runs-on: ${{ fromJSON(matrix.runner) }}
@@ -85,6 +120,25 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Python
+        if: runner.os == 'Windows'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Select Python runtime
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then PYTHON=python; else PYTHON=python3; fi
+          "$PYTHON" --version
+          "$PYTHON" -c "import sys; assert sys.version_info >= (3, 8), 'Python 3.8 or newer is required'"
+          echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
+
+      - name: Prepare Linux fonts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: '"$PYTHON" scripts/setup_ci_fonts.py'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -95,11 +149,19 @@ jobs:
       - name: Build platform packages and manifest
         shell: bash
         run: |
-          ./gradlew packagePlatform generatePlatformManifest \
+          ./gradlew --no-daemon packagePlatform generatePlatformManifest \
             -Pplatform=${{ matrix.platform }} \
             -PupdateBaseUrl="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name || github.run_id }}" \
             -PminSupported="${{ vars.MIN_SUPPORTED }}" \
             -PreleaseNotesUrl="https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+
+      - name: Verify real packages with the released 0.7.0 updater
+        shell: bash
+        run: |
+          mkdir -p build/release-compatibility
+          curl --fail --location --retry 3 "https://github.com/${{ github.repository }}/releases/download/0.7.0/seeloggyplus-Portable-${{ matrix.platform }}.zip" --output build/release-compatibility/legacy.zip
+          "$PYTHON" -c "import zipfile; z=zipfile.ZipFile('build/release-compatibility/legacy.zip'); open('build/release-compatibility/seeloggyplus.jar','wb').write(z.read('seeloggyplus/seeloggyplus.jar'))"
+          ./gradlew --no-daemon verifyReleaseCompatibility -Pplatform=${{ matrix.platform }} -PlegacyJar=build/release-compatibility/seeloggyplus.jar
 
       - name: Upload platform artifacts
         uses: actions/upload-artifact@v4
@@ -113,7 +175,7 @@ jobs:
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted","Linux","X64","PIKACU"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -123,6 +185,25 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Set up Python
+        if: runner.os == 'Windows'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Select Python runtime
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then PYTHON=python; else PYTHON=python3; fi
+          "$PYTHON" --version
+          "$PYTHON" -c "import sys; assert sys.version_info >= (3, 8), 'Python 3.8 or newer is required'"
+          echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
+
+      - name: Prepare Linux fonts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: '"$PYTHON" scripts/setup_ci_fonts.py'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -139,7 +220,11 @@ jobs:
           path: build/distributions
 
       - name: Merge manifests
-        run: ./gradlew mergeManifests
+        run: ./gradlew --no-daemon mergeManifests
+
+      - name: Validate complete release manifest
+        shell: bash
+        run: '"$PYTHON" scripts/verify_release.py ${{ github.ref_name }} --distributions build/distributions'
 
       - name: Show merged manifest
         shell: bash
@@ -173,16 +258,31 @@ jobs:
           echo "----- release-body.md -----"
           cat release-body.md
 
+      - name: Guard published releases
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: '"$PYTHON" scripts/release_publication.py prepare ${{ github.ref_name }}'
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           body_path: release-body.md
+          fail_on_unmatched_files: true
+          prerelease: false
+          draft: true
           files: |
             build/distributions/seeloggyplus-Portable-linux.zip
             build/distributions/seeloggyplus-Portable-linux-jre.zip
             build/distributions/seeloggyplus-Portable-win.zip
             build/distributions/seeloggyplus-Portable-win-jre.zip
             build/distributions/update-manifest.json
+
+      - name: Publish complete stable release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: '"$PYTHON" scripts/release_publication.py publish ${{ github.ref_name }}'
 
       - name: Stage manifest for GitHub Pages
         shell: bash
