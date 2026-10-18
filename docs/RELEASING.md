@@ -125,9 +125,11 @@ release-notes file as the body.
 ## Online documentation and compatibility gate
 
 The Linux release runner is PIKACU, selected by the repository's RUNNER_LABELS
-variable. It requires Python 3.8 or newer and native fontconfig/freetype libraries
-even for headless tests and splash generation. On Rocky Linux, provision these
-once with `sudo dnf install -y fontconfig freetype`. The workflow supplies its own
+variable. It requires Python 3.8 or newer and native fontconfig, freetype, Pango and
+GTK 3 libraries even for headless tests and splash generation. On Rocky Linux,
+provision these once with `sudo dnf install -y fontconfig freetype gtk3 pango`.
+The workflow checks native dependencies and a headless JavaFX dialog before the
+full suite. It supplies its own
 verified DejaVu fonts and isolated font cache; the runner account does not need
 unrestricted sudo after the native libraries are installed.
 

@@ -58,6 +58,10 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then VERSION="$GITHUB_REF_NAME"; fi
           "$PYTHON" scripts/verify_release.py "$VERSION"
 
+      - name: Verify JavaFX native startup (Linux, headless Monocle)
+        if: runner.os == 'Linux'
+        run: ./gradlew --no-daemon test --tests "com.seeloggyplus.app.AboutDialogContactTest" --stacktrace -PheadlessTest
+
       - name: Run tests (Linux, headless Monocle)
         if: runner.os == 'Linux'
         run: ./gradlew --no-daemon test --stacktrace -PheadlessTest

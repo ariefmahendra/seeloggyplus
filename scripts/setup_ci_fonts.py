@@ -2,12 +2,22 @@ import ctypes
 import hashlib
 import io
 import os
-import shutil
 import subprocess
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
+
+
+def require_native_libraries(load=ctypes.CDLL):
+    missing = []
+    for name in ["libfontconfig.so.1", "libfreetype.so.6", "libpango-1.0.so.0", "libpangoft2-1.0.so.0", "libgtk-3.so.0"]:
+        try:
+            load(name)
+        except OSError as error:
+            missing.append(name + ": " + str(error))
+    if missing:
+        raise RuntimeError("Missing JavaFX native dependencies: " + "; ".join(missing) + ". Provision Rocky Linux with sudo dnf install -y fontconfig freetype gtk3 pango; Debian/Ubuntu with sudo apt-get install -y fontconfig libfreetype6 libgtk-3-0 libpango-1.0-0 libpangoft2-1.0-0")
 
 
 def configure(root):
@@ -29,14 +39,7 @@ def configure(root):
 
 if __name__ == "__main__":
     print(subprocess.check_output(["cat", "/etc/os-release"], text=True))
-    try:
-        ctypes.CDLL("libfontconfig.so.1")
-    except OSError:
-        command = ["dnf", "install", "-y", "fontconfig", "freetype"] if shutil.which("dnf") else ["apt-get", "install", "-y", "fontconfig", "libfreetype6"]
-        if os.geteuid() != 0:
-            command = ["sudo", "-n"] + command
-        subprocess.run(command, check=True)
-        ctypes.CDLL("libfontconfig.so.1")
+    require_native_libraries()
     root = Path(os.environ["RUNNER_TEMP"]) / "seeloggy-fonts"
     fonts, config = configure(root)
     url = "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip"
