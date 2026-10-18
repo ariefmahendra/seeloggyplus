@@ -2,6 +2,7 @@ import ctypes
 import hashlib
 import io
 import os
+import shutil
 import subprocess
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -28,7 +29,14 @@ def configure(root):
 
 if __name__ == "__main__":
     print(subprocess.check_output(["cat", "/etc/os-release"], text=True))
-    ctypes.CDLL("libfontconfig.so.1")
+    try:
+        ctypes.CDLL("libfontconfig.so.1")
+    except OSError:
+        command = ["dnf", "install", "-y", "fontconfig", "freetype"] if shutil.which("dnf") else ["apt-get", "install", "-y", "fontconfig", "libfreetype6"]
+        if os.geteuid() != 0:
+            command = ["sudo", "-n"] + command
+        subprocess.run(command, check=True)
+        ctypes.CDLL("libfontconfig.so.1")
     root = Path(os.environ["RUNNER_TEMP"]) / "seeloggy-fonts"
     fonts, config = configure(root)
     url = "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip"
