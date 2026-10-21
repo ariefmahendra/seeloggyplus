@@ -36,6 +36,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(ApplicationExtension.class)
 class CanvasLogViewerInteractionTest {
 
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path spoolRoot;
+
     private Stage stage;
 
     @Start
@@ -52,7 +54,7 @@ class CanvasLogViewerInteractionTest {
     @Test
     void coldTailActivationAndMatchCountingCompleteWithoutFxDiskReads() throws Exception {
         var history = new com.seeloggyplus.features.logs.infrastructure.io.SpoolingTailHistory(
-                java.nio.file.Path.of("build/performance/test-fixtures"), 1024);
+                spoolRoot, 1024);
         String raw = "POST activation " + "x".repeat(2000);
         history.add(new LogEntry(0, raw)); history.add(new LogEntry(1, "GET " + "y".repeat(2000)));
         var guarded = (com.seeloggyplus.shared.tail.TailHistory) java.lang.reflect.Proxy.newProxyInstance(
@@ -83,7 +85,7 @@ class CanvasLogViewerInteractionTest {
     @Test
     void copyingColdTailSelectionReadsHistoryAwayFromTheFxThread() throws Exception {
         var history = new com.seeloggyplus.features.logs.infrastructure.io.SpoolingTailHistory(
-                java.nio.file.Path.of("build/performance/test-fixtures"), 1024);
+                spoolRoot, 1024);
         String raw = "POST cold-copy " + "x".repeat(2000);
         history.add(new LogEntry(0, raw));
         var guarded = (com.seeloggyplus.shared.tail.TailHistory) java.lang.reflect.Proxy.newProxyInstance(
@@ -124,7 +126,7 @@ class CanvasLogViewerInteractionTest {
     @Test
     void coldTailViewportLoadsRowsLargerThanTheHotCache() throws Exception {
         var history = new com.seeloggyplus.features.logs.infrastructure.io.SpoolingTailHistory(
-                java.nio.file.Path.of("build/performance/test-fixtures"), 1024);
+                spoolRoot, 1024);
         for (int i = 0; i < 10; i++) history.add(new LogEntry(i, "POST row-" + i + "x".repeat(2000)));
         AtomicReference<CanvasLogViewer> reference = new AtomicReference<>();
         try {
@@ -800,7 +802,9 @@ class CanvasLogViewerInteractionTest {
     }
 
     private static double charX(CanvasLogViewer viewer, int charIndex) {
-        return privateInt(viewer, "leftMargin") + charIndex * privateDouble(viewer, "charWidth");
+        javafx.scene.text.Text prefix = new javafx.scene.text.Text("tail-123456789".substring(0, charIndex));
+        prefix.setFont((javafx.scene.text.Font) privateField(viewer, "MONO_FONT"));
+        return privateInt(viewer, "leftMargin") + prefix.getLayoutBounds().getWidth();
     }
 
     private static ScrollEvent scrollEvent(double deltaX, double deltaY, boolean shiftDown) {

@@ -29,6 +29,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(ApplicationExtension.class)
 class SearchResultsRegressionTest {
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path spoolRoot;
+
     private Stage stage;
     private Parent root;
     private MainController controller;
@@ -358,7 +360,7 @@ class SearchResultsRegressionTest {
 
     @Test void tailIncrementalSearchDoesNotReadColdDiskRowsOnTheFxThread() throws Exception {
         var history = new com.seeloggyplus.features.logs.infrastructure.io.SpoolingTailHistory(
-                Path.of("build/performance/test-fixtures"), 1024);
+                spoolRoot, 1024);
         history.add(new LogEntry(0, "GET " + "x".repeat(2000)));
         var guarded = (com.seeloggyplus.shared.tail.TailHistory) java.lang.reflect.Proxy.newProxyInstance(
                 getClass().getClassLoader(), new Class<?>[]{com.seeloggyplus.shared.tail.TailHistory.class},

@@ -23,6 +23,9 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -164,6 +167,16 @@ class MainControllerHelperLogicTest {
             }
         });
         WaitForAsyncUtils.waitForFxEvents();
+    }
+
+    @Test
+    void keyboardShortcutsAreInstalledAsSoonAsTheViewJoinsAScene() throws Exception {
+        WaitForAsyncUtils.asyncFx(() -> {
+            Scene scene = new Scene(root);
+            assertNotNull(scene.getAccelerators().get(new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN)),
+                    "Attaching the view must install shortcuts without repeatedly queuing detached controllers");
+            assertNotNull(scene.getAccelerators().get(new KeyCodeCombination(KeyCode.J, KeyCombination.CONTROL_DOWN)));
+        }).get();
     }
 
     @Test

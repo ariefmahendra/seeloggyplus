@@ -1920,12 +1920,17 @@ public class MainController {
     }
 
     private void setupKeyboardShortcuts() {
-        if (menuBar.getScene() == null) {
-            Platform.runLater(this::setupKeyboardShortcuts);
-            return;
+        menuBar.sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene != null) {
+                installKeyboardShortcuts(newScene);
+            }
+        });
+        if (menuBar.getScene() != null) {
+            installKeyboardShortcuts(menuBar.getScene());
         }
+    }
 
-        Scene scene = menuBar.getScene();
+    private void installKeyboardShortcuts(Scene scene) {
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN),
                 () -> searchField.requestFocus());
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN), this::handleReload);
