@@ -196,7 +196,7 @@ class MainControllerReachableFlowsTest {
         assertFalse(((VBox) field("leftPanel")).isVisible());
         assertFalse(((VBox) field("detailPane")).isVisible());
         String memoryText = ((Label) field("memoryStatusLabel")).getText();
-        assertTrue(memoryText.matches("Used: \\d+ MB / Total: \\d+ MB"),
+        assertTrue(memoryText.matches("Heap: \\d+ MiB"),
                 "The GC refresh must show usage with its heap total (no max): " + memoryText);
         assertTrue(((ToggleButton) field("tailButton")).isDisabled());
         assertFalse((boolean) field("tailModeEnabled"));
@@ -462,7 +462,7 @@ class MainControllerReachableFlowsTest {
         fx(() -> invoke("onActiveSessionChanged", new Class<?>[]{LogSession.class}, session));
 
         SplitPane split = (SplitPane) field("searchSplitPane");
-        assertTrue(split.getItems().contains(field("searchResultPanel")));
+        assertNotNull(((javafx.scene.Node) field("searchResultPanel")).getScene());
         assertEquals("selected content", session.getSelectedLineContent());
     }
 
@@ -554,7 +554,7 @@ class MainControllerReachableFlowsTest {
     void tailFlushScansMatchesIntoFilteredIndexes() throws Exception {
         LogSession session = startRemoteTailSession("/var/log/flush-search.log");
         setField("currentTailSearchPattern", Pattern.compile("error"));
-        setField("currentTailSearchPredicate", null);
+        setField("currentTailSearchPredicate", (java.util.function.Predicate<String>) line -> line.contains("error"));
         setField("filteredIndexes", new IntArrayList());
         setField("tailSearchScannedUpTo", 0);
         session.setTailSearchScannedUpTo(0);
@@ -566,6 +566,7 @@ class MainControllerReachableFlowsTest {
         fx(() -> invoke("scheduleTailFlush", new Class<?>[]{LogSession.class}, session));
 
         WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> session.getLiveTailList().size() == 2);
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> ((IntArrayList) field("filteredIndexes")).size() == 1);
         IntArrayList filtered = (IntArrayList) field("filteredIndexes");
         assertEquals(1, filtered.size());
         assertEquals(0, filtered.get(0));
@@ -642,7 +643,11 @@ class MainControllerReachableFlowsTest {
         WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> field("filteredIndexes") instanceof IntArrayList);
 
         SplitPane split = (SplitPane) field("searchSplitPane");
-        assertFalse(split.getItems().contains(field("searchResultPanel")));
+        fx(() -> {
+            var results=(com.seeloggyplus.features.search.presentation.SearchResultPanel) field("searchResultPanel");
+            assertEquals(0,results.getItemCount());
+            assertNotNull(results.getScene(), "No-match feedback remains visible while Tail can add matches");
+        });
     }
 
     @Test
@@ -669,8 +674,12 @@ class MainControllerReachableFlowsTest {
         });
         setField("isSkippingFilterTrigger", false);
         fx(() -> invoke("performSearch", new Class<?>[0]));
-        WaitForAsyncUtils.waitFor(10, TimeUnit.SECONDS, () -> field("filteredIndexes") instanceof IntArrayList
-                && ((IntArrayList) field("filteredIndexes")).size() == 0);
+        fx(() -> {
+            assertNull(field("filteredIndexes"));
+            var navigator=(com.seeloggyplus.features.search.presentation.SearchNavigator) field("searchNavigator");
+            assertTrue(navigator.isVisible());
+            assertTrue(((Label)navigator.getChildren().getFirst()).getText().contains("Invalid"));
+        });
 
         setField("isSkippingFilterTrigger", true);
         fx(() -> {
@@ -684,7 +693,7 @@ class MainControllerReachableFlowsTest {
         });
         Thread.sleep(300);
         WaitForAsyncUtils.waitForFxEvents();
-        assertEquals(0, ((IntArrayList) field("filteredIndexes")).size());
+        assertNull(field("filteredIndexes"), "A stale search must not publish results");
 
         CountDownLatch started = new CountDownLatch(1);
         Task<Void> blocker = new Task<>() {
@@ -766,13 +775,13 @@ class MainControllerReachableFlowsTest {
     @Test
     void menuAndToolbarHandlersFireWithoutErrors() throws Exception {
         setField("tailModeEnabled", true);
-        fx(() -> ((Button) field("clearLogButton")).fire());
+        fx(() -> ((MenuItem) field("clearLogMenuItem")).fire());
         assertFalse((boolean) field("tailModeEnabled"));
 
         fx(() -> {
             ((Button) field("searchButton")).fire();
             ((Button) field("clearSearchButton")).fire();
-            ((Button) field("refreshButton")).fire();
+            ((MenuItem) field("refreshMenuItem")).fire();
             ((MenuItem) field("closeAllTabsMenuItem")).fire();
         });
 

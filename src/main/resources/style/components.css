@@ -96,7 +96,7 @@
 }
 
 .tab-pane > .tab-header-area > .headers-region > .tab .tab-close-button:hover {
-    -fx-background-color: -sl-danger;
+    -fx-background-color: -sl-button-icon-active;
 }
 
 .tab-pane > .tab-content-area {
@@ -214,8 +214,8 @@
 .empty-state-button .glyph-icon,
 .empty-state-button FontAwesomeIconView,
 .empty-state-button > .graphic > .glyph-icon {
-    -fx-fill: -sl-button-text;
-    fill: -sl-button-text;
+    -fx-fill: -sl-button-icon;
+    fill: -sl-button-icon;
 }
 
 .toggle-button:selected {
@@ -224,13 +224,13 @@
 
 .toggle-button:selected .glyph-icon,
 .toggle-button:selected FontAwesomeIconView {
-    -fx-fill: -sl-button-text;
-    fill: -sl-button-text;
+    -fx-fill: -sl-button-icon;
+    fill: -sl-button-icon;
 }
 
 .toggle-button:selected > .graphic > .glyph-icon {
-    -fx-fill: -sl-button-text;
-    fill: -sl-button-text;
+    -fx-fill: -sl-button-icon;
+    fill: -sl-button-icon;
 }
 
 .match-highlight {
@@ -691,12 +691,12 @@ FontAwesomeIconView.file-icon-file {
 .status-bar FontAwesomeIconView,
 .menu-bar > .container > .menu-button .glyph-icon,
 .menu-bar > .container > .menu-button FontAwesomeIconView {
-    -fx-fill: -sl-chrome-text;
+    -fx-fill: -sl-button-icon;
 }
 
 .btn-primary .glyph-icon,
 .btn-primary FontAwesomeIconView {
-    -fx-fill: -sl-button-text;
+    -fx-fill: -sl-button-icon;
 }
 
 .list-cell:filled:selected .glyph-icon,
@@ -805,7 +805,7 @@ FontAwesomeIconView.file-icon-file {
 .unified-file-manager-dialog .app-toolbar > .button:pressed .glyph-icon,
 .unified-file-manager-dialog .app-toolbar > .button:hover FontAwesomeIconView,
 .unified-file-manager-dialog .app-toolbar > .button:pressed FontAwesomeIconView {
-    -fx-fill: -sl-button-text;
+    -fx-fill: -sl-button-icon;
 }
 
 .preferences-dialog {
@@ -983,7 +983,7 @@ FontAwesomeIconView.file-icon-file {
 
 .btn-danger-outline .glyph-icon,
 .btn-danger-outline FontAwesomeIconView {
-    -fx-fill: -sl-button-danger;
+    -fx-fill: -sl-button-icon;
 }
 
 .theme-light .app-toolbar,
@@ -1020,7 +1020,7 @@ FontAwesomeIconView.file-icon-file {
 .unified-file-manager-dialog .button FontAwesomeIconView,
 .unified-file-manager-dialog .toggle-button .glyph-icon,
 .unified-file-manager-dialog .toggle-button FontAwesomeIconView {
-    -fx-fill: -sl-button-text;
+    -fx-fill: -sl-button-icon;
 }
 .unified-file-manager-dialog .file-manager-icon-button {
     -fx-min-width: 28;
@@ -1066,10 +1066,10 @@ FontAwesomeIconView.file-icon-file {
     -fx-text-fill: -sl-text;
 }
 .unified-file-manager-dialog .file-path-breadcrumb .path-chevron {
-    -fx-stroke: -sl-text-secondary;
+    -fx-stroke: -sl-button-icon;
 }
 .unified-file-manager-dialog .file-path-breadcrumb .path-overflow-dot {
-    -fx-fill: -sl-text-secondary;
+    -fx-fill: -sl-button-icon;
 }
 .unified-file-manager-dialog .file-manager-path-toolbar > .text-field {
     -fx-background-color: -sl-surface;
@@ -1262,7 +1262,7 @@ FontAwesomeIconView.file-icon-file {
 }
 .server-management-dialog .button .glyph-icon,
 .server-management-dialog .toggle-button .glyph-icon {
-    -fx-fill: -sl-button-text;
+    -fx-fill: -sl-button-icon;
 }
 .server-management-dialog .server-icon-button {
     -fx-min-width: 28;
@@ -1441,7 +1441,7 @@ FontAwesomeIconView.file-icon-file {
 }
 .server-edit-dialog .button .glyph-icon,
 .server-edit-dialog .button FontAwesomeIconView {
-    -fx-fill: -sl-button-text;
+    -fx-fill: -sl-button-icon;
 }
 .server-edit-dialog .server-edit-icon-button {
     -fx-min-width: 28;
@@ -1711,7 +1711,7 @@ FontAwesomeIconView.file-icon-file {
     -fx-cursor: HAND;
 }
 .main-view .log-tab-pane > .tab-header-area > .headers-region > .tab .tab-close-button:hover {
-    -fx-background-color: -sl-text;
+    -fx-background-color: -sl-button-icon-active;
 }
 
 .main-view .app-toolbar .text-field, .main-view #recentFilesFilterField {
@@ -1825,8 +1825,8 @@ FontAwesomeIconView.file-icon-file {
 
 .theme-dark .app-toolbar .toggle-button:selected .glyph-icon,
 .theme-dark .app-toolbar .toggle-button:selected FontAwesomeIconView {
-    -fx-fill: -sl-text-inverse;
-    fill: -sl-text-inverse;
+    -fx-fill: -sl-button-icon;
+    fill: -sl-button-icon;
 }
 
 .theme-light .locations-container .tree-cell:filled:selected,
@@ -1976,12 +1976,12 @@ FontAwesomeIconView.file-icon-file {
 
 .root .toggle-button:selected .glyph-icon,
 .root .toggle-button:selected FontAwesomeIconView {
-    -fx-fill: -sl-selection-text;
-    fill: -sl-selection-text;
+    -fx-fill: -sl-button-icon;
+    fill: -sl-button-icon;
 }
 
 .theme-dark .app-toolbar .toggle-button:selected {
-    -fx-text-fill: -sl-text-inverse;
+    -fx-text-fill: -sl-button-text;
 }
 
 .root .toggle-button:selected:hover {
@@ -2041,13 +2041,13 @@ FontAwesomeIconView.file-icon-file {
 }
 
 .root .btn-danger-outline:hover {
-    -fx-background-color: -sl-button-danger-hover;
+    -fx-background-color: -sl-button-hover;
     -fx-text-fill: -sl-button-danger;
 }
 
 .root .btn-danger-outline:pressed,
 .root .btn-danger-outline:armed {
-    -fx-background-color: -sl-button-danger-pressed;
+    -fx-background-color: -sl-button-pressed;
     -fx-text-fill: -sl-button-danger;
 }
 
@@ -2530,4 +2530,218 @@ FontAwesomeIconView.file-icon-file {
     -fx-progress-color: -sl-accent;
     -fx-accent: -sl-accent;
     -fx-padding: 0;
+}
+
+.main-view {
+    -fx-font-size: 13px;
+}
+.main-view .workbench-toolbar {
+    -fx-padding: 3 8;
+    -fx-spacing: 4;
+}
+.main-view .workbench-toolbar .button,
+.main-view .workbench-toolbar .toggle-button {
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-max-height: 32;
+    -fx-min-width: 32;
+    -fx-padding: 3 7;
+    -fx-font-size: 12px;
+}
+.main-view .workbench-toolbar .text-field {
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-max-height: 32;
+    -fx-font-size: 13px;
+}
+.main-view #centerRoot {
+    -fx-padding: 4;
+}
+.main-view .workspace-island {
+    -fx-background-radius: 4;
+}
+.main-view .workbench-dock {
+    -fx-background-color: -sl-surface;
+    -fx-background-radius: 4;
+    -fx-padding: 0;
+}
+.main-view .workbench-dock > .tab-header-area {
+    -fx-padding: 0 6;
+}
+.main-view .workbench-dock > .tab-header-area > .tab-header-background {
+    -fx-background-color: -sl-surface;
+    -fx-border-color: transparent transparent -sl-border-soft transparent;
+    -fx-border-width: 0 0 1 0;
+}
+.main-view .workbench-dock > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: transparent;
+    -fx-padding: 5 12;
+}
+.main-view .workbench-dock > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: -sl-tab-selected-bg;
+    -fx-border-color: transparent transparent -sl-accent transparent;
+    -fx-border-width: 0 0 2 0;
+}
+.main-view .workbench-dock .tab-label {
+    -fx-text-fill: -sl-text;
+}
+.main-view .tail-status {
+    -fx-text-fill: -sl-text-secondary;
+    -fx-font-size: 11px;
+    -fx-padding: 2 4;
+}
+.main-view .tail-status:live {
+    -fx-text-fill: -sl-text;
+    -fx-font-weight: bold;
+}
+.main-view .tail-status:disconnected {
+    -fx-text-fill: -sl-button-danger;
+}
+.main-view .resource-button {
+    -fx-background-color: transparent;
+    -fx-padding: 1 4;
+    -fx-font-size: 11px;
+}
+.main-view .resource-button .label {
+    -fx-text-fill: -sl-chrome-text;
+    -fx-padding: 0 4 0 0;
+}
+
+.main-view .status-bar .menu-button {
+    -fx-min-height: 24;
+    -fx-pref-height: 24;
+    -fx-max-height: 24;
+    -fx-padding: 1 4;
+    -fx-font-size: 11px;
+}
+
+.main-view .status-bar .panel-toggle {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 1;
+    -fx-background-radius: 2;
+    -fx-border-radius: 2;
+    -fx-padding: 2 5;
+    -fx-min-width: 28;
+    -fx-pref-width: 28;
+    -fx-max-width: 28;
+    -fx-min-height: 24;
+    -fx-pref-height: 24;
+    -fx-max-height: 24;
+    -fx-cursor: hand;
+}
+.main-view .status-bar .panel-toggle:hover {
+    -fx-background-color: -sl-chrome-hover;
+}
+.main-view .status-bar .panel-toggle:pressed {
+    -fx-background-color: -sl-chrome-pressed;
+}
+.main-view .panel-layout-icon {
+    -fx-fill: transparent;
+    -fx-stroke: -sl-button-icon;
+    -fx-stroke-width: 1.6;
+    -fx-stroke-line-join: round;
+    -fx-stroke-line-cap: round;
+}
+.main-view .status-bar .panel-toggle:selected {
+    -fx-background-color: -sl-toggle-selected-bg;
+}
+.main-view .status-bar .panel-toggle:selected:hover {
+    -fx-background-color: -sl-toggle-selected-hover-bg;
+}
+.main-view .status-bar .panel-toggle:selected:pressed,
+.main-view .status-bar .panel-toggle:selected:armed {
+    -fx-background-color: -sl-toggle-selected-pressed-bg;
+}
+.main-view .panel-toggle:keyboard-focus:focused {
+    -fx-border-color: -sl-focus-ring-chrome;
+}
+
+.main-view .workbench-toolbar #openFileButton {
+    -fx-min-width: 64;
+}
+.main-view .workbench-toolbar #serversButton {
+    -fx-min-width: 80;
+}
+.main-view .workbench-toolbar:compact #openFileButton,
+.main-view .workbench-toolbar:compact #serversButton {
+    -fx-min-width: 32;
+}
+.main-view .workbench-toolbar #tailButton {
+    -fx-min-width: 60;
+}
+.main-view .workbench-toolbar #followTailButton {
+    -fx-min-width: 80;
+}
+
+.root .button,
+.root .toggle-button,
+.root .menu-button,
+.root .split-menu-button {
+    -sl-button-icon: -sl-button-text;
+}
+
+.root .btn-danger-outline {
+    -sl-button-icon: -sl-button-danger;
+}
+
+.root .button .glyph-icon,
+.root .button FontAwesomeIconView,
+.root .toggle-button .glyph-icon,
+.root .toggle-button FontAwesomeIconView,
+.root .menu-button .glyph-icon,
+.root .menu-button FontAwesomeIconView,
+.root .split-menu-button .glyph-icon,
+.root .split-menu-button FontAwesomeIconView {
+    -fx-fill: -sl-button-icon;
+}
+
+.root .button:hover,
+.root .button:pressed,
+.root .button:armed,
+.root .button:showing,
+.root .button:selected,
+.root .button:keyboard-focus:focused,
+.root .toggle-button:hover,
+.root .toggle-button:pressed,
+.root .toggle-button:armed,
+.root .toggle-button:showing,
+.root .toggle-button:selected,
+.root .toggle-button:keyboard-focus:focused,
+.root .menu-button:hover,
+.root .menu-button:pressed,
+.root .menu-button:armed,
+.root .menu-button:showing,
+.root .menu-button:selected,
+.root .menu-button:keyboard-focus:focused,
+.root .split-menu-button:hover,
+.root .split-menu-button:pressed,
+.root .split-menu-button:armed,
+.root .split-menu-button:showing,
+.root .split-menu-button:selected,
+.root .split-menu-button:keyboard-focus:focused {
+    -sl-button-icon: -sl-button-icon-active;
+}
+
+.root .button:keyboard-focus:focused,
+.root .toggle-button:keyboard-focus:focused,
+.root .menu-button:keyboard-focus:focused,
+.root .split-menu-button:keyboard-focus:focused {
+    -fx-background-color: -sl-button-hover;
+}
+
+.root .button:disabled,
+.root .button:disabled:keyboard-focus:focused,
+.root .toggle-button:disabled,
+.root .toggle-button:disabled:keyboard-focus:focused,
+.root .menu-button:disabled,
+.root .menu-button:disabled:keyboard-focus:focused,
+.root .split-menu-button:disabled,
+.root .split-menu-button:disabled:keyboard-focus:focused {
+    -sl-button-icon: -sl-button-text;
+}
+
+.root .menu-button .arrow,
+.root .split-menu-button .arrow {
+    -fx-background-color: -sl-button-icon;
 }

@@ -158,7 +158,7 @@ public class SearchFeatureE2ETest {
                 assertEquals(6, viewer.getItemCount(), "Canvas log viewer item count must remain 6 (full log displayed)");
                 assertTrue(viewer.hasSearchHighlight(), "Search highlights should be active on canvas");
 
-                assertTrue(splitPane.getItems().contains(panel), "SearchResultPanel must be attached to SplitPane on the right");
+                assertNotNull(panel.getScene(), "Search results must be attached to the active dock");
                 assertTrue(panel.isVisible(), "SearchResultPanel must be visible");
                 assertEquals(2, panel.getItemCount(), "SearchResultPanel must list exactly 2 matching lines");
 
@@ -217,7 +217,7 @@ public class SearchFeatureE2ETest {
                 assertEquals(5, viewer.getItemCount(), "Canvas item count must remain 5");
                 assertTrue(viewer.hasSearchHighlight());
 
-                assertTrue(splitPane.getItems().contains(panel), "Right panel must be shown in split pane");
+                assertNotNull(panel.getScene(), "Search results must be shown in the active dock");
                 assertEquals(2, panel.getItemCount(), "Panel must show 2 matches");
 
                 panel.selectAndTriggerLine(0);
@@ -273,7 +273,7 @@ public class SearchFeatureE2ETest {
                 assertEquals(4, viewer.getTotalLines());
                 assertEquals(4, viewer.getItemCount());
 
-                assertTrue(splitPane.getItems().contains(panel));
+                assertNotNull(panel.getScene());
                 assertEquals(1, panel.getItemCount());
 
                 panel.selectAndTriggerLine(0);
@@ -343,7 +343,7 @@ public class SearchFeatureE2ETest {
                 assertEquals(3, viewer.getTotalLines());
                 assertEquals(3, viewer.getItemCount());
 
-                assertTrue(splitPane.getItems().contains(panel));
+                assertNotNull(panel.getScene());
                 assertEquals(2, panel.getItemCount());
 
                 panel.selectAndTriggerLine(1);

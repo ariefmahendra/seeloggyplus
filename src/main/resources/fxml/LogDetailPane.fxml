@@ -12,25 +12,11 @@
     </padding>
 
     <HBox alignment="CENTER_LEFT" spacing="10">
-        <Label fx:id="detailLabel" text="Log Detail" HBox.hgrow="ALWAYS" styleClass="panel-title"/>
+        <Label fx:id="detailLabel" text="Log Detail" minWidth="0" maxWidth="Infinity" HBox.hgrow="ALWAYS" styleClass="panel-title"/>
 
-        <HBox alignment="CENTER_LEFT" spacing="5" styleClass="compact-actions">
-            <ToggleButton fx:id="prettifyJsonButton" prefHeight="10.0" prefWidth="10.0">
-                <graphic>
-                    <FontAwesomeIconView glyphName="INDENT" size="12"/>
-                </graphic>
-                <tooltip>
-                    <Tooltip text="Auto-Prettify JSON"/>
-                </tooltip>
-            </ToggleButton>
-            <ToggleButton fx:id="prettifyXmlButton" prefHeight="10.0" prefWidth="10.0">
-                <graphic>
-                    <FontAwesomeIconView glyphName="CODE" size="12"/>
-                </graphic>
-                <tooltip>
-                    <Tooltip text="Auto-Prettify XML"/>
-                </tooltip>
-            </ToggleButton>
+        <FlowPane styleClass="compact-actions,detail-actions" minWidth="0" prefWrapLength="400" hgap="4" vgap="4" HBox.hgrow="ALWAYS">
+            <ToggleButton fx:id="rawModeButton" text="Raw" selected="true" accessibleText="Show original log content"/>
+            <ToggleButton fx:id="formattedModeButton" text="Formatted" disable="true" accessibleText="Show formatted log content"/>
             <Button fx:id="copyButton">
                 <graphic>
                     <FontAwesomeIconView glyphName="COPY" size="12"/>
@@ -56,7 +42,7 @@
                     <Tooltip text="Close Detail Panel (Ctrl+J)"/>
                 </tooltip>
             </Button>
-        </HBox>
+        </FlowPane>
     </HBox>
 
     <StackPane fx:id="detailContainer" VBox.vgrow="ALWAYS" styleClass="detail-container">

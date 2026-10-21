@@ -28,9 +28,29 @@ class LogDetailPaneAsyncCoverageTest extends ApplicationTest {
     @AfterEach
     void resetPanel() {
         onFxThread(() -> {
-            controller.setAutoPrettify(false, false);
+            controller.setDefaultFormatted(false);
             controller.clear();
         });
+    }
+
+    @Test void queuedFormattingCannotRestoreAnOlderLineOrClearedContent() throws Exception {
+        java.util.List<Runnable> jobs = new java.util.ArrayList<>();
+        var field = LogDetailPaneController.class.getDeclaredField("formatExecutor");
+        field.setAccessible(true);
+        field.set(controller, (java.util.concurrent.Executor) jobs::add);
+        String raw = "{\"key\":\"" + "x".repeat(5000) + "\"}";
+        onFxThread(() -> {controller.setDefaultFormatted(true); controller.show(0, raw);});
+        org.junit.jupiter.api.Assertions.assertEquals(1, jobs.size());
+        WaitForAsyncUtils.asyncFx(() -> {
+            jobs.removeFirst().run();
+            controller.show(1, "latest line");
+        }).get();
+        WaitForAsyncUtils.waitForFxEvents();
+        assertEquals("latest line", controller.getCodeArea().getText());
+        onFxThread(() -> {controller.show(2, raw); controller.clear();});
+        jobs.forEach(Runnable::run);
+        WaitForAsyncUtils.waitForFxEvents();
+        assertEquals("", controller.getCodeArea().getText());
     }
 
     @Test
@@ -38,7 +58,7 @@ class LogDetailPaneAsyncCoverageTest extends ApplicationTest {
     void largeJsonIsPrettifiedAsynchronously() throws Exception {
         String raw = "{\"key\":\"" + "x".repeat(5000) + "\"}";
         onFxThread(() -> {
-            controller.setAutoPrettify(true, false);
+            controller.setDefaultFormatted(true);
             controller.show(0, raw);
         });
 
@@ -52,7 +72,7 @@ class LogDetailPaneAsyncCoverageTest extends ApplicationTest {
     void largeXmlIsPrettifiedAsynchronously() throws Exception {
         String raw = "<root><data>" + "y".repeat(5000) + "</data></root>";
         onFxThread(() -> {
-            controller.setAutoPrettify(false, true);
+            controller.setDefaultFormatted(true);
             controller.show(0, raw);
         });
 
@@ -64,59 +84,50 @@ class LogDetailPaneAsyncCoverageTest extends ApplicationTest {
     @DisplayName("Toggling prettify on formats the line that is already shown")
     void togglingOnFormatsVisibleContent() {
         onFxThread(() -> {
-            controller.setAutoPrettify(false, false);
+            controller.setDefaultFormatted(false);
             controller.show(0, "{\"a\":1}");
         });
 
-        onFxThread(() -> toggle("prettifyJsonButton").setSelected(true));
+        onFxThread(() -> toggle("formattedModeButton").fire());
 
         assertTrue(controller.getCodeArea().getText().contains("\n"));
         assertTrue(controller.getCodeArea().getText().contains("\"a\""));
     }
 
     @Test
-    @DisplayName("Turning XML prettify off keeps the JSON formatting that still applies")
-    void restoreKeepsJsonPrettify() {
+    @DisplayName("Formatted mode survives an unsupported row and detects the next XML payload")
+    void formattedModeSurvivesUnsupportedRow() {
         onFxThread(() -> {
-            controller.setAutoPrettify(true, true);
-            controller.show(0, "{\"a\":1}");
+            controller.setDefaultFormatted(true);
+            controller.show(0,"{\"a\":1}");
+            assertTrue(controller.getCodeArea().getText().contains("\n"));
+            controller.show(1,"plain text");
+            assertEquals("plain text",controller.getCodeArea().getText());
+            controller.show(2,"<r><a>1</a></r>");
+            assertTrue(controller.getCodeArea().getText().contains("\n"));
         });
-        assertTrue(controller.getCodeArea().getText().contains("\n"));
-
-        onFxThread(() -> toggle("prettifyXmlButton").setSelected(false));
-
-        assertTrue(controller.getCodeArea().getText().contains("\n"),
-                "JSON prettify must stay active while XML is off");
     }
 
     @Test
-    @DisplayName("Turning JSON prettify off keeps the XML formatting that still applies")
-    void restoreKeepsXmlPrettify() {
+    @DisplayName("Raw mode remains selected when the next supported payload is shown")
+    void rawModeSurvivesNextPayload() {
         onFxThread(() -> {
-            controller.setAutoPrettify(true, true);
-            controller.show(0, "<r><x>1</x></r>");
+            controller.setDefaultFormatted(true); controller.show(0,"<r><a>1</a></r>");
+            toggle("rawModeButton").fire();
+            controller.show(1,"{\"a\":1}");
+            assertEquals("{\"a\":1}",controller.getCodeArea().getText());
         });
-        assertTrue(controller.getCodeArea().getText().contains("\n"));
-
-        onFxThread(() -> toggle("prettifyJsonButton").setSelected(false));
-
-        assertTrue(controller.getCodeArea().getText().contains("<r>"),
-                "XML prettify must stay active while JSON is off");
     }
 
     @Test
-    @DisplayName("Toggling both off restores the raw line exactly once")
-    void togglingBothOffRestoresRaw() {
-        String raw = "{\"a\":1}";
+    @DisplayName("Raw restores the exact original text after formatting")
+    void rawRestoresOriginal() {
+        String raw="prefix {\"a\":1} suffix";
         onFxThread(() -> {
-            controller.setAutoPrettify(true, true);
-            controller.show(0, raw);
+            controller.setDefaultFormatted(true);controller.show(0,raw);
+            toggle("rawModeButton").fire();
+            assertEquals(raw,controller.getCodeArea().getText());
         });
-
-        onFxThread(() -> toggle("prettifyJsonButton").setSelected(false));
-        onFxThread(() -> toggle("prettifyXmlButton").setSelected(false));
-
-        assertEquals(raw, controller.getCodeArea().getText());
     }
 
     private String awaitTextContaining(String needle) throws Exception {

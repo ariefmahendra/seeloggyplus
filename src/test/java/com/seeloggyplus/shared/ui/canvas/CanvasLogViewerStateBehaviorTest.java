@@ -564,7 +564,7 @@ class CanvasLogViewerStateBehaviorTest {
 
             viewer.setDarkMode(true);
             viewer.setDarkMode(true);
-            assertEquals(Color.web("#191a1c"), backgroundFill(viewer));
+            assertEquals(Color.web("#181c22"), backgroundFill(viewer));
 
             viewer.setDarkMode(false);
             assertEquals(Color.web("#ffffff"), backgroundFill(viewer));

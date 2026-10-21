@@ -45,7 +45,7 @@ labels** (`feature`, `bug`, `ui`, `test`, `docs`, `build`, `chore`, …).
 
 ## Release description format (mandatory)
 
-The GitHub Release body is **the `docs/release-notes/<version>.md` file**, copied
+The GitHub Release body is **the `release-notes/<version>.md` file**, copied
 verbatim by the release workflow. The matching `[X.Y.Z]` section in `CHANGELOG.md`
 is only the fallback (and the historical record), so both must stay in sync and
 end-user ready — never a one-line internal note.
@@ -59,7 +59,7 @@ Required order inside `[X.Y.Z]`:
 
 For the first published release of a feature line, summarize the main features
 under `### Added` (do not list only CI fixes). A matching
-`docs/release-notes/<version>.md` is mandatory and uses this structure:
+`release-notes/<version>.md` is mandatory and uses this structure:
 
 ```markdown
 # SeeLoggyPlus X.Y.Z
@@ -80,10 +80,10 @@ under `### Added` (do not list only CI fixes). A matching
 ```
 
 If a release was already published with the wrong description, fix
-`CHANGELOG.md` and `docs/release-notes/<version>.md`, push, then either:
+`CHANGELOG.md` and `release-notes/<version>.md`, push, then either:
 
 ```bash
-gh release edit X.Y.Z --notes-file docs/release-notes/X.Y.Z.md   # needs gh auth login
+gh release edit X.Y.Z --notes-file release-notes/X.Y.Z.md   # needs gh auth login
 ```
 
 or use the GitHub API (`PATCH /repos/<owner>/<repo>/releases/<id>`) with the
@@ -116,20 +116,20 @@ release-notes file as the body.
    - runs the test suite,
    - builds the portable packages for Windows/Linux (with and without JRE),
    - merges the update manifests,
-   - **creates the GitHub Release**, using `docs/release-notes/<version>.md` as the
+   - **creates the GitHub Release**, using `release-notes/<version>.md` as the
      release body, and attaches the artifacts,
    - publishes `update-manifest.json` to `gh-pages`.
 8. Verify the release page and its notes. A ready-to-use narrative per version also
-   lives in `docs/release-notes/<version>.md` for manual publishing.
+   lives in `release-notes/<version>.md` for manual publishing.
 
 ## Online documentation and compatibility gate
 
-The Linux release runner is PIKACU, selected by the repository's RUNNER_LABELS
-variable. It requires Python 3.8 or newer and native fontconfig, freetype, Pango and
-GTK 3 libraries even for headless tests and splash generation. On Rocky Linux,
-provision these once with `sudo dnf install -y fontconfig freetype gtk3 pango binutils`.
-The binutils package supplies objcopy, required by jlink when stripping the bundled
-runtime's debug information.
+Linux release jobs use RUNNER_LABELS, defaulting to GitHub-hosted ubuntu-latest.
+The same labels select tests, Linux packages and publication. A self-hosted
+runner can be selected when it is online and provisioned. All runners require
+Python 3.8 or newer, native fontconfig, freetype, Pango, GTK 3 and binutils.
+On Rocky Linux, provision with `sudo dnf install -y fontconfig freetype gtk3 pango binutils`;
+on Ubuntu use the corresponding apt packages. Binutils supplies objcopy for jlink.
 The workflow checks native dependencies and a headless JavaFX dialog before the
 full suite. It supplies its own
 verified DejaVu fonts and isolated font cache; the runner account does not need
@@ -171,10 +171,10 @@ With the GitHub CLI authenticated (`gh auth login`):
 ```bash
 gh release create X.Y.Z \
   --title "SeeLoggyPlus X.Y.Z — <short title>" \
-  --notes-file docs/release-notes/X.Y.Z.md
+  --notes-file release-notes/X.Y.Z.md
 ```
 
-Release notes per version are kept in `docs/release-notes/` (e.g. `0.4.3.md`).
+Release notes per version are kept in `release-notes/` (e.g. `0.4.3.md`).
 
 Prefer the automated workflow; use this only as a fallback.
 

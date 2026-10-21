@@ -1,35 +1,37 @@
 .root {
-    -sl-toggle-selected-pressed-bg: #a7c5ff;
+    -sl-button-icon-active: #2f5eb9;
+    -sl-button-icon: #192330;
+    -sl-toggle-selected-pressed-bg: #bfc2c8;
     -sl-focus-ring: #3871e1;
     -sl-focus-ring-panel: #3871e1;
     -sl-focus-ring-chrome: #3871e1;
     -sl-tab-selected-hover-bg: #d0dffe;
     -sl-tab-selected-pressed-bg: #bdd3ff;
-    -sl-window-bg: #e9eaee;
+    -sl-window-bg: #eef0f3;
     -sl-panel-bg: #ffffff;
     -sl-input-bg: #f7f8f9;
-    -sl-log-text: #080808;
+    -sl-log-text: #192330;
     -sl-popup-bg: #f7f8f9;
-    -sl-selection-inactive-bg: #e9eaee;
-    -sl-selection-text: #000000;
+    -sl-selection-inactive-bg: #eef0f3;
+    -sl-selection-text: #192330;
     -sl-tab-selected-bg: #e3ebfe;
     -sl-tab-selected-border: #a7c5ff;
-    -sl-tab-inactive-bg: #e9eaee;
-    -sl-toggle-selected-bg: #d0dffe;
-    -sl-toggle-selected-hover-bg: #bdd3ff;
+    -sl-tab-inactive-bg: #eef0f3;
+    -sl-toggle-selected-bg: #e4e5e8;
+    -sl-toggle-selected-hover-bg: #d1d3d9;
 
-    -sl-button-hover: rgba(0,0,0,0.070588);
-    -sl-button-pressed: rgba(0,0,0,0.12549);
-    -sl-button-text: #000000;
+    -sl-button-hover: #e4e5e8;
+    -sl-button-pressed: #d1d3d9;
+    -sl-button-text: #192330;
     -sl-button-danger: #a03325;
     -sl-button-danger-hover: rgba(220, 60, 60, 0.08);
     -sl-button-danger-pressed: rgba(220, 60, 60, 0.14);
 
 
-    -sl-chrome: #e9eaee;
+    -sl-chrome: #eef0f3;
     -sl-chrome-hover: rgba(0,0,0,0.070588);
     -sl-chrome-pressed: rgba(0,0,0,0.12549);
-    -sl-chrome-text: #000000;
+    -sl-chrome-text: #192330;
     -sl-chrome-text-muted: #5f6269;
 
 
@@ -47,7 +49,7 @@
     -sl-accent-text: #ffffff;
 
 
-    -sl-bg: #e9eaee;
+    -sl-bg: #eef0f3;
     -sl-surface: #ffffff;
     -sl-surface-alt: #ffffff;
     -sl-surface-sunken: #f7f8f9;
@@ -55,11 +57,11 @@
 
 
     -sl-border: #d1d3d9;
-    -sl-border-soft: #e9eaee;
+    -sl-border-soft: #eef0f3;
     -sl-border-strong: #b5b7bd;
 
 
-    -sl-text: #000000;
+    -sl-text: #192330;
     -sl-text-secondary: #5f6269;
     -sl-text-muted: #5f6269;
     -sl-text-faint: #73767c;
@@ -128,7 +130,7 @@
     -sl-syntax-info: #2b6cb0;
     -sl-syntax-debug: #2f855a;
     -sl-syntax-trace: #5f6269;
-    -sl-syntax-default: #080808;
+    -sl-syntax-default: #192330;
     -sl-syntax-selection: #465d73;
     -sl-syntax-selected-line: #e9ecef;
     -sl-syntax-json-key: #0b5563;

@@ -71,9 +71,9 @@
                 <HBox spacing="4" alignment="CENTER_LEFT" styleClass="file-manager-location-header">
                     <Label text="Locations" styleClass="section-title" minWidth="0"/>
                     <Region HBox.hgrow="ALWAYS"/>
-                    <Button fx:id="newGroupButton" styleClass="file-manager-icon-button">
+                    <Button fx:id="newGroupButton" styleClass="file-manager-icon-button" accessibleText="New Group">
                         <graphic>
-                            <FontAwesomeIconView glyphName="FOLDER_OPEN" size="12"/>
+                            <FontAwesomeIconView glyphName="PLUS_SQUARE" size="12"/>
                         </graphic>
                         <tooltip>
                             <Tooltip text="New group (inside the selected group)"/>
@@ -87,9 +87,9 @@
                             <Tooltip text="Favorite this folder"/>
                         </tooltip>
                     </Button>
-                    <Button fx:id="manageServersButton" styleClass="file-manager-icon-button">
+                    <Button fx:id="manageServersButton" styleClass="file-manager-icon-button" accessibleText="Manage Servers">
                         <graphic>
-                            <FontAwesomeIconView glyphName="COG" size="12"/>
+                            <FontAwesomeIconView glyphName="SERVER" size="12"/>
                         </graphic>
                         <tooltip>
                             <Tooltip text="Manage Servers"/>
@@ -148,10 +148,13 @@
                     <FontAwesomeIconView glyphName="TERMINAL" size="12"/>
                 </graphic>
             </Button>
-            <Button text="Open" fx:id="openButton" defaultButton="true" disable="true">
+            <Button text="Open" fx:id="openButton" defaultButton="true" disable="true" accessibleText="Open File">
                 <graphic>
-                    <FontAwesomeIconView glyphName="CHECK" size="12"/>
+                    <FontAwesomeIconView glyphName="EXTERNAL_LINK" size="12"/>
                 </graphic>
+                <tooltip>
+                    <Tooltip text="Open File"/>
+                </tooltip>
             </Button>
         </HBox>
     </bottom>

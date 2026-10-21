@@ -16,9 +16,9 @@ class ReleaseValidationTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        (self.root / "docs/release-notes").mkdir(parents=True)
+        (self.root / "release-notes").mkdir(parents=True)
         (self.root / "gradle.properties").write_text("version=0.8.0\n")
-        (self.root / "docs/release-notes/0.8.0.md").write_text("# SeeLoggyPlus 0.8.0\n\n## Upgrade notes\nSafe upgrade\n")
+        (self.root / "release-notes/0.8.0.md").write_text("# SeeLoggyPlus 0.8.0\n\n## Upgrade notes\nSafe upgrade\n")
 
     def test_metadata_matches_tag(self):
         module.validate("0.8.0", self.root)
@@ -28,7 +28,7 @@ class ReleaseValidationTest(unittest.TestCase):
             module.validate("0.8.1", self.root)
 
     def test_missing_notes_are_rejected(self):
-        (self.root / "docs/release-notes/0.8.0.md").unlink()
+        (self.root / "release-notes/0.8.0.md").unlink()
         with self.assertRaises(ValueError):
             module.validate("0.8.0", self.root)
 

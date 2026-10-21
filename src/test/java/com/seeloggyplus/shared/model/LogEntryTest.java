@@ -17,6 +17,20 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LogEntryTest {
+    @Test void rawEntriesShareAnEmptyFieldMapUntilMutation() throws Exception {
+        var field = LogEntry.class.getDeclaredField("parsedFields");
+        field.setAccessible(true);
+        var first = new LogEntry(1, "raw");
+        var second = new LogEntry(2, "other");
+        assertSame(field.get(first), field.get(second));
+        first.setLevel("ERROR");
+        assertEquals("ERROR", first.getField("level"));
+        assertNull(second.getField("level"));
+        var copy = first.getParsedFields();
+        copy.clear();
+        assertEquals("ERROR", first.getField("level"));
+    }
+
 
     @Test
     void unparsedEntryKeepsRawLogAsMessageAndField() {

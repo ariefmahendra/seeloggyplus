@@ -36,12 +36,129 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(ApplicationExtension.class)
 class CanvasLogViewerInteractionTest {
 
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path spoolRoot;
+
     private Stage stage;
 
     @Start
     void start(Stage stage) {
         this.stage = stage;
         AppTheme.setTheme(AppTheme.Theme.LIGHT);
+    }
+
+    private static Object readField(Object target, String name) {
+        try {Field field = target.getClass().getDeclaredField(name); field.setAccessible(true); return field.get(target);}
+        catch (ReflectiveOperationException error) {throw new AssertionError(error);}
+    }
+
+    @Test
+    void coldTailActivationAndMatchCountingCompleteWithoutFxDiskReads() throws Exception {
+        var history = new com.seeloggyplus.features.logs.infrastructure.io.SpoolingTailHistory(
+                spoolRoot, 1024);
+        String raw = "POST activation " + "x".repeat(2000);
+        history.add(new LogEntry(0, raw)); history.add(new LogEntry(1, "GET " + "y".repeat(2000)));
+        var guarded = (com.seeloggyplus.shared.tail.TailHistory) java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{com.seeloggyplus.shared.tail.TailHistory.class},
+                (proxy, method, arguments) -> {
+                    if (method.getName().equals("get") && Platform.isFxApplicationThread())
+                        throw new AssertionError("cold history read on FX thread");
+                    try {return method.invoke(history, arguments);}
+                    catch (java.lang.reflect.InvocationTargetException error) {throw error.getCause();}
+                });
+        AtomicReference<CanvasLogViewer> reference = new AtomicReference<>();
+        AtomicReference<String> activated = new AtomicReference<>();
+        java.util.concurrent.atomic.AtomicInteger matches = new java.util.concurrent.atomic.AtomicInteger(-1);
+        try {
+            onFxThread(() -> {
+                var viewer = shownViewer(); reference.set(viewer);
+                viewer.setTailBuffer(guarded); viewer.setOnLineClick((row, text) -> activated.set(text));
+                Event.fireEvent(canvasOf(viewer), mouseEvent(canvasOf(viewer), MouseEvent.MOUSE_PRESSED,
+                        rowY(0), MouseButton.PRIMARY, 1, false, true));
+                viewer.setSearchHighlight("POST", false, true);
+                viewer.countMatchesAsync((count, truncated) -> {assertTrue(Platform.isFxApplicationThread()); matches.set(count);});
+            });
+            WaitForAsyncUtils.waitFor(5, java.util.concurrent.TimeUnit.SECONDS,
+                    () -> raw.equals(activated.get()) && matches.get() == 1);
+        } finally {onFxThread(() -> {if (reference.get() != null) reference.get().resetView();}); history.close();}
+    }
+
+    @Test
+    void copyingColdTailSelectionReadsHistoryAwayFromTheFxThread() throws Exception {
+        var history = new com.seeloggyplus.features.logs.infrastructure.io.SpoolingTailHistory(
+                spoolRoot, 1024);
+        String raw = "POST cold-copy " + "x".repeat(2000);
+        history.add(new LogEntry(0, raw));
+        var guarded = (com.seeloggyplus.shared.tail.TailHistory) java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{com.seeloggyplus.shared.tail.TailHistory.class},
+                (proxy, method, arguments) -> {
+                    if (method.getName().equals("get") && Platform.isFxApplicationThread())
+                        throw new AssertionError("cold history read on FX thread");
+                    try {return method.invoke(history, arguments);}
+                    catch (java.lang.reflect.InvocationTargetException error) {throw error.getCause();}
+                });
+        AtomicReference<CanvasLogViewer> reference = new AtomicReference<>();
+        try {
+            onFxThread(() -> {
+                ClipboardContent initial = new ClipboardContent(); initial.putString("before copy");
+                Clipboard.getSystemClipboard().setContent(initial);
+                var viewer = shownViewer(); reference.set(viewer);
+                viewer.setTailBuffer(guarded); viewer.selectLine(0); viewer.copySelectedLines();
+            });
+            WaitForAsyncUtils.waitFor(5, java.util.concurrent.TimeUnit.SECONDS,
+                    () -> WaitForAsyncUtils.asyncFx(() -> raw.equals(Clipboard.getSystemClipboard().getString())).get());
+        } finally {onFxThread(() -> {if (reference.get() != null) reference.get().resetView();}); history.close();}
+    }
+
+    @Test
+    void resettingTheViewerReleasesDecodedTextAndGlyphLayouts() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setTailBuffer(tailLines(20));
+            viewer.redraw();
+            assertTrue(((String[]) readField(viewer, "lineCache")).length > 0);
+            viewer.resetView();
+            assertEquals(0, ((String[]) readField(viewer, "lineCache")).length);
+            assertEquals(0, ((javafx.scene.text.Text[]) readField(viewer, "lineLayoutCache")).length);
+            assertEquals(0, ((java.util.Map<?, ?>) readField(viewer, "loadedTailRows")).size());
+        });
+    }
+
+    @Test
+    void coldTailViewportLoadsRowsLargerThanTheHotCache() throws Exception {
+        var history = new com.seeloggyplus.features.logs.infrastructure.io.SpoolingTailHistory(
+                spoolRoot, 1024);
+        for (int i = 0; i < 10; i++) history.add(new LogEntry(i, "POST row-" + i + "x".repeat(2000)));
+        AtomicReference<CanvasLogViewer> reference = new AtomicReference<>();
+        try {
+            onFxThread(() -> {
+                var viewer = shownViewer(); reference.set(viewer);
+                viewer.setFollowTail(false); viewer.setTailBuffer(history); viewer.redraw();
+            });
+            WaitForAsyncUtils.waitFor(5, java.util.concurrent.TimeUnit.SECONDS, () -> {
+                java.util.concurrent.atomic.AtomicBoolean complete = new java.util.concurrent.atomic.AtomicBoolean();
+                onFxThread(() -> {
+                    String[] lines = (String[]) readField(reference.get(), "lineCache");
+                    complete.set(lines.length >= 10 && java.util.stream.IntStream.range(0, 10)
+                            .allMatch(i -> lines[i] != null && lines[i].contains("POST row-" + i)));
+                });
+                return complete.get();
+            });
+        } finally {onFxThread(() -> {if (reference.get() != null) reference.get().resetView();}); history.close();}
+    }
+
+    @Test
+    void scrollingReusesLayoutsForOverlappingRows() {
+        onFxThread(() -> {
+            CanvasLogViewer viewer = shownViewer();
+            viewer.setFollowTail(false);
+            viewer.setTailBuffer(tailLines(200));
+            viewer.redraw();
+            javafx.scene.text.Text[] before = ((javafx.scene.text.Text[]) readField(viewer, "lineLayoutCache")).clone();
+            viewer.getVScrollBar().setValue(1);
+            viewer.redraw();
+            javafx.scene.text.Text[] after = (javafx.scene.text.Text[]) readField(viewer, "lineLayoutCache");
+            assertSame(before[1], after[0], "overlapping text layout should survive a one-row scroll");
+        });
     }
 
     @Test
@@ -685,7 +802,9 @@ class CanvasLogViewerInteractionTest {
     }
 
     private static double charX(CanvasLogViewer viewer, int charIndex) {
-        return privateInt(viewer, "leftMargin") + charIndex * privateDouble(viewer, "charWidth");
+        javafx.scene.text.Text prefix = new javafx.scene.text.Text("tail-123456789".substring(0, charIndex));
+        prefix.setFont((javafx.scene.text.Font) privateField(viewer, "MONO_FONT"));
+        return privateInt(viewer, "leftMargin") + prefix.getLayoutBounds().getWidth();
     }
 
     private static ScrollEvent scrollEvent(double deltaX, double deltaY, boolean shiftDown) {

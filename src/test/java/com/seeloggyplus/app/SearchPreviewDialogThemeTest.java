@@ -26,6 +26,11 @@ class SearchPreviewDialogThemeTest {
     @Start void start(Stage stage) { this.stage = stage; stage.setX(40); stage.setY(40); }
     @AfterEach void reset() throws Exception { fx(() -> AppTheme.setTheme(AppTheme.Theme.LIGHT)); }
 
+    @Test void openAndJumpUsesAnOpenActionIcon() throws Exception {
+        load("RemoteLogSearchDialog");
+        fx(() -> com.seeloggyplus.shared.ui.ActionIconAssertions.verify(root, "openButton", "EXTERNAL_LINK"));
+    }
+
     @Test void searchPanelsAreFlatCompactAndFitEverySize(FxRobot robot) throws Exception {
         load("RemoteLogSearchDialog");
         for (var theme : AppTheme.Theme.values()) {

@@ -85,10 +85,13 @@
                     <FontAwesomeIconView glyphName="TERMINAL"/>
                 </graphic>
             </Button>
-            <Button fx:id="openButton" text="Open &amp; Jump" onAction="#handleOpen" disable="true" defaultButton="true">
+            <Button fx:id="openButton" text="Open &amp; Jump" onAction="#handleOpen" disable="true" defaultButton="true" accessibleText="Open File and Jump to Matching Line">
                 <graphic>
-                    <FontAwesomeIconView glyphName="CHECK"/>
+                    <FontAwesomeIconView glyphName="EXTERNAL_LINK"/>
                 </graphic>
+                <tooltip>
+                    <Tooltip text="Open File and Jump to Matching Line"/>
+                </tooltip>
             </Button>
         </HBox>
     </bottom>

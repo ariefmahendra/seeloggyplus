@@ -20,6 +20,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LogDetailPaneControllerTest extends ApplicationTest {
+    @Test void rawModeCanReturnDirectlyToFormatted() {
+        onFxThread(() -> {
+            controller.setDefaultFormatted(true);
+            controller.show(0, "{\"message\":\"ready\",\"count\":2}");
+            assertTrue(controller.getCodeArea().getText().contains("\n"));
+            ((ToggleButton) root.lookup("#rawModeButton")).fire();
+            assertEquals("{\"message\":\"ready\",\"count\":2}", controller.getCodeArea().getText());
+            assertTrue(((ToggleButton) root.lookup("#rawModeButton")).isSelected());
+            ((ToggleButton) root.lookup("#formattedModeButton")).fire();
+            assertTrue(controller.getCodeArea().getText().contains("\n"));
+        });
+    }
 
     private LogDetailPaneController controller;
     private Parent root;
@@ -34,7 +46,7 @@ class LogDetailPaneControllerTest extends ApplicationTest {
     @AfterEach
     void resetPanel() {
         onFxThread(() -> {
-            controller.setAutoPrettify(false, false);
+            controller.setDefaultFormatted(false);
             controller.clear();
         });
     }
@@ -73,24 +85,20 @@ class LogDetailPaneControllerTest extends ApplicationTest {
     }
 
     @Test
-    @DisplayName("Toggling auto-prettify reports preference changes")
-    void autoPrettifyTogglesReportPreferences() {
-        List<String> changes = new ArrayList<>();
-
+    @DisplayName("A default formatted mode detects XML without a second setting")
+    void defaultFormattedDetectsXml() {
         onFxThread(() -> {
-            controller.setOnPreferenceChanged((code, value) -> changes.add(code + "=" + value));
-            toggle("prettifyJsonButton").setSelected(true);
-            toggle("prettifyXmlButton").setSelected(true);
+            controller.setDefaultFormatted(true);
+            controller.show(0,"<r><a>1</a></r>");
         });
-
-        assertEquals(List.of("main_auto_prettify_json=true", "main_auto_prettify_xml=true"), changes);
+        assertTrue(controller.getCodeArea().getText().contains("\n"));
     }
 
     @Test
     @DisplayName("Auto-prettify JSON formats inline JSON on show")
     void autoPrettifyJsonFormatsInlineJson() {
         onFxThread(() -> {
-            controller.setAutoPrettify(true, false);
+            controller.setDefaultFormatted(true);
             controller.show(0, "{\"level\":\"INFO\",\"message\":\"ready\"}");
         });
 
@@ -103,7 +111,7 @@ class LogDetailPaneControllerTest extends ApplicationTest {
     @DisplayName("Auto-prettify XML formats inline XML on show")
     void autoPrettifyXmlFormatsInlineXml() {
         onFxThread(() -> {
-            controller.setAutoPrettify(false, true);
+            controller.setDefaultFormatted(true);
             controller.show(0, "<root><entry>1</entry></root>");
         });
 
@@ -117,12 +125,12 @@ class LogDetailPaneControllerTest extends ApplicationTest {
     void turningPrettifyOffRestoresRawText() {
         String raw = "{\"a\":1}";
         onFxThread(() -> {
-            controller.setAutoPrettify(true, false);
+            controller.setDefaultFormatted(true);
             controller.show(0, raw);
         });
         assertTrue(controller.getCodeArea().getText().contains("\n"));
 
-        onFxThread(() -> toggle("prettifyJsonButton").setSelected(false));
+        onFxThread(() -> toggle("rawModeButton").fire());
 
         assertEquals(raw, controller.getCodeArea().getText());
     }
@@ -158,6 +166,11 @@ class LogDetailPaneControllerTest extends ApplicationTest {
         });
 
         assertEquals("copy-me", clipboardText());
+        String raw="prefix {\"x\":1} suffix";
+        onFxThread(() -> {controller.show(0,raw);toggle("formattedModeButton").fire();button("copyButton").fire();});
+        assertTrue(clipboardText().contains("\n"));
+        onFxThread(() -> {toggle("rawModeButton").fire();button("copyButton").fire();});
+        assertEquals(raw,clipboardText());
     }
 
     @Test

@@ -79,6 +79,7 @@ class PreferencesDialogControllerTest {
         save("app_max_memory_gb", "4");
         save("main_tail_window_size", "20000");
         save("main_auto_prettify_json", "false");
+        save("main_detail_formatted", "false");
         save("main_auto_prettify_xml", "false");
         save("lp_line_limit", "500");
         save("ssh_connection_timeout", "60");
@@ -93,14 +94,14 @@ class PreferencesDialogControllerTest {
         save("app_font_size", "18");
         save("app_theme", "dark");
         save("main_tail_window_size", "5000");
-        save("main_auto_prettify_json", "true");
+        save("main_detail_formatted", "true");
         save("file_double_click_action", "TAIL");
 
         Loaded dialog = loadDialog();
 
         assertEquals(18, spinner(dialog.root(), "appFontSizeSpinner").getValue());
         assertEquals(5000, spinner(dialog.root(), "tailWindowSizeSpinner").getValue());
-        assertEquals(Boolean.TRUE, checkBox(dialog.root(), "mainAutoPrettifyJsonCheckBox").isSelected());
+        assertEquals(Boolean.TRUE, checkBox(dialog.root(), "detailFormattedCheckBox").isSelected());
         assertEquals("Dark", combo(dialog.root(), "themeComboBox").getValue());
         assertEquals("Tail", combo(dialog.root(), "fileDoubleClickComboBox").getValue());
     }
@@ -119,7 +120,7 @@ class PreferencesDialogControllerTest {
             combo(dialog.root(), "appFontFamilyComboBox").setValue(family);
             combo(dialog.root(), "themeComboBox").setValue("Light");
             combo(dialog.root(), "fileDoubleClickComboBox").setValue("Tail");
-            checkBox(dialog.root(), "mainAutoPrettifyJsonCheckBox").setSelected(true);
+            checkBox(dialog.root(), "detailFormattedCheckBox").setSelected(true);
             textField(dialog.root(), "sshDownloadDirField").setText(tempDir.toString());
             button(dialog.root(), "saveButton").fire();
         });
@@ -130,7 +131,7 @@ class PreferencesDialogControllerTest {
         assertEquals("7", preferences.getPreferencesByCode("app_max_memory_gb").orElseThrow());
         assertEquals("42", preferences.getPreferencesByCode("ssh_connection_timeout").orElseThrow());
         assertEquals("TAIL", preferences.getPreferencesByCode("file_double_click_action").orElseThrow());
-        assertEquals("true", preferences.getPreferencesByCode("main_auto_prettify_json").orElseThrow());
+        assertEquals("true", preferences.getPreferencesByCode("main_detail_formatted").orElseThrow());
         assertEquals(tempDir.toString(), preferences.getPreferencesByCode("ssh_download_directory").orElseThrow());
         assertEquals(List.of("saved"), callbacks);
 

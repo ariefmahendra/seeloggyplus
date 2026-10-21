@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-21
+
+SeeLoggyPlus 0.9.0 adds an adaptable workspace, simpler structured-log formatting,
+clearer button states and earlier startup feedback, with search and Tail-memory improvements.
+
+### Added
+- Configurable Results and Detail docking with Auto, Right and Bottom layouts.
+- Raw and Formatted detail modes with automatic JSON/XML detection and background formatting for large payloads.
+- Resources menu with heap and session information in the status bar.
+
+### Changed
+- Compact toolbar groups file/server actions, search and Tail/Follow; panel toggles move to the bottom bar.
+- Interactive buttons use blue icons on neutral gray backgrounds in Light and Dark themes.
+- Splash branding renders at display resolution and appears before workspace preparation; animation loads in the background.
+- Tail history spools cold content to temporary storage while retaining the existing history limit and a bounded hot cache.
+- Search and line reading reduce temporary allocations; results retain complete long lines.
+
+### Fixed
+- Stale searches cannot overwrite newer queries, other tabs, or cleared results.
+- Long selections and result scrollbars remain visible inside rounded panels.
+- Resources text fits its button without clipping or overlapping its arrow.
+- Closed or detached workspaces release UI resources: memory polling stops for hidden windows, tooltips are reused, and shortcut setup waits for scene attachment.
+
+### Tests
+- Full headless regression suite and release build, including UI, search, detail, Tail-history and allocation checks.
+- Real portable-package self-update and released-updater compatibility gates for Windows and Linux.
+- Local performance measurements show some indexing/search workloads remain slower than the baseline; the optimization targets are not fully met.
+
+### Upgrade notes
+- No database migration is required from 0.8.0; the schema remains at version 4 and existing configuration is retained.
+- Older JSON/XML preferences remain a fallback for the default Formatted mode.
+- Reload and Clear Log View are available from the log tab context menu; F5 and View > Refresh remain available.
+- Tail spooling uses temporary disk space; normal close removes its files, while a crash or forced exit can leave temporary files behind.
+- Close the app before backing up the complete data directory. For manual upgrades, use a new writable folder and preserve the complete data directory and launcher.properties.
+- Online Help remains at https://seeloggyplus-doc.vercel.app/; local log viewing works offline.
+
 ## [0.8.0] - 2026-10-18
 
 SeeLoggyPlus 0.8.0 refreshes the desktop interface with compact Light and Dark themes,
@@ -395,7 +431,9 @@ in the CI `test` job before publishing, so 0.6.2 ships the complete 0.6 feature 
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.8.0...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.9.0...HEAD
+[0.9.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.8.0...0.9.0
+[0.8.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.5...0.7.0
 [0.6.5]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.4...0.6.5
 [0.6.4]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.3...0.6.4

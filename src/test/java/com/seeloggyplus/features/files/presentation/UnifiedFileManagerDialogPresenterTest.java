@@ -77,7 +77,7 @@ class UnifiedFileManagerDialogPresenterTest {
                     var pane = input.getDialogPane();
                     pane.applyCss();
                     pane.layout();
-                    assertEquals(Color.web(theme == AppTheme.Theme.LIGHT ? "#ffffff" : "#191a1c"),
+                    assertEquals(Color.web(theme == AppTheme.Theme.LIGHT ? "#ffffff" : "#181c22"),
                             RenderedColors.background(pane));
                     assertEquals(root.getScene().getWindow(), input.getOwner());
                     assertEquals(28, input.getEditor().getHeight(), .01);
@@ -161,7 +161,7 @@ class UnifiedFileManagerDialogPresenterTest {
                     choice.show();
                     var pane = choice.getDialogPane();
                     pane.applyCss(); pane.layout();
-                    assertEquals(Color.web(theme == AppTheme.Theme.LIGHT ? "#ffffff" : "#191a1c"),
+                    assertEquals(Color.web(theme == AppTheme.Theme.LIGHT ? "#ffffff" : "#181c22"),
                             RenderedColors.background(pane));
                     org.junit.jupiter.api.Assertions.assertNull(choice.getGraphic());
                     assertEquals(root.getScene().getWindow(), choice.getOwner());

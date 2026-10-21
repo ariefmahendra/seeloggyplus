@@ -56,8 +56,12 @@ public class LogSession implements AutoCloseable {
     private boolean tailModeEnabled = false;
     private boolean followTail = true;
     private TailService tailService;
-    private final List<LogEntry> liveTailList = Collections.synchronizedList(new ArrayList<>());
+    private final com.seeloggyplus.shared.tail.TailHistory liveTailList = com.seeloggyplus.shared.tail.TailHistory.open();
     private final List<LogEntry> tailBuffer = new ArrayList<>();
+    private long tailBufferBytes;
+
+    public long getTailBufferBytes() {return tailBufferBytes;}
+    public void adjustTailBufferBytes(long delta) {tailBufferBytes = Math.max(0, tailBufferBytes + delta);}
     private long remoteTailLineCounter = 0;
     private final AtomicBoolean tailFlushScheduled = new AtomicBoolean(false);
     private int pendingTailJumpIndex = -1;
@@ -446,8 +450,9 @@ public class LogSession implements AutoCloseable {
 
         synchronized (tailBuffer) {
             tailBuffer.clear();
+            tailBuffer.notifyAll();
         }
-        liveTailList.clear();
+        liveTailList.close();
 
         if (filteredIndexes != null) {
             filteredIndexes.clear();

@@ -51,16 +51,16 @@
 .app-toolbar .toggle-button:pressed FontAwesomeIconView,
 .app-toolbar .toggle-button:selected .glyph-icon,
 .app-toolbar .toggle-button:selected FontAwesomeIconView {
-    -fx-fill: -sl-button-text;
-    fill: -sl-button-text;
+    -fx-fill: -sl-button-icon;
+    fill: -sl-button-icon;
 }
 
 .app-toolbar .button .glyph-icon,
 .app-toolbar .toggle-button .glyph-icon,
 .app-toolbar .button FontAwesomeIconView,
 .app-toolbar .toggle-button FontAwesomeIconView {
-    -fx-fill: -sl-button-text;
-    fill: -sl-button-text;
+    -fx-fill: -sl-button-icon;
+    fill: -sl-button-icon;
 }
 
 .app-toolbar .separator .line {
@@ -224,7 +224,7 @@ FontAwesomeIconView {
 
 .button:default .glyph-icon,
 .button:default FontAwesomeIconView {
-    -fx-fill: -sl-button-text;
+    -fx-fill: -sl-button-icon;
 }
 
 .btn-primary {

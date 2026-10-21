@@ -16,6 +16,7 @@ class StartupSplashStatusTest {
     @Test
     void replacingStatusClearsOldTextAndPreservesBrandingAndAnimatedBar() throws Exception {
         BufferedImage original = splashFrame();
+        paint(original, "Starting Java...");
         BufferedImage updated = copy(original);
         paint(updated, "Preparing workspace...");
         paint(updated, "Loading preferences...");
@@ -45,7 +46,7 @@ class StartupSplashStatusTest {
             } finally {
                 graphics.dispose();
             }
-            Color expected = Color.decode(theme == AppTheme.Theme.DARK ? "#26282c" : "#e9eaee");
+            Color expected = themeBackground(theme);
             assertEquals(expected.getRGB(), image.getRGB(0, 10));
             assertEquals(expected.getRGB(), image.getRGB(32, 153));
         }
@@ -61,7 +62,7 @@ class StartupSplashStatusTest {
         } finally {
             graphics.dispose();
         }
-        assertEquals(Color.decode("#e9eaee").getRGB(), image.getRGB(0, 10));
+        assertEquals(themeBackground(AppTheme.Theme.LIGHT).getRGB(), image.getRGB(0, 10));
     }
 
     @Test
@@ -77,10 +78,45 @@ class StartupSplashStatusTest {
         });
     }
 
+    @Test
+    void brandingUsesNativeResolutionOnHighDpiDisplays() throws Exception {
+        for (var theme : AppTheme.Theme.values()) {
+            var content = StartupSplash.createContent(theme, "Starting...", StartupSplash.loadFirstFrame(theme));
+            var nativeImage = new BufferedImage(960, 460, BufferedImage.TYPE_INT_RGB);
+            var graphics = nativeImage.createGraphics();
+            try {
+                graphics.scale(2, 2);
+                content.paint(graphics);
+            } finally {
+                graphics.dispose();
+            }
+            int distinctEdges = 0;
+            for (int y = 70; y < 130; y += 2) for (int x = 240; x < 880; x += 2) {
+                if (nativeImage.getRGB(x, y) != nativeImage.getRGB(x + 1, y)
+                        || nativeImage.getRGB(x, y) != nativeImage.getRGB(x, y + 1)) distinctEdges++;
+            }
+            assertTrue(distinctEdges > 100, "Branding must render at device resolution rather than magnifying GIF pixels");
+            var output = java.nio.file.Path.of("build/splash-review/" + theme.preferenceValue() + "-200.png");
+            java.nio.file.Files.createDirectories(output.getParent());
+            ImageIO.write(nativeImage, "png", output.toFile());
+        }
+    }
+
     private static BufferedImage splashFrame() throws Exception {
         try (var resource = StartupSplashStatusTest.class.getResourceAsStream("/images/startup-splash-light.gif")) {
             assertNotNull(resource);
-            return ImageIO.read(resource);
+            return copy(ImageIO.read(resource));
+        }
+    }
+
+    private static Color themeBackground(AppTheme.Theme theme) {
+        try {
+            String css = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/style/theme-" + theme.preferenceValue() + ".css"));
+            var match = java.util.regex.Pattern.compile("-sl-chrome\\s*:\\s*(#[0-9a-fA-F]{6})").matcher(css);
+            assertTrue(match.find());
+            return Color.decode(match.group(1));
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
         }
     }
 

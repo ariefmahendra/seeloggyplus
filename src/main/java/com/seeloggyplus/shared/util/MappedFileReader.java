@@ -20,6 +20,8 @@ public class MappedFileReader implements AutoCloseable {
 
     public static final int MAX_LINE_BYTES = 256 * 1024;
 
+    private static final ThreadLocal<byte[]> READ_BUFFER = ThreadLocal.withInitial(() -> new byte[4096]);
+
     private final long fileSize;
     private final Charset charset;
     private final long chunkSize;
@@ -65,7 +67,7 @@ public class MappedFileReader implements AutoCloseable {
         }
 
         int cap = (int) Math.min((long) maxLength, MAX_LINE_BYTES);
-        byte[] lineBuffer = new byte[cap];
+        byte[] lineBuffer = buffer(cap);
         int len = fillLineBytes(startOffset, lineBuffer, cap);
 
         return new String(lineBuffer, 0, len, charset);
@@ -91,42 +93,76 @@ public class MappedFileReader implements AutoCloseable {
         return matcher.test(readLine(index, lineNumber));
     }
 
+    private static byte[] buffer(int capacity) {
+        byte[] bytes = READ_BUFFER.get();
+        if (bytes.length < capacity) {
+            bytes = new byte[Math.min(MAX_LINE_BYTES, Math.max(capacity, bytes.length * 2))];
+            READ_BUFFER.set(bytes);
+        }
+        return bytes;
+    }
+
+    public boolean lineContainsLiteral(LineOffsetIndex index, int lineNumber, String term, boolean caseSensitive) {
+        if (lineNumber < 0 || lineNumber >= index.getLineCount()) return false;
+        long offset = index.getOffset(lineNumber);
+        int capacity = (int) Math.min(index.getLineLength(lineNumber, fileSize), MAX_LINE_BYTES);
+        byte[] bytes = buffer(capacity);
+        int length = fillLineBytes(offset, bytes, capacity);
+        boolean asciiTerm = charset.equals(StandardCharsets.UTF_8);
+        for (int i = 0; asciiTerm && i < term.length(); i++) asciiTerm = term.charAt(i) < 128;
+        String language = java.util.Locale.getDefault().getLanguage();
+        if (!asciiTerm || (!caseSensitive && (language.equals("tr") || language.equals("az")))) {
+            return decodedContains(bytes, length, term, caseSensitive);
+        }
+        if (term.isEmpty()) return true;
+        int first = term.charAt(0);
+        if (!caseSensitive && first >= 'A' && first <= 'Z') first += 32;
+        boolean unicode = false;
+        int limit = length - term.length();
+        for (int start = 0; start < length; start++) {
+            int actual = bytes[start];
+            if (actual < 0) {unicode = true; continue;}
+            if (!caseSensitive && actual >= 'A' && actual <= 'Z') actual += 32;
+            if (actual != first || start > limit) continue;
+            int at = 1;
+            while (at < term.length()) {
+                actual = bytes[start + at];
+                int expected = term.charAt(at);
+                if (!caseSensitive) {
+                    if (actual >= 'A' && actual <= 'Z') actual += 32;
+                    if (expected >= 'A' && expected <= 'Z') expected += 32;
+                }
+                if (actual != expected) break;
+                at++;
+            }
+            if (at == term.length()) return true;
+        }
+        return unicode && !caseSensitive && decodedContains(bytes, length, term, false);
+    }
+
+    private boolean decodedContains(byte[] bytes, int length, String term, boolean caseSensitive) {
+        String line = new String(bytes, 0, length, charset);
+        return caseSensitive ? line.contains(term) : line.toLowerCase().contains(term.toLowerCase());
+    }
+
     private int fillLineBytes(long startOffset, byte[] target, int maxBytes) {
         int written = 0;
         long position = startOffset;
-
         while (written < maxBytes && position < fileSize) {
             int chunkIndex = (int) (position / chunkSize);
             int localOffset = (int) (position - chunkOffsets[chunkIndex]);
             MappedByteBuffer buffer = buffers[chunkIndex];
-
-            int available = buffer.capacity() - localOffset;
-            if (available <= 0) {
-                break;
+            int count = Math.min(buffer.capacity() - localOffset, maxBytes - written);
+            if (count <= 0) break;
+            int begin = written;
+            buffer.get(localOffset, target, begin, count);
+            for (int i = begin; i < begin + count; i++) {
+                byte value = target[i];
+                if (value == '\n') return written;
+                if (value != '\r') target[written++] = value;
             }
-
-            int scanned = 0;
-            boolean endOfLine = false;
-
-            while (scanned < available && written < maxBytes) {
-                byte b = buffer.get(localOffset + scanned);
-                scanned++;
-                if (b == '\n') {
-                    endOfLine = true;
-                    break;
-                }
-                if (b != '\r') {
-                    target[written++] = b;
-                }
-            }
-
-            position += scanned;
-
-            if (endOfLine) {
-                break;
-            }
+            position += count;
         }
-
         return written;
     }
 

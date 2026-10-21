@@ -51,7 +51,7 @@ class ThemedAlertsTest {
                         assertTrue(message.getViewportBounds().getHeight() >= ((Label) message.getContent()).prefHeight(message.getViewportBounds().getWidth()), "The complete message line must fit in the viewport");
                         assertTrue(pane.getContent().getBoundsInParent().getHeight() >= 32, "Content must include readable text and bottom spacing");
                         Color surface = RenderedColors.background(pane);
-                        assertEquals(Color.web(theme == AppTheme.Theme.LIGHT ? "#ffffff" : "#191a1c"), surface);
+                        assertEquals(Color.web(theme == AppTheme.Theme.LIGHT ? "#ffffff" : "#181c22"), surface);
                         assertEquals(0, pane.getBackground().getFills().getFirst().getRadii().getTopLeftHorizontalRadius());
                         var glyph = (Text) pane.lookup(".message-icon-glyph");
                         assertNotNull(glyph);
@@ -128,7 +128,7 @@ class ThemedAlertsTest {
                     var pane = alert.getDialogPane();
                     pane.applyCss();
                     pane.layout();
-                    assertEquals(Color.web(theme == AppTheme.Theme.DARK ? "#191a1c" : "#ffffff"), RenderedColors.background(pane));
+                    assertEquals(Color.web(theme == AppTheme.Theme.DARK ? "#181c22" : "#ffffff"), RenderedColors.background(pane));
                     assertTrue(contrast((Color) ((Text) details.lookup(".text")).getFill(),
                             RenderedColors.background((Region) details.lookup(".content"))) >= 4.5);
                     assertNull(((Hyperlink) pane.lookup(".details-button")).getGraphic(), "Details toggle must avoid the unthemed bitmap icon");
@@ -197,7 +197,7 @@ class ThemedAlertsTest {
                 alert.show();
                 alert.getDialogPane().applyCss();
                 assertNull(alert.getOwner());
-                assertEquals(Color.web("#191a1c"), RenderedColors.background(alert.getDialogPane()));
+                assertEquals(Color.web("#181c22"), RenderedColors.background(alert.getDialogPane()));
             } finally {
                 alert.close();
             }

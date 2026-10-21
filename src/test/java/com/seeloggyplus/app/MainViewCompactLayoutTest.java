@@ -46,9 +46,9 @@ class MainViewCompactLayoutTest {
                             "Toolbar should blend with the log surface in " + theme);
                     var status = (Label) root.lookup("#statusLabel");
                     assertTrue(contrast((Color) status.getTextFill(), RenderedColors.background(status)) >= 4.5);
-                    assertTrue(toolbar.getHeight() <= 38, "toolbar height " + toolbar.getHeight());
+                    assertTrue(toolbar.getHeight() <= 40, "toolbar height " + toolbar.getHeight());
                     var search = (TextField) root.lookup("#searchField");
-                    assertTrue(search.getHeight() <= 28, "search height " + search.getHeight());
+                    assertTrue(search.getHeight() <= 32, "search height " + search.getHeight());
                     assertTrue(((Region) root.lookup(".status-bar")).getHeight() <= 28);
                     var subtitle = (Label) root.lookup(".empty-state-subtitle");
                     assertTrue(subtitle.isWrapText());

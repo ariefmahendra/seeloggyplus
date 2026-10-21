@@ -9,6 +9,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
@@ -22,6 +23,9 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +40,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -43,11 +48,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class MainControllerHelperLogicTest {
 
     private MainController controller;
+    private Parent root;
 
     @Start
     void start(Stage stage) throws Exception {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
-        Parent root = loader.load();
+        root = loader.load();
         controller = loader.getController();
     }
 
@@ -145,7 +151,7 @@ class MainControllerHelperLogicTest {
                 Label label = (Label) field("memoryStatusLabel");
                 ProgressBar bar = (ProgressBar) field("memoryBar");
 
-                assertTrue(label.getText().matches("Used: \\d+ MB / Total: \\d+ MB"),
+                assertTrue(label.getText().matches("Heap: \\d+ MiB"),
                         "The label must show the usage with its heap total (no max): " + label.getText());
                 double progress = bar.getProgress();
                 assertTrue(progress >= 0 && progress <= 1, "Progress must be a ratio: " + progress);
@@ -161,6 +167,63 @@ class MainControllerHelperLogicTest {
             }
         });
         WaitForAsyncUtils.waitForFxEvents();
+    }
+
+    @Test
+    void keyboardShortcutsAreInstalledAsSoonAsTheViewJoinsAScene() throws Exception {
+        WaitForAsyncUtils.asyncFx(() -> {
+            Scene scene = new Scene(root);
+            assertNotNull(scene.getAccelerators().get(new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN)),
+                    "Attaching the view must install shortcuts without repeatedly queuing detached controllers");
+            assertNotNull(scene.getAccelerators().get(new KeyCodeCombination(KeyCode.J, KeyCombination.CONTROL_DOWN)));
+        }).get();
+    }
+
+    @Test
+    void memoryPollingStopsWithoutAVisibleWindowAndResumesWhenShown() throws Exception {
+        Label label = (Label) field("memoryStatusLabel");
+        Stage stage = WaitForAsyncUtils.asyncFx(() -> {
+            label.setText("detached");
+            return new Stage();
+        }).get();
+        try {
+            Thread.sleep(2300);
+            WaitForAsyncUtils.asyncFx(() -> assertEquals("detached", label.getText())).get();
+            WaitForAsyncUtils.asyncFx(() -> {
+                stage.setScene(new Scene(root));
+                stage.show();
+            }).get();
+            WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> label.getText().startsWith("Heap:"));
+            WaitForAsyncUtils.asyncFx(() -> {
+                stage.hide();
+                label.setText("hidden");
+            }).get();
+            Thread.sleep(2300);
+            WaitForAsyncUtils.asyncFx(() -> assertEquals("hidden", label.getText())).get();
+            WaitForAsyncUtils.asyncFx(stage::show).get();
+            WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> label.getText().startsWith("Heap:"));
+        } finally {
+            WaitForAsyncUtils.asyncFx(stage::hide).get();
+        }
+    }
+
+    @Test
+    void repeatedMemoryUpdatesReuseTheInstalledTooltip() throws Exception {
+        WaitForAsyncUtils.asyncFx(() -> {
+            try {
+                Label label = (Label) field("memoryStatusLabel");
+                invoke("updateMemoryStatus", new Class<?>[0]);
+                var tooltip = label.getTooltip();
+                assertNotNull(tooltip);
+                for (int update = 0; update < 25; update++) {
+                    invoke("updateMemoryStatus", new Class<?>[0]);
+                    assertSame(tooltip, label.getTooltip(), "Memory polling must update one tooltip instead of retaining new popup scenes");
+                }
+                assertTrue(tooltip.getText().contains("Total:"));
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        }).get();
     }
 
     @Test
@@ -270,28 +333,6 @@ class MainControllerHelperLogicTest {
                 assertEquals(2, pane.getSelectionModel().getSelectedIndex());
                 invoke("selectPreviousTab", new Class<?>[0]);
                 assertEquals(1, pane.getSelectionModel().getSelectedIndex());
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
-        });
-        WaitForAsyncUtils.waitForFxEvents();
-    }
-
-    @Test
-    void getLineContentForGlobalReadsLiveTailBufferBounds() throws Exception {
-        Platform.runLater(() -> {
-            try {
-                setField("tailModeEnabled", true);
-                setField("liveTailList", new ArrayList<>(List.of(new LogEntry(1L, "raw tail line"))));
-                setField("canvasLogViewer", null);
-                setField("mappedFileReader", null);
-                setField("lineOffsetIndex", null);
-
-                assertEquals("raw tail line", invoke("getLineContentForGlobal", new Class<?>[]{long.class}, 0L));
-                assertEquals("", invoke("getLineContentForGlobal", new Class<?>[]{long.class}, 1L));
-
-                setField("tailModeEnabled", false);
-                assertEquals("", invoke("getLineContentForGlobal", new Class<?>[]{long.class}, 0L));
             } catch (Exception e) {
                 throw new IllegalStateException(e);
             }

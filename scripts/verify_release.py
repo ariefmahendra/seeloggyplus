@@ -14,7 +14,7 @@ def validate(version, root, distributions=None):
     require(re.fullmatch(r"\d+\.\d+\.\d+", version), "Release must use a stable semver tag")
     properties = (root / "gradle.properties").read_text(encoding="utf-8")
     require(re.search(rf"^version={re.escape(version)}$", properties, re.M), "Tag and application version differ")
-    notes = root / f"docs/release-notes/{version}.md"
+    notes = root / f"release-notes/{version}.md"
     require(notes.is_file(), "Release notes are missing")
     body = notes.read_text(encoding="utf-8")
     require(body.startswith(f"# SeeLoggyPlus {version}\n") and "## Upgrade notes" in body, "Release notes are incomplete")

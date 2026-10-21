@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted","Linux","X64","PIKACU"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -106,7 +106,7 @@ jobs:
       matrix:
         include:
           - platform: linux
-            runner: '["self-hosted","Linux","X64","PIKACU"]'
+            runner: ${{ vars.RUNNER_LABELS || '["ubuntu-latest"]' }}
           - platform: win
             runner: '["windows-latest"]'
     runs-on: ${{ fromJSON(matrix.runner) }}
@@ -175,7 +175,7 @@ jobs:
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["self-hosted","Linux","X64","PIKACU"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '["ubuntu-latest"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -230,13 +230,13 @@ jobs:
         shell: bash
         run: cat build/distributions/update-manifest.json
 
-      - name: Build release notes (standard docs/release-notes file)
+      - name: Build release notes (standard release-notes file)
         shell: bash
         run: |
           set -e
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
-          NOTES="docs/release-notes/${VERSION}.md"
+          NOTES="release-notes/${VERSION}.md"
           if [ -f "$NOTES" ]; then
             echo "Using the standard release notes document: $NOTES"
             cp "$NOTES" release-body.md

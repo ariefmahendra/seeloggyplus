@@ -6,6 +6,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.shape.Rectangle?>
+<?import javafx.scene.shape.SVGPath?>
 <?import java.net.URL?>
 <BorderPane styleClass="main-view" minHeight="400" minWidth="600" prefHeight="700" prefWidth="1024.0" xmlns="http://javafx.com/javafx/17"
             xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.seeloggyplus.app.MainController">
@@ -21,6 +22,7 @@
                     <MenuItem fx:id="closeTabMenuItem" accelerator="Ctrl+W" onAction="#handleCloseCurrentTab"
                               text="Close Tab"/>
                     <MenuItem fx:id="closeAllTabsMenuItem" onAction="#handleCloseAllTabs" text="Close All Tabs"/>
+                    <MenuItem fx:id="clearLogMenuItem" text="Clear Log View" onAction="#handleClearLog"/>
                     <SeparatorMenuItem/>
                     <MenuItem fx:id="exitMenuItem" accelerator="Alt+F4" text="Exit"/>
                 </Menu>
@@ -31,6 +33,13 @@
                     <SeparatorMenuItem/>
                     <MenuItem accelerator="Ctrl+G" onAction="#handleGoToLine" text="Go To Line..."/>
                     <MenuItem fx:id="refreshMenuItem" accelerator="F5" onAction="#handleReload" text="Refresh"/>
+                    <SeparatorMenuItem/>
+                    <Menu text="Results Position">
+                        <RadioMenuItem fx:id="resultsAutoMenuItem" text="Auto" selected="true"/>
+                        <RadioMenuItem fx:id="resultsRightMenuItem" text="Right"/>
+                        <RadioMenuItem fx:id="resultsBottomMenuItem" text="Bottom"/>
+                    </Menu>
+                    <MenuItem text="Reset Layout" onAction="#resetWorkbenchLayout"/>
                 </Menu>
 
                 <Menu text="_Settings">
@@ -39,6 +48,9 @@
                     <MenuItem fx:id="preferencesMenuItem" text="Preferences..."/>
                 </Menu>
 
+                <Menu text="_Diagnostics">
+                    <MenuItem text="Run Garbage Collection" onAction="#handleGC"/>
+                </Menu>
                 <Menu text="_Help">
                     <MenuItem fx:id="helpContentsMenuItem" text="Help Contents" accelerator="F1"/>
                     <SeparatorMenuItem/>
@@ -50,79 +62,38 @@
                 </Menu>
             </MenuBar>
 
-            <ToolBar styleClass="app-toolbar">
-                <ToggleButton fx:id="toggleLeftPanelButton" selected="true">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="FOLDER_OPEN" size="12"/>
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Show/Hide Recent Files Panel (Ctrl+B)"/>
-                    </tooltip>
-                </ToggleButton>
-                <ToggleButton fx:id="toggleBottomPanelButton" selected="true">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="FILE_TEXT" size="12"/>
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Show/Hide Detail Panel (Ctrl+J)"/>
-                    </tooltip>
-                </ToggleButton>
+            <ToolBar fx:id="workbenchToolbar" styleClass="app-toolbar,workbench-toolbar">
+                <Button fx:id="openFileButton" text="Open" onAction="#handleOpen" accessibleText="Open log file">
+                    <graphic><FontAwesomeIconView glyphName="FOLDER_OPEN" size="16"/></graphic>
+                    <tooltip><Tooltip text="Open log file (Ctrl+O)"/></tooltip>
+                </Button>
+                <Button fx:id="serversButton" text="Servers" onAction="#handleServerManagement">
+                    <graphic><FontAwesomeIconView glyphName="SERVER" size="16"/></graphic>
+                    <tooltip><Tooltip text="Manage SSH servers (Ctrl+M)"/></tooltip>
+                </Button>
                 <Separator orientation="VERTICAL"/>
-                <TextField fx:id="searchField" minWidth="120" prefWidth="200" promptText="Search logs..."/>
-
+                <TextField fx:id="searchField" minWidth="140" prefWidth="260" promptText="Search logs..."/>
                 <ToggleButton fx:id="regexCheckBox" text=".*" accessibleText="Regular expression"><tooltip><Tooltip text="Use regular expressions"/></tooltip></ToggleButton>
                 <ToggleButton fx:id="caseSensitiveCheckBox" text="Aa" accessibleText="Case sensitive"><tooltip><Tooltip text="Match case"/></tooltip></ToggleButton>
-                <Button fx:id="searchButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="SEARCH" size="12"/>
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Apply Filters"/>
-                    </tooltip>
+                <Button fx:id="searchButton" accessibleText="Search logs">
+                    <graphic><FontAwesomeIconView glyphName="SEARCH" size="16"/></graphic>
+                    <tooltip><Tooltip text="Search logs (Enter)"/></tooltip>
                 </Button>
-                <Button fx:id="clearSearchButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12"/>
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Clear All Filters"/>
-                    </tooltip>
+                <Button fx:id="clearSearchButton" accessibleText="Clear search">
+                    <graphic><FontAwesomeIconView glyphName="TIMES_CIRCLE" size="16"/></graphic>
+                    <tooltip><Tooltip text="Clear search"/></tooltip>
                 </Button>
                 <SearchNavigator fx:id="searchNavigator"/>
                 <Separator orientation="VERTICAL"/>
-                <Button fx:id="refreshButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="REFRESH" size="12"/>
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Reload Log"/>
-                    </tooltip>
-                </Button>
-                <ToggleButton fx:id="tailButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="TERMINAL" size="12"/>
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Tail (Enable Tail Mode)"/>
-                    </tooltip>
+                <ToggleButton fx:id="tailButton" text="Tail">
+                    <graphic><FontAwesomeIconView glyphName="TERMINAL" size="16"/></graphic>
+                    <tooltip><Tooltip text="Enable or pause Tail"/></tooltip>
                 </ToggleButton>
-                <ToggleButton fx:id="followTailButton" selected="true">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="ARROW_DOWN" size="12"/>
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Smart Follow (Auto-scroll to bottom)"/>
-                    </tooltip>
+                <Label fx:id="tailStatusLabel" text="Paused" styleClass="tail-status"/>
+                <ToggleButton fx:id="followTailButton" text="Follow" selected="true">
+                    <graphic><FontAwesomeIconView glyphName="ARROW_DOWN" size="16"/></graphic>
+                    <tooltip><Tooltip text="Follow new lines; disabling Follow keeps Tail running"/></tooltip>
                 </ToggleButton>
-                <Separator orientation="VERTICAL"/>
-                <Button fx:id="clearLogButton">
-                    <graphic>
-                        <FontAwesomeIconView glyphName="TRASH" size="12"/>
-                    </graphic>
-                    <tooltip>
-                        <Tooltip text="Clear Log View"/>
-                    </tooltip>
-                </Button>
             </ToolBar>
         </VBox>
     </top>
@@ -181,22 +152,32 @@
 
     <bottom>
         <HBox alignment="CENTER_LEFT" spacing="6" styleClass="status-bar">
-            <Label fx:id="statusLabel" text="Line: 0 / 0 (0%)" styleClass="status-text"/>
-            <Label fx:id="selectionStatusLabel" styleClass="status-text-muted" visible="false" managed="false"/>
+                <ToggleButton fx:id="toggleLeftPanelButton" selected="true" styleClass="panel-toggle" accessibleText="Toggle Recent Files Panel">
+                    <graphic><SVGPath content="M 2 2 H 16 V 14 H 2 Z M 7 2 V 14" styleClass="panel-layout-icon"/></graphic>
+                    <tooltip><Tooltip text="Show/Hide Recent Files Panel (Ctrl+B)"/></tooltip>
+                </ToggleButton>
+                <ToggleButton fx:id="toggleBottomPanelButton" selected="true" styleClass="panel-toggle" accessibleText="Toggle Detail Panel">
+                    <graphic><SVGPath content="M 2 2 H 16 V 14 H 2 Z M 2 10 H 16" styleClass="panel-layout-icon"/></graphic>
+                    <tooltip><Tooltip text="Show/Hide Detail Panel (Ctrl+J)"/></tooltip>
+                </ToggleButton>
             <Separator orientation="VERTICAL"/>
             <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="statusLabel" minWidth="0" text="Line: 0 / 0 (0%)" styleClass="status-text"/>
+            <Label fx:id="selectionStatusLabel" minWidth="0" maxWidth="200" styleClass="status-text-muted" visible="false" managed="false"/>
+            <Separator orientation="VERTICAL"/>
             <Label fx:id="updateStatusLabel" styleClass="status-link" visible="false" managed="false">
                 <tooltip>
                     <Tooltip text="A new version is available - click to update"/>
                 </tooltip>
             </Label>
-            <Button text="GC" onAction="#handleGC" styleClass="btn-compact">
-                <tooltip>
-                    <Tooltip text="Run Garbage Collection"/>
-                </tooltip>
-            </Button>
-            <Separator orientation="VERTICAL"/>
-            <Label fx:id="memoryStatusLabel" text="Memory: ..." styleClass="status-text-muted"/>
+            <MenuButton fx:id="resourceButton" text="Resources" minWidth="-Infinity" styleClass="resource-button">
+                <items>
+                    <CustomMenuItem hideOnClick="false">
+                        <content><Label fx:id="resourceDetailLabel" text="Java heap usage" wrapText="true" maxWidth="300"/></content>
+                    </CustomMenuItem>
+                </items>
+            </MenuButton>
+            <Label fx:id="memoryStatusLabel" text="Heap: ..." styleClass="status-text-muted"/>
             <ProgressBar fx:id="memoryBar" prefWidth="50" progress="0.0" styleClass="status-memory-bar">
                 <tooltip>
                     <Tooltip text="Heap Usage"/>

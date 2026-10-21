@@ -38,9 +38,7 @@ public class PreferencesDialogController {
     @FXML
     private Spinner<Integer> tailWindowSizeSpinner;
     @FXML
-    private CheckBox mainAutoPrettifyJsonCheckBox;
-    @FXML
-    private CheckBox mainAutoPrettifyXmlCheckBox;
+    private CheckBox detailFormattedCheckBox;
     @FXML
     private ComboBox<String> themeComboBox;
     @FXML
@@ -187,15 +185,15 @@ public class PreferencesDialogController {
     private void loadPreferences() {
         fileDoubleClickComboBox.setItems(FXCollections.observableArrayList("Open/Download", "Tail"));
         fileDoubleClickComboBox.setValue("TAIL".equalsIgnoreCase(getPreference("file_double_click_action", "OPEN")) ? "Tail" : "Open/Download");
-        appFontSizeSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("app_font_size", "12")));
+        appFontSizeSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("app_font_size", "13")));
         appFontFamilyComboBox.getSelectionModel().select(getPreference("app_font_family", "Consolas"));
         appMaxMemorySpinner.getValueFactory().setValue(Integer.parseInt(getPreference("app_max_memory_gb", "4")));
 
         tailWindowSizeSpinner.getValueFactory()
                 .setValue(Integer.parseInt(getPreference("main_tail_window_size", "20000")));
-        mainAutoPrettifyJsonCheckBox
-                .setSelected(Boolean.parseBoolean(getPreference("main_auto_prettify_json", "false")));
-        mainAutoPrettifyXmlCheckBox.setSelected(Boolean.parseBoolean(getPreference("main_auto_prettify_xml", "false")));
+        boolean legacyFormatted = Boolean.parseBoolean(getPreference("main_auto_prettify_json", "false"))
+                || Boolean.parseBoolean(getPreference("main_auto_prettify_xml", "false"));
+        detailFormattedCheckBox.setSelected(Boolean.parseBoolean(getPreference("main_detail_formatted", String.valueOf(legacyFormatted))));
 
         lpLineLimitSpinner.getValueFactory().setValue(Integer.parseInt(getPreference("lp_line_limit", "500")));
 
@@ -234,8 +232,7 @@ public class PreferencesDialogController {
         updateLauncherConfig(appMaxMemorySpinner.getValue());
 
         savePreference("main_tail_window_size", String.valueOf(tailWindowSizeSpinner.getValue()));
-        savePreference("main_auto_prettify_json", String.valueOf(mainAutoPrettifyJsonCheckBox.isSelected()));
-        savePreference("main_auto_prettify_xml", String.valueOf(mainAutoPrettifyXmlCheckBox.isSelected()));
+        savePreference("main_detail_formatted", String.valueOf(detailFormattedCheckBox.isSelected()));
 
         savePreference("lp_line_limit", String.valueOf(lpLineLimitSpinner.getValue()));
 

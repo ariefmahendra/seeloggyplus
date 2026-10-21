@@ -24,7 +24,12 @@ def fetch_tagged_text(name, version, fetch=request):
         content = fetch("contents/" + name + "?ref=" + version)
         return base64.b64decode(content["content"]).decode("utf-8").replace("\r\n", "\n")
     except Exception:
-        return subprocess.check_output(["git", "show", version + ":" + name]).decode("utf-8").replace("\r\n", "\n")
+        try:
+            return subprocess.check_output(["git", "show", version + ":" + name]).decode("utf-8").replace("\r\n", "\n")
+        except subprocess.CalledProcessError:
+            if name.startswith("release-notes/"):
+                return fetch_tagged_text("docs/" + name, version, fetch=fetch)
+            raise
 
 
 if __name__ == "__main__":
@@ -38,7 +43,7 @@ if __name__ == "__main__":
     run = request("actions/runs/" + str(args.run_id))
     jobs = request("actions/runs/" + str(args.run_id) + "/jobs?per_page=100")["jobs"]
     validate(run, jobs, args.version, commit["sha"])
-    for name in ["gradle.properties", "docs/release-notes/" + args.version + ".md"]:
+    for name in ["gradle.properties", "release-notes/" + args.version + ".md"]:
         tagged = fetch_tagged_text(name, args.version)
         if Path(name).read_text(encoding="utf-8").replace("\r\n", "\n") != tagged:
             raise ValueError("Recovery metadata differs from the tested tag: " + name)

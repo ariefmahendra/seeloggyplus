@@ -74,6 +74,12 @@ public class SearchNavigator extends HBox {
         updateVisibility(true);
     }
 
+    public void showMessage(String message, String detail) {
+        statusLabel.setText(message);
+        statusLabel.setTooltip(detail == null ? null : new Tooltip(detail));
+        updateVisibility(true);
+    }
+
     public void clear() {
         statusLabel.setText("");
         statusLabel.setTooltip(null);

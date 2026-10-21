@@ -38,6 +38,7 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(ApplicationExtension.class)
@@ -130,8 +131,8 @@ class SearchResultPanelBehaviorTest {
     }
 
     @Test
-    @DisplayName("long lines are truncated to five hundred characters")
-    void longLineIsTruncated() {
+    @DisplayName("long lines retain their complete content beyond five hundred characters")
+    void longLineRetainsFullContent() {
         SearchResultPanel panel = new SearchResultPanel();
         panel.showResults(list(0), 1);
         panel.setLineContentResolver(line -> "x".repeat(600));
@@ -141,7 +142,7 @@ class SearchResultPanelBehaviorTest {
         panel.selectAndTriggerLine(0);
 
         assertEquals(1, contents.size());
-        assertEquals(500, contents.get(0).length());
+        assertEquals(600, contents.get(0).length());
     }
 
     @Test
@@ -247,7 +248,7 @@ class SearchResultPanelBehaviorTest {
     @DisplayName("scrollbar changes move the viewport offsets")
     void scrollBarsMoveViewport() throws Exception {
         SearchResultPanel panel = showPanel(400, 320);
-        onFxThread(() -> panel.showResults(sequence(100), 100));
+        onFxThread(() -> { panel.setLineContentResolver(line -> "payload-".repeat(100)); panel.showResults(sequence(100), 100); });
         ScrollBar v = (ScrollBar) privateField(panel, "vScrollBar");
         ScrollBar h = (ScrollBar) privateField(panel, "hScrollBar");
 
@@ -265,7 +266,7 @@ class SearchResultPanelBehaviorTest {
     @DisplayName("wheel scrolling moves lines vertically and horizontally")
     void scrollGesturesMoveViewport() throws Exception {
         SearchResultPanel panel = showPanel(400, 320);
-        onFxThread(() -> panel.showResults(sequence(100), 100));
+        onFxThread(() -> { panel.setLineContentResolver(line -> "payload-".repeat(100)); panel.showResults(sequence(100), 100); });
         Canvas canvas = canvas(panel);
 
         onFxThread(() -> Event.fireEvent(canvas, scrollEvent(0, -120, false)));
@@ -403,6 +404,78 @@ class SearchResultPanelBehaviorTest {
         });
 
         assertTrue(painted.get(), "match text or highlight must be painted on the canvas");
+    }
+
+    @Test
+    void asynchronousContentLoadsOffTheFxThreadAndDeliversFullSelection() throws Exception {
+        SearchResultPanel panel = showPanel(400, 320);
+        List<Runnable> work = new ArrayList<>();
+        AtomicBoolean onFx = new AtomicBoolean(true);
+        AtomicReference<String> selected = new AtomicReference<>();
+        String content = "payload-".repeat(100) + "END_MARKER";
+        onFxThread(() -> {
+            panel.setLineContentResolver(line -> {
+                onFx.set(Platform.isFxApplicationThread());
+                return content;
+            }, work::add);
+            panel.setOnLineSelected((index, line, value) -> selected.set(value));
+            panel.showResults(list(0),1);
+            panel.selectAndTriggerLine(0);
+            assertNull(selected.get());
+        });
+        Thread worker = Thread.ofVirtual().start(work.get(0));
+        worker.join();
+        onFxThread(() -> {
+            assertFalse(onFx.get());
+            assertEquals(content, selected.get());
+        });
+    }
+
+    @Test
+    void clearingRejectsPendingContentAndTheCacheStaysBounded() throws Exception {
+        SearchResultPanel panel = showPanel(400, 320);
+        List<Runnable> work = new ArrayList<>();
+        AtomicReference<String> selected = new AtomicReference<>();
+        onFxThread(() -> {
+            panel.setLineContentResolver(line -> "old content", work::add);
+            panel.setOnLineSelected((index, line, value) -> selected.set(value));
+            panel.showResults(list(0),1);
+            panel.selectAndTriggerLine(0);
+            panel.clear();
+        });
+        Thread worker = Thread.ofVirtual().start(work.get(0));
+        worker.join();
+        onFxThread(() -> {
+            assertNull(selected.get());
+            assertFalse(panel.isVisible());
+            panel.setLineContentResolver(line -> "line-" + line);
+            panel.showResults(sequence(300),300);
+            for (int i=0;i<300;i++) panel.selectAndTriggerLine(i);
+            assertTrue(((java.util.Map<?,?>) privateFieldUnchecked(panel,"lineCache")).size() <= 256);
+        });
+    }
+
+    private static Object privateFieldUnchecked(Object target, String name) {
+        try { return privateField(target,name); }
+        catch (Exception error) { throw new AssertionError(error); }
+    }
+
+    @Test
+    void resultCacheHonorsAByteBudgetAndLimitsOutstandingLoads() throws Exception {
+        SearchResultPanel panel = showPanel(400, 600);
+        List<Runnable> jobs = new ArrayList<>();
+        onFxThread(() -> {
+            panel.setLineContentResolver(line -> "payload-".repeat(25000), jobs::add);
+            panel.showResults(sequence(100),100);
+            assertTrue(jobs.size() <= 4, "visible rows must not launch unbounded workers: " + jobs.size());
+            panel.clear();
+            panel.setLineContentResolver(line -> "payload-".repeat(25000));
+            panel.showResults(sequence(100),100);
+            for (int i=0;i<100;i++) panel.selectAndTriggerLine(i);
+            var cache = (java.util.Map<?,String>) privateFieldUnchecked(panel,"lineCache");
+            long bytes = cache.values().stream().mapToLong(value -> value.length()*2L).sum();
+            assertTrue(bytes <= 8L*1024*1024, "result text cache retained " + bytes + " bytes");
+        });
     }
 
     private SearchResultPanel showPanel(int width, int height) {

@@ -131,3 +131,7 @@ target/
 
 test-results/
 __pycache__/
+/docs/*
+!/docs/RELEASING.md
+/.local-docs/
+/.mcp.json

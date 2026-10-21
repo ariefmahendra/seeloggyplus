@@ -268,9 +268,9 @@ class DocumentationScreenshotGeneratorTest {
                 field.setAccessible(true);
                 Object paneController = field.get(controller);
                 Method setAutoPrettify = paneController.getClass()
-                        .getDeclaredMethod("setAutoPrettify", boolean.class, boolean.class);
+                        .getDeclaredMethod("setDefaultFormatted", boolean.class);
                 setAutoPrettify.setAccessible(true);
-                setAutoPrettify.invoke(paneController, true, false);
+                setAutoPrettify.invoke(paneController, true);
 
                 Method show = paneController.getClass()
                         .getDeclaredMethod("show", long.class, String.class);

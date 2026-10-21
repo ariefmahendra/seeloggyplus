@@ -25,6 +25,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.function.LongFunction;
+import java.util.function.BiConsumer;
+import java.util.LinkedHashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Executor;
+import javafx.application.Platform;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.seeloggyplus.shared.ui.SelectionColors;
@@ -60,7 +67,14 @@ public class SearchResultPanel extends VBox {
     private final double charWidth;
 
     private IntArrayList matchedLines;
-    private String[] lineCache;
+    private final Map<Integer, String> lineCache = new LinkedHashMap<>(256, .75f, true);
+    private final Set<Integer> pendingLines = new HashSet<>();
+    private Executor contentExecutor;
+    private volatile long contentGeneration;
+    private int inFlightContent;
+    private static final long CACHE_BYTES = 8L * 1024 * 1024;
+    private int pendingSelection = -1;
+    private int maxLineCharacters;
     private int itemCount = 0;
     private long currentTopLine = 0;
     private double currentScrollX = 0;
@@ -72,6 +86,7 @@ public class SearchResultPanel extends VBox {
     private Pattern searchPattern;
 
     private SearchHitCallback onLineSelected;
+    private BiConsumer<Integer, Long> onLineActivated;
     private LongFunction<String> lineContentResolver;
 
     @FunctionalInterface
@@ -139,7 +154,7 @@ public class SearchResultPanel extends VBox {
         VBox.setVgrow(canvasGrid, Priority.ALWAYS);
 
         setSpacing(2);
-        setPadding(new Insets(2));
+        setPadding(new Insets(8));
         setMinWidth(120);
         setPrefWidth(250);
         setMaxWidth(Double.MAX_VALUE);
@@ -148,9 +163,9 @@ public class SearchResultPanel extends VBox {
         setVisible(false);
         setManaged(false);
 
-        canvas.widthProperty().addListener((obs, o, n) -> render());
+        canvas.widthProperty().addListener((obs, o, n) -> { updateScrollBar(); render(); });
         canvas.heightProperty().addListener((obs, o, n) -> {
-            visibleLineCount = Math.max(1, (int) (n.doubleValue() / LINE_HEIGHT));
+            visibleLineCount = Math.max(1, (int) ((n.doubleValue() - PADDING * 2) / LINE_HEIGHT));
             updateScrollBar();
             render();
         });
@@ -216,8 +231,26 @@ public class SearchResultPanel extends VBox {
         this.onLineSelected = handler;
     }
 
+    public void setOnLineActivated(BiConsumer<Integer, Long> handler) {
+        this.onLineActivated = handler;
+    }
+
     public void setLineContentResolver(LongFunction<String> resolver) {
+        setLineContentResolver(resolver, null);
+    }
+
+    public void setLineContentResolver(LongFunction<String> resolver, Executor executor) {
         this.lineContentResolver = resolver;
+        this.contentExecutor = executor;
+        resetContent();
+    }
+
+    private void resetContent() {
+        contentGeneration++;
+        pendingLines.clear();
+        lineCache.clear();
+        pendingSelection = -1;
+        maxLineCharacters = 0;
     }
 
     public void setSearchPattern(Pattern pattern) {
@@ -226,22 +259,29 @@ public class SearchResultPanel extends VBox {
     }
 
     public void showResults(IntArrayList matchedIndexes, int totalLines) {
+        matchedLines = null;
+        itemCount = 0;
+        selectedIndex = -1;
+        resetContent();
+        currentScrollX = 0;
+        hScrollBar.setValue(0);
+        vScrollBar.setValue(0);
         if (matchedIndexes == null || matchedIndexes.size() == 0) {
             headerLabel.setText("No results");
-            this.matchedLines = null;
-            this.lineCache = null;
+            this.matchedLines = matchedIndexes;
             this.itemCount = 0;
             this.selectedIndex = -1;
             currentTopLine = 0;
             setVisible(true);
             setManaged(true);
+            updateScrollBar();
             render();
             return;
         }
 
         this.matchedLines = matchedIndexes;
         this.itemCount = matchedIndexes.size();
-        this.lineCache = new String[itemCount];
+
         this.selectedIndex = -1;
         this.currentTopLine = 0;
 
@@ -258,7 +298,7 @@ public class SearchResultPanel extends VBox {
 
     public void clear() {
         matchedLines = null;
-        lineCache = null;
+        resetContent();
         itemCount = 0;
         selectedIndex = -1;
         hoveredIndex = -1;
@@ -281,12 +321,16 @@ public class SearchResultPanel extends VBox {
         matchedLines = trimmed;
         itemCount = matchedLines.size();
 
-        String[] newCache = new String[itemCount];
-        if (lineCache != null && lineCache.length > removeCount) {
-            System.arraycopy(lineCache, removeCount, newCache, 0,
-                    Math.min(lineCache.length - removeCount, itemCount));
-        }
-        lineCache = newCache;
+        contentGeneration++;
+        pendingLines.clear();
+        pendingSelection = -1;
+        Map<Integer, String> shiftedCache = new LinkedHashMap<>();
+        lineCache.forEach((index, content) -> {
+            if (index >= removeCount) shiftedCache.put(index - removeCount, content);
+        });
+        lineCache.clear();
+        lineCache.putAll(shiftedCache);
+        maxLineCharacters = lineCache.values().stream().mapToInt(String::length).max().orElse(0);
 
         if (selectedIndex >= 0) {
             selectedIndex -= removeCount;
@@ -305,12 +349,12 @@ public class SearchResultPanel extends VBox {
         int newCount = matchedLines.size();
         if (newCount == itemCount) return;
 
-        if (lineCache == null || lineCache.length < newCount) {
-            String[] newCache = new String[newCount];
-            if (lineCache != null) {
-                System.arraycopy(lineCache, 0, newCache, 0, Math.min(lineCache.length, itemCount));
-            }
-            lineCache = newCache;
+        if (newCount < itemCount) {
+            contentGeneration++;
+            pendingLines.clear();
+            pendingSelection = -1;
+            lineCache.keySet().removeIf(index -> index >= newCount);
+            maxLineCharacters = lineCache.values().stream().mapToInt(String::length).max().orElse(0);
         }
         itemCount = newCount;
 
@@ -346,38 +390,79 @@ public class SearchResultPanel extends VBox {
 
     private void updateScrollBar() {
         long max = Math.max(0, itemCount - visibleLineCount);
+        currentTopLine = Math.min(currentTopLine, max);
         vScrollBar.setMax(max);
+        vScrollBar.setValue(currentTopLine);
         double minVisibleProportion = 0.12;
         double safeVisibleAmount = Math.max(visibleLineCount, itemCount * minVisibleProportion);
         vScrollBar.setVisibleAmount(safeVisibleAmount);
         vScrollBar.setBlockIncrement(Math.max(1, visibleLineCount - 1));
 
-        double visibleWidth = canvas.getWidth() - leftMargin;
-        double maxLineWidth = 500 * charWidth;
+        double visibleWidth = Math.max(0, canvas.getWidth() - leftMargin);
+        double maxLineWidth = maxLineCharacters * charWidth + PADDING;
         double maxScroll = Math.max(0, maxLineWidth - visibleWidth);
+        currentScrollX = Math.min(currentScrollX, maxScroll);
         hScrollBar.setMax(maxScroll);
+        hScrollBar.setValue(currentScrollX);
         hScrollBar.setVisibleAmount(visibleWidth);
         hScrollBar.setBlockIncrement(visibleWidth / 2);
     }
 
     private String getLineContent(int matchIndex) {
         if (matchIndex < 0 || matchIndex >= itemCount) return "";
-        if (lineCache[matchIndex] != null) return lineCache[matchIndex];
-
-        if (lineContentResolver != null && matchedLines != null) {
-            try {
-                long globalIdx = matchedLines.get(matchIndex);
-                String full = lineContentResolver.apply(globalIdx);
-                if (full != null) {
-                    lineCache[matchIndex] = full.length() > 500 ? full.substring(0, 500) : full;
-                    return lineCache[matchIndex];
-                }
-            } catch (Exception e) {
-                logger.debug("Could not resolve the full line for a search match", e);
-            }
+        String cached = lineCache.get(matchIndex);
+        if (cached != null) return cached;
+        if (lineContentResolver == null || matchedLines == null) return "";
+        long globalLine = matchedLines.get(matchIndex);
+        LongFunction<String> resolver = lineContentResolver;
+        if (contentExecutor == null) {
+            String content = resolve(resolver, globalLine);
+            cacheContent(matchIndex, content);
+            return content;
         }
-        lineCache[matchIndex] = "";
+        if (inFlightContent < 4 && pendingLines.add(matchIndex)) {
+            inFlightContent++;
+            long generation = contentGeneration;
+            contentExecutor.execute(() -> {
+                String content = generation == contentGeneration ? resolve(resolver, globalLine) : "";
+                Platform.runLater(() -> {
+                    inFlightContent--;
+                    if (generation != contentGeneration) {
+                        render();
+                        return;
+                    }
+                    pendingLines.remove(matchIndex);
+                    cacheContent(matchIndex, content);
+                    render();
+                    if (pendingSelection == matchIndex && selectedIndex == matchIndex) {
+                        pendingSelection = -1;
+                        fireSelection(matchIndex, globalLine, content);
+                    }
+                });
+            });
+        }
         return "";
+    }
+
+    private String resolve(LongFunction<String> resolver, long globalLine) {
+        try {
+            String content = resolver.apply(globalLine);
+            return content == null ? "" : content;
+        } catch (Exception error) {
+            logger.debug("Could not resolve the full line for a search match", error);
+            return "";
+        }
+    }
+
+    private void cacheContent(int index, String content) {
+        lineCache.put(index, content);
+        long bytes = lineCache.values().stream().mapToLong(value -> 40L + 2L * value.length()).sum();
+        while (lineCache.size() > 256 || bytes > CACHE_BYTES) {
+            String removed = lineCache.remove(lineCache.keySet().iterator().next());
+            bytes -= 40L + 2L * removed.length();
+        }
+        maxLineCharacters = Math.max(maxLineCharacters, content.length());
+        updateScrollBar();
     }
 
     private void render() {
@@ -394,7 +479,7 @@ public class SearchResultPanel extends VBox {
 
         gc.save();
         gc.beginPath();
-        gc.rect(leftMargin, 0, width - leftMargin, height);
+        gc.rect(leftMargin, 0, Math.max(0, width - leftMargin), height);
         gc.clip();
         gc.setFont(MONO_FONT);
 
@@ -464,11 +549,19 @@ public class SearchResultPanel extends VBox {
         if (index >= 0 && index < itemCount && matchedLines != null) {
             selectIndex(index);
             long globalLine = matchedLines.get(index);
+            if (onLineActivated != null) onLineActivated.accept(index, globalLine);
             String content = getLineContent(index);
-            if (onLineSelected != null) {
-                onLineSelected.onSelected(index, globalLine, content);
+            if (contentExecutor != null && !lineCache.containsKey(index)) {
+                pendingSelection = index;
+            } else {
+                pendingSelection = -1;
+                fireSelection(index, globalLine, content);
             }
         }
+    }
+
+    private void fireSelection(int index, long globalLine, String content) {
+        if (onLineSelected != null) onLineSelected.onSelected(index, globalLine, content);
     }
 
     private void setupMouseHandlers() {

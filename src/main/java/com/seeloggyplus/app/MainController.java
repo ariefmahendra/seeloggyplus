@@ -24,6 +24,7 @@ import javafx.animation.KeyFrame;
 import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
 import javafx.beans.binding.Bindings;
+import javafx.beans.value.ObservableValue;
 import javafx.scene.Cursor;
 import javafx.util.Duration;
 
@@ -91,6 +92,8 @@ import javafx.stage.Window;
 
 public class MainController {
 
+    private ObservableValue<Boolean> memoryMonitorShowing;
+
     private final LogServices suppliedLogServices;
 
     public MainController() {
@@ -140,12 +143,26 @@ public class MainController {
     private MenuItem preferencesMenuItem;
     @FXML
     private MenuItem refreshMenuItem;
+    @FXML private MenuItem clearLogMenuItem;
 
     @FXML
     private SplitPane horizontalSplitPane;
     @FXML
     private SplitPane verticalSplitPane;
 
+    @FXML private ToolBar workbenchToolbar;
+    @FXML private Button openFileButton;
+    @FXML private Button serversButton;
+    @FXML private Label tailStatusLabel;
+    @FXML private Label resourceDetailLabel;
+    @FXML private RadioMenuItem resultsAutoMenuItem;
+    @FXML private RadioMenuItem resultsRightMenuItem;
+    @FXML private RadioMenuItem resultsBottomMenuItem;
+    private WorkbenchDock workbenchDock;
+    private final java.util.concurrent.ExecutorService layoutPreferenceWriter = new java.util.concurrent.ThreadPoolExecutor(0, 1, 5,
+            java.util.concurrent.TimeUnit.SECONDS, new java.util.concurrent.ArrayBlockingQueue<>(1), r -> {
+        Thread thread = new Thread(r, "workbench-preferences"); thread.setDaemon(true); return thread;
+    }, new java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy());
     private VBox leftPanel;
     @FXML
     private VBox recentPanel;
@@ -185,11 +202,7 @@ public class MainController {
     @FXML
     private Rectangle centerClip;
     @FXML
-    private Button refreshButton;
-    @FXML
     private ToggleButton tailButton;
-    @FXML
-    private Button clearLogButton;
 
     @FXML
     private VBox detailPane;
@@ -292,13 +305,17 @@ public class MainController {
     private int totalEntries = 0;
     private IntArrayList filteredIndexes = null;
 
-    private static final ForkJoinPool SEARCH_POOL = new ForkJoinPool(Runtime.getRuntime().availableProcessors());
+    private static final int SEARCH_WORKERS = Math.max(1, Math.min(Integer.getInteger("seeloggyplus.searchWorkers", 6),
+            Runtime.getRuntime().availableProcessors()));
+    private static final ForkJoinPool SEARCH_POOL = new ForkJoinPool(SEARCH_WORKERS);
     private CanvasLogViewer canvasLogViewer;
     private MappedFileReader mappedFileReader;
     private LineOffsetIndex lineOffsetIndex;
     private int currentMatchIndex = -1;
     private PauseTransition searchDebounce;
     private Task<?> currentSearchTask;
+    private Future<?> currentTailSearchTask;
+    private Object incrementalTailSearchToken;
     private volatile long searchGeneration = 0;
     private String lastAppliedSearchQuery = null;
     private boolean lastAppliedRegex = false;
@@ -342,6 +359,7 @@ public class MainController {
 
         restorePanelVisibility();
         loadPreferences();
+        setupWorkbench();
 
         updateTailButtonState();
         startMemoryMonitor();
@@ -362,9 +380,9 @@ public class MainController {
                     emptyStatePane.getChildren().getFirst().layoutBoundsProperty()));
         }
 
-        RoundedPanelSupport.apply(recentPanel);
-        RoundedPanelSupport.apply(logContainer);
-        RoundedPanelSupport.apply(detailPane);
+        RoundedPanelSupport.apply(recentPanel, 4);
+        RoundedPanelSupport.apply(logContainer, 4);
+        RoundedPanelSupport.apply(detailPane, 4);
 
         if (centerRoot != null && centerClip != null) {
             centerClip.widthProperty().bind(centerRoot.widthProperty());
@@ -672,16 +690,17 @@ public class MainController {
         }
 
         searchResultPanel = new SearchResultPanel();
-        RoundedPanelSupport.apply(searchResultPanel);
-        searchResultPanel.setOnLineSelected((listIndex, globalLine, content) -> {
+        RoundedPanelSupport.apply(searchResultPanel, 4);
+        searchResultPanel.setOnLineSelected((listIndex, globalLine, content) -> displayLogDetailFromCanvas(globalLine, content));
+        searchResultPanel.setOnLineActivated((listIndex, globalLine) -> {
+            revealWorkbenchDetail();
             if (canvasLogViewer != null) {
                 canvasLogViewer.jumpToLine(globalLine);
                 canvasLogViewer.selectLine(globalLine);
             }
-            displayLogDetailFromCanvas(globalLine, content);
-
             if (filteredIndexes != null && searchNavigator != null) {
                 currentMatchIndex = listIndex + 1;
+                if (tabSessionManager.getActive() != null) tabSessionManager.getActive().setCurrentMatchIndex(currentMatchIndex);
                 searchNavigator.updateStatus(listIndex + 1, filteredIndexes.size());
             }
         });
@@ -696,6 +715,7 @@ public class MainController {
         VBox.setVgrow(searchSplit, Priority.ALWAYS);
         logParent.getChildren().set(logIdx, searchSplit);
         this.searchSplitPane = searchSplit;
+        workbenchDock = new WorkbenchDock(verticalSplitPane, searchSplit, logIsland, detailPane, searchResultPanel);
 
         setupDragAndDrop();
         updateEmptyState();
@@ -725,6 +745,7 @@ public class MainController {
             if (isSkippingFilterTrigger) {
                 return;
             }
+            cancelSearchWork();
             if (newText != null && !newText.isEmpty()) {
                 searchDebounce.playFromStart();
             } else {
@@ -740,16 +761,12 @@ public class MainController {
         searchButton.setTooltip(new Tooltip("Perform search (press Enter in text field)"));
         clearSearchButton.setOnAction(e -> clearSearch());
         clearSearchButton.setTooltip(new Tooltip("Clear search and filters (press Escape in text field)"));
-        refreshButton.setOnAction(e -> handleReload());
-        clearLogButton.setOnAction(e -> handleClearLog());
-        refreshButton.setTooltip(new Tooltip("Reload current file or tailing session (Ctrl+R)"));
 
         if (searchNavigator != null) {
             searchNavigator.setOnNext(this::navigateNextMatch);
             searchNavigator.setOnPrevious(this::navigatePreviousMatch);
         }
 
-        refreshButton.setTooltip(new Tooltip("Reload current file or tailing session (Ctrl+R)"));
 
         tailButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
             if (isProgrammaticUpdate)
@@ -841,7 +858,30 @@ public class MainController {
         detailPaneController.show(lineNumber, content);
     }
 
+    private void cancelSearchWork() {
+        searchGeneration++;
+        incrementalTailSearchToken = null;
+        if (searchDebounce != null) searchDebounce.stop();
+        if (currentSearchTask != null) currentSearchTask.cancel(true);
+        if (currentTailSearchTask != null) currentTailSearchTask.cancel(true);
+        hideLoading();
+    }
+
+    private boolean searchContextIsCurrent(long generation, LogSession session, MappedFileReader reader,
+            LineOffsetIndex index, boolean tail) {
+        return generation == searchGeneration && tabSessionManager.getActive() == session
+                && (session == null || (!session.isClosed() && session.getReader() == reader && session.getIndex() == index))
+                && mappedFileReader == reader
+                && lineOffsetIndex == index && tailModeEnabled == tail;
+    }
+
     private void performSearch() {
+        cancelSearchWork();
+        final long thisGeneration = searchGeneration;
+        final LogSession searchSession = tabSessionManager.getActive();
+        final MappedFileReader searchReader = mappedFileReader;
+        final LineOffsetIndex searchIndex = lineOffsetIndex;
+        final boolean searchingTail = tailModeEnabled;
         final String searchText = searchField.getText();
         final boolean isRegex = regexCheckBox.isSelected();
         final boolean caseSensitive = caseSensitiveCheckBox.isSelected();
@@ -849,9 +889,7 @@ public class MainController {
         logger.info("Search - Include: '{}', Regex: {}, CaseSensitive: {}",
                 searchText, isRegex, caseSensitive);
 
-        lastAppliedSearchQuery = searchText;
-        lastAppliedRegex = isRegex;
-        lastAppliedCaseSensitive = caseSensitive;
+        lastAppliedSearchQuery = null;
 
         if ((mappedFileReader == null || lineOffsetIndex == null) && !tailModeEnabled) {
             logger.warn("No file loaded for search");
@@ -862,6 +900,38 @@ public class MainController {
             clearSearch();
             return;
         }
+
+        if (isRegex) {
+            try {
+                Pattern.compile(searchText, caseSensitive ? 0 : Pattern.CASE_INSENSITIVE);
+            } catch (java.util.regex.PatternSyntaxException error) {
+                filteredIndexes = null;
+                currentTailSearchPattern = null;
+                currentTailSearchPredicate = null;
+                if (searchSession != null) {
+                    searchSession.setFilteredIndexes(null);
+                    searchSession.setCurrentTailSearchPattern(null);
+                }
+                if (canvasLogViewer != null) canvasLogViewer.clearSearchHighlight();
+                hideSearchResultPanel();
+                if (searchNavigator != null) searchNavigator.showMessage("Invalid regular expression", error.getDescription());
+                return;
+            }
+        }
+
+        filteredIndexes = null;
+        currentMatchIndex = -1;
+        currentTailSearchPattern = null;
+        currentTailSearchPredicate = null;
+        if (searchSession != null) {
+            searchSession.setFilteredIndexes(null);
+            searchSession.setSearchQuery(searchText);
+            searchSession.setRegex(isRegex);
+            searchSession.setCaseSensitive(caseSensitive);
+            searchSession.setCurrentTailSearchPattern(null);
+        }
+        hideSearchResultPanel();
+        if (searchNavigator != null) searchNavigator.setMatchCount(-1);
 
         if (tailModeEnabled) {
             String highlightPattern = searchText;
@@ -905,9 +975,12 @@ public class MainController {
             final CanvasLogViewer viewer = canvasLogViewer;
             final List<LogEntry> snapshot;
             synchronized (liveTailList) {
-                snapshot = new ArrayList<>(liveTailList);
+                snapshot = liveTailList instanceof com.seeloggyplus.shared.tail.TailHistory history
+                        ? history.snapshot() : new ArrayList<>(liveTailList);
             }
             final int snapshotSize = snapshot.size();
+            final long snapshotBase = snapshot instanceof com.seeloggyplus.shared.tail.TailHistory.Snapshot historySnapshot
+                    ? historySnapshot.baseIndex() : 0;
 
             final Predicate<String> searchPredicate;
             if (isRegex) {
@@ -916,78 +989,99 @@ public class MainController {
                 searchPredicate = createBooleanSearchPredicate(searchText, caseSensitive);
             }
 
-            SEARCH_POOL.submit(() -> {
-                IntArrayList results = new IntArrayList();
-                if (reader != null && index != null && tailOffset > 0) {
-                    int fileLines = index.getLineCount();
-                    for (int i = 0; i < fileLines; i++) {
-                        if (Thread.currentThread().isInterrupted()) return;
-                        CharSequence line = reader.readLine(index, i);
-                        if (line != null && searchPredicate.test(line.toString())) {
-                            results.add(i);
+            currentTailSearchTask = new java.util.concurrent.FutureTask<Void>(() -> {
+                try {
+                    IntArrayList results = new IntArrayList();
+                    if (reader != null && index != null && tailOffset > 0) {
+                        int fileLines = index.getLineCount();
+                        for (int i = 0; i < fileLines; i++) {
+                            if (Thread.currentThread().isInterrupted() || thisGeneration != searchGeneration) return;
+                            CharSequence line = reader.readLine(index, i);
+                            if (line != null && searchPredicate.test(line.toString())) {
+                                results.add(i);
+                            }
+                        }
+                        logger.info("Tail search: {} matches in file lines (0..{})", results.size(), fileLines);
+                    }
+
+                    for (int i = 0; i < snapshot.size(); i++) {
+                        if (Thread.currentThread().isInterrupted() || thisGeneration != searchGeneration) return;
+                        LogEntry entry = snapshot.get(i);
+                        String raw = entry != null ? entry.getRawLog() : "";
+                        if (searchPredicate.test(raw)) {
+                            results.add((int) (tailOffset + i));
                         }
                     }
-                    logger.info("Tail search: {} matches in file lines (0..{})", results.size(), fileLines);
-                }
 
-                for (int i = 0; i < snapshot.size(); i++) {
-                    if (Thread.currentThread().isInterrupted()) return;
-                    LogEntry entry = snapshot.get(i);
-                    String raw = entry != null ? entry.getRawLog() : "";
-                    if (searchPredicate.test(raw)) {
-                        results.add((int) (tailOffset + i));
-                    }
-                }
+                    Platform.runLater(() -> {
+                        if (!searchContextIsCurrent(thisGeneration, searchSession, searchReader, searchIndex, searchingTail)) return;
+                        long trimmedSinceSnapshot = tailBase(searchSession.getLiveTailList()) - snapshotBase;
+                        if (trimmedSinceSnapshot > 0) rebaseTailResults(results, tailOffset, trimmedSinceSnapshot);
+                        int scanned = (int) Math.max(0, snapshotSize - trimmedSinceSnapshot);
+                        lastAppliedSearchQuery = searchText;
+                        lastAppliedRegex = isRegex;
+                        lastAppliedCaseSensitive = caseSensitive;
+                        this.filteredIndexes = results;
+                        this.currentTailSearchPattern = pattern;
+                        this.currentTailSearchPredicate = searchPredicate;
+                        this.tailSearchScannedUpTo = scanned;
 
-                Platform.runLater(() -> {
-                    this.filteredIndexes = results;
-                    this.currentTailSearchPattern = pattern;
-                    this.currentTailSearchPredicate = searchPredicate;
-                    this.tailSearchScannedUpTo = snapshotSize;
+                        if (tabSessionManager.getActive() != null) {
+                            tabSessionManager.getActive().setFilteredIndexes(results);
+                            tabSessionManager.getActive().setSearchQuery(searchText);
+                            tabSessionManager.getActive().setRegex(isRegex);
+                            tabSessionManager.getActive().setCaseSensitive(caseSensitive);
+                            tabSessionManager.getActive().setCurrentTailSearchPattern(pattern);
+                            tabSessionManager.getActive().setTailSearchScannedUpTo(scanned);
+                        }
 
-                    if (tabSessionManager.getActive() != null) {
-                        tabSessionManager.getActive().setFilteredIndexes(results);
-                        tabSessionManager.getActive().setSearchQuery(searchText);
-                        tabSessionManager.getActive().setRegex(isRegex);
-                        tabSessionManager.getActive().setCaseSensitive(caseSensitive);
-                        tabSessionManager.getActive().setCurrentTailSearchPattern(pattern);
-                        tabSessionManager.getActive().setTailSearchScannedUpTo(snapshotSize);
-                    }
-
-                    if (viewer != null) {
-                        viewer.clearFilter();
-                        viewer.setSearchHighlight(finalHighlightPattern, finalHighlightIsRegex, caseSensitive);
-                    }
-
-                    if (searchNavigator != null) {
-                        searchNavigator.setMatchCount(results.size());
-                    }
-
-                    if (results.size() > 0) {
-                        showSearchResultPanelForTail(results, pattern);
-                        long firstLine = results.get(0);
                         if (viewer != null) {
-                            viewer.jumpToLine(firstLine);
-                            viewer.selectLine(firstLine);
+                            viewer.clearFilter();
+                            viewer.setSearchHighlight(finalHighlightPattern, finalHighlightIsRegex, caseSensitive);
                         }
-                        currentMatchIndex = 1;
-                        if (tabSessionManager.getActive() != null) {
-                            tabSessionManager.getActive().setCurrentMatchIndex(1);
-                        }
+
                         if (searchNavigator != null) {
-                            searchNavigator.updateStatus(1, results.size());
+                            searchNavigator.setMatchCount(results.size());
                         }
-                        String content = getLineContentForGlobal(firstLine);
-                        displayLogDetailFromCanvas(firstLine, content);
-                    } else {
-                        hideSearchResultPanel();
-                        currentMatchIndex = -1;
-                        if (tabSessionManager.getActive() != null) {
-                            tabSessionManager.getActive().setCurrentMatchIndex(-1);
+
+                        if (results.size() > 0) {
+                            showSearchResultPanelForTail(results, pattern);
+                            long firstLine = results.get(0);
+                            if (viewer != null) {
+                                viewer.jumpToLine(firstLine);
+                                viewer.selectLine(firstLine);
+                            }
+                            currentMatchIndex = 1;
+                            if (tabSessionManager.getActive() != null) {
+                                tabSessionManager.getActive().setCurrentMatchIndex(1);
+                            }
+                            if (searchNavigator != null) {
+                                searchNavigator.updateStatus(1, results.size());
+                            }
+                            searchResultPanel.selectAndTriggerLine(0);
+                        } else {
+                            showSearchResultPanelForTail(results, pattern);
+                            currentMatchIndex = -1;
+                            if (tabSessionManager.getActive() != null) {
+                                tabSessionManager.getActive().setCurrentMatchIndex(-1);
+                            }
                         }
-                    }
-                });
-            });
+                        scheduleIncrementalTailSearch(searchSession);
+                    });
+                } catch (Exception error) {
+                    if (Thread.currentThread().isInterrupted()) return;
+                    logger.error("Tail search failed", error);
+                    Platform.runLater(() -> {
+                        if (!searchContextIsCurrent(thisGeneration, searchSession, searchReader, searchIndex, searchingTail)) return;
+                        if (searchNavigator != null) searchNavigator.showMessage("Search failed", error.getMessage());
+                    });
+                }
+            }, null) {
+                @Override protected void done() {
+                    if (snapshot instanceof com.seeloggyplus.shared.tail.TailHistory.Snapshot historySnapshot) historySnapshot.close();
+                }
+            };
+            SEARCH_POOL.execute((Runnable) currentTailSearchTask);
 
             try {
                 currentTailFilterPredicate = buildSearchPredicate(searchText, isRegex, caseSensitive);
@@ -1000,15 +1094,10 @@ public class MainController {
 
         showLoading("Searching...");
 
-        if (currentSearchTask != null && currentSearchTask.isRunning()) {
-            currentSearchTask.cancel(true);
-        }
-        final long thisGeneration = ++searchGeneration;
-
         Task<IntArrayList> task = new Task<>() {
             @Override
             protected IntArrayList call() {
-                int total = lineOffsetIndex.getLineCount();
+                int total = searchIndex.getLineCount();
                 final Pattern pattern;
                 final Predicate<String> booleanPredicate;
 
@@ -1026,7 +1115,10 @@ public class MainController {
                     booleanPredicate = createBooleanSearchPredicate(searchText, caseSensitive);
                 }
 
-                int numThreads = Runtime.getRuntime().availableProcessors();
+                final boolean simpleLiteral = pattern == null && !searchText.matches("(?s).*\\s+(AND|OR)\\s+.*")
+                        && !searchText.trim().startsWith("NOT ");
+                final String literalTerm = searchText.trim();
+                int numThreads = SEARCH_WORKERS;
                 int chunkSize = Math.max(10000, (total + numThreads - 1) / numThreads);
 
                 logger.info("Parallel search: {} threads, {} lines/chunk, {} total lines", numThreads, chunkSize,
@@ -1041,19 +1133,17 @@ public class MainController {
 
                         futures.add(SEARCH_POOL.submit(() -> {
                             IntArrayList chunkMatches = new IntArrayList();
+                            Predicate<CharSequence> matcher = pattern != null
+                                    ? cs -> pattern.matcher(cs).find() : cs -> booleanPredicate.test(cs.toString());
 
                             for (int i = chunkStart; i < chunkEnd; i++) {
-                                if (isCancelled())
+                                if (isCancelled() || thisGeneration != searchGeneration)
                                     break;
 
-                                Predicate<CharSequence> matcher;
-                                if (pattern != null) {
-                                    matcher = cs -> pattern.matcher(cs).find();
-                                } else {
-                                    matcher = cs -> booleanPredicate.test(cs.toString());
-                                }
-
-                                if (mappedFileReader.lineMatches(lineOffsetIndex, i, matcher)) {
+                                boolean matches = simpleLiteral
+                                        ? searchReader.lineContainsLiteral(searchIndex, i, literalTerm, caseSensitive)
+                                        : searchReader.lineMatches(searchIndex, i, matcher);
+                                if (matches) {
                                     chunkMatches.add(i);
                                 }
                             }
@@ -1068,31 +1158,34 @@ public class MainController {
                     for (var future : futures) {
                         IntArrayList chunkResult = future.get();
 
-                        for (int i = 0; i < chunkResult.size(); i++) {
-                            allMatches.add(chunkResult.get(i));
-                        }
+                        allMatches.moveAllFrom(chunkResult);
 
                         completedChunks++;
                         final int progress = completedChunks;
                         final int totalChunks = futures.size();
-                        Platform.runLater(
-                                () -> showLoading(String.format("Searching: %d/%d chunks...", progress, totalChunks)));
+                        Platform.runLater(() -> {
+                            if (searchContextIsCurrent(thisGeneration, searchSession, searchReader, searchIndex, searchingTail))
+                                showLoading(String.format("Searching: %d/%d chunks...", progress, totalChunks));
+                        });
                     }
 
                     return allMatches;
                 } catch (Exception e) {
-                    logger.error("Parallel search error", e);
-                    return new IntArrayList();
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Could not complete the log search", e);
                 }
             }
         };
 
         task.setOnSucceeded(e -> {
-            if (thisGeneration != searchGeneration) {
+            if (!searchContextIsCurrent(thisGeneration, searchSession, searchReader, searchIndex, searchingTail)) {
                 logger.info("Discarding stale search results (gen {} vs current {})", thisGeneration, searchGeneration);
                 return;
             }
 
+            lastAppliedSearchQuery = searchText;
+            lastAppliedRegex = isRegex;
+            lastAppliedCaseSensitive = caseSensitive;
             IntArrayList matches = task.getValue();
             logger.info("Search complete: {} matches found", matches.size());
 
@@ -1151,12 +1244,9 @@ public class MainController {
                 if (searchNavigator != null) {
                     searchNavigator.updateStatus(1, matches.size());
                 }
-                if (mappedFileReader != null && lineOffsetIndex != null) {
-                    String content = mappedFileReader.readLine(lineOffsetIndex, firstLine);
-                    displayLogDetailFromCanvas(firstLine, content);
-                }
+                searchResultPanel.selectAndTriggerLine(0);
             } else {
-                hideSearchResultPanel();
+                showSearchResultPanel(matches, null);
                 currentMatchIndex = -1;
                 if (tabSessionManager.getActive() != null) {
                     tabSessionManager.getActive().setCurrentMatchIndex(-1);
@@ -1167,11 +1257,11 @@ public class MainController {
         });
 
         task.setOnFailed(e -> {
-            if (thisGeneration != searchGeneration) return;
+            if (!searchContextIsCurrent(thisGeneration, searchSession, searchReader, searchIndex, searchingTail)) return;
             hideLoading();
             Throwable ex = task.getException();
             logger.error("Search failed", ex);
-            showError("Search Failed", ex.getMessage());
+            if (searchNavigator != null) searchNavigator.showMessage("Search failed", ex.getMessage());
         });
 
         currentSearchTask = task;
@@ -1199,10 +1289,8 @@ public class MainController {
             searchNavigator.updateStatus(nextIdx + 1, total);
         }
         if (searchResultPanel != null) {
-            searchResultPanel.selectIndex(nextIdx);
+            searchResultPanel.selectAndTriggerLine(nextIdx);
         }
-        String content = getLineContentForGlobal(globalLine);
-        displayLogDetailFromCanvas(globalLine, content);
     }
 
     private void navigatePreviousMatch() {
@@ -1225,14 +1313,15 @@ public class MainController {
             searchNavigator.updateStatus(prevIdx + 1, total);
         }
         if (searchResultPanel != null) {
-            searchResultPanel.selectIndex(prevIdx);
+            searchResultPanel.selectAndTriggerLine(prevIdx);
         }
-        String content = getLineContentForGlobal(globalLine);
-        displayLogDetailFromCanvas(globalLine, content);
     }
 
     private void clearSearch() {
-        searchField.clear();
+        cancelSearchWork();
+        boolean skipping = isSkippingFilterTrigger;
+        isSkippingFilterTrigger = true;
+        try { searchField.clear(); } finally { isSkippingFilterTrigger = skipping; }
         filteredIndexes = null;
         currentMatchIndex = -1;
         currentTailSearchPattern = null;
@@ -1240,10 +1329,6 @@ public class MainController {
         tailSearchScannedUpTo = 0;
         lastAppliedSearchQuery = null;
 
-        searchGeneration++;
-        if (currentSearchTask != null && currentSearchTask.isRunning()) {
-            currentSearchTask.cancel(true);
-        }
         if (tabSessionManager.getActive() != null) {
             tabSessionManager.getActive().setFilteredIndexes(null);
             tabSessionManager.getActive().setSearchQuery("");
@@ -1265,79 +1350,55 @@ public class MainController {
         hideSearchResultPanel();
     }
 
-    private String getLineContentForGlobal(long globalLine) {
-        if (tailModeEnabled) {
-            long fileLineCount = canvasLogViewer != null ? canvasLogViewer.getFileLineCount() : 0;
-            if (globalLine < fileLineCount) {
-                if (mappedFileReader != null && lineOffsetIndex != null && globalLine < lineOffsetIndex.getLineCount()) {
-                    return mappedFileReader.readLine(lineOffsetIndex, (int) globalLine);
-                }
-            } else {
-                int tailIdx = (int) (globalLine - fileLineCount);
-                synchronized (liveTailList) {
-                    if (tailIdx >= 0 && tailIdx < liveTailList.size()) {
-                        LogEntry entry = liveTailList.get(tailIdx);
-                        return entry != null ? entry.getRawLog() : "";
-                    }
-                }
-            }
-            return "";
-        } else {
-            if (mappedFileReader != null && lineOffsetIndex != null && globalLine < lineOffsetIndex.getLineCount()) {
-                return mappedFileReader.readLine(lineOffsetIndex, (int) globalLine);
-            }
-            return "";
-        }
-    }
-
     private void showSearchResultPanel(IntArrayList matches, Pattern highlightPattern) {
         if (searchResultPanel == null || searchSplitPane == null) return;
 
+        final MappedFileReader reader = mappedFileReader;
+        final LineOffsetIndex index = lineOffsetIndex;
         searchResultPanel.setLineContentResolver(idx -> {
-            if (mappedFileReader != null && lineOffsetIndex != null && idx < lineOffsetIndex.getLineCount()) {
-                return mappedFileReader.readLine(lineOffsetIndex, idx);
+            if (reader != null && index != null && idx >= 0 && idx < index.getLineCount()) {
+                return reader.readLine(index, idx);
             }
             return "";
-        });
+        }, command -> Thread.ofVirtual().start(command));
         searchResultPanel.setSearchPattern(highlightPattern);
         searchResultPanel.showResults(matches, lineOffsetIndex != null ? lineOffsetIndex.getLineCount() : 0);
-        if (!searchSplitPane.getItems().contains(searchResultPanel)) {
-            searchSplitPane.getItems().add(searchResultPanel);
-            Platform.runLater(() -> searchSplitPane.setDividerPositions(0.75));
-        }
+        workbenchDock.resultsVisible(true);
     }
 
     private void hideSearchResultPanel() {
         if (searchResultPanel == null || searchSplitPane == null) return;
         searchResultPanel.clear();
-        searchSplitPane.getItems().remove(searchResultPanel);
+        workbenchDock.resultsVisible(false);
     }
 
     private void showSearchResultPanelForTail(IntArrayList matches, Pattern highlightPattern) {
         if (searchResultPanel == null || searchSplitPane == null) return;
 
         long tailOffset = canvasLogViewer != null ? canvasLogViewer.getFileLineCount() : 0;
+        final List<LogEntry> tailLines = liveTailList;
+        final MappedFileReader reader = mappedFileReader;
+        final LineOffsetIndex index = lineOffsetIndex;
         searchResultPanel.setLineContentResolver(idx -> {
             if (idx < tailOffset) {
-                if (mappedFileReader != null && lineOffsetIndex != null && idx < lineOffsetIndex.getLineCount()) {
-                    return mappedFileReader.readLine(lineOffsetIndex, idx);
+                if (reader != null && index != null && idx >= 0 && idx < index.getLineCount()) {
+                    return reader.readLine(index, idx);
                 }
             } else {
                 int bufferIdx = (int) (idx - tailOffset);
-                if (bufferIdx >= 0 && bufferIdx < liveTailList.size()) {
-                    LogEntry entry = liveTailList.get(bufferIdx);
-                    return entry != null ? entry.getRawLog() : "";
+                synchronized (tailLines) {
+                    if (bufferIdx >= 0 && bufferIdx < tailLines.size()) {
+                        LogEntry entry = tailLines.get(bufferIdx);
+                        return entry != null ? entry.getRawLog() : "";
+                    }
                 }
             }
             return "";
-        });
+        }, command -> Thread.ofVirtual().start(command));
         searchResultPanel.setSearchPattern(highlightPattern);
         long totalLines = tailOffset + liveTailList.size();
         searchResultPanel.showResults(matches, (int) totalLines);
-        if (!searchSplitPane.getItems().contains(searchResultPanel)) {
-            searchSplitPane.getItems().add(searchResultPanel);
-            Platform.runLater(() -> searchSplitPane.setDividerPositions(0.75));
-        }
+        workbenchDock.resultsVisible(true);
     }
 
     private void deleteCancelledDownloadFiles(File file) {
@@ -1405,6 +1466,7 @@ public class MainController {
     private void loadFileWithParallelParsing(LogSession session, File file, LogFile logFile, boolean updateRecentFilesList,
             boolean jumpToEnd, boolean selectInRecent, boolean startTail, int targetLine) {
         final int jumpLine = targetLine;
+        if (session == tabSessionManager.getActive()) cancelSearchWork();
         showLoading("Indexing file: " + file.getName() + " (scanning for lines...)");
         Task<Void> task = new Task<>() {
             @Override
@@ -1466,6 +1528,7 @@ public class MainController {
                     }
                     updateTailButtonState();
                     updateBottomBarLineCount(session);
+                    if (!searchField.getText().isBlank()) performSearch();
                 }
                 logger.info("Canvas viewer initialized for session: {}", session.getTitle());
             });
@@ -1724,8 +1787,6 @@ public class MainController {
     }
 
     private void setupBottomPanel() {
-        detailPaneController.setOnPreferenceChanged((code, value) -> preferenceService
-                .saveOrUpdatePreferences(new Preference(code, String.valueOf(value))));
         detailPaneController.setOnCloseRequest(this::handleToggleBottomPanelPin);
 
         if (statusLabel != null) {
@@ -1740,6 +1801,107 @@ public class MainController {
         updateBottomPanelDisplay();
     }
 
+    private void setupWorkbench() {
+        ToggleGroup positions = new ToggleGroup();
+        resultsAutoMenuItem.setToggleGroup(positions);
+        resultsRightMenuItem.setToggleGroup(positions);
+        resultsBottomMenuItem.setToggleGroup(positions);
+        resultsAutoMenuItem.setOnAction(e -> setResultsPosition("auto"));
+        resultsRightMenuItem.setOnAction(e -> setResultsPosition("right"));
+        resultsBottomMenuItem.setOnAction(e -> setResultsPosition("bottom"));
+        String position=preferenceService.getPreferencesByCode("workbench_results_position").orElse("auto");
+        workbenchDock.position(position);
+        selectResultsPositionMenu();
+        lastHorizontalDividerPos=readLayoutNumber("workbench_sidebar_divider", .24);
+        double bottom=readLayoutNumber("workbench_bottom_divider",lastVerticalDividerPos);
+        workbenchDock.restoreDividers(readLayoutNumber("workbench_right_divider",.66),bottom);
+        SplitPane.setResizableWithParent(leftPanel,false);
+        Platform.runLater(() -> {
+            if (preferenceService.getPreferencesByCode("workbench_sidebar_divider").isEmpty()) {
+                lastHorizontalDividerPos=horizontalSplitPane.getWidth()>0 ? 240/horizontalSplitPane.getWidth() : .24;
+            }
+            if (isLeftPanelPinned) horizontalSplitPane.setDividerPositions(clampDivider(lastHorizontalDividerPos));
+        });
+        workbenchToolbar.widthProperty().addListener((o,a,b) -> resizeWorkbenchSearch());
+        searchNavigator.managedProperty().addListener((o,a,b) -> resizeWorkbenchSearch());
+        resizeWorkbenchSearch();
+        tailButton.selectedProperty().addListener((o,a,b) -> updateWorkbenchTailStatus());
+        followTailButton.selectedProperty().addListener((o,a,b) -> updateWorkbenchTailStatus());
+        centerRoot.addEventFilter(MouseEvent.MOUSE_RELEASED,e -> {
+            Node node=e.getTarget() instanceof Node n ? n : null;
+            while (node!=null && !node.getStyleClass().contains("split-pane-divider")) node=node.getParent();
+            if (node!=null) saveWorkbenchSizes();
+        });
+    }
+
+    private void resizeWorkbenchSearch() {
+        boolean compact=workbenchToolbar.getWidth()<1000;
+        workbenchToolbar.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("compact"),compact);
+        var display=compact ? ContentDisplay.GRAPHIC_ONLY : ContentDisplay.LEFT;
+        openFileButton.setContentDisplay(display); serversButton.setContentDisplay(display);
+        tailStatusLabel.setMinWidth(Region.USE_PREF_SIZE);
+        searchField.setPrefWidth(Math.max(140,workbenchToolbar.getWidth()-(searchNavigator.isManaged()?760:620)));
+    }
+
+    private double readLayoutNumber(String code,double fallback) {
+        try {
+            double value=Double.parseDouble(preferenceService.getPreferencesByCode(code).orElse(""));
+            return Double.isFinite(value) && value>=.1 && value<=.9 ? value : fallback;
+        } catch (NumberFormatException e) { return fallback; }
+    }
+
+    private void selectResultsPositionMenu() {
+        switch (workbenchDock.position()) {
+            case "right" -> resultsRightMenuItem.setSelected(true);
+            case "bottom" -> resultsBottomMenuItem.setSelected(true);
+            default -> resultsAutoMenuItem.setSelected(true);
+        }
+    }
+
+    private void setResultsPosition(String position) {
+        workbenchDock.position(position);
+        selectResultsPositionMenu();
+        preferenceService.saveOrUpdatePreferences(new Preference("workbench_results_position",workbenchDock.position()));
+    }
+
+    private void saveWorkbenchSizes() {
+        workbenchDock.rememberDividers();
+        if (!horizontalSplitPane.getDividers().isEmpty()) lastHorizontalDividerPos=horizontalSplitPane.getDividerPositions()[0];
+        Map<String,String> sizes=Map.of("workbench_sidebar_divider",String.valueOf(lastHorizontalDividerPos),
+                "workbench_right_divider",String.valueOf(workbenchDock.rightDivider()),
+                "workbench_bottom_divider",String.valueOf(workbenchDock.bottomDivider()));
+        layoutPreferenceWriter.execute(() -> sizes.forEach((code,value) -> preferenceService.saveOrUpdatePreferences(new Preference(code,value))));
+    }
+
+    @FXML private void resetWorkbenchLayout() {
+        setResultsPosition("auto");
+        lastHorizontalDividerPos=horizontalSplitPane.getWidth()>0 ? 240/horizontalSplitPane.getWidth() : .24;
+        lastVerticalDividerPos=.7;
+        isLeftPanelPinned=true; isBottomPanelPinned=true;
+        updateLeftPanelDisplay(); updateBottomPanelDisplay();
+        workbenchDock.restoreDividers(.66,.7);
+        preferenceService.saveOrUpdatePreferences(new Preference("left_panel_pinned","true"));
+        preferenceService.saveOrUpdatePreferences(new Preference("bottom_panel_pinned","true"));
+        saveWorkbenchSizes();
+    }
+
+    private void revealWorkbenchDetail() {
+        if (!isBottomPanelPinned) toggleBottomPanel();
+        if (workbenchDock!=null) workbenchDock.revealDetail();
+    }
+
+    private void updateWorkbenchTailStatus() {
+        if (tailStatusLabel==null) return;
+        LogSession active=tabSessionManager.getActive();
+        boolean enabled=active!=null ? active.isTailModeEnabled() : tailModeEnabled;
+        boolean disconnected=enabled && active!=null && active.getSessionType()==LogSession.SessionType.REMOTE
+                && (active.getSshService()==null || !active.getSshService().isConnected());
+        tailStatusLabel.setText(disconnected?"Disconnected":enabled?"Live":"Paused");
+        tailStatusLabel.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("live"),enabled && !disconnected);
+        tailStatusLabel.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("disconnected"),disconnected);
+        followTailButton.setAccessibleText(followTailButton.isSelected()?"Follow new lines enabled":"Follow new lines disabled");
+    }
+
     private void handleToggleBottomPanelPin() {
         toggleBottomPanel();
     }
@@ -1749,33 +1911,8 @@ public class MainController {
             return;
         }
 
-        if (isBottomPanelPinned) {
-            if (!verticalSplitPane.getItems().contains(detailPane)) {
-                verticalSplitPane.getItems().add(detailPane);
-            }
-            detailPane.setVisible(true);
-            detailPane.setManaged(true);
-
-            double pos = lastVerticalDividerPos > 0 ? lastVerticalDividerPos : 0.7;
-            verticalSplitPane.setDividerPositions(clampDivider(pos));
-            Platform.runLater(() -> verticalSplitPane.setDividerPositions(clampDivider(pos)));
-
-            if (toggleBottomPanelButton != null) {
-                toggleBottomPanelButton.setSelected(true);
-            }
-        } else {
-            if (verticalSplitPane.getDividerPositions().length > 0) {
-                lastVerticalDividerPos = verticalSplitPane.getDividerPositions()[0];
-            }
-
-            verticalSplitPane.getItems().remove(detailPane);
-            detailPane.setVisible(false);
-            detailPane.setManaged(false);
-
-            if (toggleBottomPanelButton != null) {
-                toggleBottomPanelButton.setSelected(false);
-            }
-        }
+        if (workbenchDock != null) workbenchDock.detailVisible(isBottomPanelPinned);
+        if (toggleBottomPanelButton != null) toggleBottomPanelButton.setSelected(isBottomPanelPinned);
 
         if (showBottomPanelMenuItem != null) {
             showBottomPanelMenuItem.setSelected(isBottomPanelPinned);
@@ -1783,12 +1920,17 @@ public class MainController {
     }
 
     private void setupKeyboardShortcuts() {
-        if (menuBar.getScene() == null) {
-            Platform.runLater(this::setupKeyboardShortcuts);
-            return;
+        menuBar.sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene != null) {
+                installKeyboardShortcuts(newScene);
+            }
+        });
+        if (menuBar.getScene() != null) {
+            installKeyboardShortcuts(menuBar.getScene());
         }
+    }
 
-        Scene scene = menuBar.getScene();
+    private void installKeyboardShortcuts(Scene scene) {
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN),
                 () -> searchField.requestFocus());
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN), this::handleReload);
@@ -2220,6 +2362,7 @@ public class MainController {
         }
     }
 
+    @FXML
     private void handleServerManagement() {
         try {
             Stage mainStage = (Stage) menuBar.getScene().getWindow();
@@ -2285,7 +2428,7 @@ public class MainController {
         logger.info("Loading preferences...");
 
         String fontFamily = preferenceService.getPreferencesByCode("app_font_family").orElse("Consolas");
-        String fontSizeStr = preferenceService.getPreferencesByCode("app_font_size").orElse("12");
+        String fontSizeStr = preferenceService.getPreferencesByCode("app_font_size").orElse("13");
         int fontSize = 12;
         try {
             fontSize = Integer.parseInt(fontSizeStr);
@@ -2320,7 +2463,9 @@ public class MainController {
         logger.info("Preferences loaded: font={} {}, threads={}, tailWindowSize={}", fontFamily, fontSize,
                 sshDownloadThreads, tailWindowSize);
 
-        detailPaneController.setAutoPrettify(autoPrettifyJson, autoPrettifyXml);
+        boolean defaultFormatted = preferenceService.getPreferencesByCode("main_detail_formatted")
+                .map(Boolean::parseBoolean).orElse(autoPrettifyJson || autoPrettifyXml);
+        detailPaneController.setDefaultFormatted(defaultFormatted);
     }
 
     static boolean isTailModeRecent(RecentFilesDto recentFile) {
@@ -2480,6 +2625,7 @@ public class MainController {
     private void toggleBottomPanel() {
         isBottomPanelPinned = !isBottomPanelPinned;
         updateBottomPanelDisplay();
+        if (isBottomPanelPinned && workbenchDock != null) workbenchDock.revealDetail();
         preferenceService
                 .saveOrUpdatePreferences(new Preference("bottom_panel_pinned", String.valueOf(isBottomPanelPinned)));
     }
@@ -2811,6 +2957,7 @@ public class MainController {
 
     private void disableTail(LogSession session, boolean skipReindex) {
         if (session == null) return;
+        if (session == tabSessionManager.getActive()) cancelSearchWork();
         session.setTailModeEnabled(false);
 
         if (session.getTailService() != null) {
@@ -2998,11 +3145,18 @@ public class MainController {
         if (session == null || session.isClosed()) return;
         long lineNumber = session.incrementRemoteTailLineCounter();
         LogEntry entry = logParserService.parseLine(line, lineNumber);
+        long entryBytes = 128L + 2L * line.length();
+        if (session.getLiveTailList() instanceof com.seeloggyplus.shared.tail.TailHistory history) entry = history.prepare(entry);
         synchronized (session.getTailBuffer()) {
-            if (session.getTailBuffer().size() >= MAX_TAIL_BUFFER_SIZE) {
-                session.getTailBuffer().remove(0);
+            while (!session.isClosed() && (session.getTailBuffer().size() >= MAX_TAIL_BUFFER_SIZE
+                    || (!session.getTailBuffer().isEmpty() && session.getTailBufferBytes() + entryBytes > 4L * 1024 * 1024))) {
+                scheduleTailFlush(session);
+                try {session.getTailBuffer().wait(50);}
+                catch (InterruptedException error) {Thread.currentThread().interrupt(); return;}
             }
+            if (session.isClosed()) return;
             session.getTailBuffer().add(entry);
+            session.adjustTailBufferBytes(entryBytes);
         }
 
         scheduleTailFlush(session);
@@ -3179,6 +3333,8 @@ public class MainController {
             if (!session.isTailModeEnabled() || session.isClosed()) {
                 synchronized (session.getTailBuffer()) {
                     session.getTailBuffer().clear();
+                    session.adjustTailBufferBytes(-session.getTailBufferBytes());
+                    session.getTailBuffer().notifyAll();
                 }
                 return;
             }
@@ -3189,8 +3345,14 @@ public class MainController {
                     if (session.getTailBuffer().isEmpty()) {
                         return;
                     }
-                    toAdd = new ArrayList<>(session.getTailBuffer());
-                    session.getTailBuffer().clear();
+                    int batchSize = Math.min(500, session.getTailBuffer().size());
+                    toAdd = new ArrayList<>(session.getTailBuffer().subList(0, batchSize));
+                    session.getTailBuffer().subList(0, batchSize).clear();
+                    long released = toAdd.stream().mapToLong(entry -> session.getLiveTailList() instanceof com.seeloggyplus.shared.tail.TailHistory history
+                            ? history.entryBytes(entry) : 128L + 2L * entry.getRawLog().length()).sum();
+                    session.adjustTailBufferBytes(-released);
+                    session.getTailBuffer().notifyAll();
+                    if (!session.getTailBuffer().isEmpty()) scheduleTailFlush(session);
                 }
 
                 int oldSize = session.getLiveTailList().size();
@@ -3246,33 +3408,14 @@ public class MainController {
                             }
                         }
 
-                        IntArrayList newMatches = new IntArrayList();
-                        Predicate<String> pred = currentTailSearchPredicate != null ? currentTailSearchPredicate
-                                : (currentTailSearchPattern != null ? (s -> currentTailSearchPattern.matcher(s).find()) : null);
-                        if (pred != null) {
-                            for (int i = tailSearchScannedUpTo; i < session.getLiveTailList().size(); i++) {
-                                LogEntry entry = session.getLiveTailList().get(i);
-                                String raw = entry != null ? entry.getRawLog() : "";
-                                if (pred.test(raw)) {
-                                    int globalIdx = (int) (tailOffset + i);
-                                    filteredIndexes.add(globalIdx);
-                                    newMatches.add(globalIdx);
-                                }
-                            }
-                        }
-                        tailSearchScannedUpTo = session.getLiveTailList().size();
-                        session.setTailSearchScannedUpTo(tailSearchScannedUpTo);
-
-                        if (newMatches.size() > 0 && searchResultPanel != null) {
-                            searchResultPanel.syncItemCount();
-                        }
-                        if (searchNavigator != null) {
-                            searchNavigator.setMatchCount(filteredIndexes.size());
-                        }
+                        scheduleIncrementalTailSearch(session);
                     } else if (session == tabSessionManager.getActive() && canvasLogViewer != null && canvasLogViewer.hasSearchHighlight()) {
                         if (searchNavigator != null) {
-                            searchNavigator.setMatchCount(canvasLogViewer.countMatches(),
-                                    canvasLogViewer.isMatchScanTruncated());
+                            CanvasLogViewer viewer = canvasLogViewer;
+                            viewer.countMatchesAsync((matches, truncated) -> {
+                                if (session == tabSessionManager.getActive() && viewer == canvasLogViewer)
+                                    searchNavigator.setMatchCount(matches, truncated);
+                            });
                         }
                     }
 
@@ -3290,6 +3433,75 @@ public class MainController {
                 }
             } catch (Throwable t) {
                 logger.error("CRITICAL ERROR in tail flush for session {}", session.getTitle(), t);
+            }
+        });
+    }
+
+    private static long tailBase(List<LogEntry> rows) {
+        return rows instanceof com.seeloggyplus.shared.tail.TailHistory history ? history.baseIndex() : 0;
+    }
+
+    private static void rebaseTailResults(IntArrayList results, long tailOffset, long trimmed) {
+        int write = 0;
+        for (int i = 0; i < results.size(); i++) {
+            long value = results.get(i);
+            if (value >= tailOffset) {
+                value -= trimmed;
+                if (value < tailOffset) continue;
+            }
+            results.set(write++, (int) value);
+        }
+        while (results.size() > write) results.removeLast();
+    }
+
+    private void scheduleIncrementalTailSearch(LogSession session) {
+        if (session == null || session.isClosed() || session != tabSessionManager.getActive()
+                || incrementalTailSearchToken != null || filteredIndexes == null || currentTailSearchPredicate == null) return;
+        List<LogEntry> rows = session.getLiveTailList();
+        int begin = Math.max(0, tailSearchScannedUpTo);
+        if (begin >= rows.size()) return;
+        List<LogEntry> snapshot;
+        synchronized (rows) {
+            snapshot = rows instanceof com.seeloggyplus.shared.tail.TailHistory history
+                    ? history.snapshot() : new ArrayList<>(rows);
+        }
+        int end = snapshot.size();
+        long base = snapshot instanceof com.seeloggyplus.shared.tail.TailHistory.Snapshot captured ? captured.baseIndex() : 0;
+        long generation = searchGeneration;
+        Object token = new Object();
+        incrementalTailSearchToken = token;
+        IntArrayList target = filteredIndexes;
+        Predicate<String> predicate = currentTailSearchPredicate;
+        long offset = canvasLogViewer != null ? canvasLogViewer.getFileLineCount() : 0;
+        SEARCH_POOL.execute(() -> {
+            try {
+                IntArrayList matches = new IntArrayList();
+                for (int i = begin; i < end; i++) {
+                    if (generation != searchGeneration || session.isClosed()) return;
+                    LogEntry entry = snapshot.get(i);
+                    if (predicate.test(entry == null ? "" : entry.getRawLog())) matches.add(i);
+                }
+                Platform.runLater(() -> {
+                    if (incrementalTailSearchToken != token) return;
+                    incrementalTailSearchToken = null;
+                    if (generation != searchGeneration || session != tabSessionManager.getActive()
+                            || session.isClosed() || filteredIndexes != target) return;
+                    long trimmed = tailBase(rows) - base;
+                    for (int i = 0; i < matches.size(); i++) {
+                        long shifted = matches.get(i) - trimmed;
+                        if (shifted >= 0 && shifted < rows.size()) target.add((int) (offset + shifted));
+                    }
+                    tailSearchScannedUpTo = (int) Math.max(0, end - trimmed);
+                    session.setTailSearchScannedUpTo(tailSearchScannedUpTo);
+                    if (searchResultPanel != null) searchResultPanel.syncItemCount();
+                    if (searchNavigator != null) searchNavigator.setMatchCount(target.size());
+                    if (rows.size() > tailSearchScannedUpTo) scheduleIncrementalTailSearch(session);
+                });
+            } catch (RuntimeException error) {
+                logger.warn("Incremental tail search failed", error);
+                Platform.runLater(() -> {if (incrementalTailSearchToken == token) incrementalTailSearchToken = null;});
+            } finally {
+                if (snapshot instanceof com.seeloggyplus.shared.tail.TailHistory.Snapshot captured) captured.close();
             }
         });
     }
@@ -3476,7 +3688,21 @@ public class MainController {
     private void startMemoryMonitor() {
         Timeline timeline = new Timeline(new KeyFrame(Duration.seconds(2), e -> updateMemoryStatus()));
         timeline.setCycleCount(Animation.INDEFINITE);
-        timeline.play();
+        memoryMonitorShowing = memoryStatusLabel.sceneProperty()
+                .flatMap(Scene::windowProperty)
+                .flatMap(Window::showingProperty)
+                .orElse(false);
+        memoryMonitorShowing.addListener((observable, wasShowing, showing) -> {
+            if (showing) {
+                updateMemoryStatus();
+                timeline.play();
+            } else {
+                timeline.stop();
+            }
+        });
+        if (memoryMonitorShowing.getValue()) {
+            timeline.play();
+        }
         updateMemoryStatus();
     }
 
@@ -3497,7 +3723,17 @@ public class MainController {
         progress = Math.max(0, Math.min(1, progress));
 
         String text = String.format("Used: %.0f MB / Total: %.0f MB", usedMb, totalMb);
-        memoryStatusLabel.setText(text);
+        memoryStatusLabel.setText(String.format("Heap: %.0f MiB", usedMb));
+        Tooltip memoryTooltip = memoryStatusLabel.getTooltip();
+        if (memoryTooltip == null) {
+            memoryTooltip = new Tooltip();
+            memoryStatusLabel.setTooltip(memoryTooltip);
+        }
+        memoryTooltip.setText(text);
+        if (resourceDetailLabel != null) resourceDetailLabel.setText(String.format(
+                "Java heap used: %.0f MiB%nCommitted: %.0f MiB%nMaximum: %.0f MiB%n%nHeap is not total process RAM. See operating-system tools for private memory and working set.",
+                usedMb, totalMb, runtime.maxMemory() / (1024.0 * 1024.0)));
+        updateWorkbenchTailStatus();
 
         memoryBar.getStyleClass().removeAll("memory-ok", "memory-warn", "memory-high");
         if (progress > 0.85) {
@@ -3723,7 +3959,16 @@ public class MainController {
         reloadItem.setOnAction(e -> {
             if (session.getSessionType() == LogSession.SessionType.LOCAL && session.getLocalFile() != null) {
                 loadFileWithParallelParsing(session, session.getLocalFile(), session.getLogFileRecord(), false, false, false);
+            } else {
+                tabSessionManager.sessions().entrySet().stream().filter(entry -> entry.getValue()==session).findFirst()
+                        .ifPresent(entry -> logTabPane.getSelectionModel().select(entry.getKey()));
+                if (session==tabSessionManager.getActive()) handleReload();
             }
+        });
+
+        MenuItem clearItem = new MenuItem("Clear Log View");
+        clearItem.setOnAction(e -> {
+            if (session == tabSessionManager.getActive()) handleClearLog(); else clearSessionLogView(session);
         });
 
         MenuItem copyPathItem = new MenuItem("Copy File Path");
@@ -3753,7 +3998,7 @@ public class MainController {
             }
         });
 
-        menu.getItems().addAll(closeItem, closeRightItem, closeOthersItem, closeAllItem, new SeparatorMenuItem(), reloadItem, new SeparatorMenuItem(), copyPathItem, showInExplorerItem);
+        menu.getItems().addAll(closeItem, closeRightItem, closeOthersItem, closeAllItem, new SeparatorMenuItem(), reloadItem, clearItem, new SeparatorMenuItem(), copyPathItem, showInExplorerItem);
         return menu;
     }
 
@@ -3830,6 +4075,7 @@ public class MainController {
     }
 
     private void onActiveSessionChanged(LogSession session) {
+        cancelSearchWork();
         if (tabSessionManager.getActive() != null && tabSessionManager.getActive() != session) {
             tabSessionManager.getActive().setActive(false);
         }
@@ -3856,6 +4102,9 @@ public class MainController {
             currentMatchIndex = session.getCurrentMatchIndex();
             liveTailList = session.getLiveTailList();
             currentTailSearchPattern = session.getCurrentTailSearchPattern();
+            currentTailSearchPredicate = currentTailSearchPattern == null ? null
+                    : session.isRegex() ? raw -> currentTailSearchPattern.matcher(raw).find()
+                    : createBooleanSearchPredicate(session.getSearchQuery(), session.isCaseSensitive());
             tailSearchScannedUpTo = session.getTailSearchScannedUpTo();
             lastAppliedSearchQuery = session.getSearchQuery();
             lastAppliedRegex = session.isRegex();
@@ -3905,7 +4154,7 @@ public class MainController {
                 }
             }
 
-            if (filteredIndexes != null && filteredIndexes.size() > 0) {
+            if (filteredIndexes != null) {
                 if (searchNavigator != null) {
                     searchNavigator.setMatchCount(filteredIndexes.size());
                     if (currentMatchIndex > 0) {
@@ -3957,6 +4206,9 @@ public class MainController {
             recentPanelController.selectForSession(session);
             updateTailButtonState();
             updateBottomBarLineCount(session);
+            if (filteredIndexes == null && session.getSearchQuery() != null && !session.getSearchQuery().isBlank()) {
+                performSearch();
+            }
         } else {
             canvasLogViewer = null;
             mappedFileReader = null;

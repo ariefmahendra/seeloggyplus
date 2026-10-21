@@ -155,7 +155,8 @@ them windowed or optional.
 - The change that removes usage MUST also delete now-unused files
   (classes/services/FXML/CSS/scripts/tests). Prove no references first, then run the
   related tests. Full-suite validation follows §2 (release or explicit request only).
-- NEVER commit: `docs/UI_PLAN.md`, `docs/FEEDBACK_*.md`, `.jqwik-database`, `bin/`,
+- The `docs/` directory contains only `RELEASING.md`. Keep release notes in `release-notes/`; local reports and working notes belong in ignored `.local-docs/`.
+- NEVER commit: `.local-docs/`, other `docs/` files, `.jqwik-database`, `bin/`,
   `build/`, `logs/`, `.data/`, `launcher.properties`.
 - Check `git status` before committing: relevant files only; no logs, build artifacts,
   or user data. MUST NOT commit unless explicitly asked.
@@ -184,18 +185,18 @@ layout. Self-update breakage strands users on old versions.
 Full checklist: `docs/RELEASING.md`. Sequence:
 
 1. Full suite + `build` green, working tree clean (MUST NOT release otherwise).
-2. Update `CHANGELOG.md` and write `docs/release-notes/<version>.md`.
+2. Update `CHANGELOG.md` and write `release-notes/<version>.md`.
 3. Bump `version` in `gradle.properties`; commit `chore(release): X.Y.Z` on `dev`.
 4. Merge `--no-ff` into `main`; push `main` + `dev`; tag `X.Y.Z` and push the tag
    (triggers the Release workflow). Semver; Conventional Commits
    (`feat|fix|test|docs|refactor|perf|build|ci|chore`).
-5. Release description: the GitHub Release body is `docs/release-notes/<version>.md`
+5. Release description: the GitHub Release body is `release-notes/<version>.md`
    copied verbatim by the workflow; the `CHANGELOG.md` `[X.Y.Z]` section is the
    fallback. Both stay in sync, end-user ready. Notes structure:
    `# SeeLoggyPlus <v>` → `## Overview` → Features/Fixed/Improvements → `## Tests` →
    `## Upgrade notes` → `**Full changelog:**` compare link to the previous version.
 6. Published description needs fixing: edit `CHANGELOG.md` + the notes file, push, then
-   `gh release edit X.Y.Z --notes-file docs/release-notes/X.Y.Z.md` (or the GitHub API
+   `gh release edit X.Y.Z --notes-file release-notes/X.Y.Z.md` (or the GitHub API
    via `git credential fill`).
 
 Online documentation is published at https://seeloggyplus-doc.vercel.app/. Offline help is removed in 0.8.0; website guides and README are the user-documentation sources of truth. DocumentationScreenshotGeneratorTest replaces the offline screenshot generator.

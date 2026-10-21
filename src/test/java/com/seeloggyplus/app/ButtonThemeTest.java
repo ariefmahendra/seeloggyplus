@@ -258,7 +258,8 @@ class ButtonThemeTest {
                         control.pseudoClassStateChanged(PseudoClass.getPseudoClass("keyboard-focus"), state.equals("focused"));
                         root.applyCss(); root.layout();
                         if (state.equals("focused")) {
-                            assertEquals(0, ((Color)control.getBackground().getFills().getFirst().getFill()).getOpacity(), .001);
+                            assertTrue(((Color)control.getBackground().getFills().getFirst().getFill()).getOpacity()>0,
+                                    "Keyboard-focused buttons must use the neutral interaction background");
                             var ring = control.getBorder().getStrokes().getFirst();
                             assertEquals(1, ring.getWidths().getTop());
                             assertTrue(contrast((Color)ring.getTopStroke(), com.seeloggyplus.shared.ui.RenderedColors.background(control)) >= 3);
