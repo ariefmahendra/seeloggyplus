@@ -28,7 +28,7 @@ clearer button states and earlier startup feedback, with search and Tail-memory 
 - Stale searches cannot overwrite newer queries, other tabs, or cleared results.
 - Long selections and result scrollbars remain visible inside rounded panels.
 - Resources text fits its button without clipping or overlapping its arrow.
-- Memory-status updates reuse their tooltip instead of accumulating popup resources during long sessions.
+- Memory-status updates reuse their tooltip and stop polling while the window is hidden, preventing closed workspaces from retaining popup resources.
 
 ### Tests
 - Full headless regression suite and release build, including UI, search, detail, Tail-history and allocation checks.

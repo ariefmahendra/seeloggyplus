@@ -24,6 +24,7 @@ import javafx.animation.KeyFrame;
 import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
 import javafx.beans.binding.Bindings;
+import javafx.beans.value.ObservableValue;
 import javafx.scene.Cursor;
 import javafx.util.Duration;
 
@@ -90,6 +91,8 @@ import javafx.scene.shape.Rectangle;
 import javafx.stage.Window;
 
 public class MainController {
+
+    private ObservableValue<Boolean> memoryMonitorShowing;
 
     private final LogServices suppliedLogServices;
 
@@ -3680,7 +3683,21 @@ public class MainController {
     private void startMemoryMonitor() {
         Timeline timeline = new Timeline(new KeyFrame(Duration.seconds(2), e -> updateMemoryStatus()));
         timeline.setCycleCount(Animation.INDEFINITE);
-        timeline.play();
+        memoryMonitorShowing = memoryStatusLabel.sceneProperty()
+                .flatMap(Scene::windowProperty)
+                .flatMap(Window::showingProperty)
+                .orElse(false);
+        memoryMonitorShowing.addListener((observable, wasShowing, showing) -> {
+            if (showing) {
+                updateMemoryStatus();
+                timeline.play();
+            } else {
+                timeline.stop();
+            }
+        });
+        if (memoryMonitorShowing.getValue()) {
+            timeline.play();
+        }
         updateMemoryStatus();
     }
 

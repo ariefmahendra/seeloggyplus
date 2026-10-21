@@ -9,6 +9,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
@@ -36,6 +37,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -43,11 +45,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class MainControllerHelperLogicTest {
 
     private MainController controller;
+    private Parent root;
 
     @Start
     void start(Stage stage) throws Exception {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
-        Parent root = loader.load();
+        root = loader.load();
         controller = loader.getController();
     }
 
@@ -161,6 +164,34 @@ class MainControllerHelperLogicTest {
             }
         });
         WaitForAsyncUtils.waitForFxEvents();
+    }
+
+    @Test
+    void memoryPollingStopsWithoutAVisibleWindowAndResumesWhenShown() throws Exception {
+        Label label = (Label) field("memoryStatusLabel");
+        Stage stage = WaitForAsyncUtils.asyncFx(() -> {
+            label.setText("detached");
+            return new Stage();
+        }).get();
+        try {
+            Thread.sleep(2300);
+            WaitForAsyncUtils.asyncFx(() -> assertEquals("detached", label.getText())).get();
+            WaitForAsyncUtils.asyncFx(() -> {
+                stage.setScene(new Scene(root));
+                stage.show();
+            }).get();
+            WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> label.getText().startsWith("Heap:"));
+            WaitForAsyncUtils.asyncFx(() -> {
+                stage.hide();
+                label.setText("hidden");
+            }).get();
+            Thread.sleep(2300);
+            WaitForAsyncUtils.asyncFx(() -> assertEquals("hidden", label.getText())).get();
+            WaitForAsyncUtils.asyncFx(stage::show).get();
+            WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> label.getText().startsWith("Heap:"));
+        } finally {
+            WaitForAsyncUtils.asyncFx(stage::hide).get();
+        }
     }
 
     @Test
