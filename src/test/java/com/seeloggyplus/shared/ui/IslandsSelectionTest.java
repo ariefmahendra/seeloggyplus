@@ -48,7 +48,7 @@ class IslandsSelectionTest {
                     var cell = root.lookup(".tree-cell:selected");
                     assertNotNull(cell);
                     Color expected = Color.web(theme == AppTheme.Theme.LIGHT
-                            ? active ? "#d0dffe" : "#e9eaee"
+                            ? active ? "#d0dffe" : "#eef0f3"
                             : active ? "#2a4371" : "#33353b");
                     assertEquals(expected, RenderedColors.background(cell));
                     assertEquals(expected, SelectionColors.background(theme, active));

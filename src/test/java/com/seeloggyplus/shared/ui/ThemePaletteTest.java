@@ -14,7 +14,7 @@ class ThemePaletteTest {
     @DisplayName("tokens resolve independently for Light and Dark")
     void resolvesEachThemeTokenSet() {
         assertEquals(Color.web("#ffffff"), ThemePalette.color("-sl-surface", Theme.LIGHT));
-        assertEquals(Color.web("#191a1c"), ThemePalette.color("-sl-surface", Theme.DARK));
+        assertEquals(Color.web("#181c22"), ThemePalette.color("-sl-surface", Theme.DARK));
 
         assertEquals(Color.web("#3871e1"), ThemePalette.color("-sl-accent", Theme.LIGHT));
         assertEquals(Color.web("#3871e1"), ThemePalette.color("-sl-accent", Theme.DARK));
@@ -24,7 +24,7 @@ class ThemePaletteTest {
     @DisplayName("rgba tokens keep their alpha")
     void parsesAlphaTokens() {
         assertEquals(Color.web("rgba(0,0,0,0.070588)"),
-                ThemePalette.color("-sl-button-hover", Theme.LIGHT));
+                ThemePalette.color("-sl-chrome-hover", Theme.LIGHT));
         assertEquals(Color.web("#2a4371"),
                 ThemePalette.color("-sl-selection-bg", Theme.DARK));
     }

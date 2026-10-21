@@ -5,19 +5,19 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class IslandsPaletteTest {
-    @Test void lightUsesOfficialIslandsSurfacesAndSelection() {
+    @Test void lightUsesWorkbenchSurfacesAndSelection() {
         var theme = AppTheme.Theme.LIGHT;
-        assertEquals(Color.web("#e9eaee"), ThemePalette.color("-sl-chrome", theme));
+        assertEquals(Color.web("#eef0f3"), ThemePalette.color("-sl-chrome", theme));
         assertEquals(Color.WHITE, ThemePalette.color("-sl-surface", theme));
-        assertEquals(Color.BLACK, ThemePalette.color("-sl-text", theme));
+        assertEquals(Color.web("#192330"), ThemePalette.color("-sl-text", theme));
         assertEquals(Color.web("#d0dffe"), ThemePalette.color("-sl-selection-bg", theme));
         assertEquals(Color.web("#e3ebfe"), ThemePalette.color("-sl-tab-selected-bg", theme));
     }
 
-    @Test void darkUsesOfficialIslandsSurfacesAndSelection() {
+    @Test void darkUsesWorkbenchSurfacesAndSelection() {
         var theme = AppTheme.Theme.DARK;
-        assertEquals(Color.web("#26282c"), ThemePalette.color("-sl-chrome", theme));
-        assertEquals(Color.web("#191a1c"), ThemePalette.color("-sl-surface", theme));
+        assertEquals(Color.web("#20242b"), ThemePalette.color("-sl-chrome", theme));
+        assertEquals(Color.web("#181c22"), ThemePalette.color("-sl-surface", theme));
         assertEquals(Color.web("#d1d3d9"), ThemePalette.color("-sl-text", theme));
         assertEquals(Color.web("#2a4371"), ThemePalette.color("-sl-selection-bg", theme));
         assertEquals(Color.web("#233558"), ThemePalette.color("-sl-tab-selected-bg", theme));
