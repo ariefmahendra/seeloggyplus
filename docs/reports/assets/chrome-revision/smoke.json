@@ -1,9 +1,0 @@
-{
-  "timestamp": "2026-10-21T10:29:35.4234451+07:00",
-  "launchedDetached": true,
-  "startedSuccessfully": true,
-  "fxmlLoadException": false,
-  "applicationStartException": false,
-  "stoppedWith": "scripts/stop-app.ps1",
-  "rootLogCleaned": true
-}

@@ -1,8 +1,0 @@
-{
-  "startedSuccessfully": true,
-  "fxmlLoadException": false,
-  "command": "gradlew.bat --no-daemon runDev",
-  "launchedDetached": true,
-  "stoppedWith": "scripts/stop-app.ps1",
-  "finalSourceSnapshot": "optimized"
-}

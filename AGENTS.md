@@ -155,7 +155,7 @@ them windowed or optional.
 - The change that removes usage MUST also delete now-unused files
   (classes/services/FXML/CSS/scripts/tests). Prove no references first, then run the
   related tests. Full-suite validation follows §2 (release or explicit request only).
-- NEVER commit: `docs/UI_PLAN.md`, `docs/FEEDBACK_*.md`, `.jqwik-database`, `bin/`,
+- NEVER commit: `docs/reports/`, `docs/UI_PLAN.md`, `docs/FEEDBACK_*.md`, `.jqwik-database`, `bin/`,
   `build/`, `logs/`, `.data/`, `launcher.properties`.
 - Check `git status` before committing: relevant files only; no logs, build artifacts,
   or user data. MUST NOT commit unless explicitly asked.
