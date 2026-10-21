@@ -1,0 +1,74 @@
+[
+  {
+    "logWidth": 586.0,
+    "name": "light-800x600",
+    "logHeight": 303.0,
+    "rootHeight": 600,
+    "visibleRows": 14,
+    "rootWidth": 800,
+    "logArea": 177558.0
+  },
+  {
+    "logWidth": 810.0,
+    "name": "light-1024x700",
+    "logHeight": 353.0,
+    "rootHeight": 700,
+    "visibleRows": 16,
+    "rootWidth": 1024,
+    "logArea": 285930.0
+  },
+  {
+    "logWidth": 757.0,
+    "name": "light-1366x768",
+    "logHeight": 464.0,
+    "rootHeight": 768,
+    "visibleRows": 23,
+    "rootWidth": 1366,
+    "logArea": 351248.0
+  },
+  {
+    "logWidth": 1034.0,
+    "name": "light-1920x1080",
+    "logHeight": 620.0,
+    "rootHeight": 1080,
+    "visibleRows": 31,
+    "rootWidth": 1920,
+    "logArea": 641080.0
+  },
+  {
+    "logWidth": 586.0,
+    "name": "dark-800x600",
+    "logHeight": 346.0,
+    "rootHeight": 600,
+    "visibleRows": 16,
+    "rootWidth": 800,
+    "logArea": 202756.0
+  },
+  {
+    "logWidth": 810.0,
+    "name": "dark-1024x700",
+    "logHeight": 396.0,
+    "rootHeight": 700,
+    "visibleRows": 19,
+    "rootWidth": 1024,
+    "logArea": 320760.0
+  },
+  {
+    "logWidth": 757.0,
+    "name": "dark-1366x768",
+    "logHeight": 464.0,
+    "rootHeight": 768,
+    "visibleRows": 23,
+    "rootWidth": 1366,
+    "logArea": 351248.0
+  },
+  {
+    "logWidth": 1034.0,
+    "name": "dark-1920x1080",
+    "logHeight": 620.0,
+    "rootHeight": 1080,
+    "visibleRows": 31,
+    "rootWidth": 1920,
+    "logArea": 641080.0
+  }
+]

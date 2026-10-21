@@ -85,7 +85,7 @@ public class MainViewFxmlLoadTest {
                 for (AppTheme.Theme theme : AppTheme.Theme.values()) {
                     AppTheme.setTheme(theme); root.applyCss(); root.layout();
                     var label = (javafx.scene.control.Label) root.lookup("#statusLabel");
-                    Color expected = theme == AppTheme.Theme.DARK ? Color.web("#d1d3d9") : Color.BLACK;
+                    Color expected = theme == AppTheme.Theme.DARK ? Color.web("#d1d3d9") : Color.web("#192330");
                     assertEquals(expected, label.getTextFill(), theme.name());
                 }
             } finally { stage.close(); AppTheme.setTheme(AppTheme.Theme.LIGHT); }
@@ -350,23 +350,24 @@ public class MainViewFxmlLoadTest {
             Stage stage = new Stage();
             stage.setScene(AppTheme.scene(root));
             stage.show();
+            tailButton.setDisable(false);
             AppTheme.setTheme(AppTheme.Theme.LIGHT);
             root.applyCss();
 
             tailButton.setSelected(false);
             root.applyCss();
-            assertEquals(Color.BLACK, icon.getFill(),
+            assertEquals(Color.web("#192330"), icon.getFill(),
                     "A toolbar icon must follow the light chrome text token");
 
             tailButton.setSelected(true);
             root.applyCss();
-            assertEquals(Color.BLACK, icon.getFill(),
-                    "A selected toolbar icon must keep following the light chrome text token");
+            assertEquals(Color.web("#2f5eb9"), icon.getFill(),
+                    "An enabled selected toolbar icon must use the light blue interaction token");
 
             AppTheme.setDark(true);
             root.applyCss();
-            assertEquals(Color.WHITE, icon.getFill(),
-                    "Switching to dark must move the icon to the dark chrome text token");
+            assertEquals(Color.web("#71a1fe"), icon.getFill(),
+                    "Switching to dark must move an active icon to the brighter blue interaction token");
 
             AppTheme.setDark(false);
             stage.close();

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Configurable Results and Detail docking with Auto, Right and Bottom layouts.
+- Raw and Formatted detail modes with automatic JSON/XML detection and background formatting for large payloads.
+- Resources menu with heap and session information in the status bar.
+
+### Changed
+- Compact toolbar groups file/server actions, search and Tail/Follow; panel toggles move to the bottom bar.
+- Interactive buttons use blue icons on neutral gray backgrounds in Light and Dark themes.
+- Splash branding renders at display resolution and appears before workspace preparation; animation loads in the background.
+- Tail history spools cold content to temporary storage while retaining the existing history limit and a bounded hot cache.
+- Search and line reading reduce temporary allocations; results retain complete long lines.
+
+### Fixed
+- Stale searches cannot overwrite newer queries, other tabs, or cleared results.
+- Long selections and result scrollbars remain visible inside rounded panels.
+- Resources text fits its button without clipping or overlapping its arrow.
+
+### Tests
+- Selected headless UI, search, detail, Tail-history and allocation regression classes; this is not a full-suite release validation.
+- Performance measurements and limitations are recorded in `docs/reports/performance-audit.md`; some indexing/search workloads remain slower than the baseline.
+
 ## [0.8.0] - 2026-10-18
 
 SeeLoggyPlus 0.8.0 refreshes the desktop interface with compact Light and Dark themes,

@@ -34,6 +34,8 @@ class MainViewIslandLayoutTest {
         controller = loader.getController();
         stage.setScene(AppTheme.scene(root));
         stage.setWidth(1024); stage.setHeight(700); stage.show();
+        var reset=MainController.class.getDeclaredMethod("resetWorkbenchLayout"); reset.setAccessible(true); reset.invoke(controller);
+        var position=MainController.class.getDeclaredMethod("setResultsPosition",String.class); position.setAccessible(true); position.invoke(controller,"right");
         for (String id : new String[] {"toggleLeftPanelButton", "toggleBottomPanelButton"}) {
             var button = (ToggleButton) root.lookup("#" + id);
             if (!button.isSelected()) button.fire();
@@ -55,17 +57,17 @@ class MainViewIslandLayoutTest {
                     root.applyCss(); root.layout();
                     var workspace = (Region) root.lookup("#centerRoot");
                     Color backdrop = RenderedColors.background(workspace);
-                    assertEquals(6, workspace.getPadding().getLeft());
+                    assertEquals(4, workspace.getPadding().getLeft());
                     for (String id : new String[] {"leftPanel", "logContainer", "bottomPanel"}) {
                         var panel = (Region) root.lookup("#" + id);
                         assertNotNull(panel, id);
                         var clip = assertInstanceOf(Rectangle.class, panel.getClip(), id);
-                        assertEquals(20, clip.getArcWidth());
-                        assertEquals(20, clip.getArcHeight());
+                        assertEquals(8, clip.getArcWidth());
+                        assertEquals(8, clip.getArcHeight());
                         assertEquals(panel.getWidth(), clip.getWidth(), .1);
                         assertEquals(panel.getHeight(), clip.getHeight(), .1);
                         assertNotEquals(backdrop, RenderedColors.background(panel));
-                        var point = root.sceneToLocal(panel.localToScene(1, 1));
+                        var point = root.sceneToLocal(panel.localToScene(0, 0));
                         var pixels = root.snapshot(null, null).getPixelReader();
                         assertEquals(backdrop, pixels.getColor((int) point.getX(), (int) point.getY()), id + " clipped corner");
                     }
@@ -144,15 +146,18 @@ class MainViewIslandLayoutTest {
                     var pixels = root.snapshot(null, null).getPixelReader();
                     for (Region panel : new Region[]{region("logContainer"), results}) {
                         var clip = assertInstanceOf(Rectangle.class, panel.getClip());
-                        assertEquals(20, clip.getArcWidth());
+                        assertEquals(8, clip.getArcWidth());
                         assertEquals(panel.getWidth(), clip.getWidth(), .1);
                         assertEquals(panel.getHeight(), clip.getHeight(), .1);
-                        assertTrue(panel.getBackground().getFills().getFirst().getRadii().getTopLeftHorizontalRadius() >= 10);
+                        assertTrue(panel.getBackground().getFills().getFirst().getRadii().getTopLeftHorizontalRadius() >= 4);
                         assertNotEquals(backdrop, RenderedColors.background(panel));
-                        for (double x : new double[]{1,panel.getWidth()-2}) {
-                            for (double y : new double[]{1,panel.getHeight()-2}) {
+                        for (double x : new double[]{0,panel.getWidth()-1}) {
+                            for (double y : new double[]{0,panel.getHeight()-1}) {
                                 var point = root.sceneToLocal(panel.localToScene(x,y));
-                                assertEquals(backdrop, pixels.getColor((int)point.getX(), (int)point.getY()), theme + " internal corner");
+                                var corner=pixels.getColor((int)point.getX(), (int)point.getY());
+                                assertTrue(Math.abs(Math.round(backdrop.getRed()*255)-Math.round(corner.getRed()*255))<=1,theme+" corner red raster rounding");
+                                assertTrue(Math.abs(Math.round(backdrop.getGreen()*255)-Math.round(corner.getGreen()*255))<=1,theme+" corner green raster rounding");
+                                assertTrue(Math.abs(Math.round(backdrop.getBlue()*255)-Math.round(corner.getBlue()*255))<=1,theme+" corner blue raster rounding");
                             }
                         }
                     }

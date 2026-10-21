@@ -1,0 +1,7 @@
+allprojects {
+    afterEvaluate {
+        tasks.named('test') {
+            classpath = project.files(project.sourceSets.test.output, new File(project.projectDir, 'build/performance/optimized/classes'), new File(project.projectDir, 'build/performance/optimized/resources')) + project.configurations.testRuntimeClasspath
+        }
+    }
+}

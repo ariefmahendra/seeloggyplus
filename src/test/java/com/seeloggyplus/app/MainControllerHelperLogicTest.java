@@ -145,7 +145,7 @@ class MainControllerHelperLogicTest {
                 Label label = (Label) field("memoryStatusLabel");
                 ProgressBar bar = (ProgressBar) field("memoryBar");
 
-                assertTrue(label.getText().matches("Used: \\d+ MB / Total: \\d+ MB"),
+                assertTrue(label.getText().matches("Heap: \\d+ MiB"),
                         "The label must show the usage with its heap total (no max): " + label.getText());
                 double progress = bar.getProgress();
                 assertTrue(progress >= 0 && progress <= 1, "Progress must be a ratio: " + progress);
@@ -270,28 +270,6 @@ class MainControllerHelperLogicTest {
                 assertEquals(2, pane.getSelectionModel().getSelectedIndex());
                 invoke("selectPreviousTab", new Class<?>[0]);
                 assertEquals(1, pane.getSelectionModel().getSelectedIndex());
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
-        });
-        WaitForAsyncUtils.waitForFxEvents();
-    }
-
-    @Test
-    void getLineContentForGlobalReadsLiveTailBufferBounds() throws Exception {
-        Platform.runLater(() -> {
-            try {
-                setField("tailModeEnabled", true);
-                setField("liveTailList", new ArrayList<>(List.of(new LogEntry(1L, "raw tail line"))));
-                setField("canvasLogViewer", null);
-                setField("mappedFileReader", null);
-                setField("lineOffsetIndex", null);
-
-                assertEquals("raw tail line", invoke("getLineContentForGlobal", new Class<?>[]{long.class}, 0L));
-                assertEquals("", invoke("getLineContentForGlobal", new Class<?>[]{long.class}, 1L));
-
-                setField("tailModeEnabled", false);
-                assertEquals("", invoke("getLineContentForGlobal", new Class<?>[]{long.class}, 0L));
             } catch (Exception e) {
                 throw new IllegalStateException(e);
             }

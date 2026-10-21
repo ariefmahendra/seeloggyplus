@@ -1,0 +1,434 @@
+[
+  {
+    "workers": 2,
+    "query": "ABSENT_MARKER",
+    "run": 0,
+    "milliseconds": 784.7276,
+    "allocatedBytes": 21184,
+    "matches": 0
+  },
+  {
+    "workers": 2,
+    "query": "ABSENT_MARKER",
+    "run": 1,
+    "milliseconds": 584.3911,
+    "allocatedBytes": 160,
+    "matches": 0
+  },
+  {
+    "workers": 2,
+    "query": "ABSENT_MARKER",
+    "run": 2,
+    "milliseconds": 803.8287,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 2,
+    "query": "ABSENT_MARKER",
+    "run": 3,
+    "milliseconds": 1080.3781,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 2,
+    "query": "ABSENT_MARKER",
+    "run": 4,
+    "milliseconds": 969.7983,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 2,
+    "query": "ABSENT_MARKER",
+    "run": 5,
+    "milliseconds": 1133.5908,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 2,
+    "query": "ERROR",
+    "run": 0,
+    "milliseconds": 1244.5502,
+    "allocatedBytes": 98272,
+    "matches": 10486
+  },
+  {
+    "workers": 2,
+    "query": "ERROR",
+    "run": 1,
+    "milliseconds": 1192.2305,
+    "allocatedBytes": 98112,
+    "matches": 10486
+  },
+  {
+    "workers": 2,
+    "query": "ERROR",
+    "run": 2,
+    "milliseconds": 1190.5817,
+    "allocatedBytes": 98112,
+    "matches": 10486
+  },
+  {
+    "workers": 2,
+    "query": "ERROR",
+    "run": 3,
+    "milliseconds": 1261.0326,
+    "allocatedBytes": 98112,
+    "matches": 10486
+  },
+  {
+    "workers": 2,
+    "query": "ERROR",
+    "run": 4,
+    "milliseconds": 1227.888,
+    "allocatedBytes": 98112,
+    "matches": 10486
+  },
+  {
+    "workers": 2,
+    "query": "ERROR",
+    "run": 5,
+    "milliseconds": 1175.6091,
+    "allocatedBytes": 98048,
+    "matches": 10486
+  },
+  {
+    "workers": 2,
+    "query": "2026",
+    "run": 0,
+    "milliseconds": 479.78,
+    "allocatedBytes": 8367856,
+    "matches": 1048576
+  },
+  {
+    "workers": 2,
+    "query": "2026",
+    "run": 1,
+    "milliseconds": 491.2084,
+    "allocatedBytes": 8364000,
+    "matches": 1048576
+  },
+  {
+    "workers": 2,
+    "query": "2026",
+    "run": 2,
+    "milliseconds": 474.0012,
+    "allocatedBytes": 8364000,
+    "matches": 1048576
+  },
+  {
+    "workers": 2,
+    "query": "2026",
+    "run": 3,
+    "milliseconds": 553.6903,
+    "allocatedBytes": 8364000,
+    "matches": 1048576
+  },
+  {
+    "workers": 2,
+    "query": "2026",
+    "run": 4,
+    "milliseconds": 505.0083,
+    "allocatedBytes": 8364000,
+    "matches": 1048576
+  },
+  {
+    "workers": 2,
+    "query": "2026",
+    "run": 5,
+    "milliseconds": 521.8745,
+    "allocatedBytes": 8364000,
+    "matches": 1048576
+  },
+  {
+    "workers": 4,
+    "query": "ABSENT_MARKER",
+    "run": 0,
+    "milliseconds": 749.0028,
+    "allocatedBytes": 17312,
+    "matches": 0
+  },
+  {
+    "workers": 4,
+    "query": "ABSENT_MARKER",
+    "run": 1,
+    "milliseconds": 722.4085,
+    "allocatedBytes": 320,
+    "matches": 0
+  },
+  {
+    "workers": 4,
+    "query": "ABSENT_MARKER",
+    "run": 2,
+    "milliseconds": 678.6269,
+    "allocatedBytes": 320,
+    "matches": 0
+  },
+  {
+    "workers": 4,
+    "query": "ABSENT_MARKER",
+    "run": 3,
+    "milliseconds": 628.4486,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 4,
+    "query": "ABSENT_MARKER",
+    "run": 4,
+    "milliseconds": 684.7156,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 4,
+    "query": "ABSENT_MARKER",
+    "run": 5,
+    "milliseconds": 631.1967,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 4,
+    "query": "ERROR",
+    "run": 0,
+    "milliseconds": 663.9597,
+    "allocatedBytes": 130944,
+    "matches": 10486
+  },
+  {
+    "workers": 4,
+    "query": "ERROR",
+    "run": 1,
+    "milliseconds": 693.9677,
+    "allocatedBytes": 130944,
+    "matches": 10486
+  },
+  {
+    "workers": 4,
+    "query": "ERROR",
+    "run": 2,
+    "milliseconds": 638.0738,
+    "allocatedBytes": 130944,
+    "matches": 10486
+  },
+  {
+    "workers": 4,
+    "query": "ERROR",
+    "run": 3,
+    "milliseconds": 649.9296,
+    "allocatedBytes": 130944,
+    "matches": 10486
+  },
+  {
+    "workers": 4,
+    "query": "ERROR",
+    "run": 4,
+    "milliseconds": 676.8569,
+    "allocatedBytes": 130944,
+    "matches": 10486
+  },
+  {
+    "workers": 4,
+    "query": "ERROR",
+    "run": 5,
+    "milliseconds": 701.9263,
+    "allocatedBytes": 130944,
+    "matches": 10486
+  },
+  {
+    "workers": 4,
+    "query": "2026",
+    "run": 0,
+    "milliseconds": 271.676,
+    "allocatedBytes": 8363136,
+    "matches": 1048576
+  },
+  {
+    "workers": 4,
+    "query": "2026",
+    "run": 1,
+    "milliseconds": 245.236,
+    "allocatedBytes": 8363136,
+    "matches": 1048576
+  },
+  {
+    "workers": 4,
+    "query": "2026",
+    "run": 2,
+    "milliseconds": 259.2701,
+    "allocatedBytes": 8363136,
+    "matches": 1048576
+  },
+  {
+    "workers": 4,
+    "query": "2026",
+    "run": 3,
+    "milliseconds": 261.8208,
+    "allocatedBytes": 8363136,
+    "matches": 1048576
+  },
+  {
+    "workers": 4,
+    "query": "2026",
+    "run": 4,
+    "milliseconds": 267.5323,
+    "allocatedBytes": 8363136,
+    "matches": 1048576
+  },
+  {
+    "workers": 4,
+    "query": "2026",
+    "run": 5,
+    "milliseconds": 264.0945,
+    "allocatedBytes": 8363136,
+    "matches": 1048576
+  },
+  {
+    "workers": 6,
+    "query": "ABSENT_MARKER",
+    "run": 0,
+    "milliseconds": 493.7245,
+    "allocatedBytes": 25488,
+    "matches": 0
+  },
+  {
+    "workers": 6,
+    "query": "ABSENT_MARKER",
+    "run": 1,
+    "milliseconds": 493.2144,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 6,
+    "query": "ABSENT_MARKER",
+    "run": 2,
+    "milliseconds": 490.6237,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 6,
+    "query": "ABSENT_MARKER",
+    "run": 3,
+    "milliseconds": 483.581,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 6,
+    "query": "ABSENT_MARKER",
+    "run": 4,
+    "milliseconds": 483.7835,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 6,
+    "query": "ABSENT_MARKER",
+    "run": 5,
+    "milliseconds": 484.8901,
+    "allocatedBytes": 0,
+    "matches": 0
+  },
+  {
+    "workers": 6,
+    "query": "ERROR",
+    "run": 0,
+    "milliseconds": 460.0569,
+    "allocatedBytes": 98016,
+    "matches": 10486
+  },
+  {
+    "workers": 6,
+    "query": "ERROR",
+    "run": 1,
+    "milliseconds": 465.2432,
+    "allocatedBytes": 98016,
+    "matches": 10486
+  },
+  {
+    "workers": 6,
+    "query": "ERROR",
+    "run": 2,
+    "milliseconds": 494.9014,
+    "allocatedBytes": 98016,
+    "matches": 10486
+  },
+  {
+    "workers": 6,
+    "query": "ERROR",
+    "run": 3,
+    "milliseconds": 492.7022,
+    "allocatedBytes": 98016,
+    "matches": 10486
+  },
+  {
+    "workers": 6,
+    "query": "ERROR",
+    "run": 4,
+    "milliseconds": 468.6079,
+    "allocatedBytes": 98016,
+    "matches": 10486
+  },
+  {
+    "workers": 6,
+    "query": "ERROR",
+    "run": 5,
+    "milliseconds": 480.8017,
+    "allocatedBytes": 98016,
+    "matches": 10486
+  },
+  {
+    "workers": 6,
+    "query": "2026",
+    "run": 0,
+    "milliseconds": 183.9465,
+    "allocatedBytes": 8428320,
+    "matches": 1048576
+  },
+  {
+    "workers": 6,
+    "query": "2026",
+    "run": 1,
+    "milliseconds": 180.9519,
+    "allocatedBytes": 8428320,
+    "matches": 1048576
+  },
+  {
+    "workers": 6,
+    "query": "2026",
+    "run": 2,
+    "milliseconds": 178.733,
+    "allocatedBytes": 8428320,
+    "matches": 1048576
+  },
+  {
+    "workers": 6,
+    "query": "2026",
+    "run": 3,
+    "milliseconds": 176.837,
+    "allocatedBytes": 8428320,
+    "matches": 1048576
+  },
+  {
+    "workers": 6,
+    "query": "2026",
+    "run": 4,
+    "milliseconds": 181.7309,
+    "allocatedBytes": 8428320,
+    "matches": 1048576
+  },
+  {
+    "workers": 6,
+    "query": "2026",
+    "run": 5,
+    "milliseconds": 184.7525,
+    "allocatedBytes": 8428320,
+    "matches": 1048576
+  }
+]

@@ -437,7 +437,7 @@ public class ServerManagementDialogController {
         editMenuItem.setOnAction(e -> handleEditServer());
 
         MenuItem cloneMenuItem = new MenuItem("Clone...");
-        cloneMenuItem.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.COPY));
+        cloneMenuItem.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.CLONE));
         cloneMenuItem.setOnAction(e -> handleCloneServer());
 
         MenuItem deleteMenuItem = new MenuItem("Delete");

@@ -94,8 +94,7 @@
                         <VBox spacing="10" styleClass="settings-section">
                             <Label text="Formatting" styleClass="settings-section-title" wrapText="true" maxWidth="Infinity"/>
                             <VBox spacing="8">
-                                <CheckBox fx:id="mainAutoPrettifyJsonCheckBox" text="Automatically format JSON"/>
-                                <CheckBox fx:id="mainAutoPrettifyXmlCheckBox" text="Automatically format XML"/>
+                                <CheckBox fx:id="detailFormattedCheckBox" text="Open log details in Formatted mode (JSON/XML)"/>
                             </VBox>
                         </VBox>
                     </VBox>

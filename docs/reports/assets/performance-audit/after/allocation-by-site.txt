@@ -1,0 +1,30 @@
+
+                                                                                 Allocation by Site
+
+Method                                                                                                                                                          Allocation Pressure
+--------------------------------------------------------------------------------------------------------------------------------------------------------------- -------------------
+java.lang.String.getBytes(byte[], int, byte)                                                                                                                                 24.62%
+java.io.DataOutputStream.incCount(int)                                                                                                                                       15.56%
+com.seeloggyplus.shared.util.MappedFileReader.fillLineBytes(long, byte[], int)                                                                                               14.76%
+java.lang.StringLatin1.toLowerCase(String, byte[], Locale)                                                                                                                   13.58%
+com.sun.javafx.text.PrismTextLayout.layout()                                                                                                                                  7.51%
+java.util.regex.Pattern.matcher(CharSequence)                                                                                                                                 5.82%
+com.sun.javafx.text.PrismTextLayout.setContent(String, Object)                                                                                                                4.10%
+jdk.internal.icu.text.BidiBase.<init>(int, int)                                                                                                                               2.33%
+jdk.internal.icu.text.BidiBase.setPara(char[], byte, byte[])                                                                                                                  2.06%
+java.lang.StringConcatHelper.mix(long, long)                                                                                                                                  0.92%
+java.lang.String.repeat(int)                                                                                                                                                  0.92%
+jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Object, Object[])                                                                                                      0.76%
+jdk.internal.misc.Unsafe.allocateUninitializedArray(Class, int)                                                                                                               0.59%
+com.seeloggyplus.features.logs.infrastructure.io.SpoolingTailHistory.cache(SpoolingTailHistory$Record, LogEntry)                                                              0.58%
+java.util.HashMap.putMapEntries(Map, boolean)                                                                                                                                 0.52%
+java.lang.String.encodeUTF8(byte, byte[], boolean)                                                                                                                            0.50%
+com.seeloggyplus.shared.util.LineOffsetIndex.buildIndex(RandomAccessFile, LongConsumer)                                                                                       0.49%
+java.lang.invoke.Invokers.checkCustomized(MethodHandle)                                                                                                                       0.47%
+java.util.ArrayList.grow(int)                                                                                                                                                 0.41%
+java.util.HashMap.putVal(int, Object, Object, boolean, boolean)                                                                                                               0.38%
+java.util.HashMap$KeyIterator.<init>(HashMap)                                                                                                                                 0.28%
+javafx.scene.Node.<init>()                                                                                                                                                    0.26%
+com.seeloggyplus.shared.ui.canvas.CanvasLogViewer.render()                                                                                                                    0.22%
+com.sun.javafx.text.GlyphLayout.breakRuns(PrismTextLayout, char[], int)                                                                                                       0.19%
+java.lang.StringConcatHelper.simpleConcat(Object, Object)                                                                                                                     0.18%

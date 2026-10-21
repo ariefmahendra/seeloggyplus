@@ -1,0 +1,30 @@
+
+                                                                                 Allocation by Site
+
+Method                                                                                                                                                          Allocation Pressure
+--------------------------------------------------------------------------------------------------------------------------------------------------------------- -------------------
+com.seeloggyplus.shared.util.MappedFileReader.fillLineBytes(long, byte[], int)                                                                                               25.13%
+java.lang.StringLatin1.toLowerCase(String, byte[], Locale)                                                                                                                   23.71%
+java.lang.Math.min(long, long)                                                                                                                                               20.99%
+java.lang.String.getBytes(byte[], int, byte)                                                                                                                                 13.37%
+com.sun.javafx.text.PrismTextLayout.layout()                                                                                                                                  4.12%
+com.seeloggyplus.performance.PerformanceProfile.main(String[])                                                                                                                3.72%
+com.sun.javafx.text.PrismTextLayout.setContent(String, Object)                                                                                                                2.12%
+java.text.Bidi.<init>(char[], int, byte[], int, int, int)                                                                                                                     1.44%
+java.lang.String.<init>(byte[], int, int, Charset)                                                                                                                            1.02%
+java.lang.Long.stringSize(long)                                                                                                                                               0.93%
+jdk.internal.icu.text.BidiBase.getDirProps()                                                                                                                                  0.79%
+java.io.RandomAccessFile.length()                                                                                                                                             0.62%
+java.lang.String.repeat(int)                                                                                                                                                  0.29%
+java.util.ArrayList.grow(int)                                                                                                                                                 0.21%
+jdk.internal.misc.Unsafe.allocateUninitializedArray(Class, int)                                                                                                               0.20%
+javafx.scene.Node.<init>()                                                                                                                                                    0.10%
+com.seeloggyplus.shared.ui.canvas.CanvasLogViewer.render()                                                                                                                    0.09%
+com.seeloggyplus.shared.util.MappedFileReader.readLine(long, int)                                                                                                             0.09%
+java.util.concurrent.ConcurrentHashMap.get(Object)                                                                                                                            0.09%
+com.sun.javafx.text.PrismTextLayout.buildRuns(char[])                                                                                                                         0.08%
+com.sun.javafx.text.PrismTextLayout.addTextRun(TextRun)                                                                                                                       0.07%
+java.lang.Thread.sleep(long, int)                                                                                                                                             0.07%
+com.seeloggyplus.shared.util.LineOffsetIndex.buildIndex(RandomAccessFile, LongConsumer)                                                                                       0.06%
+jdk.internal.misc.Unsafe.allocateInstance(Class)                                                                                                                              0.06%
+com.sun.prism.sw.SWRTTexture.createGraphics()                                                                                                                                 0.04%

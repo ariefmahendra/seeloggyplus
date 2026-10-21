@@ -1,0 +1,8 @@
+{
+  "cpu": "AMD Ryzen 5 6600H with Radeon Graphics         ",
+  "cores": 6,
+  "logicalProcessors": 12,
+  "physicalMemoryBytes": 14761947136,
+  "os": "Microsoft Windows 11 Pro",
+  "osVersion": "10.0.26200"
+}

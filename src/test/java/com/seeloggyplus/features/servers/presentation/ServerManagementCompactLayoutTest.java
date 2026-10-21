@@ -27,6 +27,17 @@ class ServerManagementCompactLayoutTest {
         stage.setScene(AppTheme.scene(root)); stage.show();
     }
     @AfterEach void resetTheme() throws Exception { fx(() -> AppTheme.setTheme(AppTheme.Theme.LIGHT)); }
+    @Test void groupAndCloneActionsHaveSemanticIcons() throws Exception {
+        fx(() -> {
+            com.seeloggyplus.shared.ui.ActionIconAssertions.verify(root, "newGroupButton", "PLUS_SQUARE");
+            com.seeloggyplus.shared.ui.ActionIconAssertions.verify(root, "moveToGroupButton", "SIGN_IN");
+            com.seeloggyplus.shared.ui.ActionIconAssertions.verify(root, "cloneServerButton", "CLONE");
+            var table = (TableView<?>) root.lookup("#serverTable");
+            var clone = table.getContextMenu().getItems().stream()
+                    .filter(item -> "Clone...".equals(item.getText())).findFirst().orElseThrow();
+            assertEquals("CLONE", ((de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView) clone.getGraphic()).getGlyphName());
+        });
+    }
     @Test void dividerRespectsSidebarLimitsAndPreservesUserWidth() throws Exception {
         fx(() -> { stage.setWidth(1000); stage.setHeight(640); });
         fx(() -> {

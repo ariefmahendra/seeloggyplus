@@ -1,31 +1,33 @@
 .root {
-    -sl-toggle-selected-pressed-bg: #233558;
+    -sl-button-icon-active: #71a1fe;
+    -sl-button-icon: #d1d3d9;
+    -sl-toggle-selected-pressed-bg: #40434a;
     -sl-focus-ring: #71a1fe;
     -sl-focus-ring-panel: #71a1fe;
     -sl-focus-ring-chrome: #71a1fe;
     -sl-tab-selected-hover-bg: #2a4371;
     -sl-tab-selected-pressed-bg: #2e4d89;
-    -sl-window-bg: #26282c;
-    -sl-panel-bg: #191a1c;
-    -sl-input-bg: #212326;
-    -sl-log-text: #bcbec4;
-    -sl-popup-bg: #26282c;
+    -sl-window-bg: #20242b;
+    -sl-panel-bg: #181c22;
+    -sl-input-bg: #202630;
+    -sl-log-text: #d6dbe3;
+    -sl-popup-bg: #20242b;
     -sl-selection-inactive-bg: #33353b;
     -sl-selection-text: #d1d3d9;
     -sl-tab-selected-bg: #233558;
     -sl-tab-selected-border: #2e4d89;
-    -sl-tab-inactive-bg: #26282c;
-    -sl-toggle-selected-bg: #2e4d89;
-    -sl-toggle-selected-hover-bg: #2f5eb9;
+    -sl-tab-inactive-bg: #20242b;
+    -sl-toggle-selected-bg: #33353b;
+    -sl-toggle-selected-hover-bg: #40434a;
 
-    -sl-button-hover: rgba(255,255,255,0.090196);
-    -sl-button-pressed: rgba(255,255,255,0.160784);
+    -sl-button-hover: #33353b;
+    -sl-button-pressed: #40434a;
     -sl-button-text: #d1d3d9;
-    -sl-button-danger: #f87171;
+    -sl-button-danger: #fca5a5;
     -sl-button-danger-hover: rgba(220, 60, 60, 0.08);
     -sl-button-danger-pressed: rgba(220, 60, 60, 0.14);
 
-    -sl-chrome: #26282c;
+    -sl-chrome: #20242b;
     -sl-chrome-hover: rgba(255,255,255,0.090196);
     -sl-chrome-pressed: rgba(255,255,255,0.160784);
     -sl-chrome-text: #d1d3d9;
@@ -43,14 +45,14 @@
     -sl-accent-pressed: #2e4d89;
     -sl-accent-text: #ffffff;
 
-    -sl-bg: #26282c;
-    -sl-surface: #191a1c;
-    -sl-surface-alt: #191a1c;
-    -sl-surface-sunken: #212326;
+    -sl-bg: #20242b;
+    -sl-surface: #181c22;
+    -sl-surface-alt: #181c22;
+    -sl-surface-sunken: #202630;
     -sl-overlay: rgba(0, 0, 0, 0.55);
 
     -sl-border: #33353b;
-    -sl-border-soft: #26282c;
+    -sl-border-soft: #20242b;
     -sl-border-strong: #40434a;
 
     -sl-text: #d1d3d9;
@@ -64,9 +66,9 @@
     -sl-preview-target: #233558;
     -sl-selection-bg: #2a4371;
     -sl-canvas-line-number: #9fa2a8;
-    -sl-canvas-line-number-bg: #191a1c;
+    -sl-canvas-line-number-bg: #181c22;
     -sl-canvas-highlight: rgba(250, 204, 21, 0.35);
-    -sl-canvas-hover: #212326;
+    -sl-canvas-hover: #202630;
 
     -sl-success: #4ade80;
     -sl-warning: #fbbf24;
@@ -82,7 +84,7 @@
     -sl-chrome-danger: #fca5a5;
     -sl-memory-track: #33353b;
 
-    -sl-scroll-track: #191a1c;
+    -sl-scroll-track: #181c22;
     -sl-scroll-thumb: #4c4f56;
     -sl-scroll-thumb-hover: #5f6269;
     -sl-scroll-thumb-pressed: #73767c;
@@ -117,7 +119,7 @@
     -sl-syntax-info: #6ea8fe;
     -sl-syntax-debug: #4ade80;
     -sl-syntax-trace: #9fa2a8;
-    -sl-syntax-default: #bcbec4;
+    -sl-syntax-default: #d6dbe3;
     -sl-syntax-selection: #6ea8fe;
     -sl-syntax-selected-line: #2a3036;
     -sl-syntax-json-key: #7dd3fc;
@@ -134,10 +136,10 @@
     -sl-syntax-xml-decl: #5eead4;
     -sl-syntax-xml-cdata: #f9a8d4;
 
-    -fx-base: #26282c;
-    -fx-background: #191a1c;
-    -fx-control-inner-background: #212326;
-    -fx-control-inner-background-alt: #191a1c;
+    -fx-base: #20242b;
+    -fx-background: #181c22;
+    -fx-control-inner-background: #202630;
+    -fx-control-inner-background-alt: #181c22;
 
     -fx-accent: -sl-brand;
     -fx-focus-color: -sl-brand;

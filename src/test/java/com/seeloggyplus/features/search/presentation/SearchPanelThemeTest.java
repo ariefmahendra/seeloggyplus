@@ -124,18 +124,18 @@ class SearchPanelThemeTest {
 
             assertEquals(Color.web("#ffffff"), backgroundFill(panel),
                     "light theme search panel background must be white");
-            assertEquals(Color.web("#080808"), paletteField(panel, "textColor"),
+            assertEquals(Color.web("#192330"), paletteField(panel, "textColor"),
                     "search text must use the theme text token");
             assertEquals(Color.web("#5f6269"), paletteField(panel, "lineNumColor"));
             assertEquals(Color.web("#f7f8f9"), paletteField(panel, "hoverColor"));
 
             AppTheme.setDark(true);
             root.applyCss();
-            assertEquals(Color.web("#191a1c"), backgroundFill(panel),
+            assertEquals(Color.web("#181c22"), backgroundFill(panel),
                     "dark theme search panel background must be the dark surface");
-            assertEquals(Color.web("#bcbec4"), paletteField(panel, "textColor"));
+            assertEquals(Color.web("#d6dbe3"), paletteField(panel, "textColor"));
             assertEquals(Color.web("#9fa2a8"), paletteField(panel, "lineNumColor"));
-            assertEquals(Color.web("#212326"), paletteField(panel, "hoverColor"));
+            assertEquals(Color.web("#202630"), paletteField(panel, "hoverColor"));
 
             AppTheme.setDark(false);
         });

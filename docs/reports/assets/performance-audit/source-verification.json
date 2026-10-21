@@ -1,0 +1,8 @@
+{
+  "files": 170,
+  "differences": [],
+  "harnessSha256": {
+    "src\\test\\java\\com\\seeloggyplus\\performance\\PerformanceProfile.java": "e412eb2d666c9fe22ae0dc3469106f30c66fa3143f3a401fdca2b9cddd6c73d0",
+    "src\\test\\java\\com\\seeloggyplus\\performance\\SearchKernelProfile.java": "7cb5308b3a40609a6385000cb3298453f22284e738c955254d4c4e40b2bcac73"
+  }
+}

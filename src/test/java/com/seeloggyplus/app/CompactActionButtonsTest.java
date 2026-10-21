@@ -50,8 +50,8 @@ class CompactActionButtonsTest {
                 AppTheme.setTheme(theme);
                 main.applyCss();
                 main.layout();
-                ButtonBase reference = button(main, "refreshButton");
-                for (String id : new String[]{"prettifyJsonButton", "prettifyXmlButton", "copyButton", "clearDetailButton", "pinBottomPanelButton"}) {
+                ButtonBase reference = button(main, "searchButton");
+                for (String id : new String[]{"copyButton", "clearDetailButton", "pinBottomPanelButton"}) {
                     ButtonBase action = button(main, id);
                     assertEquals(reference.getPadding().getTop(), action.getPadding().getTop(), id + " should match toolbar vertical density");
                     assertEquals(reference.getPadding().getBottom(), action.getPadding().getBottom(), id + " should match toolbar vertical density");
@@ -67,7 +67,7 @@ class CompactActionButtonsTest {
         robot.interact(() -> {
             main.applyCss();
             main.layout();
-            ButtonBase reference = button(main, "refreshButton");
+            ButtonBase reference = button(main, "searchButton");
             Insets padding = reference.getPadding();
             double height = reference.getHeight();
             try {
@@ -111,7 +111,7 @@ class CompactActionButtonsTest {
                 AppTheme.setTheme(theme);
                 main.applyCss();
                 main.layout();
-                ButtonBase reference = button(main, "refreshButton");
+                ButtonBase reference = button(main, "searchButton");
                 for (String id : new String[]{"pinLeftPanelButton", "clearRecentButton"}) {
                     ButtonBase action = button(main, id);
                     assertEquals(reference.getPadding().getTop(), action.getPadding().getTop(), id + " should match toolbar vertical density");

@@ -1,0 +1,156 @@
+[
+  {
+    "class": "com.seeloggyplus.app.CanvasSearchFilteringTest",
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.app.FileManagerTailModeEndToEndTest",
+    "total": 20,
+    "passed": 20,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "Search Feature E2E and Unit Tests",
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.app.SearchResultsRegressionTest",
+    "total": 13,
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.app.TailEnableDisableLogDisplayTest",
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.app.TailTransitionAndRecentSyncTest",
+    "total": 14,
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.features.detail.presentation.DetailPanelThemeTest",
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.features.detail.presentation.LogDetailPaneAsyncCoverageTest",
+    "total": 7,
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.features.detail.presentation.LogDetailPaneControllerTest",
+    "total": 11,
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.features.logs.infrastructure.io.SpoolingTailHistoryTest",
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.features.search.presentation.SearchPanelThemeTest",
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.features.search.presentation.SearchResultPanelBehaviorTest",
+    "total": 20,
+    "passed": 20,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.shared.model.LogEntryTest",
+    "total": 13,
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.shared.session.LogSessionTest",
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.shared.ui.canvas.CanvasLogViewerInteractionTest",
+    "total": 29,
+    "passed": 29,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.shared.ui.canvas.CanvasLogViewerStateBehaviorTest",
+    "total": 21,
+    "passed": 21,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.shared.ui.canvas.CanvasSelectionRenderingRegressionTest",
+    "total": 8,
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.shared.ui.canvas.CanvasThemeTest",
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.shared.util.IntArrayListTransferTest",
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.shared.util.LineOffsetIndexAllocationTest",
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.shared.util.MappedFileReaderTest",
+    "total": 7,
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+  },
+  {
+    "class": "com.seeloggyplus.shared.util.ReaderAllocationTest",
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0
+  }
+]

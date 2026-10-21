@@ -44,11 +44,11 @@ class ThemeComponentParityTest {
     }
 
     private static final Palette LIGHT =
-            new Palette(Color.web("#e9eaee"), Color.web("#3871e1"), Color.web("#2f5eb9"),
-                    Color.web("#ffffff"), Color.web("#f7f8f9"), Color.web("#000000"));
+            new Palette(Color.web("#eef0f3"), Color.web("#3871e1"), Color.web("#2f5eb9"),
+                    Color.web("#ffffff"), Color.web("#f7f8f9"), Color.web("#192330"));
     private static final Palette DARK =
-            new Palette(Color.web("#26282c"), Color.web("#3871e1"), Color.web("#2f5eb9"),
-                    Color.web("#ffffff"), Color.web("#212326"), Color.web("#d1d3d9"));
+            new Palette(Color.web("#20242b"), Color.web("#3871e1"), Color.web("#2f5eb9"),
+                    Color.web("#ffffff"), Color.web("#202630"), Color.web("#d1d3d9"));
 
     private Stage stage;
     private Parent root;
@@ -109,18 +109,18 @@ class ThemeComponentParityTest {
             forAllThemes((theme, palette) -> {
                 toggle.setSelected(true);
                 apply();
-                assertEquals(Color.web(theme == AppTheme.Theme.DARK ? "#2e4d89" : "#d0dffe"), backgroundFill(toggle),
-                        "selected toolbar toggle must use the soft surface [" + theme + "]");
-                assertEquals(theme == AppTheme.Theme.DARK ? Color.WHITE : palette.text(), icon.getFill(),
-                        "selected toolbar icon must use the theme text [" + theme + "]");
+                assertEquals(Color.web(theme == AppTheme.Theme.DARK ? "#33353b" : "#e4e5e8"), backgroundFill(toggle),
+                        "selected toolbar toggle must use a neutral gray surface [" + theme + "]");
+                assertEquals(Color.web(theme == AppTheme.Theme.DARK ? "#71a1fe" : "#2f5eb9"), icon.getFill(),
+                        "selected toolbar icon must use readable blue [" + theme + "]");
 
                 toggle.setSelected(false);
                 toggle.pseudoClassStateChanged(HOVER, true);
                 apply();
                 assertEquals(com.seeloggyplus.shared.ui.ThemePalette.color("-sl-button-hover", theme), backgroundFill(toggle),
                         "hovered toolbar toggle must use the soft surface [" + theme + "]");
-                assertEquals(palette.text(), icon.getFill(),
-                        "hovered toolbar icon must use the theme text [" + theme + "]");
+                assertEquals(Color.web(theme == AppTheme.Theme.DARK ? "#71a1fe" : "#2f5eb9"), icon.getFill(),
+                        "hovered toolbar icon must use readable blue [" + theme + "]");
                 toggle.pseudoClassStateChanged(HOVER, false);
                 apply();
             });
@@ -130,11 +130,12 @@ class ThemeComponentParityTest {
     }
 
     @Test
-    @DisplayName("Keyboard toolbar focus uses a thin theme ring without replacing the surface")
+    @DisplayName("Keyboard toolbar focus uses a thin theme ring and gray interaction surface")
     void toolbarFocusRingFollowsTheme() {
         onFx(() -> {
-            Button refresh = (Button) root.lookup("#refreshButton");
-            assertNotNull(refresh, "toolbar must contain the refresh button");
+            Button refresh = (Button) root.lookup("#searchButton");
+            assertNotNull(refresh, "toolbar must contain the search button");
+            refresh.setDisable(false);
 
             forAllThemes((theme, palette) -> {
                 refresh.pseudoClassStateChanged(FOCUSED, true);
@@ -142,7 +143,7 @@ class ThemeComponentParityTest {
                 apply();
                 assertEquals(com.seeloggyplus.shared.ui.ThemePalette.color("-sl-focus-ring-panel", theme), borderStroke(refresh));
                 assertEquals(1, refresh.getBorder().getStrokes().getFirst().getWidths().getTop());
-                assertEquals(Color.TRANSPARENT, backgroundFill(refresh));
+                assertEquals(Color.web(theme == AppTheme.Theme.DARK ? "#33353b" : "#e4e5e8"), backgroundFill(refresh));
                 assertEquals(palette.text(), refresh.getTextFill());
                 refresh.pseudoClassStateChanged(FOCUSED, false);
                 refresh.pseudoClassStateChanged(PseudoClass.getPseudoClass("keyboard-focus"), false);
@@ -155,8 +156,9 @@ class ThemeComponentParityTest {
     @DisplayName("Focusing / clicking a toolbar button must not resize it")
     void focusDoesNotResizeToolbarButton() {
         onFx(() -> {
-            Button refresh = (Button) root.lookup("#refreshButton");
-            assertNotNull(refresh, "toolbar must contain the refresh button");
+            Button refresh = (Button) root.lookup("#searchButton");
+            assertNotNull(refresh, "toolbar must contain the search button");
+            refresh.setDisable(false);
             apply();
 
             double width = refresh.getWidth();

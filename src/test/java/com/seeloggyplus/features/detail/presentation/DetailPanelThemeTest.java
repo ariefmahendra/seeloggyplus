@@ -83,7 +83,7 @@ class DetailPanelThemeTest {
 
             AppTheme.setDark(true);
             area.applyCss();
-            assertEquals(Color.web("#191a1c"), backgroundFill(area),
+            assertEquals(Color.web("#181c22"), backgroundFill(area),
                     "dark theme detail background must be the dark surface");
 
             AppTheme.setDark(false);
@@ -102,14 +102,14 @@ class DetailPanelThemeTest {
 
             Text lightText = firstTextNode(area);
             assertNotNull(lightText, "detail area must render text nodes");
-            assertEquals(Color.web("#080808"), lightText.getFill(),
+            assertEquals(Color.web("#192330"), lightText.getFill(),
                     "light theme default detail text must be dark");
 
             AppTheme.setDark(true);
             area.applyCss();
             Text darkText = firstTextNode(area);
             assertNotNull(darkText);
-            assertEquals(Color.web("#bcbec4"), darkText.getFill(),
+            assertEquals(Color.web("#d6dbe3"), darkText.getFill(),
                     "dark theme default detail text must be light (not black)");
 
             AppTheme.setDark(false);
@@ -117,43 +117,20 @@ class DetailPanelThemeTest {
     }
 
     @Test
-    void prettifyToggleIconsFollowTheTheme() {
+    void rawAndFormattedControlsKeepReadableTextAndSelectedState() {
         onFxThread(() -> {
-            stage.setScene(AppTheme.scene(mainRoot));
-            stage.show();
-
-            ToggleButton json = prettifyToggle("prettifyJsonButton");
-            FontAwesomeIconView icon = (FontAwesomeIconView) json.getGraphic();
-            assertNotNull(icon, "prettify toggle must have an icon graphic");
-
-            for (var theme : AppTheme.Theme.values()) {
+            stage.setScene(AppTheme.scene(mainRoot)); stage.show();
+            ToggleButton mode=prettifyToggle("rawModeButton");
+            for (var theme:AppTheme.Theme.values()) {
                 AppTheme.setTheme(theme);
-                json.setSelected(false);
-                mainRoot.applyCss();
-                Color restingBackground = RenderedColors.background(json);
-                for (boolean selected : new boolean[] {false, true}) {
-                    json.setSelected(selected);
-                    mainRoot.applyCss();
-                    Color expected = Color.web(theme == AppTheme.Theme.DARK ? "#d1d3d9" : "#000000");
-                    assertEquals(expected, icon.getFill(), "prettify icon theme " + theme);
-                    Color background = RenderedColors.background(json);
-                    double foregroundLight = luminance((Color) icon.getFill());
-                    double backgroundLight = luminance(background);
-                    assertTrue((Math.max(foregroundLight, backgroundLight) + .05)
-                            / (Math.min(foregroundLight, backgroundLight) + .05) >= 3,
-                            "prettify icon contrast " + theme + " selected=" + selected);
-                    if (selected) assertNotEquals(restingBackground, background, "selected format must remain visible");
+                for(boolean selected:new boolean[]{false,true}) {
+                    mode.setSelected(selected);mainRoot.applyCss();mainRoot.layout();
+                    Color background=RenderedColors.background(mode);
+                    assertTrue(contrast((Color)mode.getTextFill(),background)>=4.5,"Mode text contrast "+theme);
+                    assertTrue(mode.getHeight()>=24 && mode.getHeight()<=32);
                 }
             }
         });
-    }
-
-    private static double luminance(Color color) {
-        return .2126 * linear(color.getRed()) + .7152 * linear(color.getGreen()) + .0722 * linear(color.getBlue());
-    }
-
-    private static double linear(double value) {
-        return value <= .04045 ? value / 12.92 : Math.pow((value + .055) / 1.055, 2.4);
     }
 
     @Test
@@ -294,4 +271,8 @@ class DetailPanelThemeTest {
             throw new RuntimeException(error.get());
         }
     }
+    private static double contrast(Color a,Color b) {double x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);}
+    private static double luminance(Color c) {return .2126*linear(c.getRed())+.7152*linear(c.getGreen())+.0722*linear(c.getBlue());}
+    private static double linear(double c) {return c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4);}
+
 }

@@ -48,6 +48,26 @@ class FilePathBreadcrumbTest {
         }).get();
     }
 
+    @Test void navigationArrowsTurnBlueOnHoverInBothThemes() throws Exception {
+        WaitForAsyncUtils.asyncFx(() -> {
+            var bar=new FilePathBreadcrumb(new TextField("/var/log"), path -> {},
+                    path -> CompletableFuture.completedFuture(List.of()));
+            var root=new VBox(bar);root.getStyleClass().add("unified-file-manager-dialog");
+            stage.setScene(AppTheme.scene(root));stage.show();
+            for(var theme:AppTheme.Theme.values()) {
+                AppTheme.setTheme(theme);root.applyCss();root.layout();
+                var arrow=(MenuButton)bar.lookup(".path-children");
+                assertNotNull(arrow);
+                arrow.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("hover"),true);
+                root.applyCss();
+                var color=(javafx.scene.paint.Color)((javafx.scene.shape.SVGPath)arrow.getGraphic()).getStroke();
+                assertTrue(color.getBlue()>color.getRed()+.15 && color.getBlue()>color.getGreen()+.08,
+                        theme+" breadcrumb arrow must turn blue: "+color);
+                arrow.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("hover"),false);
+            }
+        }).get();
+    }
+
     @Test void remotePathsAndThemesRemainReadableAndSized() throws Exception {
         WaitForAsyncUtils.asyncFx(() -> {
             TextField field = new TextField("/var/log");

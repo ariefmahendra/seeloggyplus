@@ -24,7 +24,7 @@ public class LineOffsetIndex {
         long fileSize = file.length();
 
         int estimatedLines = (int) Math.min(fileSize / 100, Integer.MAX_VALUE - 8);
-        LongArrayBuilder builder = new LongArrayBuilder(Math.max(estimatedLines, 1000));
+        LongArrayBuilder builder = new LongArrayBuilder(Math.min(65536, Math.max(estimatedLines, 1000)));
 
         builder.add(0);
 

@@ -113,7 +113,7 @@ Java is selected in this order: `java.home` in `launcher.properties` → the bun
 
 *   Type into the **Include (Search)** field in the toolbar. Results update as you type (300 ms debounce) and pressing `Enter` applies immediately.
 *   Toggle **Regex** and **Case Sensitive** to change matching.
-*   When a search is active, the **Search Result Panel** appears on the right; click a result to jump to that line.
+*   When a search is active, the **Results** panel appears in the configured dock. Choose Auto, Right or Bottom from **View**; click a result to jump to that line.
 *   Use `F3` / `Shift+F3` to move between matches, and `Escape` in the search field to clear the filter.
 
 ### Selecting & Copying Text
@@ -126,10 +126,12 @@ Java is selected in this order: `java.home` in `launcher.properties` → the bun
 
 Click a log line to see its full content in the bottom panel. The panel toolbar offers:
 
-*   **Auto-Prettify JSON / XML** toggles (also available in **Preferences → Log Viewer**),
+*   **Raw** to show the original line and **Formatted** to detect and format embedded JSON/XML without separate format toggles,
 *   **Copy** to copy the shown content,
 *   **Clear** to empty the panel,
 *   **Close** to hide the panel (`Ctrl+J` to show it again).
+
+The bottom-bar panel icons also toggle Recent Files and Detail. When Results and Detail share the bottom dock, choose their tabs to switch views. **Copy** follows the displayed Raw/Formatted mode. Choose the default formatting mode in **Preferences → Log Viewer**.
 
 ### Keyboard Shortcuts
 
@@ -155,7 +157,7 @@ Click a log line to see its full content in the bottom panel. The panel toolbar 
 **Settings → Preferences...** has three tabs:
 
 *   **General**: font size and family, theme (Light/Dark), file double-click action, and maximum memory (restart required).
-*   **Log Viewer**: tail window size, preview line limit, and auto-prettify JSON/XML.
+*   **Log Viewer**: tail window size, preview line limit, and opening Detail in Formatted mode.
 *   **SSH**: download threads, connection timeout, and the download directory (with **Open Folder** and **Clean Downloads** helpers).
 
 ### Updates

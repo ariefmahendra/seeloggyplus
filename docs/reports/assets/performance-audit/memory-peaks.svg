@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="390" viewBox="0 0 1000 390">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g font-family="Arial, sans-serif" fill="#172b4d">
+<text x="30" y="35" font-size="22">Normal-workload memory peaks (MiB)</text>
+<text x="30" y="59" font-size="13">Diagnostic GC and close phase excluded; cache budget is not the whole process budget.</text>
+<text x="30" y="118" font-size="15">Private memory</text>
+<rect x="210" y="95" width="300.6" height="23" rx="3" fill="#64748b"/>
+<text x="520.6" y="112" font-size="13">931.3</text>
+<rect x="210" y="125" width="265.5" height="23" rx="3" fill="#167a56"/>
+<text x="485.5" y="142" font-size="13">822.5</text>
+<text x="30" y="205" font-size="15">Java heap used</text>
+<rect x="210" y="182" width="192.6" height="23" rx="3" fill="#64748b"/>
+<text x="412.6" y="199" font-size="13">596.8</text>
+<rect x="210" y="212" width="162.1" height="23" rx="3" fill="#167a56"/>
+<text x="382.1" y="229" font-size="13">502.1</text>
+<text x="30" y="292" font-size="15">Working set</text>
+<rect x="210" y="269" width="620.0" height="23" rx="3" fill="#64748b"/>
+<text x="840.0" y="286" font-size="13">1920.6</text>
+<rect x="210" y="299" width="521.3" height="23" rx="3" fill="#167a56"/>
+<text x="741.3" y="316" font-size="13">1615.0</text>
+<rect x="210" y="363" width="14" height="14" fill="#64748b"/><text x="232" y="375" font-size="13">Before</text>
+<rect x="330" y="363" width="14" height="14" fill="#167a56"/><text x="352" y="375" font-size="13">After</text>
+</g></svg>

@@ -87,6 +87,13 @@ public class CanvasLogViewer extends GridPane {
     private long fileLineCount = 0;
     private int visibleLineCount = 50;
 
+    private static final java.util.concurrent.atomic.AtomicLong COPY_REQUESTS = new java.util.concurrent.atomic.AtomicLong();
+    private java.util.concurrent.FutureTask<Void> copyTask;
+    private java.util.concurrent.FutureTask<Void> countTask;
+    private long countGeneration;
+    private boolean countDirty;
+    private java.util.function.BiConsumer<Integer, Boolean> countCallback;
+    private final java.util.Map<Object, String> loadedTailRows = new java.util.LinkedHashMap<>(64, .75f, true);
     private List<LogEntry> tailBuffer = Collections.emptyList();
 
     private IntArrayList filteredIndexes = null;
@@ -149,8 +156,7 @@ public class CanvasLogViewer extends GridPane {
         int scanned = (int) Math.min(lines, SELECTION_CHAR_SCAN_LIMIT);
         long chars = 0;
         for (long view = first; view < first + scanned; view++) {
-            String line = getLineContent(toGlobalLine(view));
-            int length = line == null ? 0 : line.length();
+            int length = lineLengthAt(view);
             int from = Math.min(selectionStartCharAt(view), length);
             int to = Math.max(from, selectionEndCharAt(view, length));
             chars += (to - from);
@@ -275,7 +281,12 @@ public class CanvasLogViewer extends GridPane {
     }
 
     private int lineLengthAt(long viewIndex) {
-        String line = viewIndex < 0 ? null : getLineContent(toGlobalLine(viewIndex));
+        long global = toGlobalLine(viewIndex);
+        if (global >= fileLineCount && tailBuffer instanceof com.seeloggyplus.shared.tail.TailHistory history) {
+            int row = (int) (global - fileLineCount);
+            return row >= 0 && row < history.size() ? history.lineLength(row) : 0;
+        }
+        String line = viewIndex < 0 ? null : lineAtView(viewIndex);
         return line == null ? 0 : line.length();
     }
 
@@ -334,11 +345,42 @@ public class CanvasLogViewer extends GridPane {
         return viewIndex == selectionEndViewLine ? Math.min(selectionEndChar, lineLength) : lineLength;
     }
 
+    private String lineAtView(long viewIndex) {
+        long row = viewIndex - lineCacheStartLine;
+        if (lineCacheStartLine >= 0 && row >= 0 && row < lineCacheRows && row < lineCache.length) {
+            return lineCache[(int) row];
+        }
+        return getLineContent(toGlobalLine(viewIndex));
+    }
+
+    private Text layoutAtView(long viewIndex) {
+        long row = viewIndex - lineCacheStartLine;
+        if (lineCacheStartLine >= 0 && row >= 0 && row < lineCacheRows && row < lineLayoutCache.length
+                && lineLayoutCache[(int) row] != null) {
+            return lineLayoutCache[(int) row];
+        }
+        return textLayout(lineAtView(viewIndex));
+    }
+
+    private static Text textLayout(String line) {
+        Text layout = new Text(line == null ? "" : line);
+        layout.setFont(MONO_FONT);
+        return layout;
+    }
+
+    private static double caretX(Text layout, int index) {
+        int safeIndex = Math.max(0, Math.min(index, layout.getText().length()));
+        for (var element : layout.caretShape(safeIndex, true)) {
+            if (element instanceof javafx.scene.shape.MoveTo move) return move.getX();
+        }
+        return 0;
+    }
+
     private int charIndexAt(double localX, long viewIndex) {
-        int length = lineLengthAt(viewIndex);
+        Text layout = layoutAtView(viewIndex);
         double textX = localX - leftMargin + currentScrollX;
-        int index = (int) Math.round(textX / charWidth);
-        return Math.max(0, Math.min(index, length));
+        int index = layout.hitTest(new javafx.geometry.Point2D(textX, 0)).getInsertionIndex();
+        return Math.max(0, Math.min(index, layout.getText().length()));
     }
 
     private String buildSelectedText() {
@@ -369,10 +411,16 @@ public class CanvasLogViewer extends GridPane {
     }
 
     public void resetView() {
+        cancelAsyncWork();
         this.reader = null;
         this.index = null;
         this.fileLineCount = 0;
         this.tailBuffer = Collections.emptyList();
+        loadedTailRows.clear();
+        lineCache = new String[0];
+        lineLayoutCache = new Text[0];
+        lineLevelCache = new int[0];
+        lineCacheRows = 0;
         this.totalLines = 0;
         this.currentTopLine = 0;
         this.smoothScrollY = 0;
@@ -480,6 +528,8 @@ public class CanvasLogViewer extends GridPane {
     }
 
     public void setTailBuffer(List<LogEntry> tailBuffer) {
+        lineCacheStartLine = -1;
+        loadedTailRows.clear();
         this.tailBuffer = (tailBuffer != null) ? tailBuffer : Collections.emptyList();
         this.totalLines = fileLineCount + this.tailBuffer.size();
 
@@ -626,6 +676,7 @@ public class CanvasLogViewer extends GridPane {
     }
 
     private String[] lineCache = new String[0];
+    private Text[] lineLayoutCache = new Text[0];
     private int[] lineLevelCache = new int[0];
     private long lineCacheStartLine = -1;
     private int lineCacheRows = 0;
@@ -721,30 +772,48 @@ public class CanvasLogViewer extends GridPane {
 
         if (lineCache.length < linesToRender) {
             lineCache = new String[linesToRender + 10];
+            lineLayoutCache = new Text[linesToRender + 10];
             lineLevelCache = new int[linesToRender + 10];
             lineCacheStartLine = -1;
         }
         if (lineCacheStartLine != currentTopLine || lineCacheRows < linesToRender) {
+            long previousStart = lineCacheStartLine;
+            int previousRows = lineCacheRows;
+            long shift = currentTopLine - previousStart;
+            if (previousStart >= 0 && Math.abs(shift) < previousRows) {
+                int from = (int) Math.max(0, shift);
+                int to = (int) Math.max(0, -shift);
+                int count = Math.min(previousRows - from, lineCache.length - to);
+                System.arraycopy(lineCache, from, lineCache, to, count);
+                System.arraycopy(lineLayoutCache, from, lineLayoutCache, to, count);
+                System.arraycopy(lineLevelCache, from, lineLevelCache, to, count);
+            }
             lineCacheStartLine = currentTopLine;
             lineCacheRows = linesToRender;
             for (int i = 0; i < linesToRender; i++) {
                 long viewIndex = currentTopLine + i;
                 if (viewIndex >= effectiveLineCount) {
                     lineCache[i] = null;
+                    lineLayoutCache[i] = null;
                     lineLevelCache[i] = 0;
                     continue;
                 }
+                long previousRow = viewIndex - previousStart;
+                if (previousStart >= 0 && previousRow >= 0 && previousRow < previousRows) continue;
                 long actualLineIndex = (filteredIndexes != null)
                         ? filteredIndexes.get((int) viewIndex) : viewIndex;
-                String content = getLineContent(actualLineIndex);
+                String content = getRenderLineContent(actualLineIndex);
+                if (!java.util.Objects.equals(lineCache[i], content) || lineLayoutCache[i] == null) {
+                    lineLayoutCache[i] = textLayout(content);
+                    lineLevelCache[i] = detectLevelCode(content);
+                }
                 lineCache[i] = content;
-                lineLevelCache[i] = detectLevelCode(content);
             }
         }
 
         gc.save();
         gc.beginPath();
-        gc.rect(leftMargin, 0, width - leftMargin, height);
+        gc.rect(leftMargin, 0, Math.max(0, width - leftMargin), height);
         gc.clip();
 
         gc.setFont(MONO_FONT);
@@ -764,7 +833,7 @@ public class CanvasLogViewer extends GridPane {
             String line = lineCache[i];
             if (line == null) line = "";
             int level = lineLevelCache[i];
-            renderLineContent(line, level, leftMargin, y, viewIndex);
+            renderLineContent(line, lineLayoutCache[i], level, leftMargin, y, viewIndex);
         }
         gc.restore();
 
@@ -791,60 +860,71 @@ public class CanvasLogViewer extends GridPane {
         }
     }
 
-    private void renderLineContent(String line, int levelCode, double x, double y, long viewIndex) {
+    private void renderLineContent(String line, Text layout, int levelCode, double x, double y, long viewIndex) {
+        if (layout == null) return;
         double drawX = x - currentScrollX;
         double canvasWidth = canvas.getWidth();
-
-        double lineWidth = line.length() * charWidth;
-        if (drawX + lineWidth < leftMargin || drawX > canvasWidth) {
-            return;
-        }
-
-        int visStart = Math.max(0, (int) ((leftMargin - drawX) / charWidth));
-        int visEnd = Math.min(line.length(), (int) ((canvasWidth - drawX) / charWidth) + 1);
+        if (drawX + layout.getLayoutBounds().getWidth() < leftMargin || drawX > canvasWidth) return;
 
         boolean isSelected = isViewLineSelected(viewIndex);
-
+        double selectedStart = drawX;
+        double selectedEnd = drawX;
+        boolean wholeTextSelected = false;
         if (isSelected) {
-            int selStart = Math.max(0, Math.min(selectionStartCharAt(viewIndex), line.length()));
-            int selEnd = Math.max(selStart, selectionEndCharAt(viewIndex, line.length()));
+            int start = selectionStartCharAt(viewIndex);
+            int end = selectionEndCharAt(viewIndex, line.length());
+            wholeTextSelected = start == 0 && end == line.length();
+            selectedStart = drawX + caretX(layout, start);
+            selectedEnd = drawX + caretX(layout, end);
             boolean toRowEnd = selectionWholeLine || viewIndex < selectionEndViewLine;
-            double selX = drawX + selStart * charWidth;
-            double selW = toRowEnd ? (canvasWidth - selX) : (selEnd - selStart) * charWidth;
-            if (selW > 0) {
+            double selectionWidth = toRowEnd ? canvasWidth - selectedStart : selectedEnd - selectedStart;
+            if (selectionWidth > 0) {
                 gc.setFill(SelectionColors.active(this) ? selectionColor : SelectionColors.background(paletteTheme, false));
-                gc.fillRect(selX, y, selW, LINE_HEIGHT);
+                gc.fillRect(selectedStart, y, selectionWidth, LINE_HEIGHT);
             }
         }
 
         if (searchPattern != null) {
-            Matcher m = searchPattern.matcher(line);
-
+            Matcher matcher = searchPattern.matcher(line);
             gc.setFill(highlightBg);
-            while (m.find()) {
-                if (m.end() < visStart) continue;
-                if (m.start() > visEnd) break;
-                double startX = drawX + m.start() * charWidth;
-                double highlightWidth = (m.end() - m.start()) * charWidth;
-                gc.fillRect(startX, y, highlightWidth, LINE_HEIGHT);
+            while (matcher.find()) {
+                double start = drawX + caretX(layout, matcher.start());
+                double end = drawX + caretX(layout, matcher.end());
+                if (end < leftMargin) continue;
+                if (start > canvasWidth) break;
+                gc.fillRect(start, y, end - start, LINE_HEIGHT);
             }
         }
 
-        gc.setFill(levelTextColor(levelCode));
-        if (visStart > 0 || visEnd < line.length()) {
-            String visibleText = line.substring(visStart, visEnd);
-            gc.fillText(visibleText, drawX + visStart * charWidth, y + 2);
-        } else {
+        if (wholeTextSelected) {
+            gc.setFill(textColor);
             gc.fillText(line, drawX, y + 2);
+            return;
         }
+        Color normal = levelTextColor(levelCode);
+        if (!isSelected || selectedStart >= selectedEnd || normal.equals(textColor)) {
+            gc.setFill(normal);
+            gc.fillText(line, drawX, y + 2);
+            return;
+        }
+        renderTextSegment(line, drawX, y, leftMargin, selectedStart, normal);
+        renderTextSegment(line, drawX, y, selectedStart, selectedEnd, textColor);
+        renderTextSegment(line, drawX, y, selectedEnd, canvasWidth, normal);
+    }
 
-        if (isSelected) {
-            int start = Math.max(visStart, selectionStartCharAt(viewIndex));
-            int end = Math.min(visEnd, selectionEndCharAt(viewIndex, line.length()));
-            if (start < end) {
-                gc.setFill(textColor);
-                gc.fillText(line.substring(start, end), drawX + start * charWidth, y + 2);
-            }
+    private void renderTextSegment(String line, double drawX, double y, double left, double right, Color color) {
+        left = Math.max(leftMargin, left);
+        right = Math.min(canvas.getWidth(), right);
+        if (right <= left) return;
+        gc.save();
+        try {
+            gc.beginPath();
+            gc.rect(left, y, right - left, LINE_HEIGHT);
+            gc.clip();
+            gc.setFill(color);
+            gc.fillText(line, drawX, y + 2);
+        } finally {
+            gc.restore();
         }
     }
 
@@ -1018,12 +1098,7 @@ public class CanvasLogViewer extends GridPane {
 
             render();
 
-            String lineContent = getLineContent(actualLineIndex);
-            if (e.getClickCount() == 1 && onLineClick != null) {
-                onLineClick.handle(actualLineIndex, lineContent);
-            } else if (e.getClickCount() == 2 && onLineDoubleClick != null) {
-                onLineDoubleClick.handle(actualLineIndex, lineContent);
-            }
+            if (e.getClickCount() == 1 || e.getClickCount() == 2) notifyLineSelected(actualLineIndex, e.getClickCount() == 2);
         }
     }
 
@@ -1095,10 +1170,7 @@ public class CanvasLogViewer extends GridPane {
             render();
             fireStatusUpdate(effectiveLines);
 
-            String content = getLineContent(toGlobalLine(newSel));
-            if (onLineClick != null) {
-                onLineClick.handle(toGlobalLine(newSel), content);
-            }
+            notifyLineSelected(toGlobalLine(newSel), false);
 
             e.consume();
             return;
@@ -1155,15 +1227,151 @@ public class CanvasLogViewer extends GridPane {
             return;
         }
 
-        String selected = buildSelectedText();
-        if (selected == null || selected.isEmpty()) {
+        long request = COPY_REQUESTS.incrementAndGet();
+        if (copyTask != null) copyTask.cancel(true);
+        if (tailBuffer instanceof com.seeloggyplus.shared.tail.TailHistory && hasSelection()) {
+            copyTailSelection(request);
             return;
         }
+        putClipboard(buildSelectedText());
+    }
 
+    private record SourceSnapshot(MappedFileReader reader, LineOffsetIndex index, long fileLines,
+                                  List<LogEntry> tail) implements AutoCloseable {
+        String line(long global) {
+            if (global < fileLines) return reader.readLine(index, global);
+            long row = global - fileLines;
+            if (row < 0 || row >= tail.size()) return "";
+            LogEntry entry = tail.get((int) row);
+            return entry == null ? "" : entry.getRawLog();
+        }
+        @Override public void close() {
+            if (tail instanceof com.seeloggyplus.shared.tail.TailHistory.Snapshot snapshot) snapshot.close();
+        }
+    }
+
+    private SourceSnapshot captureSource() {
+        List<LogEntry> tail = tailBuffer instanceof com.seeloggyplus.shared.tail.TailHistory history
+                ? history.snapshot() : new java.util.ArrayList<>(tailBuffer);
+        return new SourceSnapshot(reader, index, fileLineCount, tail);
+    }
+
+    private void cancelAsyncWork() {
+        if (copyTask != null) {copyTask.cancel(true); copyTask = null;}
+        countGeneration++;
+        countDirty = false;
+        if (countTask != null) {countTask.cancel(true); countTask = null;}
+    }
+
+    private void putClipboard(String text) {
+        if (text == null || text.isEmpty()) return;
         ClipboardContent content = new ClipboardContent();
-        content.putString(selected);
+        content.putString(text);
         Clipboard.getSystemClipboard().setContent(content);
-        logger.info("Copied {} characters to clipboard", selected.length());
+        logger.info("Copied {} characters to clipboard", text.length());
+    }
+
+    private void copyTailSelection(long request) {
+        boolean ranged = hasSelectionRange();
+        long first = ranged ? selectionStartViewLine : selectedLine;
+        long last = ranged ? selectionEndViewLine : selectedLine;
+        int from = selectionStartChar;
+        int end = selectionEndChar;
+        boolean whole = !ranged || selectionWholeLine;
+        long[] globals = new long[(int) (last - first + 1)];
+        for (int i = 0; i < globals.length; i++) globals[i] = toGlobalLine(first + i);
+        SourceSnapshot source = captureSource();
+        copyTask = new java.util.concurrent.FutureTask<>(() -> {
+            try {
+                StringBuilder text = new StringBuilder();
+                for (int i = 0; i < globals.length; i++) {
+                    if (Thread.currentThread().isInterrupted() || COPY_REQUESTS.get() != request) return null;
+                    String line = source.line(globals[i]);
+                    if (line == null) line = "";
+                    int begin = !whole && i == 0 ? Math.min(from, line.length()) : 0;
+                    int finish = !whole && i == globals.length - 1 ? Math.min(end, line.length()) : line.length();
+                    if (finish > begin) text.append(line, begin, finish);
+                    if (i + 1 < globals.length) text.append(System.lineSeparator());
+                }
+                String copied = text.toString();
+                Platform.runLater(() -> {if (COPY_REQUESTS.get() == request) putClipboard(copied);});
+            } catch (RuntimeException error) {logger.debug("Could not copy the tail snapshot", error);}
+            return null;
+        }) {
+            @Override protected void done() {source.close();}
+        };
+        Thread.ofVirtual().name("tail-copy").start(copyTask);
+    }
+
+    private void notifyLineSelected(long global, boolean doubleClick) {
+        if (global >= fileLineCount && tailBuffer instanceof com.seeloggyplus.shared.tail.TailHistory history) {
+            int row = (int) (global - fileLineCount);
+            if (row < 0 || row >= history.size()) return;
+            Object key = history.keyAt(row);
+            String loaded = loadedTailRows.get(key);
+            LogEntry cached = loaded == null ? history.peek(row) : null;
+            if (loaded != null || cached != null) {
+                fireLineSelected(global, loaded != null ? loaded : cached.getRawLog(), doubleClick);
+            } else {
+                history.loadAsync(row, entry -> Platform.runLater(() -> {
+                    if (tailBuffer == history && row < history.size() && history.keyAt(row) == key
+                            && toGlobalLine(selectedLine) == global) {
+                        rememberTailLine(key, entry.getRawLog());
+                        fireLineSelected(global, entry.getRawLog(), doubleClick);
+                    }
+                }));
+            }
+            return;
+        }
+        fireLineSelected(global, getLineContent(global), doubleClick);
+    }
+
+    private void fireLineSelected(long global, String content, boolean doubleClick) {
+        if (doubleClick && onLineDoubleClick != null) onLineDoubleClick.handle(global, content);
+        if (!doubleClick && onLineClick != null) onLineClick.handle(global, content);
+    }
+
+    private void rememberTailLine(Object key, String content) {
+        loadedTailRows.put(key, content == null ? "" : content);
+        while (loadedTailRows.size() > visibleLineCount + 10) loadedTailRows.remove(loadedTailRows.keySet().iterator().next());
+        lineCacheStartLine = -1;
+        requestRender();
+    }
+
+    public void countMatchesAsync(java.util.function.BiConsumer<Integer, Boolean> ready) {
+        countCallback = ready;
+        if (countTask != null && !countTask.isDone()) {countDirty = true; return;}
+        countDirty = false;
+        Pattern pattern = searchPattern;
+        if (pattern == null) {ready.accept(0, false); return;}
+        List<LogEntry> currentTail = tailBuffer;
+        MappedFileReader currentReader = reader;
+        int count = getItemCount();
+        long[] globals = new long[Math.min(count, MATCH_SCAN_LIMIT)];
+        for (int i = 0; i < globals.length; i++) globals[i] = toGlobalLine(i);
+        SourceSnapshot source = captureSource();
+        long generation = ++countGeneration;
+        countTask = new java.util.concurrent.FutureTask<>(() -> {
+            int matches = 0;
+            try {
+                for (long global : globals) {
+                    if (Thread.currentThread().isInterrupted()) return null;
+                    if (pattern.matcher(source.line(global)).find()) matches++;
+                }
+                int found = matches;
+                Platform.runLater(() -> {
+                    if (generation != countGeneration) return;
+                    countTask = null;
+                    if (currentTail == tailBuffer && currentReader == reader && pattern == searchPattern)
+                        ready.accept(found, count > MATCH_SCAN_LIMIT);
+                    if (countDirty) countMatchesAsync(countCallback);
+                });
+            } catch (RuntimeException error) {logger.debug("Could not count snapshot matches", error);}
+            return null;
+        }) {
+            @Override protected void done() {source.close();}
+        };
+        Thread.ofVirtual().name("tail-match-count").start(countTask);
     }
 
     private void setupScrollBarListener() {
@@ -1255,6 +1463,14 @@ public class CanvasLogViewer extends GridPane {
         scrollAnimating = false;
     }
 
+    private void requestRender() {
+        renderDirty = true;
+        if (!scrollAnimating) {
+            scrollAnimating = true;
+            scrollAnimator.start();
+        }
+    }
+
     private boolean scrollAnimating = false;
 
     private void applySmoothScroll() {
@@ -1273,12 +1489,33 @@ public class CanvasLogViewer extends GridPane {
         renderDirty = true;
     }
 
+    private String getRenderLineContent(long globalIndex) {
+        if (globalIndex >= fileLineCount && tailBuffer instanceof com.seeloggyplus.shared.tail.TailHistory history) {
+            int row = (int) (globalIndex - fileLineCount);
+            if (row < 0 || row >= history.size()) return "";
+            Object key = history.keyAt(row);
+            String loaded = loadedTailRows.get(key);
+            if (loaded != null) return loaded;
+            LogEntry entry = history.peek(row);
+            if (entry != null) return entry.getRawLog();
+            history.loadAsync(row, resolved -> javafx.application.Platform.runLater(() -> {
+                if (tailBuffer == history && row < history.size() && history.keyAt(row) == key) {
+                    rememberTailLine(key, resolved.getRawLog());
+                }
+            }));
+            return "";
+        }
+        return getLineContent(globalIndex);
+    }
+
     private String getLineContent(long globalIndex) {
         if (globalIndex < fileLineCount) {
             return reader.readLine(index, globalIndex);
         } else {
             int bufferIndex = (int) (globalIndex - fileLineCount);
             if (bufferIndex >= 0 && bufferIndex < tailBuffer.size()) {
+                if (Platform.isFxApplicationThread() && tailBuffer instanceof com.seeloggyplus.shared.tail.TailHistory)
+                    return getRenderLineContent(globalIndex);
                 LogEntry entry = tailBuffer.get(bufferIndex);
                 return entry != null ? entry.getRawLog() : "";
             }

@@ -538,3 +538,11 @@ tasks.register('verifyReleaseCompatibility') {
     group = 'verification'
     dependsOn 'verifyReleaseCompatibilityNoJre', 'verifyReleaseCompatibilityWithJre'
 }
+tasks.register('performanceClasspath') {
+    dependsOn testClasses
+    doLast {
+        def destination = file("${buildDir}/performance/runtime-classpath.txt")
+        destination.parentFile.mkdirs()
+        destination.setText(sourceSets.test.runtimeClasspath.asPath, 'UTF-8')
+    }
+}

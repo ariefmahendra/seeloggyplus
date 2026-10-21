@@ -24,8 +24,12 @@ import java.net.URL;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.ResourceBundle;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
+import java.util.concurrent.Executor;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import javafx.scene.control.Tooltip;
 
 public class LogDetailPaneController implements Initializable {
 
@@ -38,47 +42,41 @@ public class LogDetailPaneController implements Initializable {
     @FXML
     private StackPane detailContainer;
     @FXML
-    private ToggleButton prettifyJsonButton;
-    @FXML
-    private ToggleButton prettifyXmlButton;
-    @FXML
     private Button copyButton;
     @FXML
     private Button clearDetailButton;
     @FXML
     private Button pinBottomPanelButton;
 
+    @FXML private ToggleButton rawModeButton;
+    @FXML private ToggleButton formattedModeButton;
+    private boolean formattedMode;
+    private boolean updatingMode;
     private StyleClassedTextArea detailCodeArea;
     private Label detailPlaceholderLabel;
     private String currentRawLogContent;
-    private boolean autoPrettifyJson = false;
-    private boolean autoPrettifyXml = false;
+    private volatile long formatGeneration;
+    private FutureTask<Void> pendingFormat;
+    private Executor formatExecutor = new ThreadPoolExecutor(0, 1, 5, TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(1), runnable -> {
+                Thread worker = new Thread(runnable, "log-detail-format");
+                worker.setDaemon(true);
+                return worker;
+            }, new ThreadPoolExecutor.DiscardOldestPolicy());
     private Runnable onCloseRequest = () -> { };
-    private BiConsumer<String, Boolean> onPreferenceChanged = (code, value) -> { };
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         setupDetailPanel();
-
-        prettifyJsonButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            autoPrettifyJson = newVal;
-            onPreferenceChanged.accept("main_auto_prettify_json", newVal);
-            if (newVal) {
-                applyAutoPrettify();
-            } else {
-                restoreRawDetailIfNotPrettified();
-            }
+        var modes = new javafx.scene.control.ToggleGroup();
+        rawModeButton.setToggleGroup(modes); formattedModeButton.setToggleGroup(modes);
+        modes.selectedToggleProperty().addListener((o,a,b) -> {
+            if (updatingMode) return;
+            if (b == null) { modes.selectToggle(a); return; }
+            formattedMode = b == formattedModeButton;
+            refreshFormatting();
         });
-
-        prettifyXmlButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            autoPrettifyXml = newVal;
-            onPreferenceChanged.accept("main_auto_prettify_xml", newVal);
-            if (newVal) {
-                applyAutoPrettify();
-            } else {
-                restoreRawDetailIfNotPrettified();
-            }
-        });
+        syncMode(false, false, "Select a log line containing JSON or XML");
 
         copyButton.setOnAction(e -> copyDetailToClipboard());
         clearDetailButton.setOnAction(e -> clear());
@@ -97,24 +95,15 @@ public class LogDetailPaneController implements Initializable {
         this.onCloseRequest = onCloseRequest != null ? onCloseRequest : () -> { };
     }
 
-    public void setOnPreferenceChanged(BiConsumer<String, Boolean> onPreferenceChanged) {
-        this.onPreferenceChanged = onPreferenceChanged != null ? onPreferenceChanged : (code, value) -> { };
-    }
-
     public void setFontStyle(String fontStyle) {
         if (detailCodeArea != null) {
             detailCodeArea.setStyle(fontStyle);
         }
     }
 
-    public void setAutoPrettify(boolean json, boolean xml) {
-        this.autoPrettifyJson = json;
-        this.autoPrettifyXml = xml;
-        if (json || xml) {
-            applyAutoPrettify();
-        }
-        prettifyJsonButton.setSelected(json);
-        prettifyXmlButton.setSelected(xml);
+    public void setDefaultFormatted(boolean formatted) {
+        formattedMode = formatted;
+        refreshFormatting();
     }
 
     public void show(long lineNumber, String content) {
@@ -130,28 +119,17 @@ public class LogDetailPaneController implements Initializable {
         detailCodeArea.replaceText(0, 0, content);
         detailLabel.setText("Line " + (lineNumber + 1));
 
-        boolean prettified = false;
-        if (autoPrettifyJson) {
-            prettified = prettifyJson();
-        }
-        if (!prettified && autoPrettifyXml) {
-            prettified = prettifyXml();
-        }
-        if (!prettified) {
-            try {
-                detailCodeArea.setStyleSpans(0, computeHighlightingSpans(content));
-            } catch (Exception e) {
-                logger.warn("Failed to apply detail highlighting", e);
-            }
-        }
+        refreshFormatting();
     }
 
     public void clear() {
         Runnable r = () -> {
+            cancelFormatting();
             if (detailCodeArea != null) {
                 detailCodeArea.clear();
             }
             currentRawLogContent = null;
+            syncMode(false, false, "Select a log line containing JSON or XML");
             if (detailLabel != null) {
                 detailLabel.setText("Log Detail");
             }
@@ -181,7 +159,7 @@ public class LogDetailPaneController implements Initializable {
         VirtualizedScrollPane<StyleClassedTextArea> vsp = new VirtualizedScrollPane<>(detailCodeArea);
 
         detailPlaceholderLabel = new Label(
-                "Select a log line from the table above to view formatted details, JSON/XML, or stack trace");
+                "Select a log line to view formatted details, JSON/XML, or stack trace");
         detailPlaceholderLabel.getStyleClass().add("muted-italic");
         detailPlaceholderLabel.setWrapText(true);
         detailPlaceholderLabel.setAlignment(Pos.CENTER);
@@ -193,145 +171,72 @@ public class LogDetailPaneController implements Initializable {
         return SyntaxHighlighter.computeLogHighlighting(text);
     }
 
-    private void applyAutoPrettify() {
-        if (currentRawLogContent == null && detailCodeArea != null) {
-            currentRawLogContent = detailCodeArea.getText();
+    private void cancelFormatting() {
+        formatGeneration++;
+        if (pendingFormat != null) {
+            pendingFormat.cancel(true);
+            pendingFormat = null;
         }
-        if (currentRawLogContent == null || currentRawLogContent.isEmpty()) {
+    }
+
+    private record Formatted(String text, StyleSpans<Collection<String>> spans, boolean supported) {}
+
+    private Formatted format(String raw, boolean displayFormatted) {
+        String text = raw;
+        int syntax = 0;
+        if ((raw.indexOf('{') >= 0 || raw.indexOf('[') >= 0) && JsonPrettify.containsJson(raw)) {
+            syntax = 1;
+            if (displayFormatted) text = JsonPrettify.prettifyFromLog(raw);
+        } else if (raw.indexOf('<') >= 0 && !raw.contains("<!DOCTYPE") && !raw.contains("<!ENTITY")
+                && !Thread.currentThread().isInterrupted() && XmlPrettify.containsXml(raw)) {
+            syntax = 2;
+            if (displayFormatted) text = XmlPrettify.prettifyFromLog(raw);
+        }
+        if (Thread.currentThread().isInterrupted()) return null;
+        StyleSpans<Collection<String>> spans = !displayFormatted || syntax == 0 ? computeHighlightingSpans(text)
+                : syntax == 1 ? SyntaxHighlighter.computeJsonHighlighting(text) : SyntaxHighlighter.computeXmlHighlighting(text);
+        return new Formatted(text, spans, syntax != 0);
+    }
+
+    private void syncMode(boolean formatted, boolean supported, String explanation) {
+        updatingMode = true;
+        try {
+            formattedModeButton.setDisable(!supported);
+            formattedModeButton.setTooltip(new Tooltip(explanation));
+            if (formatted) formattedModeButton.setSelected(true); else rawModeButton.setSelected(true);
+        } finally { updatingMode = false; }
+    }
+
+    private void refreshFormatting() {
+        cancelFormatting();
+        String raw = currentRawLogContent;
+        if (detailCodeArea == null) return;
+        if (raw == null || raw.isEmpty()) { syncMode(false, false, "Select a log line containing JSON or XML"); return; }
+        long generation = formatGeneration;
+        boolean requestedMode = formattedMode;
+        if (!requestedMode && !raw.equals(detailCodeArea.getText())) detailCodeArea.replaceText(raw);
+        syncMode(false, false, "Checking for JSON or XML...");
+        if (raw.length() <= 4096) {
+            applyFormatted(format(raw, requestedMode), generation);
             return;
         }
-
-        boolean prettified = false;
-        if (autoPrettifyJson) {
-            prettified = prettifyJson();
-        }
-        if (!prettified && autoPrettifyXml) {
-            prettifyXml();
-        }
+        pendingFormat = new FutureTask<>(() -> {
+            if (generation != formatGeneration) return null;
+            Formatted formatted = format(raw, requestedMode);
+            if (generation == formatGeneration && !Thread.currentThread().isInterrupted()) {
+                Platform.runLater(() -> applyFormatted(formatted, generation));
+            }
+            return null;
+        });
+        formatExecutor.execute(pendingFormat);
     }
 
-    private void restoreRawDetailIfNotPrettified() {
-        if (currentRawLogContent != null && detailCodeArea != null) {
-            boolean prettified = false;
-            if (autoPrettifyJson) {
-                prettified = prettifyJson();
-            }
-            if (!prettified && autoPrettifyXml) {
-                prettified = prettifyXml();
-            }
-            if (!prettified) {
-                detailCodeArea.replaceText(currentRawLogContent);
-                try {
-                    detailCodeArea.setStyleSpans(0, computeHighlightingSpans(currentRawLogContent));
-                } catch (Exception e) {
-                    logger.warn("CSS load fail in restore raw detail");
-                }
-            }
-        }
-    }
-
-    private boolean prettifyJson() {
-        String sourceText = currentRawLogContent != null ? currentRawLogContent : detailCodeArea.getText();
-        if (sourceText == null || sourceText.isEmpty()) {
-            return false;
-        }
-
-        if (sourceText.length() > 4096) {
-            CompletableFuture.supplyAsync(() -> {
-                String prettified = JsonPrettify.prettifyFromLog(sourceText);
-                if (prettified != null && !prettified.equals(sourceText)) {
-                    StyleSpans<Collection<String>> spans = null;
-                    try {
-                        spans = SyntaxHighlighter.computeJsonHighlighting(prettified);
-                    } catch (Exception e) {
-                        logger.debug("Could not compute JSON highlighting", e);
-                    }
-                    return new Object[] { prettified, spans };
-                }
-                return null;
-            }).thenAccept(result -> {
-                if (result != null && sourceText.equals(currentRawLogContent)) {
-                    Platform.runLater(() -> {
-                        String prettified = (String) result[0];
-                        @SuppressWarnings("unchecked")
-                        StyleSpans<Collection<String>> spans = (StyleSpans<Collection<String>>) result[1];
-                        detailCodeArea.replaceText(prettified);
-                        if (spans != null) {
-                            try {
-                                detailCodeArea.setStyleSpans(0, spans);
-                            } catch (Exception e) {
-                                logger.debug("Could not apply JSON highlighting", e);
-                            }
-                        }
-                    });
-                }
-            });
-            return true;
-        }
-
-        String prettified = JsonPrettify.prettifyFromLog(sourceText);
-        if (prettified != null && !prettified.equals(sourceText)) {
-            detailCodeArea.replaceText(prettified);
-            try {
-                detailCodeArea.setStyleSpans(0, SyntaxHighlighter.computeJsonHighlighting(prettified));
-            } catch (Exception e) {
-                logger.warn("CSS load fail in pretty json", e);
-            }
-            return true;
-        }
-        return false;
-    }
-
-    private boolean prettifyXml() {
-        String sourceText = currentRawLogContent != null ? currentRawLogContent : detailCodeArea.getText();
-        if (sourceText == null || sourceText.isEmpty()) {
-            return false;
-        }
-
-        if (sourceText.length() > 4096) {
-            CompletableFuture.supplyAsync(() -> {
-                String prettified = XmlPrettify.prettifyFromLog(sourceText);
-                if (prettified != null && !prettified.equals(sourceText)) {
-                    StyleSpans<Collection<String>> spans = null;
-                    try {
-                        spans = SyntaxHighlighter.computeXmlHighlighting(prettified);
-                    } catch (Exception e) {
-                        logger.debug("Could not compute XML highlighting", e);
-                    }
-                    return new Object[] { prettified, spans };
-                }
-                return null;
-            }).thenAccept(result -> {
-                if (result != null && sourceText.equals(currentRawLogContent)) {
-                    Platform.runLater(() -> {
-                        String prettified = (String) result[0];
-                        @SuppressWarnings("unchecked")
-                        StyleSpans<Collection<String>> spans = (StyleSpans<Collection<String>>) result[1];
-                        detailCodeArea.replaceText(prettified);
-                        if (spans != null) {
-                            try {
-                                detailCodeArea.setStyleSpans(0, spans);
-                            } catch (Exception e) {
-                                logger.debug("Could not apply XML highlighting", e);
-                            }
-                        }
-                    });
-                }
-            });
-            return true;
-        }
-
-        String prettified = XmlPrettify.prettifyFromLog(sourceText);
-        if (prettified != null && !prettified.equals(sourceText)) {
-            detailCodeArea.replaceText(prettified);
-            try {
-                detailCodeArea.setStyleSpans(0, SyntaxHighlighter.computeXmlHighlighting(prettified));
-            } catch (Exception e) {
-                logger.warn("CSS load fail in pretty xml", e);
-            }
-            return true;
-        }
-        return false;
+    private void applyFormatted(Formatted formatted, long generation) {
+        if (generation != formatGeneration || formatted == null) return;
+        syncMode(formattedMode && formatted.supported, formatted.supported,
+                formatted.supported ? "Format detected JSON or XML; original log stays unchanged" : "No supported JSON/XML payload found");
+        if (!formatted.text.equals(detailCodeArea.getText())) detailCodeArea.replaceText(formatted.text);
+        if (formatted.spans != null) detailCodeArea.setStyleSpans(0, formatted.spans);
     }
 
     private void copyDetailToClipboard() {

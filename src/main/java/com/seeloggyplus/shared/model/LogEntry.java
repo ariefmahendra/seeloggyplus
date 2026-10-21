@@ -17,7 +17,7 @@ public class LogEntry {
     private final long endLineNumber;
     @Getter
     private final String rawLog;
-    private final Map<String, String> parsedFields;
+    private Map<String, String> parsedFields;
     @Getter
     private LocalDateTime timestamp;
     private String level;
@@ -29,7 +29,7 @@ public class LogEntry {
     private boolean isParsed;
 
     public LogEntry(long lineNumber, String rawLog) {
-        this(lineNumber, lineNumber, rawLog, new HashMap<>(), false);
+        this(lineNumber, lineNumber, rawLog, Map.of(), false);
     }
 
     public LogEntry(long startLineNumber, long endLineNumber, String rawLog) {
@@ -49,7 +49,7 @@ public class LogEntry {
         this.lineNumber = lineNumber;
         this.endLineNumber = endLineNumber;
         this.rawLog = rawLog;
-        this.parsedFields = new HashMap<>(parsedFields);
+        this.parsedFields = parsedFields.isEmpty() ? Map.of() : new HashMap<>(parsedFields);
         this.isParsed = isParsed;
 
         if (isParsed) {
@@ -64,6 +64,11 @@ public class LogEntry {
         }
     }
 
+    private Map<String, String> mutableFields() {
+        if (!(parsedFields instanceof HashMap)) parsedFields = new HashMap<>(parsedFields);
+        return parsedFields;
+    }
+
     public Map<String, String> getParsedFields() {
         return new HashMap<>(parsedFields);
     }
@@ -75,7 +80,7 @@ public class LogEntry {
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
         if (timestamp != null) {
-            parsedFields.put("timestamp", timestamp.toString());
+            mutableFields().put("timestamp", timestamp.toString());
         }
     }
 
@@ -85,7 +90,7 @@ public class LogEntry {
 
     public void setLevel(String level) {
         this.level = level;
-        parsedFields.put("level", level);
+        mutableFields().put("level", level);
     }
 
     public String getMessage() {
@@ -94,7 +99,7 @@ public class LogEntry {
 
     public void setMessage(String message) {
         this.message = message;
-        parsedFields.put("message", message);
+        mutableFields().put("message", message);
     }
 
     public String getThread() {
@@ -103,7 +108,7 @@ public class LogEntry {
 
     public void setThread(String thread) {
         this.thread = thread;
-        parsedFields.put("thread", thread);
+        mutableFields().put("thread", thread);
     }
 
     public String getLogger() {
@@ -112,15 +117,15 @@ public class LogEntry {
 
     public void setLogger(String logger) {
         this.logger = logger;
-        parsedFields.put("logger", logger);
+        mutableFields().put("logger", logger);
     }
 
     public void addField(String key, String value) {
-        parsedFields.put(key, value);
+        mutableFields().put(key, value);
     }
 
     public void addFields(Map<String, String> fields) {
-        parsedFields.putAll(fields);
+        mutableFields().putAll(fields);
     }
 
     private static Map<String, String> createMapFromMatcher(Matcher matcher, List<String> groupNames) {

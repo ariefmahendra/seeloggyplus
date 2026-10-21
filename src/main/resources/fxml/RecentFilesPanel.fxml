@@ -29,10 +29,13 @@
     <TreeView fx:id="recentFilesTreeView" VBox.vgrow="ALWAYS" showRoot="false"/>
 
     <HBox alignment="CENTER_LEFT" styleClass="compact-actions">
-        <Button fx:id="clearRecentButton" text="Clear Recent Files">
+        <Button fx:id="clearRecentButton" text="Clear Recent Files" accessibleText="Clear Recent Files">
             <graphic>
-                <FontAwesomeIconView glyphName="TIMES_CIRCLE" size="12"/>
+                <FontAwesomeIconView glyphName="ERASER" size="12"/>
             </graphic>
+            <tooltip>
+                <Tooltip text="Clear Recent Files"/>
+            </tooltip>
         </Button>
     </HBox>
 </VBox>

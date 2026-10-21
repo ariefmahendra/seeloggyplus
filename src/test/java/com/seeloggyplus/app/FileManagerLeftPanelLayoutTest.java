@@ -54,6 +54,16 @@ class FileManagerLeftPanelLayoutTest {
     }
 
     @Test
+    void locationAndOpenActionsHaveSemanticIcons() throws Exception {
+        WaitForAsyncUtils.asyncFx(() -> {
+            Parent root = stage.getScene().getRoot();
+            com.seeloggyplus.shared.ui.ActionIconAssertions.verify(root, "newGroupButton", "PLUS_SQUARE");
+            com.seeloggyplus.shared.ui.ActionIconAssertions.verify(root, "manageServersButton", "SERVER");
+            com.seeloggyplus.shared.ui.ActionIconAssertions.verify(root, "openButton", "EXTERNAL_LINK");
+        }).get();
+    }
+
+    @Test
     @DisplayName("action buttons form a compact icon bar above the tree")
     void actionButtonsAreCompact() throws Exception {
         Button newGroup = field("newGroupButton");

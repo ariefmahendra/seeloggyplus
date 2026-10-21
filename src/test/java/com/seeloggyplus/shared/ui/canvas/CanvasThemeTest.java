@@ -55,7 +55,7 @@ class CanvasThemeTest {
 
             AppTheme.setDark(true);
             root.applyCss();
-            assertEquals(Color.web("#191a1c"), backgroundFill(viewer),
+            assertEquals(Color.web("#181c22"), backgroundFill(viewer),
                     "dark theme canvas background must be the dark surface");
             assertEquals(Color.web("#ff8a80"), palette(viewer, "fatalText"));
             assertEquals(Color.web("#9fa2a8"), palette(viewer, "lineNumColor"));
@@ -90,7 +90,7 @@ class CanvasThemeTest {
                 root.applyCss(); root.layout(); viewer.redraw();
                 var image = viewer.snapshot(null, null);
                 var pixels = image.getPixelReader();
-                Color surface = Color.web(theme == AppTheme.Theme.LIGHT ? "#ffffff" : "#191a1c");
+                Color surface = Color.web(theme == AppTheme.Theme.LIGHT ? "#ffffff" : "#181c22");
                 for (int i = 0; i < levels.length; i++) {
                     int top = 4 + i * 18;
                     assertEquals(surface, pixels.getColor(600, top + 9), "Row background must stay neutral for " + levels[i]);
@@ -159,7 +159,7 @@ class CanvasThemeTest {
             for (int y = 4; y < 22; y++) {
                 for (int x = 80; x < 112; x++) brightest = Math.max(brightest, luminance(pixels.getColor(x, y)));
             }
-            assertTrue(brightest >= luminance(Color.web("#bcbec4")) * .9,
+            assertTrue(brightest >= luminance(Color.web("#d6dbe3")) * .9,
                     "Selected INFO must use readable editor text instead of low-contrast blue on blue");
         });
     }

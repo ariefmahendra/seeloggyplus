@@ -39,6 +39,16 @@ class MainViewIconsTest {
     }
 
     @Test
+    void navigationAndClearingIconsDescribeTheirTargets(FxRobot robot) {
+        robot.interact(() -> {
+            var left=assertInstanceOf(javafx.scene.shape.SVGPath.class,button("toggleLeftPanelButton").getGraphic());
+            var bottom=assertInstanceOf(javafx.scene.shape.SVGPath.class,button("toggleBottomPanelButton").getGraphic());
+            assertNotEquals(left.getContent(),bottom.getContent());
+            com.seeloggyplus.shared.ui.ActionIconAssertions.verify(root, "clearRecentButton", "ERASER");
+        });
+    }
+
+    @Test
     void clearAndCloseDetailHaveDistinctActionIcons(FxRobot robot) {
         robot.interact(() -> {
             ButtonBase clear = button("clearDetailButton");
@@ -68,7 +78,7 @@ class MainViewIconsTest {
             detail.setManaged(true);
             for (AppTheme.Theme theme : AppTheme.Theme.values()) {
                 AppTheme.setTheme(theme);
-                for (String id : new String[]{"clearDetailButton", "pinBottomPanelButton", "tailButton"}) {
+                for (String id : new String[]{"clearDetailButton", "pinBottomPanelButton", "tailButton", "searchButton"}) {
                     ButtonBase button = button(id);
                     button.setDisable(false);
                     for (String state : new String[]{"hover", "pressed", "focused"}) {
@@ -79,7 +89,7 @@ class MainViewIconsTest {
                         FontAwesomeIconView icon = icon(button);
                         assertTrue(icon.getFont().getSize() >= 12, "Action glyphs must remain readable");
                         assertTrue(button.getHeight() > 0 && button.getHeight() <= 36, "Action buttons must stay compact");
-                        assertTrue(button.getWidth() > 0 && button.getWidth() <= 48);
+                        assertTrue(button.getWidth() > 0 && button.getWidth() <= (button.getText().isEmpty() ? 48 : 96));
                         Color foreground = (Color) icon.getFill();
                         Color background = background(icon);
                         assertTrue(contrast(foreground, background) >= 3,
