@@ -468,7 +468,7 @@ class SearchResultsRegressionTest {
             root.applyCss(); root.layout();
             String phase = System.getenv().getOrDefault("SEELOGGY_SEARCH_REPORT_PHASE", "after");
             Path directory = System.getenv().containsKey("SEELOGGY_SEARCH_REPORT_PHASE")
-                    ? Path.of("docs/reports/assets/search-results-fix") : Path.of("build/search-results-review");
+                    ? Path.of(".local-docs/reports/assets/search-results-fix") : Path.of("build/search-results-review");
             Path path = directory.resolve(phase + "-" + name + ".png");
             Files.createDirectories(path.getParent());
             var image = root.snapshot(null, null);

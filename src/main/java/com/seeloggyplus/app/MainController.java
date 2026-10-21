@@ -3702,7 +3702,12 @@ public class MainController {
 
         String text = String.format("Used: %.0f MB / Total: %.0f MB", usedMb, totalMb);
         memoryStatusLabel.setText(String.format("Heap: %.0f MiB", usedMb));
-        memoryStatusLabel.setTooltip(new Tooltip(text));
+        Tooltip memoryTooltip = memoryStatusLabel.getTooltip();
+        if (memoryTooltip == null) {
+            memoryTooltip = new Tooltip();
+            memoryStatusLabel.setTooltip(memoryTooltip);
+        }
+        memoryTooltip.setText(text);
         if (resourceDetailLabel != null) resourceDetailLabel.setText(String.format(
                 "Java heap used: %.0f MiB%nCommitted: %.0f MiB%nMaximum: %.0f MiB%n%nHeap is not total process RAM. See operating-system tools for private memory and working set.",
                 usedMb, totalMb, runtime.maxMemory() / (1024.0 * 1024.0)));

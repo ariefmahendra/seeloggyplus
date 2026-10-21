@@ -44,7 +44,7 @@ public class ServerManagementDialogTest {
         Button cloneButton = (Button) cloneButtonField.get(controller);
 
         assertNotNull(cloneButton, "cloneServerButton must be injected from FXML");
-        assertEquals("Clone", cloneButton.getAccessibleText());
+        assertEquals("Clone Server", cloneButton.getAccessibleText());
         assertTrue(cloneButton.getText() == null || cloneButton.getText().isBlank());
         assertTrue(cloneButton.isDisable(), "Clone button should initially be disabled without selection");
     }

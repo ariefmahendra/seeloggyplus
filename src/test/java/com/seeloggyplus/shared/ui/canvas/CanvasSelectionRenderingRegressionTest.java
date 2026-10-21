@@ -267,7 +267,7 @@ class CanvasSelectionRenderingRegressionTest {
         try {
             String phase = System.getenv().getOrDefault("SEELOGGY_SELECTION_REPORT_PHASE", "after");
             Path directory = System.getenv().containsKey("SEELOGGY_SELECTION_REPORT_PHASE")
-                    ? Path.of("docs/reports/assets/canvas-selection-fix") : Path.of("build/canvas-selection-review");
+                    ? Path.of(".local-docs/reports/assets/canvas-selection-fix") : Path.of("build/canvas-selection-review");
             Files.createDirectories(directory);
             WritableImage full = root.snapshot(null, null);
             write(full, directory.resolve(phase + "-" + name + ".png"));

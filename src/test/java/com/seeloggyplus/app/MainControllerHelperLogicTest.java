@@ -164,6 +164,25 @@ class MainControllerHelperLogicTest {
     }
 
     @Test
+    void repeatedMemoryUpdatesReuseTheInstalledTooltip() throws Exception {
+        WaitForAsyncUtils.asyncFx(() -> {
+            try {
+                Label label = (Label) field("memoryStatusLabel");
+                invoke("updateMemoryStatus", new Class<?>[0]);
+                var tooltip = label.getTooltip();
+                assertNotNull(tooltip);
+                for (int update = 0; update < 25; update++) {
+                    invoke("updateMemoryStatus", new Class<?>[0]);
+                    assertSame(tooltip, label.getTooltip(), "Memory polling must update one tooltip instead of retaining new popup scenes");
+                }
+                assertTrue(tooltip.getText().contains("Total:"));
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        }).get();
+    }
+
+    @Test
     void updateTailButtonStateTogglesWithFilePresence() throws Exception {
         ToggleButton tailButton = (ToggleButton) field("tailButton");
         ToggleButton followTailButton = (ToggleButton) field("followTailButton");

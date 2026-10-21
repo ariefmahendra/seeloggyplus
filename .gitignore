@@ -131,4 +131,7 @@ target/
 
 test-results/
 __pycache__/
-/docs/reports/
+/docs/*
+!/docs/RELEASING.md
+/.local-docs/
+/.mcp.json

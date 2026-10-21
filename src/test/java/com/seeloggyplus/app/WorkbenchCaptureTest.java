@@ -62,7 +62,7 @@ class WorkbenchCaptureTest {
     @Test void captureMatchedWorkloadAtFourSizesAndBothThemes() throws Exception {
         recentReady.get(10,TimeUnit.SECONDS);
         String phase=System.getenv().getOrDefault("SEELOGGY_WORKBENCH_PHASE","review");
-        Path directory=phase.equals("review")?Path.of("build/workbench-review"):Path.of(System.getenv().getOrDefault("SEELOGGY_WORKBENCH_ROOT","docs/reports/assets/workbench"),phase);
+        Path directory=phase.equals("review")?Path.of("build/workbench-review"):Path.of(System.getenv().getOrDefault("SEELOGGY_WORKBENCH_ROOT",".local-docs/reports/assets/workbench"),phase);
         Files.createDirectories(directory);
         var metrics=new ArrayList<Map<String,Object>>();
         try {

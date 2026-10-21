@@ -55,10 +55,14 @@ class ToolbarToggleIconThemeTest {
             for (boolean dark : new boolean[] {false, true}) {
                 AppTheme.setDark(dark);
                 String mode = dark ? "dark" : "light";
+                tail.setDisable(false);
+                follow.setDisable(false);
 
                 assertIconColour(tail, false, mode);
                 assertIconColour(follow, false, mode);
                 assertIconColour(tail, true, mode);
+                assertIconColour(follow, true, mode);
+                follow.setDisable(true);
                 assertIconColour(follow, true, mode);
             }
 
@@ -80,11 +84,11 @@ class ToolbarToggleIconThemeTest {
 
         FontAwesomeIconView icon = (FontAwesomeIconView) button.getGraphic();
         assertNotNull(icon, "toolbar toggle must have an icon");
-        Color expected = com.seeloggyplus.shared.ui.ThemePalette.color(
-                mode.equals("dark") && selected ? "-sl-text-inverse" : "-sl-chrome-text",
-                mode.equals("dark") ? AppTheme.Theme.DARK : AppTheme.Theme.LIGHT);
+        Color expected = selected && !button.isDisabled()
+                ? Color.web(mode.equals("dark") ? "#71a1fe" : "#2f5eb9")
+                : Color.web(mode.equals("dark") ? "#d1d3d9" : "#192330");
         assertEquals(expected, icon.getFill(),
-                "toolbar toggle icon must use the chrome text colour (" + mode
+                "toolbar toggle icon must use blue only when active and enabled (" + mode
                         + ", selected=" + selected + "), was " + icon.getFill());
     }
 

@@ -142,7 +142,7 @@ def chart(summary, destination):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path("build/performance"))
-    parser.add_argument("--output", type=Path, default=Path("docs/reports/assets/performance-audit"))
+    parser.add_argument("--output", type=Path, default=Path(".local-docs/reports/assets/performance-audit"))
     parser.add_argument("--partial", action="store_true")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
