@@ -1,7 +1,12 @@
 import importlib.util
 import hashlib
 import json
+import os
+import shlex
+import shutil
+import subprocess
 import tempfile
+import textwrap
 import unittest
 import zipfile
 from pathlib import Path
@@ -84,6 +89,30 @@ class ReleaseValidationTest(unittest.TestCase):
         (dist / "update-manifest.json").write_text(json.dumps(manifest))
         with self.assertRaises(ValueError):
             module.validate("0.8.0", self.root, dist)
+
+
+class ReleaseWorkflowTest(unittest.TestCase):
+    def test_manual_package_urls_use_the_application_version(self):
+        workflow = (Path(__file__).parents[1] / ".github/workflows/release.yml").read_text(encoding="utf-8")
+        step = workflow.split("- name: Build platform packages and manifest", 1)[1].split("- name:", 1)[0]
+        command = textwrap.dedent(step.split("run: |", 1)[1]).strip()
+        substitutions = {"github.repository": "ariefmahendra/seeloggyplus", "github.ref_name || github.run_id": "main", "github.ref_name": "main", "matrix.platform": "win", "vars.MIN_SUPPORTED": ""}
+        for expression, value in substitutions.items():
+            command = command.replace("${{ " + expression + " }}", value)
+        bash = shutil.which("bash")
+        git_bash = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git/bin/bash.exe"
+        if os.name == "nt" and git_bash.is_file():
+            bash = str(git_bash)
+        self.assertIsNotNone(bash, "Release workflow validation requires Bash")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "gradle.properties").write_text("version=0.8.0\n", encoding="utf-8")
+            (root / "capture.py").write_text("import json,sys\nfrom pathlib import Path\nPath('args.json').write_text(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
+            command = command.replace("./gradlew", shlex.quote(shutil.which("python").replace("\\", "/")) + " capture.py")
+            subprocess.run([bash, "-c", command], cwd=root, check=True, capture_output=True, text=True)
+            arguments = json.loads((root / "args.json").read_text())
+            self.assertIn("-PupdateBaseUrl=https://github.com/ariefmahendra/seeloggyplus/releases/download/0.8.0", arguments)
+            self.assertIn("-PreleaseNotesUrl=https://github.com/ariefmahendra/seeloggyplus/releases/tag/0.8.0", arguments)
 
 
 if __name__ == "__main__":

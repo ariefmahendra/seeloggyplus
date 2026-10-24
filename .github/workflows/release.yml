@@ -149,11 +149,12 @@ jobs:
       - name: Build platform packages and manifest
         shell: bash
         run: |
+          VERSION=$(sed -n 's/^version=//p' gradle.properties | tr -d '\r')
           ./gradlew --no-daemon packagePlatform generatePlatformManifest \
             -Pplatform=${{ matrix.platform }} \
-            -PupdateBaseUrl="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name || github.run_id }}" \
+            -PupdateBaseUrl="https://github.com/${{ github.repository }}/releases/download/$VERSION" \
             -PminSupported="${{ vars.MIN_SUPPORTED }}" \
-            -PreleaseNotesUrl="https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+            -PreleaseNotesUrl="https://github.com/${{ github.repository }}/releases/tag/$VERSION"
 
       - name: Verify real packages with the released 0.7.0 updater
         shell: bash
