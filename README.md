@@ -23,6 +23,18 @@ SeeLoggyPlus is a high-performance, JavaFX-based desktop log viewer designed for
 
 ## 🚀 Getting Started
 
+### Windows distribution
+
+Microsoft Store is the primary Windows installation and update channel. Store
+publication is being prepared. Once published, install
+[SeeLoggyPlus from Microsoft Store](https://apps.microsoft.com/detail/9PDJ4N28SNT7)
+and launch it from Start; Java is included and Store manages updates.
+
+For a portable installation, download the Windows package ending in `-jre.zip`
+from [GitHub Releases](https://github.com/ariefmahendra/seeloggyplus/releases).
+It includes Java and does not check for updates, show update notifications, or
+install updates. Download a newer portable package manually when needed.
+
 ### Prerequisites
 
 *   **Java 21** or newer to build and run from source.
@@ -162,11 +174,16 @@ The bottom-bar panel icons also toggle Recent Files and Detail. When Results and
 
 ### Updates
 
-Use **Help → Check for Updates...** for a manual check, or leave the automatic options enabled:
-
-*   **Check for Updates Automatically** — checks in the background and shows a status-bar indicator when a new version exists.
-*   **Download Updates Automatically** — downloads and stages the update in the background; the indicator then offers **Restart to update**.
-*   After upgrading, a **What's New** dialog shows the release notes of the new version.
+*   **Microsoft Store installation**: updates are managed by Microsoft Store. Use
+    **Help → Open Microsoft Store** to open the Store. Automatic delivery follows
+    Store settings and device conditions; the application does not download or
+    replace itself. After a version change, **What's New** shows bundled release
+    notes once. First installation does not show an update popup.
+*   **Portable installation**: no update checks or notifications. Download the
+    latest portable package with JRE from GitHub Releases to update manually.
+*   The Store and portable variants have the same log-viewing features. Moving
+    from portable to Store requires a separate installation; settings and data
+    are not automatically imported.
 
 ---
 

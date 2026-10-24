@@ -1,0 +1,115 @@
+def storeRoot = layout.buildDirectory.dir('store')
+def storeIdentityName = 'AriefMahendra.SeeLoggyPlus'
+def storePublisher = 'CN=A19804B0-0953-43F2-B116-C24E0EED56BE'
+def storePublisherDisplayName = 'Arief Mahendra'
+
+def windowsSdkTool = { String name, String propertyName, String environmentName ->
+    def explicitTool = project.findProperty(propertyName) ?: System.getenv(environmentName)
+    File tool = explicitTool ? file(explicitTool) : null
+    if (tool == null) {
+        def kits = new File(System.getenv('ProgramFiles(x86)') ?: 'C:/Program Files (x86)', 'Windows Kits/10/bin')
+        def versions = kits.listFiles()?.findAll { it.isDirectory() }?.sort { a, b -> b.name <=> a.name } ?: []
+        tool = versions.collect { new File(it, "x64/${name}") }.find { it.isFile() }
+    }
+    if (tool == null || !tool.isFile()) {
+        throw new GradleException("${name} not found. Install Windows SDK tools, or use -P${propertyName}=<path>/${name}.")
+    }
+    tool
+}
+
+tasks.register('prepareStoreInput', Sync) {
+    dependsOn 'fatJar'
+    from tasks.named('fatJar').flatMap { it.archiveFile }
+    into storeRoot.map { it.dir('input') }
+}
+
+tasks.register('generateStoreManifest', JavaExec) {
+    group = 'distribution'
+    description = 'Generate Microsoft Store identity, MSIX manifest and tile images'
+    dependsOn 'classes'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.seeloggyplus.app.StorePackageCli'
+    systemProperty 'java.awt.headless', 'true'
+    inputs.property('version', project.version.toString())
+    inputs.property('identity', storeIdentityName)
+    inputs.property('publisher', storePublisher)
+    inputs.property('publisherDisplayName', storePublisherDisplayName)
+    inputs.files(sourceSets.main.output)
+    outputs.dir storeRoot.map { it.dir('metadata') }
+    args storeRoot.get().dir('metadata').asFile.absolutePath, project.version.toString(),
+            storeIdentityName, storePublisher, storePublisherDisplayName
+}
+
+tasks.register('createStoreAppImage', Exec) {
+    group = 'distribution'
+    description = 'Create a console-free Windows x64 launcher with bundled Java for Microsoft Store'
+    dependsOn 'prepareStoreInput', 'createCustomJre', 'generateStoreManifest'
+    inputs.dir storeRoot.map { it.dir('input') }
+    inputs.dir layout.buildDirectory.dir('custom-jre')
+    inputs.property('version', project.version.toString())
+    inputs.file storeRoot.map { it.file('metadata/StoreLauncher.manifest') }
+    outputs.dir storeRoot.map { it.dir('image/SeeLoggyPlus') }
+    doFirst {
+        if (!org.gradle.internal.os.OperatingSystem.current().isWindows()
+                || System.getProperty('os.arch') !in ['amd64', 'x86_64']) {
+            throw new GradleException('Microsoft Store packaging must run on Windows x64 with a Windows x64 JDK 21')
+        }
+        def javaLauncher = javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(21)
+        }.get()
+        def imageRoot = storeRoot.get().dir('image').asFile
+        delete imageRoot
+        commandLine new File(javaLauncher.metadata.installationPath.asFile, 'bin/jpackage.exe'),
+                '--type', 'app-image', '--name', 'SeeLoggyPlus',
+                '--vendor', storePublisherDisplayName,
+                '--app-version', project.version.toString(),
+                '--input', storeRoot.get().dir('input').asFile.absolutePath,
+                '--main-jar', 'seeloggyplus-all.jar',
+                '--main-class', 'com.seeloggyplus.app.StoreLauncher',
+                '--runtime-image', layout.buildDirectory.dir('custom-jre').get().asFile.absolutePath,
+                '--dest', imageRoot.absolutePath
+    }
+    doLast {
+        def manifest = storeRoot.get().file('metadata/StoreLauncher.manifest').asFile
+        def executable = storeRoot.get().file('image/SeeLoggyPlus/SeeLoggyPlus.exe').asFile
+        if (!executable.setWritable(true)) {
+            throw new GradleException('Cannot update the generated Store launcher manifest')
+        }
+        try {
+            project.exec {
+                commandLine windowsSdkTool('mt.exe', 'manifestTool', 'MT_EXE').absolutePath,
+                        '-nologo', '-manifest', manifest.absolutePath,
+                        "-outputresource:${executable.absolutePath};#1"
+            }
+        } finally {
+            executable.setReadOnly()
+        }
+    }
+}
+
+tasks.register('stageStorePackage', Sync) {
+    group = 'distribution'
+    description = 'Stage the complete MSIX package contents for inspection'
+    dependsOn 'createStoreAppImage', 'generateStoreManifest'
+    from storeRoot.map { it.dir('image/SeeLoggyPlus') }
+    from(storeRoot.map { it.dir('metadata') }) {
+        exclude 'StoreLauncher.manifest'
+    }
+    into storeRoot.map { it.dir('package') }
+}
+
+tasks.register('packageMicrosoftStore', Exec) {
+    group = 'distribution'
+    description = 'Build an unsigned x64 MSIX for submission to Microsoft Store'
+    dependsOn 'stageStorePackage'
+    inputs.dir storeRoot.map { it.dir('package') }
+    def packageFile = layout.buildDirectory.file("distributions/SeeLoggyPlus-${project.version}-x64.msix")
+    outputs.file packageFile
+    doFirst {
+        File makeAppx = windowsSdkTool('makeappx.exe', 'makeAppx', 'MAKEAPPX_EXE')
+        packageFile.get().asFile.parentFile.mkdirs()
+        commandLine makeAppx.absolutePath, 'pack', '/o', '/d',
+                storeRoot.get().dir('package').asFile.absolutePath,
+                '/p', packageFile.get().asFile.absolutePath
+    }
+}

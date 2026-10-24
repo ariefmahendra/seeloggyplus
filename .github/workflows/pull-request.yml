@@ -1,0 +1,129 @@
+name: Pull request validation
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare platform tools
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "CI_GRADLE=./gradlew.bat" >> "$GITHUB_ENV"
+          else
+            chmod +x gradlew
+            echo "CI_GRADLE=./gradlew" >> "$GITHUB_ENV"
+            python scripts/setup_ci_fonts.py
+          fi
+
+      - name: Require release PRs from dev
+        if: github.base_ref == 'main'
+        shell: bash
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref }}
+        run: test "$SOURCE_BRANCH" = dev
+
+      - name: Validate release metadata
+        shell: bash
+        run: |
+          python scripts/test_verify_release.py
+          python scripts/test_release_publication.py
+          python scripts/test_ci_fonts.py
+          RELEASE_VERSION=$(sed -n 's/^version=//p' gradle.properties | tr -d '\r')
+          python scripts/verify_release.py "$RELEASE_VERSION"
+
+      - name: Compile sources and tests
+        shell: bash
+        run: '"$CI_GRADLE" --no-daemon classes testClasses'
+
+      - name: Validate distribution changes
+        if: github.base_ref == 'dev'
+        shell: bash
+        run: |
+          "$CI_GRADLE" --no-daemon test \
+            --tests "com.seeloggyplus.app.StoreLauncherTest" \
+            --tests "com.seeloggyplus.app.StoreLinksTest" \
+            --tests "com.seeloggyplus.app.StorePackageCliTest" \
+            --tests "com.seeloggyplus.app.StoreMenuPresentationTest" \
+            --tests "com.seeloggyplus.app.PortableStartupUpdatePolicyTest" \
+            --tests "com.seeloggyplus.app.MainViewFxmlLoadTest" \
+            --tests "com.seeloggyplus.app.MainStartupTest" \
+            --tests "com.seeloggyplus.features.update.presentation.UpdateFeatureBehaviorTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.SelfUpdateEndToEndTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.UpdateInstallerTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.UpdateDownloaderTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.UpdateCoordinatorTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.UpdateBootstrapperTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.SilentLauncherInstallerTest"
+
+      - name: Run full headless release tests
+        if: github.base_ref == 'main'
+        shell: bash
+        run: '"$CI_GRADLE" --no-daemon test'
+
+      - name: Run release build
+        if: github.base_ref == 'main'
+        shell: bash
+        run: '"$CI_GRADLE" --no-daemon build'
+
+      - name: Build portable packages
+        shell: bash
+        run: '"$CI_GRADLE" --no-daemon packagePlatform generatePlatformManifest -Pplatform=${{ matrix.platform }}'
+
+      - name: Verify released installer compatibility
+        if: github.base_ref == 'main'
+        shell: bash
+        run: |
+          mkdir -p build/release-compatibility
+          curl --fail --location --retry 3 "https://github.com/${{ github.repository }}/releases/download/0.7.0/seeloggyplus-Portable-${{ matrix.platform }}.zip" --output build/release-compatibility/legacy.zip
+          python -c "import zipfile; z=zipfile.ZipFile('build/release-compatibility/legacy.zip'); open('build/release-compatibility/seeloggyplus.jar','wb').write(z.read('seeloggyplus/seeloggyplus.jar'))"
+          "$CI_GRADLE" --no-daemon verifyReleaseCompatibility -Pplatform=${{ matrix.platform }} -PlegacyJar=build/release-compatibility/seeloggyplus.jar
+
+      - name: Build Microsoft Store package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\gradlew.bat --no-daemon packageMicrosoftStore
+
+      - name: Preserve validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-${{ github.event.pull_request.number }}-${{ matrix.platform }}
+          path: |
+            build/test-results/test
+            build/reports/tests/test
+            build/distributions/*.zip
+            build/distributions/*.json
+            build/distributions/*.msix

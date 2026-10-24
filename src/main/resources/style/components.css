@@ -247,67 +247,6 @@
     -fx-background-color: -sl-preview-target;
 }
 
-.update-dialog {
-    -fx-background-color: -sl-surface;
-}
-
-.update-dialog-header {
-    -fx-background-color: -sl-surface;
-    -fx-padding: 12;
-    -fx-border-color: transparent transparent -sl-border-soft transparent;
-    -fx-border-width: 0 0 1 0;
-}
-
-.update-dialog-title {
-    -fx-font-size: 16px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -sl-text;
-}
-
-.update-dialog-version {
-    -fx-font-size: 13px;
-    -fx-text-fill: -sl-text-secondary;
-}
-
-.update-dialog-body {
-    -fx-padding: 12;
-}
-
-.update-dialog-field {
-    -fx-text-fill: -sl-text-secondary;
-    -fx-font-weight: bold;
-}
-
-.update-dialog-value {
-    -fx-text-fill: -sl-text;
-}
-
-.update-dialog-section {
-    -fx-font-size: 13px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -sl-text;
-}
-
-.update-dialog-notes {
-    -fx-font-family: 'Consolas', 'Menlo', 'DejaVu Sans Mono', monospace;
-    -fx-font-size: 12px;
-    -fx-control-inner-background: -sl-surface;
-}
-
-.update-dialog-status {
-    -fx-text-fill: -sl-text-secondary;
-}
-
-.update-dialog-progress {
-    -fx-pref-height: 12px;
-}
-
-.update-dialog-actions {
-    -fx-padding: 8 12;
-    -fx-border-color: -sl-border-soft transparent transparent transparent;
-    -fx-border-width: 1 0 0 0;
-}
-
 .remote-log-search-dialog .scroll-bar:vertical {
     -fx-pref-width: 16px;
     -fx-min-width: 16px;
@@ -2402,24 +2341,11 @@ FontAwesomeIconView.file-icon-file {
     -fx-text-fill: -sl-text-secondary;
 }
 
-.about-dialog .button,
-.update-dialog .button {
+.about-dialog .button {
     -fx-padding: 3 9;
     -fx-background-radius: 5;
     -fx-border-radius: 5;
     -fx-min-width: 68;
-}
-
-.update-dialog .update-dialog-notes,
-.update-dialog .update-dialog-notes .scroll-pane,
-.update-dialog .update-dialog-notes .viewport,
-.update-dialog .update-dialog-notes .content {
-    -fx-background-color: -sl-surface;
-    -fx-background-radius: 0;
-    -fx-background-insets: 0;
-    -fx-border-width: 0;
-    -fx-padding: 0;
-    -fx-text-fill: -sl-text;
 }
 
 .root.embedded-panel .detail-container {

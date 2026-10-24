@@ -133,7 +133,7 @@ public class Main extends Application {
     }
 
     private void ensureLaunchers() {
-        if (Boolean.getBoolean("seeloggyplus.dev")) {
+        if (Boolean.getBoolean("seeloggyplus.dev") || com.seeloggyplus.shared.util.AppDistribution.isStore()) {
             return;
         }
         try {

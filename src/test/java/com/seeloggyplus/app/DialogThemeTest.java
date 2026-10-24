@@ -36,20 +36,22 @@ class DialogThemeTest {
             var description=(Text)root.lookup(".about-description"); readable((Color)description.getFill(),RenderedColors.background(description));
         });
     }
-    @Test void updateHeaderUsesFlatSurfaceInEveryTheme() throws Exception {
-        load("UpdateDialog");
+    @Test void aboutHeaderUsesFlatSurfaceInEveryTheme() throws Exception {
+        load("AboutDialog");
         for(var theme:AppTheme.Theme.values()) fx(() -> {
             AppTheme.setTheme(theme); apply();
-            var header=(Region)root.lookup(".update-dialog-header");
-            assertTrue(header.getBackground().getFills().getFirst().getFill() instanceof Color);
+            var header=(Region)root.lookup(".about-dialog-header");
+            assertTrue(header.getBackground() == null || header.getBackground().getFills().stream()
+                    .allMatch(fill -> fill.getFill() instanceof Color));
             assertEquals(RenderedColors.background(root),RenderedColors.background(header));
-            var title=(Label)root.lookup("#titleLabel"); readable((Color)title.getTextFill(),RenderedColors.background(title));
+            var title=(Label)root.lookup(".about-dialog-title"); readable((Color)title.getTextFill(),RenderedColors.background(title));
         });
     }
     @Test void primaryButtonKeepsDistinctNeutralFeedback() throws Exception {
-        load("UpdateDialog");
+        load("AboutDialog");
         for(var theme:AppTheme.Theme.values()) fx(() -> {
-            AppTheme.setTheme(theme); apply(); var button=(Button)root.lookup("#downloadButton");
+            AppTheme.setTheme(theme); apply(); var button=(Button)root.lookup("#closeButton");
+            assertTrue(button.getMinWidth() >= 68, "About action must retain its minimum target width");
             Color idle=RenderedColors.background(button);
             button.pseudoClassStateChanged(PseudoClass.getPseudoClass("hover"),true); apply(); Color hover=RenderedColors.background(button);
             assertNotEquals(idle,hover); readable((Color)button.getTextFill(),hover);

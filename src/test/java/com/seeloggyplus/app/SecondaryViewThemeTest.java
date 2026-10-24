@@ -27,7 +27,6 @@ class SecondaryViewThemeTest {
     @AfterEach void reset() throws Exception { fx(() -> { stage.hide(); AppTheme.setTheme(AppTheme.Theme.LIGHT); }); }
 
     @Test void aboutIsFlatAndReadable() throws Exception { checkDialog("AboutDialog"); }
-    @Test void updateIsFlatAndReadable() throws Exception { checkDialog("UpdateDialog"); }
     @Test void fileManagerIsFlatAndReadable() throws Exception { checkDialog("UnifiedFileManagerDialog"); }
     @Test void serverManagementIsFlatAndReadable() throws Exception { checkDialog("ServerManagementDialog"); }
     @Test void serverEditorIsFlatAndReadable() throws Exception { checkDialog("ServerEditDialog"); }
@@ -87,7 +86,6 @@ class SecondaryViewThemeTest {
     private String[] sections(String view) {
         return switch(view) {
             case "AboutDialog" -> new String[]{".about-dialog-header",".about-dialog-body",".simple-dialog-footer"};
-            case "UpdateDialog" -> new String[]{".update-dialog-header",".update-dialog-body",".update-dialog-actions"};
             case "UnifiedFileManagerDialog" -> new String[]{".file-manager-path-toolbar",".locations-container",".file-manager-footer"};
             case "ServerManagementDialog" -> new String[]{".server-toolbar",".server-group-sidebar",".server-footer",".server-details"};
             case "ServerEditDialog" -> new String[]{".server-edit-footer"};
@@ -96,8 +94,8 @@ class SecondaryViewThemeTest {
             default -> new String[]{".preview-dialog-header",".simple-dialog-footer"};
         };
     }
-    private int width(String view) { return switch(view) { case "AboutDialog" -> 420; case "UpdateDialog","PreferencesDialog" -> 660; case "ServerEditDialog" -> 440; case "LogPreviewDialog" -> 700; default -> 1000; }; }
-    private int height(String view) { return switch(view) { case "AboutDialog" -> 320; case "UpdateDialog","ServerEditDialog","PreferencesDialog" -> 460; case "LogPreviewDialog" -> 500; default -> 640; }; }
+    private int width(String view) { return switch(view) { case "AboutDialog" -> 420; case "PreferencesDialog" -> 660; case "ServerEditDialog" -> 440; case "LogPreviewDialog" -> 700; default -> 1000; }; }
+    private int height(String view) { return switch(view) { case "AboutDialog" -> 320; case "ServerEditDialog","PreferencesDialog" -> 460; case "LogPreviewDialog" -> 500; default -> 640; }; }
     private void load(String view) throws Exception {
         fx(() -> {
             try { root=new FXMLLoader(getClass().getResource("/fxml/"+view+".fxml")).load(); }
