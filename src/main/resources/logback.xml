@@ -8,20 +8,20 @@
     </appender>
 
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>./logs/seeloggyplus.log</file>
+        <file>${seeloggyplus.logDir:-./logs}/seeloggyplus.log</file>
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
 
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${user.home}/.seeloggyplus/logs/seeloggyplus.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>${seeloggyplus.logDir:-${user.home}/.seeloggyplus/logs}/seeloggyplus.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>30</maxHistory>
             <totalSizeCap>1GB</totalSizeCap>
         </rollingPolicy>
     </appender>
 
     <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>./logs/seeloggyplus-error.log</file>
+        <file>${seeloggyplus.logDir:-./logs}/seeloggyplus-error.log</file>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>ERROR</level>
         </filter>
@@ -30,7 +30,7 @@
         </encoder>
 
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>./logs/seeloggyplus-error.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>${seeloggyplus.logDir:-./logs}/seeloggyplus-error.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>90</maxHistory>
             <totalSizeCap>500MB</totalSizeCap>
         </rollingPolicy>

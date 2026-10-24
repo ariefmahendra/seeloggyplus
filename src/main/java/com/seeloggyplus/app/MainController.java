@@ -129,9 +129,7 @@ public class MainController {
     @FXML
     private CheckMenuItem showBottomPanelMenuItem;
     @FXML
-    private CheckMenuItem autoCheckUpdatesMenuItem;
-    @FXML
-    private CheckMenuItem autoDownloadUpdatesMenuItem;
+    private MenuItem storeMenuItem;
 
     @FXML
     private MenuItem serverManagementMenuItem;
@@ -224,8 +222,6 @@ public class MainController {
     @FXML
     private Label selectionStatusLabel;
     @FXML
-    private Label updateStatusLabel;
-    @FXML
     private Label memoryStatusLabel;
     @FXML
     private ProgressBar memoryBar;
@@ -249,7 +245,6 @@ public class MainController {
 
     private LogFile currentLogFromDb;
 
-    private UpdateFeature updateFeature;
 
     private volatile ParsingConfig currentParsingConfig;
     private File currentFile;
@@ -363,13 +358,9 @@ public class MainController {
 
         updateTailButtonState();
         startMemoryMonitor();
-        updateFeature = new UpdateFeature(preferenceService);
-        updateFeature.setOwnerSupplier(() -> menuBar != null && menuBar.getScene() != null
-                ? menuBar.getScene().getWindow() : null);
-        updateFeature.setErrorReporter(this::showError);
-        updateFeature.initialize(updateStatusLabel, autoCheckUpdatesMenuItem, autoDownloadUpdatesMenuItem);
+        var updateFeature = new UpdateFeature(preferenceService);
+        storeMenuItem.setVisible(com.seeloggyplus.shared.util.AppDistribution.isStore());
         updateFeature.reconcileUpdateStartup();
-        updateFeature.scheduleAutoUpdateCheck();
         updateFeature.showWhatsNewIfNeeded();
 
         if (logIsland != null && emptyStatePane != null && logContainer != null) {
@@ -2666,8 +2657,13 @@ public class MainController {
     }
 
     @FXML
-    public void handleCheckForUpdates() {
-        updateFeature.handleCheckForUpdates();
+    public void handleOpenMicrosoftStore() {
+        try {
+            StoreLinks.open(StoreLinks.configuredProductId(), uri -> Desktop.getDesktop().browse(uri));
+        } catch (Exception e) {
+            logger.error("Failed to open Microsoft Store", e);
+            showError("Microsoft Store", "Could not open Microsoft Store. Search for SeeLoggyPlus in Microsoft Store.");
+        }
     }
 
     private void handleHelpContents() {

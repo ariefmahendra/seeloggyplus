@@ -156,6 +156,105 @@ synthetic database records, credentials, trusted hosts and launcher settings, an
 exercises activation, checksum rejection, health confirmation and rollback.
 Run it on Windows and Linux before publishing. Never publish when this gate fails.
 
+## Microsoft Store distribution
+
+The separate Windows x64 MSIX includes a console-free launcher and Java runtime.
+The registered identity is `AriefMahendra.SeeLoggyPlus`, publisher
+`CN=A19804B0-0953-43F2-B116-C24E0EED56BE`, display name `Arief Mahendra`.
+
+Build on Windows x64 with JDK 21 and Windows SDK packaging tools:
+
+```powershell
+.\gradlew.bat --no-daemon packageMicrosoftStore
+```
+
+If MakeAppx is outside the standard SDK location, supply
+`-PmakeAppx="C:/path/to/x64/makeappx.exe"` or set `MAKEAPPX_EXE`.
+Store launcher creation also uses the Windows SDK Manifest Tool, `mt.exe`, to
+embed the application's x64 identity and PerMonitorV2 DPI declaration. Override
+its location with `-PmanifestTool="C:/path/to/x64/mt.exe"` or `MT_EXE` when needed.
+The unsigned submission package is
+`build/distributions/SeeLoggyPlus-<version>-x64.msix`. Microsoft Store handles
+production signing. This is not a signed package for direct sideloading.
+The project version must be `major.minor.patch`; the MSIX version becomes
+`major.minor.patch.0`, with each component at most 65535.
+
+To inspect the native launcher, runtime, manifest and assets without MakeAppx:
+
+```powershell
+.\gradlew.bat --no-daemon stageStorePackage
+```
+
+The staged files are in `build/store/package`. Store data, credentials, known
+hosts, logs and memory settings live under `%LOCALAPPDATA%/SeeLoggyPlus/Store`.
+The launcher reads `launcher.properties` before starting the bundled JVM, so
+memory settings apply on the next launch. Portable data is not automatically
+imported. Neither variant checks for, downloads or installs GitHub updates.
+Portable has no update notifications or What's New popup. The Store variant
+provides Help → Open Microsoft Store and shows bundled What's New notes once
+after a version change, with no popup on first installation. Store controls
+update delivery. The Store variant does not heal portable launch scripts.
+
+The registered Store ID is `9PDJ4N28SNT7`, configured in
+`src/main/resources/store.properties`. The public listing URL is
+https://apps.microsoft.com/detail/9PDJ4N28SNT7. The menu opens that product directly
+using the Store protocol, with a fallback to its web listing if the protocol
+cannot open. `-Dseeloggyplus.storeProductId=<id>` overrides the bundled ID for
+testing. Missing or invalid IDs fall back to a Store search. A Store ID is public
+and is not a signing secret. The listing becomes available after publication.
+
+The manually dispatched GitHub Actions workflow Build Microsoft Store package
+produces an unsigned MSIX artifact without publishing it. Download that artifact
+and complete the installed-package checks and Partner Center submission below.
+
+For installed-package validation, sign a copy with a development certificate
+matching the manifest publisher and trust it only on the test machine. Keep
+private keys outside the repository. Test Start Menu launch, local files, SSH,
+saved settings, package upgrades with preserved data and uninstall. Run the
+Windows App Certification Kit before submission. App-image smoke testing does
+not replace installed-MSIX validation.
+
+Install both Windows App Certification Kit and the SDK's Windows Store managed
+tools/metadata. Installing only the certification feature can leave metadata
+tests unable to initialize. Test the complete signed MSIX directly from an
+administrator PowerShell session:
+
+```powershell
+& "C:/Program Files (x86)/Windows Kits/10/App Certification Kit/appcert.exe" reset
+& "C:/Program Files (x86)/Windows Kits/10/App Certification Kit/appcert.exe" test -appxpackagepath "C:/path/to/signed-test.msix" -reportoutputpath "C:/path/to/report.xml"
+```
+
+Read `OVERALL_RESULT`, `PARTIAL_RUN`, and individual test results from the XML;
+the process exit code alone is not the certification result. Keep optional
+failures visible. The SDK 10.0.26100.9457 installed-package workflow can fail to
+inspect DPI metadata under the protected WindowsApps path even when the same
+binary is reported PerMonitorV2-aware by its own BinaryInfo reader outside that
+directory. Full MSIX-file validation avoids this observed path-dependent issue
+without excluding checks. Keep the original and rerun reports for comparison.
+
+The optional Blocked executables test flags process-launch APIs in the bundled
+JVM and launcher, plus executable-like strings in binaries and archives. Those
+APIs exist in standard OpenJDK; they cannot all be removed through application
+configuration. Review the findings and retain them in the submission evidence.
+Microsoft's Desktop Bridge test guidance treats optional tests as informational:
+https://learn.microsoft.com/en-us/windows/uwp/debug-test-perf/windows-desktop-bridge-app-tests.
+Do not describe an overall PASS with an optional FAIL as all checks passing.
+
+In Partner Center, create an MSIX submission and upload the package. Complete
+listings, screenshots, privacy/support links, age ratings and availability.
+Explain the required `runFullTrust` capability: this JavaFX desktop application
+reads user-selected local logs and connects to user-configured SSH servers.
+Use a private audience or package flight for initial distribution.
+
+Follow the normal release gates before publishing. Retain the portable package
+layout, update-manifest generation and legacy compatibility gates so older
+released applications can still download and activate the transition version.
+The new application only confirms startup health for upgrades delivered by old
+installers; it does not schedule update checks. Legacy download/staging adapters
+remain for those compatibility tools and their end-to-end gates. Keep the JRE
+portable ZIP available for manual download. Never put the MSIX in the portable
+update manifest. Microsoft Store is the primary Windows distribution channel.
+
 ## One-off / manual release (if CI is unavailable)
 
 If a tag run passed its tests and both platform package jobs but failed only at

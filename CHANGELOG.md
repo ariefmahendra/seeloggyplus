@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-25
+
+SeeLoggyPlus 0.10.0 prepares a simpler Windows installation through Microsoft Store,
+with Java included and launch from the Start menu. Portable packages remain
+available for Windows and Linux with manual upgrades.
+
+### Added
+- Windows x64 Microsoft Store MSIX packaging with a native launcher and bundled Java runtime.
+- Store installations can open Microsoft Store from Help and show bundled release notes once after a version change.
+
+### Changed
+- Store launcher embeds an application-specific x64 native manifest with PerMonitorV2 DPI awareness.
+- Microsoft Store is the primary Windows installation and update channel; portable packages with Java remain available through GitHub Releases.
+- Portable installations no longer check for updates, show update notifications, or download and install updates.
+- Removed in-app update download, restart and automatic-update controls. Existing installations upgraded by older installers still confirm startup health.
+
+### Tests
+- Full headless regression suite and release build.
+- Store launcher, package manifest, menu visibility, startup policy, UI contrast and legacy update-safety coverage.
+- Real portable-package compatibility checks against the released 0.7.0 installer on Windows and Linux.
+- Final MSIX validation with Windows App Certification Kit; the local handoff report records the optional JVM blocked-executables finding separately from mandatory results.
+
+### Upgrade notes
+- No database migration is required from 0.9.0; the schema remains at version 4.
+- Portable users should close the app, back up the complete data directory and launcher settings, extract the new package into a writable folder, and preserve their existing data. Portable 0.10.0 does not notify about later releases.
+- Store and portable installations use separate data locations. Installing the Store edition does not automatically import a portable profile.
+- Microsoft Store update availability and timing depend on Store settings and service availability. Opening the product page does not force an immediate update.
+- Online Help remains at https://seeloggyplus-doc.vercel.app/. Privacy information is available in English and Indonesian.
+
 ## [0.9.0] - 2026-10-21
 
 SeeLoggyPlus 0.9.0 adds an adaptable workspace, simpler structured-log formatting,
@@ -431,7 +460,8 @@ in the CI `test` job before publishing, so 0.6.2 ships the complete 0.6 feature 
 - Multi-platform packages (Windows/Linux, with and without bundled JRE) and merged update manifest.
 - Improved update UI.
 
-[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.9.0...HEAD
+[Unreleased]: https://github.com/ariefmahendra/seeloggyplus/compare/0.10.0...HEAD
+[0.10.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.9.0...0.10.0
 [0.9.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.8.0...0.9.0
 [0.8.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/ariefmahendra/seeloggyplus/compare/0.6.5...0.7.0

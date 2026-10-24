@@ -35,8 +35,7 @@ class LabelContrastTest {
             "/fxml/ServerEditDialog.fxml",
             "/fxml/UnifiedFileManagerDialog.fxml",
             "/fxml/RemoteLogSearchDialog.fxml",
-            "/fxml/LogPreviewDialog.fxml",
-            "/fxml/UpdateDialog.fxml"
+            "/fxml/LogPreviewDialog.fxml"
     };
 
     private Stage stage;

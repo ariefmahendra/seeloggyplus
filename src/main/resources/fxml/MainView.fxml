@@ -54,10 +54,7 @@
                 <Menu text="_Help">
                     <MenuItem fx:id="helpContentsMenuItem" text="Help Contents" accelerator="F1"/>
                     <SeparatorMenuItem/>
-                    <MenuItem text="Check for Updates..." onAction="#handleCheckForUpdates"/>
-                    <CheckMenuItem fx:id="autoCheckUpdatesMenuItem" text="Check for Updates Automatically"/>
-                    <CheckMenuItem fx:id="autoDownloadUpdatesMenuItem" text="Download Updates Automatically"/>
-                    <SeparatorMenuItem/>
+                    <MenuItem fx:id="storeMenuItem" text="Open Microsoft Store" onAction="#handleOpenMicrosoftStore" visible="false"/>
                     <MenuItem fx:id="aboutMenuItem" text="About"/>
                 </Menu>
             </MenuBar>
@@ -165,11 +162,6 @@
             <Label fx:id="statusLabel" minWidth="0" text="Line: 0 / 0 (0%)" styleClass="status-text"/>
             <Label fx:id="selectionStatusLabel" minWidth="0" maxWidth="200" styleClass="status-text-muted" visible="false" managed="false"/>
             <Separator orientation="VERTICAL"/>
-            <Label fx:id="updateStatusLabel" styleClass="status-link" visible="false" managed="false">
-                <tooltip>
-                    <Tooltip text="A new version is available - click to update"/>
-                </tooltip>
-            </Label>
             <MenuButton fx:id="resourceButton" text="Resources" minWidth="-Infinity" styleClass="resource-button">
                 <items>
                     <CustomMenuItem hideOnClick="false">
