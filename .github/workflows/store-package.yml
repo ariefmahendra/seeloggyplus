@@ -1,0 +1,51 @@
+name: Build Microsoft Store package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate Store distribution and legacy installation compatibility
+        shell: pwsh
+        run: >-
+          .\gradlew.bat --no-daemon test
+          --tests "com.seeloggyplus.app.StoreLauncherTest"
+          --tests "com.seeloggyplus.app.StoreLinksTest"
+          --tests "com.seeloggyplus.app.StorePackageCliTest"
+          --tests "com.seeloggyplus.app.StoreMenuPresentationTest"
+          --tests "com.seeloggyplus.app.PortableStartupUpdatePolicyTest"
+          --tests "com.seeloggyplus.features.update.presentation.UpdateFeatureBehaviorTest"
+          --tests "com.seeloggyplus.features.update.infrastructure.SelfUpdateEndToEndTest"
+          --tests "com.seeloggyplus.features.update.infrastructure.UpdateInstallerTest"
+          --tests "com.seeloggyplus.features.update.infrastructure.UpdateDownloaderTest"
+          --tests "com.seeloggyplus.features.update.infrastructure.UpdateCoordinatorTest"
+          --tests "com.seeloggyplus.features.update.infrastructure.UpdateBootstrapperTest"
+          --tests "com.seeloggyplus.features.update.infrastructure.SilentLauncherInstallerTest"
+
+      - name: Build unsigned MSIX
+        shell: pwsh
+        run: .\gradlew.bat --no-daemon packageMicrosoftStore
+
+      - name: Upload Store submission package
+        uses: actions/upload-artifact@v4
+        with:
+          name: SeeLoggyPlus-MicrosoftStore-x64
+          if-no-files-found: error
+          path: build/distributions/SeeLoggyPlus-*-x64.msix

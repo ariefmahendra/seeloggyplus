@@ -52,6 +52,60 @@ public class MainViewFxmlLoadTest {
     }
 
     @Test
+    public void storeBuildExplainsWhereUpdatesAreManaged() throws Exception {
+        String previous = System.getProperty("seeloggyplus.distribution");
+        try {
+            System.setProperty("seeloggyplus.distribution", "store");
+            WaitForAsyncUtils.asyncFx(() -> {
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
+                try {
+                    loader.load();
+                    MenuItem updates = (MenuItem) loader.getNamespace().get("storeMenuItem");
+                    assertNotNull(updates);
+                    assertEquals("Open Microsoft Store", updates.getText());
+                    assertTrue(updates.isVisible());
+                    assertFalse(updates.isDisable());
+                    assertNotNull(updates.getOnAction());
+                    assertNull(loader.getNamespace().get("autoCheckUpdatesMenuItem"));
+                    assertNull(loader.getNamespace().get("autoDownloadUpdatesMenuItem"));
+                    assertNull(loader.getNamespace().get("updateStatusLabel"));
+                } catch (java.io.IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+            }).get();
+        } finally {
+            if (previous == null) System.clearProperty("seeloggyplus.distribution");
+            else System.setProperty("seeloggyplus.distribution", previous);
+        }
+    }
+
+    @Test
+    public void portableHasNoUpdateControlsOrNotifications() throws Exception {
+        String previous = System.getProperty("seeloggyplus.distribution");
+        try {
+            System.clearProperty("seeloggyplus.distribution");
+            WaitForAsyncUtils.asyncFx(() -> {
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/MainView.fxml"));
+                try {
+                    loader.load();
+                    MenuItem store = (MenuItem) loader.getNamespace().get("storeMenuItem");
+                    assertNotNull(store);
+                    assertFalse(store.isVisible());
+                    assertNull(loader.getNamespace().get("checkForUpdatesMenuItem"));
+                    assertNull(loader.getNamespace().get("autoCheckUpdatesMenuItem"));
+                    assertNull(loader.getNamespace().get("autoDownloadUpdatesMenuItem"));
+                    assertNull(loader.getNamespace().get("updateStatusLabel"));
+                } catch (java.io.IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+            }).get();
+        } finally {
+            if (previous == null) System.clearProperty("seeloggyplus.distribution");
+            else System.setProperty("seeloggyplus.distribution", previous);
+        }
+    }
+
+    @Test
     public void testMainViewFxmlLoadsSuccessfully() throws Exception {
         assertNotNull(root);
         assertNotNull(controller);

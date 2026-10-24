@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Windows x64 Microsoft Store MSIX packaging with a native launcher and bundled Java runtime.
+- Store installations can open Microsoft Store from Help and show bundled release notes once after a version change.
+
+### Changed
+- Store launcher embeds an application-specific x64 native manifest with PerMonitorV2 DPI awareness.
+- Microsoft Store is the primary Windows installation and update channel; portable packages with Java remain available through GitHub Releases.
+- Portable installations no longer check for updates, show update notifications, or download and install updates.
+- Removed in-app update download, restart and automatic-update controls. Existing installations upgraded by older installers still confirm startup health.
+
 ## [0.9.0] - 2026-10-21
 
 SeeLoggyPlus 0.9.0 adds an adaptable workspace, simpler structured-log formatting,

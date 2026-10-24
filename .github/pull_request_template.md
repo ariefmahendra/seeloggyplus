@@ -21,6 +21,8 @@
 ## Checklist
 
 - [ ] `CHANGELOG.md` updated (under `Unreleased`)
-- [ ] Tests added/updated and `./gradlew test -PheadlessTest` passes
+- [ ] Related tests pass through the Gradle wrapper with `--no-daemon`; all JavaFX tests remain headless
+- [ ] For release PRs: full `test`, `build`, and legacy installer compatibility pass on Windows and Linux
+- [ ] Actual `TEST SUMMARY` and any skipped tests are included in the validation evidence
 - [ ] No CSS warnings in the test output
 - [ ] Screenshots attached for UI changes (light **and** dark, if applicable)

@@ -303,6 +303,8 @@ tasks.register('fatJar', Jar) {
     with jar
 }
 
+apply from: 'gradle/store.gradle'
+
 def detectedPlatform = {
     def os = org.gradle.internal.os.OperatingSystem.current()
     if (os.isWindows()) return 'win'
