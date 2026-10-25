@@ -72,6 +72,10 @@ jobs:
             --tests "com.seeloggyplus.app.MainControllerIndexingTest" \
             --tests "com.seeloggyplus.app.MainControllerOpenAtLineTest" \
             --tests "com.seeloggyplus.shared.util.SyntaxHighlighterTest" \
+            --tests "com.seeloggyplus.shared.util.CredentialEncryptorTest" \
+            --tests "com.seeloggyplus.shared.ui.SshConnectFlowTest" \
+            --tests "com.seeloggyplus.shared.ui.SshConnectFlowThreadingTest" \
+            --tests "com.seeloggyplus.features.servers.infrastructure.ServerAuthPersistenceTest" \
             --tests "com.seeloggyplus.features.ssh.infrastructure.SSHSessionManagerImplTest" \
             --tests "com.seeloggyplus.features.ssh.infrastructure.SSHServiceImplSessionManagerTest" \
             --tests "com.seeloggyplus.features.logs.infrastructure.io.LogParserServiceImplTest" \
