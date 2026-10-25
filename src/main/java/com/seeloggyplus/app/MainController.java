@@ -1652,7 +1652,7 @@ public class MainController {
 
         final SSHService service = activeTailSshService;
         final String remotePath = monitoringRemotePath;
-        Thread.ofVirtual().name("tail-reload").start(() -> {
+        Thread.ofPlatform().name("tail-reload").start(() -> {
             boolean connected = false;
             String failure = null;
             try {

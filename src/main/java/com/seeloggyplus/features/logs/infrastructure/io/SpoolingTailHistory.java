@@ -249,7 +249,7 @@ public final class SpoolingTailHistory extends AbstractList<LogEntry> implements
         if (pending.size() < 256 || pending.containsKey(requested)) pending.put(requested, ready);
         if (loading) return;
         loading = true;
-        Thread.ofVirtual().name("tail-history-read").start(() -> {
+        Thread.ofPlatform().name("tail-history-read").start(() -> {
             try {
                 while (true) {
                     LogEntry entry;
