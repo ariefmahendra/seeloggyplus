@@ -80,6 +80,7 @@ public class FileManagerDialogHost implements FileManagerHost {
     public void openPreview(FileInfo file, SSHService sshService) {
         try {
             Stage restoreStage = ultimateOwner(owner);
+            if (restoreStage == null) throw new IllegalStateException("Owner stage is unavailable");
             boolean wasMaximized = restoreStage.isMaximized();
             double oldX = restoreStage.getX();
             double oldY = restoreStage.getY();
@@ -111,6 +112,7 @@ public class FileManagerDialogHost implements FileManagerHost {
     public void openServerManagement() {
         try {
             Stage restoreStage = ultimateOwner(owner);
+            if (restoreStage == null) throw new IllegalStateException("Owner stage is unavailable");
             boolean wasMaximized = restoreStage.isMaximized();
             double oldX = restoreStage.getX();
             double oldY = restoreStage.getY();
