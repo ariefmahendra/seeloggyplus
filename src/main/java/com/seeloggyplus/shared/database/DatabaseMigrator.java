@@ -24,6 +24,27 @@ public final class DatabaseMigrator {
 
     private static final int KEEP_BACKUPS = 3;
 
+    private enum ColumnMigration {
+        TIMESTAMP_FORMAT("parsing_configs", "timestamp_format", "ALTER TABLE parsing_configs ADD COLUMN timestamp_format TEXT"),
+        RECENT_MODE("recent_files", "mode", "ALTER TABLE recent_files ADD COLUMN mode TEXT"),
+        FAVORITE("ssh_servers", "favorite", "ALTER TABLE ssh_servers ADD COLUMN favorite BOOLEAN NOT NULL DEFAULT 0"),
+        SORT_ORDER("ssh_servers", "sort_order", "ALTER TABLE ssh_servers ADD COLUMN sort_order INTEGER"),
+        GROUP_NAME("ssh_servers", "group_name", "ALTER TABLE ssh_servers ADD COLUMN group_name TEXT"),
+        AUTH_TYPE("ssh_servers", "auth_type", "ALTER TABLE ssh_servers ADD COLUMN auth_type TEXT"),
+        KEY_PATH("ssh_servers", "key_path", "ALTER TABLE ssh_servers ADD COLUMN key_path TEXT"),
+        KEY_PASSPHRASE("ssh_servers", "key_passphrase", "ALTER TABLE ssh_servers ADD COLUMN key_passphrase TEXT");
+
+        private final String table;
+        private final String column;
+        private final String sql;
+
+        ColumnMigration(String table, String column, String sql) {
+            this.table = table;
+            this.column = column;
+            this.sql = sql;
+        }
+    }
+
     private DatabaseMigrator() {
     }
 
@@ -72,24 +93,24 @@ public final class DatabaseMigrator {
     }
 
     private static void migrateTimestampFormat(Connection connection) throws SQLException {
-        addColumnIfMissing(connection, "parsing_configs", "timestamp_format", "TEXT");
+        addColumnIfMissing(connection, ColumnMigration.TIMESTAMP_FORMAT);
     }
 
     private static void migrateRecentFileMode(Connection connection) throws SQLException {
-        addColumnIfMissing(connection, "recent_files", "mode", "TEXT");
+        addColumnIfMissing(connection, ColumnMigration.RECENT_MODE);
     }
 
     private static void migrateServerOrganization(Connection connection) throws SQLException {
-        addColumnIfMissing(connection, "ssh_servers", "favorite", "BOOLEAN NOT NULL DEFAULT 0");
-        addColumnIfMissing(connection, "ssh_servers", "sort_order", "INTEGER");
-        addColumnIfMissing(connection, "ssh_servers", "group_name", "TEXT");
+        addColumnIfMissing(connection, ColumnMigration.FAVORITE);
+        addColumnIfMissing(connection, ColumnMigration.SORT_ORDER);
+        addColumnIfMissing(connection, ColumnMigration.GROUP_NAME);
         backfillSortOrder(connection);
     }
 
     private static void migrateServerAuth(Connection connection) throws SQLException {
-        addColumnIfMissing(connection, "ssh_servers", "auth_type", "TEXT");
-        addColumnIfMissing(connection, "ssh_servers", "key_path", "TEXT");
-        addColumnIfMissing(connection, "ssh_servers", "key_passphrase", "TEXT");
+        addColumnIfMissing(connection, ColumnMigration.AUTH_TYPE);
+        addColumnIfMissing(connection, ColumnMigration.KEY_PATH);
+        addColumnIfMissing(connection, ColumnMigration.KEY_PASSPHRASE);
     }
 
     private static void migrateServerGroups(Connection connection) throws SQLException {
@@ -145,29 +166,28 @@ public final class DatabaseMigrator {
     }
 
     static boolean columnExists(Connection connection, String table, String column) throws SQLException {
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
-            while (rs.next()) {
-                if (column.equalsIgnoreCase(rs.getString("name"))) {
-                    return true;
-                }
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT 1 FROM pragma_table_info(?) WHERE name = ? COLLATE NOCASE")) {
+            statement.setString(1, table);
+            statement.setString(2, column);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next();
             }
         }
-        return false;
     }
 
-    private static void addColumnIfMissing(Connection connection, String table, String column, String definition)
+    private static void addColumnIfMissing(Connection connection, ColumnMigration migration)
             throws SQLException {
-        if (columnExists(connection, table, column)) {
-            logger.debug("Column {}.{} already exists", table, column);
+        if (columnExists(connection, migration.table, migration.column)) {
+            logger.debug("Column {}.{} already exists", migration.table, migration.column);
             return;
         }
         try (Statement stmt = connection.createStatement()) {
-            stmt.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
-            logger.info("Migration: added column {}.{}", table, column);
+            stmt.execute(migration.sql);
+            logger.info("Migration: added column {}.{}", migration.table, migration.column);
         } catch (SQLException e) {
             if (isDuplicateColumn(e)) {
-                logger.debug("Column {}.{} was added concurrently", table, column);
+                logger.debug("Column {}.{} was added concurrently", migration.table, migration.column);
                 return;
             }
             throw e;
@@ -186,6 +206,9 @@ public final class DatabaseMigrator {
     }
 
     static void setUserVersion(Connection connection, int version) throws SQLException {
+        if (version < 0 || version > SCHEMA_VERSION) {
+            throw new IllegalArgumentException("Unsupported database schema version: " + version);
+        }
         try (Statement stmt = connection.createStatement()) {
             stmt.execute("PRAGMA user_version = " + version);
         }
@@ -194,9 +217,9 @@ public final class DatabaseMigrator {
     static Path backupDatabase(Connection connection, Path dbFile, int fromVersion) {
         Path backup = dbFile.resolveSibling(
                 dbFile.getFileName() + ".bak-v" + fromVersion + "-" + System.currentTimeMillis());
-        String escaped = backup.toAbsolutePath().toString().replace("'", "''");
-        try (Statement stmt = connection.createStatement()) {
-            stmt.execute("VACUUM INTO '" + escaped + "'");
+        try (PreparedStatement stmt = connection.prepareStatement("VACUUM INTO ?")) {
+            stmt.setString(1, backup.toAbsolutePath().toString());
+            stmt.execute();
             logger.info("Database backup created at {}", backup);
         } catch (SQLException e) {
             throw new DatabaseMigrationException("Backup failed; migration was not started.", backup, e);
