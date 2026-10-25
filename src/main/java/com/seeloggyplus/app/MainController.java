@@ -311,7 +311,7 @@ public class MainController {
     private Task<?> currentSearchTask;
     private Future<?> currentTailSearchTask;
     private Object incrementalTailSearchToken;
-    private volatile long searchGeneration = 0;
+    private final AtomicLong searchGeneration = new AtomicLong();
     private String lastAppliedSearchQuery = null;
     private boolean lastAppliedRegex = false;
     private boolean lastAppliedCaseSensitive = false;
@@ -850,7 +850,7 @@ public class MainController {
     }
 
     private void cancelSearchWork() {
-        searchGeneration++;
+        searchGeneration.incrementAndGet();
         incrementalTailSearchToken = null;
         if (searchDebounce != null) searchDebounce.stop();
         if (currentSearchTask != null) currentSearchTask.cancel(true);
@@ -860,7 +860,7 @@ public class MainController {
 
     private boolean searchContextIsCurrent(long generation, LogSession session, MappedFileReader reader,
             LineOffsetIndex index, boolean tail) {
-        return generation == searchGeneration && tabSessionManager.getActive() == session
+        return generation == searchGeneration.get() && tabSessionManager.getActive() == session
                 && (session == null || (!session.isClosed() && session.getReader() == reader && session.getIndex() == index))
                 && mappedFileReader == reader
                 && lineOffsetIndex == index && tailModeEnabled == tail;
@@ -868,7 +868,7 @@ public class MainController {
 
     private void performSearch() {
         cancelSearchWork();
-        final long thisGeneration = searchGeneration;
+        final long thisGeneration = searchGeneration.get();
         final LogSession searchSession = tabSessionManager.getActive();
         final MappedFileReader searchReader = mappedFileReader;
         final LineOffsetIndex searchIndex = lineOffsetIndex;
@@ -986,7 +986,7 @@ public class MainController {
                     if (reader != null && index != null && tailOffset > 0) {
                         int fileLines = index.getLineCount();
                         for (int i = 0; i < fileLines; i++) {
-                            if (Thread.currentThread().isInterrupted() || thisGeneration != searchGeneration) return;
+                            if (Thread.currentThread().isInterrupted() || thisGeneration != searchGeneration.get()) return;
                             CharSequence line = reader.readLine(index, i);
                             if (line != null && searchPredicate.test(line.toString())) {
                                 results.add(i);
@@ -996,7 +996,7 @@ public class MainController {
                     }
 
                     for (int i = 0; i < snapshot.size(); i++) {
-                        if (Thread.currentThread().isInterrupted() || thisGeneration != searchGeneration) return;
+                        if (Thread.currentThread().isInterrupted() || thisGeneration != searchGeneration.get()) return;
                         LogEntry entry = snapshot.get(i);
                         String raw = entry != null ? entry.getRawLog() : "";
                         if (searchPredicate.test(raw)) {
@@ -1128,7 +1128,7 @@ public class MainController {
                                     ? cs -> pattern.matcher(cs).find() : cs -> booleanPredicate.test(cs.toString());
 
                             for (int i = chunkStart; i < chunkEnd; i++) {
-                                if (isCancelled() || thisGeneration != searchGeneration)
+                                if (isCancelled() || thisGeneration != searchGeneration.get())
                                     break;
 
                                 boolean matches = simpleLiteral
@@ -1170,7 +1170,7 @@ public class MainController {
 
         task.setOnSucceeded(e -> {
             if (!searchContextIsCurrent(thisGeneration, searchSession, searchReader, searchIndex, searchingTail)) {
-                logger.info("Discarding stale search results (gen {} vs current {})", thisGeneration, searchGeneration);
+                logger.info("Discarding stale search results (gen {} vs current {})", thisGeneration, searchGeneration.get());
                 return;
             }
 
@@ -2902,7 +2902,7 @@ public class MainController {
 
         String remotePath = (tabSessionManager.getActive() != null && tabSessionManager.getActive().getRemotePath() != null)
                 ? tabSessionManager.getActive().getRemotePath()
-                : (currentLogFromDb != null ? currentLogFromDb.getFilePath() : null);
+                : currentLogFromDb.getFilePath();
         if (!validateRemoteTailPath(remotePath)) {
             disableTail();
             return;
@@ -3468,7 +3468,7 @@ public class MainController {
         }
         int end = snapshot.size();
         long base = snapshot instanceof com.seeloggyplus.shared.tail.TailHistory.Snapshot captured ? captured.baseIndex() : 0;
-        long generation = searchGeneration;
+        long generation = searchGeneration.get();
         Object token = new Object();
         incrementalTailSearchToken = token;
         IntArrayList target = filteredIndexes;
@@ -3478,14 +3478,14 @@ public class MainController {
             try {
                 IntArrayList matches = new IntArrayList();
                 for (int i = begin; i < end; i++) {
-                    if (generation != searchGeneration || session.isClosed()) return;
+                    if (generation != searchGeneration.get() || session.isClosed()) return;
                     LogEntry entry = snapshot.get(i);
                     if (predicate.test(entry == null ? "" : entry.getRawLog())) matches.add(i);
                 }
                 Platform.runLater(() -> {
                     if (incrementalTailSearchToken != token) return;
                     incrementalTailSearchToken = null;
-                    if (generation != searchGeneration || session != tabSessionManager.getActive()
+                    if (generation != searchGeneration.get() || session != tabSessionManager.getActive()
                             || session.isClosed() || filteredIndexes != target) return;
                     long trimmed = tailBase(rows) - base;
                     for (int i = 0; i < matches.size(); i++) {

@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicLong;
 import javafx.application.Platform;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -70,7 +71,7 @@ public class SearchResultPanel extends VBox {
     private final Map<Integer, String> lineCache = new LinkedHashMap<>(256, .75f, true);
     private final Set<Integer> pendingLines = new HashSet<>();
     private Executor contentExecutor;
-    private volatile long contentGeneration;
+    private final AtomicLong contentGeneration = new AtomicLong();
     private int inFlightContent;
     private static final long CACHE_BYTES = 8L * 1024 * 1024;
     private int pendingSelection = -1;
@@ -246,7 +247,7 @@ public class SearchResultPanel extends VBox {
     }
 
     private void resetContent() {
-        contentGeneration++;
+        contentGeneration.incrementAndGet();
         pendingLines.clear();
         lineCache.clear();
         pendingSelection = -1;
@@ -321,7 +322,7 @@ public class SearchResultPanel extends VBox {
         matchedLines = trimmed;
         itemCount = matchedLines.size();
 
-        contentGeneration++;
+        contentGeneration.incrementAndGet();
         pendingLines.clear();
         pendingSelection = -1;
         Map<Integer, String> shiftedCache = new LinkedHashMap<>();
@@ -350,7 +351,7 @@ public class SearchResultPanel extends VBox {
         if (newCount == itemCount) return;
 
         if (newCount < itemCount) {
-            contentGeneration++;
+            contentGeneration.incrementAndGet();
             pendingLines.clear();
             pendingSelection = -1;
             lineCache.keySet().removeIf(index -> index >= newCount);
@@ -422,12 +423,12 @@ public class SearchResultPanel extends VBox {
         }
         if (inFlightContent < 4 && pendingLines.add(matchIndex)) {
             inFlightContent++;
-            long generation = contentGeneration;
+            long generation = contentGeneration.get();
             contentExecutor.execute(() -> {
-                String content = generation == contentGeneration ? resolve(resolver, globalLine) : "";
+                String content = generation == contentGeneration.get() ? resolve(resolver, globalLine) : "";
                 Platform.runLater(() -> {
                     inFlightContent--;
-                    if (generation != contentGeneration) {
+                    if (generation != contentGeneration.get()) {
                         render();
                         return;
                     }
