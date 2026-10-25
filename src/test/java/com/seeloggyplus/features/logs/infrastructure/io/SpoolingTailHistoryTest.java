@@ -41,6 +41,21 @@ class SpoolingTailHistoryTest {
         try (var paths = Files.list(root)) {assertEquals(0, paths.count());}
     }
 
+    @Test void closeReleasesThePerThreadWriteBuffer() throws Exception {
+        var history = new SpoolingTailHistory(root, 8192L);
+        history.add(new LogEntry(0, "row"));
+        Object buffer = writeBuffer().get();
+        assertNotNull(buffer);
+        history.close();
+        assertNotSame(buffer, writeBuffer().get());
+    }
+
+    private static ThreadLocal<?> writeBuffer() throws Exception {
+        var field = SpoolingTailHistory.class.getDeclaredField("WRITE_BUFFER");
+        field.setAccessible(true);
+        return (ThreadLocal<?>) field.get(null);
+    }
+
     @Test void aSearchSnapshotPinsEvictedDiskRowsUntilSearchFinishes() throws Exception {
         var history = new SpoolingTailHistory(root, 8192L);
         List<LogEntry> rows = history;

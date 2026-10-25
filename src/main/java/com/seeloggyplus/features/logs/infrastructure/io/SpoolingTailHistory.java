@@ -321,5 +321,5 @@ public final class SpoolingTailHistory extends AbstractList<LogEntry> implements
             catch (IOException error) {throw new UncheckedIOException(error);}
         }
     }
-    @Override public synchronized void close() {closed = true; clear();}
+    @Override public synchronized void close() {closed = true; clear(); WRITE_BUFFER.remove();}
 }
