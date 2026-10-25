@@ -28,9 +28,15 @@ public class CredentialEncryptor {
 
     private static CredentialEncryptor instance;
     private final SecretKey secretKey;
+    private final SecureRandom random;
 
     private CredentialEncryptor(SecretKey key) {
+        this(key, new SecureRandom());
+    }
+
+    CredentialEncryptor(SecretKey key, SecureRandom random) {
         this.secretKey = key;
+        this.random = random;
     }
 
     public static synchronized CredentialEncryptor getInstance() {
@@ -44,7 +50,7 @@ public class CredentialEncryptor {
         if (plaintext == null || plaintext.isBlank()) return plaintext;
         try {
             byte[] iv = new byte[GCM_IV_BYTES];
-            new SecureRandom().nextBytes(iv);
+            random.nextBytes(iv);
 
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, new GCMParameterSpec(GCM_TAG_BITS, iv));
