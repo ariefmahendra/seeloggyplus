@@ -20,6 +20,70 @@ class DatabaseMigrationTest {
     @TempDir
     Path tempDir;
 
+    @Test
+    void metadataLookupTreatsTableNamesAsData() throws Exception {
+        try (Connection c = connect(tempDir.resolve("metadata.db")); Statement statement = c.createStatement()) {
+            statement.execute("CREATE TABLE \"odd table\" (\"MixedCase\" TEXT)");
+            assertTrue(DatabaseMigrator.columnExists(c, "odd table", "mixedcase"));
+            assertFalse(DatabaseMigrator.columnExists(c, "odd table); DROP TABLE ssh_servers; --", "MixedCase"));
+            assertTrue(DatabaseMigrator.tableExists(c, "odd table"));
+        }
+    }
+
+    @Test
+    void unsupportedSchemaVersionsAreRejectedWithoutChangingTheDatabase() throws Exception {
+        try (Connection c = connect(tempDir.resolve("version.db"))) {
+            for (int version : new int[]{-1, DatabaseMigrator.SCHEMA_VERSION + 1, Integer.MAX_VALUE}) {
+                assertThrows(IllegalArgumentException.class, () -> DatabaseMigrator.setUserVersion(c, version));
+                assertEquals(0, DatabaseMigrator.getUserVersion(c));
+            }
+            DatabaseMigrator.setUserVersion(c, DatabaseMigrator.SCHEMA_VERSION);
+            assertEquals(DatabaseMigrator.SCHEMA_VERSION, DatabaseMigrator.getUserVersion(c));
+        }
+    }
+
+    @Test
+    void migratesAndBacksUpPathsContainingSpacesAndApostrophes() throws Exception {
+        Path db = tempDir.resolve("user's logs.db");
+        try (Connection c = connect(db)) {
+            createLegacySchema(c);
+            insertLegacyServer(c, "retained", "Original", "2024-01-01T00:00:00");
+            DatabaseMigrator.migrate(c, db, false);
+            assertEquals("Original", serverName(c, "retained"));
+            Path backup;
+            try (var files = Files.list(tempDir)) {
+                backup = files.filter(p -> p.getFileName().toString().startsWith("user's logs.db.bak-v"))
+                        .findFirst().orElseThrow();
+            }
+            try (Connection saved = connect(backup)) {
+                assertEquals("Original", serverName(saved, "retained"));
+                assertFalse(DatabaseMigrator.columnExists(saved, "ssh_servers", "auth_type"));
+                assertEquals(0, DatabaseMigrator.getUserVersion(saved));
+            }
+        }
+    }
+
+    @Test
+    void retainsThreeReadableBackups() throws Exception {
+        Path db = tempDir.resolve("retention.db");
+        try (Connection c = connect(db)) {
+            createLegacySchema(c);
+            insertLegacyServer(c, "retained", "Original", "2024-01-01T00:00:00");
+            for (int version = 0; version < 5; version++) {
+                DatabaseMigrator.backupDatabase(c, db, version);
+            }
+            try (var files = Files.list(tempDir)) {
+                var backups = files.filter(p -> p.getFileName().toString().startsWith("retention.db.bak-v")).toList();
+                assertEquals(3, backups.size());
+                for (Path backup : backups) {
+                    try (Connection saved = connect(backup)) {
+                        assertEquals("Original", serverName(saved, "retained"));
+                    }
+                }
+            }
+        }
+    }
+
     private Connection connect(Path dbFile) throws SQLException {
         return DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath());
     }
