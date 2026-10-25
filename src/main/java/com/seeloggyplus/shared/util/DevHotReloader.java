@@ -19,8 +19,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -44,19 +42,23 @@ public class DevHotReloader {
     private static final AtomicBoolean isReloading = new AtomicBoolean(false);
     private static long lastCssModified = 0;
     private static long lastFxmlModified = 0;
-    private static final List<File> createdTempFiles = new ArrayList<>();
+    private static final HotReloadStylesheets stylesheets = new HotReloadStylesheets(CSS_SOURCE_PATHS.size() * 3);
+    private static volatile boolean storageUnavailable;
 
     public static boolean isDevMode() {
-        if (Boolean.getBoolean("seeloggyplus.dev")) {
-            return true;
-        }
-        File cssFile = new File(CSS_SOURCE_PATH);
-        return cssFile.exists() && cssFile.isFile();
+        return Boolean.getBoolean("seeloggyplus.dev");
     }
 
     public static void init(Stage stage, Scene scene) {
         if (!isDevMode()) {
             logger.info("DevHotReloader: Production environment detected. Hot reload disabled.");
+            return;
+        }
+        try {
+            stylesheets.prepare();
+        } catch (IOException exception) {
+            storageUnavailable = true;
+            logger.warn("Private stylesheet storage is unavailable; hot reload is disabled", exception);
             return;
         }
 
@@ -126,6 +128,7 @@ public class DevHotReloader {
     }
 
     public static void reloadCss(Stage stage, Scene scene, boolean showToast) {
+        if (!isDevMode() || storageUnavailable) return;
         if (!isReloading.compareAndSet(false, true)) {
             return;
         }
@@ -147,27 +150,12 @@ public class DevHotReloader {
                     continue;
                 }
 
-                String base = sourceCss.getName().replaceAll("\\.css$", "");
-                File tempCss = File.createTempFile("seeloggy-hotreload-" + base + "-", ".css");
-                tempCss.deleteOnExit();
-                Files.copy(sourceCss.toPath(), tempCss.toPath(), StandardCopyOption.REPLACE_EXISTING);
-
-                createdTempFiles.add(tempCss);
-                newCssUrls.add(tempCss.toURI().toURL().toExternalForm());
+                newCssUrls.add(stylesheets.copy(sourceCss.toPath()).toUri().toURL().toExternalForm());
             }
 
             if (newCssUrls.isEmpty()) {
                 isReloading.set(false);
                 return;
-            }
-
-            while (createdTempFiles.size() > CSS_SOURCE_PATHS.size() * 3) {
-                File oldFile = createdTempFiles.remove(0);
-                try {
-                    oldFile.delete();
-                } catch (Exception e) {
-                    logger.debug("Could not delete a rotated hot-reload stylesheet", e);
-                }
             }
 
             Platform.runLater(() -> {
@@ -194,8 +182,9 @@ public class DevHotReloader {
                 }
             });
         } catch (Exception e) {
+            storageUnavailable = true;
             isReloading.set(false);
-            logger.error("[DevHotReloader] Failed to reload CSS", e);
+            logger.error("[DevHotReloader] Failed to reload CSS; hot reload is disabled", e);
         }
     }
 
@@ -217,6 +206,7 @@ public class DevHotReloader {
     }
 
     public static void reloadFxml(Stage stage) {
+        if (!isDevMode() || storageUnavailable) return;
         if (stage == null || !stage.isShowing()) return;
 
         File fxmlFile = new File(FXML_SOURCE_PATH);
@@ -283,13 +273,11 @@ public class DevHotReloader {
             watcherExecutor.shutdownNow();
             watcherExecutor = null;
         }
-        for (File temp : createdTempFiles) {
-            try {
-                temp.delete();
-            } catch (Exception e) {
-                logger.debug("Could not delete a hot-reload stylesheet", e);
-            }
+        try {
+            stylesheets.close();
+        } catch (IOException exception) {
+            logger.warn("Could not remove private hot-reload stylesheets", exception);
         }
-        createdTempFiles.clear();
+        storageUnavailable = false;
     }
 }

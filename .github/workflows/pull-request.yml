@@ -105,6 +105,10 @@ jobs:
             --tests "com.seeloggyplus.app.StorePackageCliTest" \
             --tests "com.seeloggyplus.shared.util.XmlPrettifyTest" \
             --tests "com.seeloggyplus.shared.database.DatabaseMigrationTest" \
+            --tests "com.seeloggyplus.shared.util.DevHotReloaderTest" \
+            --tests "com.seeloggyplus.shared.util.HotReloadStylesheetsTest" \
+            --tests "com.seeloggyplus.app.FileExplorerTest" \
+            --tests "com.seeloggyplus.shared.util.AppThemeTest" \
             --tests "com.seeloggyplus.app.StoreMenuPresentationTest" \
             --tests "com.seeloggyplus.app.PortableStartupUpdatePolicyTest" \
             --tests "com.seeloggyplus.app.MainViewFxmlLoadTest" \

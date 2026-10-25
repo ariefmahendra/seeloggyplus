@@ -13,8 +13,78 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  coverage:
+    name: Security coverage (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Require dev branch
+        shell: bash
+        run: test "$GITHUB_REF" = refs/heads/dev
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare platform tools
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "CI_GRADLE=./gradlew.bat" >> "$GITHUB_ENV"
+          else
+            chmod +x gradlew
+            echo "CI_GRADLE=./gradlew" >> "$GITHUB_ENV"
+            python scripts/setup_ci_fonts.py
+          fi
+
+      - name: Run related headless security regressions
+        shell: bash
+        run: |
+          "$CI_GRADLE" --no-daemon test \
+            --tests "com.seeloggyplus.app.StorePackageCliTest" \
+            --tests "com.seeloggyplus.shared.util.XmlPrettifyTest" \
+            --tests "com.seeloggyplus.shared.database.DatabaseMigrationTest" \
+            --tests "com.seeloggyplus.shared.util.DevHotReloaderTest" \
+            --tests "com.seeloggyplus.shared.util.HotReloadStylesheetsTest" \
+            --tests "com.seeloggyplus.app.FileExplorerTest" \
+            --tests "com.seeloggyplus.shared.util.AppThemeTest" \
+            --tests "com.seeloggyplus.app.MainViewFxmlLoadTest" \
+            --tests "com.seeloggyplus.app.MainStartupTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.SelfUpdateEndToEndTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.UpdateInstallerTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.UpdateDownloaderTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.UpdateCoordinatorTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.UpdateBootstrapperTest" \
+            --tests "com.seeloggyplus.features.update.infrastructure.SilentLauncherInstallerTest"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.platform }}
+          path: build/jacoco/test.exec
+          if-no-files-found: error
+
   analyze:
     name: SonarQube analysis
+    needs: coverage
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -34,6 +104,11 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: build/sonar-coverage
+
       - name: Validate gate tests
         run: python3 scripts/test_sonar_gate.py
 
@@ -47,7 +122,14 @@ jobs:
           test -n "$SONAR_HOST_URL" || { echo 'Missing SONAR_HOST_URL secret'; exit 1; }
           test -n "$SONAR_TOKEN" || { echo 'Missing SONAR_TOKEN secret'; exit 1; }
           chmod +x gradlew
-          ./gradlew --no-daemon classes testClasses sonar \
+          ./gradlew --no-daemon classes testClasses jacocoSonarReport sonar \
             -Dsonar.scm.revision="$GITHUB_SHA" \
             -Dsonar.qualitygate.wait=true \
             -Dsonar.qualitygate.timeout=600
+
+      - name: Preserve combined coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-combined-coverage
+          path: build/reports/jacoco/sonar
