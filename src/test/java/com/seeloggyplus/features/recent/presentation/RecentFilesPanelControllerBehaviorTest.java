@@ -167,6 +167,8 @@ class RecentFilesPanelControllerBehaviorTest {
 
         awaitFx(() -> fileNodes().stream()
                 .anyMatch(node -> "file-3".equals(node.getValue().getFile().logFile().getId())));
+        assertTrue(fileNodes().stream()
+                .anyMatch(node -> "file-3".equals(node.getValue().getFile().logFile().getId())));
     }
 
     private void awaitFx(java.util.function.BooleanSupplier condition) {

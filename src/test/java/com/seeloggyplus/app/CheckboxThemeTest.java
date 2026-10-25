@@ -102,6 +102,7 @@ class CheckboxThemeTest {
             root.getChildren().setAll(row); AppTheme.setTheme(theme); stage.setWidth(760); stage.setHeight(90); apply();
             try {
                 var rendered=root.snapshot(null,null); int width=(int)rendered.getWidth(),height=(int)rendered.getHeight();
+                assertTrue(width > 0 && height > 0);
                 int[] pixels=new int[width*height]; rendered.getPixelReader().getPixels(0,0,width,height,javafx.scene.image.PixelFormat.getIntArgbInstance(),pixels,0,width);
                 var png=new java.awt.image.BufferedImage(width,height,java.awt.image.BufferedImage.TYPE_INT_ARGB); png.setRGB(0,0,width,height,pixels,0,width);
                 var path=java.nio.file.Path.of("build","checkbox-review","checkboxes-"+theme.name().toLowerCase()+".png");

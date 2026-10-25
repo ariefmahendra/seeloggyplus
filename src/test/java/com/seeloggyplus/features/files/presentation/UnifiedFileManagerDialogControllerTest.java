@@ -13,7 +13,6 @@ import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +23,7 @@ import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
 
 import com.seeloggyplus.features.ssh.infrastructure.SSHServiceImpl;
+import com.seeloggyplus.shared.ssh.SSHService;
 import com.seeloggyplus.shared.ssh.SSHServiceFactory;
 import com.seeloggyplus.shared.dto.RemoteFileInfo;
 
@@ -45,6 +45,9 @@ import java.lang.reflect.Method;
 import java.util.Locale;
 import java.util.Set;
 import java.util.Stack;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import javafx.concurrent.Task;
 
 @ExtendWith(ApplicationExtension.class)
@@ -324,14 +327,18 @@ public class UnifiedFileManagerDialogControllerTest {
         });
         Thread.sleep(1000);
         WaitForAsyncUtils.waitForFxEvents();
+        int allFiles = fileTable.getItems().size();
 
         Platform.runLater(() -> searchField.setText("file1"));
         Thread.sleep(500);
         WaitForAsyncUtils.waitForFxEvents();
+        int filtered = fileTable.getItems().size();
 
         Platform.runLater(() -> searchField.setText(""));
         Thread.sleep(500);
         WaitForAsyncUtils.waitForFxEvents();
+        assertTrue(filtered > 0 && filtered < allFiles);
+        assertEquals(allFiles, fileTable.getItems().size());
     }
 
     @Test
@@ -503,6 +510,9 @@ public class UnifiedFileManagerDialogControllerTest {
 
     @Test
     public void testAutoRefreshOnFocus(FxRobot robot) throws Exception {
+        Field suppressed = UnifiedFileManagerDialogController.class.getDeclaredField("suppressAutoRefresh");
+        suppressed.setAccessible(true);
+        suppressed.setBoolean(controller, true);
         Platform.runLater(() -> {
             try {
                 Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleWindowGainedFocus");
@@ -511,22 +521,33 @@ public class UnifiedFileManagerDialogControllerTest {
             } catch (Exception e) {}
         });
         WaitForAsyncUtils.waitForFxEvents();
+        assertFalse(suppressed.getBoolean(controller));
     }
 
     @Test
-    public void testDirectoryLoadFailure(FxRobot robot) {
+    public void testDirectoryLoadFailure(FxRobot robot) throws Exception {
+        int callsBefore = localFileService.callCount;
         localFileService.throwError = true;
-        robot.clickOn("#homeButton");
-        WaitForAsyncUtils.waitForFxEvents();
+        Platform.runLater(() -> {
+            try {
+                Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("navigateTo", String.class);
+                m.setAccessible(true);
+                m.invoke(controller, HOME + SEP + "missing");
+            } catch (Exception e) {}
+        });
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> localFileService.callCount > callsBefore);
+        assertTrue(localFileService.callCount > callsBefore);
     }
 
     @Test
     public void testNavigateBeyondRoot(FxRobot robot) {
         robot.clickOn("#homeButton");
         WaitForAsyncUtils.waitForFxEvents();
+        String homePath = pathField.getText();
 
         robot.clickOn("#upButton");
         WaitForAsyncUtils.waitForFxEvents();
+        assertEquals(homePath, pathField.getText());
     }
 
     @Test
@@ -822,6 +843,8 @@ public class UnifiedFileManagerDialogControllerTest {
 
     @Test
     public void testPreviewAction(FxRobot robot) throws Exception {
+        List<FileInfo> previews = new CopyOnWriteArrayList<>();
+        controller.setHost(recordingHost(previews, null));
         robot.clickOn("#homeButton");
         Thread.sleep(1500);
         WaitForAsyncUtils.waitForFxEvents();
@@ -829,38 +852,50 @@ public class UnifiedFileManagerDialogControllerTest {
         Platform.runLater(() -> fileTable.getSelectionModel().select(1));
         WaitForAsyncUtils.waitForFxEvents();
 
-        Thread t = new Thread(() -> {
-            Platform.runLater(() -> {
-                try {
-                    Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handlePreview");
-                    m.setAccessible(true);
-                    m.invoke(controller);
-                } catch (Exception e) {}
-            });
+        Platform.runLater(() -> {
+            try {
+                Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handlePreview");
+                m.setAccessible(true);
+                m.invoke(controller);
+            } catch (Exception e) {}
         });
-        t.start();
-        Thread.sleep(1500);
-
-        robot.type(KeyCode.ESCAPE);
-        WaitForAsyncUtils.waitForFxEvents();
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> !previews.isEmpty());
+        assertFalse(previews.isEmpty());
     }
 
     @Test
     public void testManageServersAction(FxRobot robot) throws Exception {
-        Thread t = new Thread(() -> {
-            Platform.runLater(() -> {
-                try {
-                    Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleManageServers");
-                    m.setAccessible(true);
-                    m.invoke(controller);
-                } catch (Exception e) {}
-            });
+        AtomicInteger manageCalls = new AtomicInteger();
+        controller.setHost(recordingHost(null, manageCalls));
+        Platform.runLater(() -> {
+            try {
+                Method m = UnifiedFileManagerDialogController.class.getDeclaredMethod("handleManageServers");
+                m.setAccessible(true);
+                m.invoke(controller);
+            } catch (Exception e) {}
         });
-        t.start();
-        Thread.sleep(1500);
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> manageCalls.get() > 0);
+        assertEquals(1, manageCalls.get());
+    }
 
-        robot.type(KeyCode.ESCAPE);
-        WaitForAsyncUtils.waitForFxEvents();
+    private static FileManagerHost recordingHost(List<FileInfo> previews, AtomicInteger manageCalls) {
+        return new FileManagerHost() {
+            @Override
+            public FileManagerHost.FindInFilesResult openFindInFiles(SSHService sshService, SSHServerModel server,
+                    String path, int maxTailWindow) {
+                return null;
+            }
+
+            @Override
+            public void openPreview(FileInfo file, SSHService sshService) {
+                if (previews != null) previews.add(file);
+            }
+
+            @Override
+            public void openServerManagement() {
+                if (manageCalls != null) manageCalls.incrementAndGet();
+            }
+        };
     }
 
     private static class InMemoryPreferenceService implements PreferenceService {

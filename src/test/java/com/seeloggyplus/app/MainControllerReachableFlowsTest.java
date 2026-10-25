@@ -221,8 +221,12 @@ class MainControllerReachableFlowsTest {
     @Test
     void dialogIconHelpersAttachIcons() throws Exception {
         fx(() -> {
-            invoke("addAppIcon", new Class<?>[]{Stage.class}, new Stage());
-            invokeStatic("addDialogIcon", new Class<?>[]{javafx.stage.Window.class}, new javafx.stage.Popup());
+            Stage appStage = new Stage();
+            Stage dialogStage = new Stage();
+            invoke("addAppIcon", new Class<?>[]{Stage.class}, appStage);
+            invokeStatic("addDialogIcon", new Class<?>[]{javafx.stage.Window.class}, dialogStage);
+            assertFalse(appStage.getIcons().isEmpty());
+            assertFalse(dialogStage.getIcons().isEmpty());
         });
     }
 
@@ -689,7 +693,7 @@ class MainControllerReachableFlowsTest {
         setField("isSkippingFilterTrigger", false);
         fx(() -> {
             invoke("performSearch", new Class<?>[0]);
-            setField("searchGeneration", ((Long) field("searchGeneration")) + 1);
+            ((java.util.concurrent.atomic.AtomicLong) field("searchGeneration")).incrementAndGet();
         });
         Thread.sleep(300);
         WaitForAsyncUtils.waitForFxEvents();

@@ -379,6 +379,7 @@ class SearchResultsRegressionTest {
             await(() -> "POST".equals(field(controller, "lastAppliedSearchQuery")));
             invoke("handleTailLineBackground", session, "POST " + "y".repeat(2000));
             await(() -> panel().getItemCount() == 1);
+            assertEquals(1, panel().getItemCount());
         } finally {fx(session::close);}
     }
 
