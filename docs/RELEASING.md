@@ -164,7 +164,7 @@ also target `dev`. The project key is the repository variable `SONAR_PROJECT_KEY
 the token needs Execute Analysis permission for that project. The GitHub-hosted
 Linux runner must be able to reach the SonarQube server.
 
-The workflow runs selected headless security, startup and updater regression
+The workflow runs selected headless security, reliability, startup and updater regression
 classes on Windows and Linux at the same dev revision. Both jobs must pass and
 upload non-empty JaCoCo execution data. `jacocoSonarReport` combines those inputs
 against the matching classes before analysis; it does not invoke the full suite.

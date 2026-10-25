@@ -22,7 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class SSHSessionManagerImpl implements SSHSessionManager {
+public class SSHSessionManagerImpl implements SSHSessionManager, AutoCloseable {
 
     private static final Logger logger = LoggerFactory.getLogger(SSHSessionManagerImpl.class);
     private static final SSHSessionManagerImpl INSTANCE = new SSHSessionManagerImpl();
@@ -31,9 +31,15 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
 
     private final Map<String, HostKey> pendingHostKeys = new ConcurrentHashMap<>();
     private PreferenceService preferenceService;
+    private final ScheduledExecutorService cleanupScheduler;
+    private boolean closed;
 
     private SSHSessionManagerImpl() {
-        ScheduledExecutorService cleanupScheduler = Executors.newSingleThreadScheduledExecutor();
+        this(Executors.newSingleThreadScheduledExecutor());
+    }
+
+    SSHSessionManagerImpl(ScheduledExecutorService cleanupScheduler) {
+        this.cleanupScheduler = cleanupScheduler;
         cleanupScheduler.scheduleAtFixedRate(this::cleanupExpiredSessions, 1, 1, TimeUnit.MINUTES);
     }
 
@@ -60,9 +66,10 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
         String key = auth.type() == SshAuthConfig.AuthType.KEY
                 ? baseKey + "#key:" + (auth.keyPath() == null ? "" : auth.keyPath())
                 : baseKey;
-        if (sessionPool.containsKey(key)) {
+        synchronized (this) {
+            if (closed) throw new JSchException("SSH session manager is closed");
             ManagedSession managed = sessionPool.get(key);
-            if (managed.isValid()) {
+            if (managed != null && managed.isValid()) {
                 managed.touch(ttlMillis);
                 return managed.getSession();
             } else {
@@ -72,11 +79,27 @@ public class SSHSessionManagerImpl implements SSHSessionManager {
 
         logger.info("Creating NEW SSH session for {} ({})", key, auth.type());
         Session session = createNewSession(host, port, username, secret, auth);
-        sessionPool.put(key, new ManagedSession(session, ttlMillis));
+        synchronized (this) {
+            if (closed) {
+                session.disconnect();
+                throw new JSchException("SSH session manager closed while connecting");
+            }
+            sessionPool.put(key, new ManagedSession(session, ttlMillis));
+        }
         return session;
     }
 
-    private Session createNewSession(String host, int port, String username, String secret, SshAuthConfig auth)
+    @Override
+    public synchronized void close() {
+        if (closed) return;
+        closed = true;
+        cleanupScheduler.shutdownNow();
+        sessionPool.values().forEach(managed -> managed.getSession().disconnect());
+        sessionPool.clear();
+        pendingHostKeys.clear();
+    }
+
+    Session createNewSession(String host, int port, String username, String secret, SshAuthConfig auth)
             throws JSchException {
         JSch jsch = new JSch();
         HostKeyRepository knownHosts = SshKnownHosts.load(jsch, SshKnownHosts.defaultFile());

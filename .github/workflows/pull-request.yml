@@ -113,6 +113,12 @@ jobs:
             --tests "com.seeloggyplus.app.PortableStartupUpdatePolicyTest" \
             --tests "com.seeloggyplus.app.MainViewFxmlLoadTest" \
             --tests "com.seeloggyplus.app.MainStartupTest" \
+            --tests "com.seeloggyplus.app.MainControllerIndexingTest" \
+            --tests "com.seeloggyplus.app.MainControllerOpenAtLineTest" \
+            --tests "com.seeloggyplus.shared.util.SyntaxHighlighterTest" \
+            --tests "com.seeloggyplus.features.ssh.infrastructure.SSHSessionManagerImplTest" \
+            --tests "com.seeloggyplus.features.ssh.infrastructure.SSHServiceImplSessionManagerTest" \
+            --tests "com.seeloggyplus.features.logs.infrastructure.io.LogParserServiceImplTest" \
             --tests "com.seeloggyplus.features.update.presentation.UpdateFeatureBehaviorTest" \
             --tests "com.seeloggyplus.features.update.infrastructure.SelfUpdateEndToEndTest" \
             --tests "com.seeloggyplus.features.update.infrastructure.UpdateInstallerTest" \

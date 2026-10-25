@@ -11,8 +11,8 @@ import java.util.regex.Pattern;
 public class SyntaxHighlighter {
 
     private static final Pattern JSON_PATTERN = Pattern.compile(
-            "(?<KEY>\"([^\"\\\\]|\\\\.)*\"(?=\\s*:))|" +
-            "(?<STRING>\"([^\"\\\\]|\\\\.)*\")|" +
+            "(?<KEY>\"(?:[^\"\\\\]|\\\\.)*+\"(?=\\s*:))|" +
+            "(?<STRING>\"(?:[^\"\\\\]|\\\\.)*+\")|" +
             "(?<NUMBER>-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b)|" +
             "(?<BOOLEAN>\\b(true|false)\\b)|" +
             "(?<NULL>\\bnull\\b)|" +
