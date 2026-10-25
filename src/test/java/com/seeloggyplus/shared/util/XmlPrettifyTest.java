@@ -7,6 +7,19 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class XmlPrettifyTest {
 
+    @org.junit.jupiter.api.io.TempDir
+    java.nio.file.Path directory;
+
+    @Test
+    void doesNotExpandExternalEntitiesFromLocalFiles() throws Exception {
+        var secret = java.nio.file.Files.writeString(directory.resolve("secret.txt"), "PRIVATE_XML_SENTINEL");
+        String xml = "<!DOCTYPE root [<!ENTITY external SYSTEM \"" + secret.toUri()
+                + "\">]><root>&external;</root>";
+        assertFalse(XmlPrettify.prettify(xml).contains("PRIVATE_XML_SENTINEL"));
+        assertFalse(XmlPrettify.minify(xml).contains("PRIVATE_XML_SENTINEL"));
+        assertFalse(XmlPrettify.prettifyFromLog(xml).contains("PRIVATE_XML_SENTINEL"));
+    }
+
     @Test
     @DisplayName("Should prettify pure XML with 2-space indentation")
     void testPrettifyPureXml() {
