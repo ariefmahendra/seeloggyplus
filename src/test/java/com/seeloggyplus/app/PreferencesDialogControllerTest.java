@@ -60,19 +60,7 @@ class PreferencesDialogControllerTest {
     }
 
     @AfterEach
-    void restoreLauncherProperties() throws Exception {
-        if (launcherPropertiesPath == null) {
-            return;
-        }
-        if (originalLauncherProperties == null) {
-            Files.deleteIfExists(Path.of(launcherPropertiesPath));
-        } else {
-            Files.writeString(Path.of(launcherPropertiesPath), originalLauncherProperties);
-        }
-    }
-
-    @AfterEach
-    void restoreDefaults() {
+    void restoreDefaults() throws Exception {
         save("app_font_size", "12");
         save("app_font_family", "Consolas");
         save("app_theme", "light");
@@ -87,6 +75,14 @@ class PreferencesDialogControllerTest {
         save("ssh_download_directory", "");
         save("file_double_click_action", "OPEN");
         onFx(() -> AppTheme.setTheme(AppTheme.Theme.LIGHT));
+        if (launcherPropertiesPath == null) {
+            return;
+        }
+        if (originalLauncherProperties == null) {
+            Files.deleteIfExists(Path.of(launcherPropertiesPath));
+        } else {
+            Files.writeString(Path.of(launcherPropertiesPath), originalLauncherProperties);
+        }
     }
 
     @Test

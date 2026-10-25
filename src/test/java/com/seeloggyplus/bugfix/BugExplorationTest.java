@@ -338,10 +338,8 @@ public class BugExplorationTest {
             cacheField.setAccessible(true);
             ((Map<?, ?>) cacheField.get(controller)).clear();
 
-            Class<?> locationItemClass = Arrays.stream(controller.getClass().getDeclaredClasses())
-                    .filter(c -> c.getSimpleName().equals("LocationItem"))
-                    .findFirst()
-                    .orElseThrow();
+            Class<?> locationItemClass = Class.forName(
+                    UnifiedFileManagerDialogController.class.getName() + "$LocationItem");
             Method localFactory = locationItemClass.getDeclaredMethod("local");
             localFactory.setAccessible(true);
             Object localItem = localFactory.invoke(null);
