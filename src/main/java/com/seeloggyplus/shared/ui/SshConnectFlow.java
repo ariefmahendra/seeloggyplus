@@ -9,6 +9,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.function.Supplier;
 
@@ -84,6 +85,9 @@ public final class SshConnectFlow {
     }
 
     private static <T> T runOnFxAndWait(Supplier<T> action) {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new IllegalStateException("Host key confirmation interrupted", new InterruptedException());
+        }
         if (Platform.isFxApplicationThread()) {
             return action.get();
         }
@@ -91,7 +95,11 @@ public final class SshConnectFlow {
         Platform.runLater(task);
         try {
             return task.get();
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
+            task.cancel(false);
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Host key confirmation interrupted", e);
+        } catch (ExecutionException e) {
             throw new IllegalStateException("Host key confirmation failed", e);
         }
     }
