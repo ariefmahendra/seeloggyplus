@@ -188,6 +188,12 @@ it as a required status check for main, alongside the Windows/Linux validation
 jobs. If a scan finishes after the gate times out, rerun the failed gate check.
 
 Configure security conditions and the New Code definition in the SonarQube UI.
+The project uses the `SeeLoggyPlus JavaFX` CSS quality profile, copied from
+`Sonar way core`. Its selector parameters are recorded in
+`config/sonar-javafx-css-profile.json`. Keep the CSS rules and their severities
+enabled; the exact additional pseudo-classes and control types are JavaFX
+selectors, not wildcard exclusions. Associate this profile only with this project
+and compare it with the built-in base after Sonar upgrades to retain new rules.
 Review the initial baseline and security hotspots rather than weakening the gate
 or broadly excluding application code to make it green. Review the combined
 coverage artifact for untested new behavior when a coverage condition fails;
