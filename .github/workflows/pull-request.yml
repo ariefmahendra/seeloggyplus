@@ -103,6 +103,7 @@ jobs:
             --tests "com.seeloggyplus.app.StoreLauncherTest" \
             --tests "com.seeloggyplus.app.StoreLinksTest" \
             --tests "com.seeloggyplus.app.StorePackageCliTest" \
+            --tests "com.seeloggyplus.shared.util.XmlPrettifyTest" \
             --tests "com.seeloggyplus.app.StoreMenuPresentationTest" \
             --tests "com.seeloggyplus.app.PortableStartupUpdatePolicyTest" \
             --tests "com.seeloggyplus.app.MainViewFxmlLoadTest" \

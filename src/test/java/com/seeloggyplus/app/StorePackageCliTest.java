@@ -7,6 +7,10 @@ import javax.imageio.ImageIO;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.StringReader;
+import javax.xml.XMLConstants;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.stream.StreamSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -14,6 +18,23 @@ class StorePackageCliTest {
 
     @TempDir
     Path stage;
+
+    @Test
+    void transformerBlocksExternalStylesheetsAndDtds() throws Exception {
+        var factory = StorePackageCli.transformerFactory();
+        assertTrue(factory.getFeature(XMLConstants.FEATURE_SECURE_PROCESSING));
+        assertEquals("", factory.getAttribute(XMLConstants.ACCESS_EXTERNAL_DTD));
+        assertEquals("", factory.getAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET));
+        Path secret = Files.writeString(stage.resolve("external.xml"), "<secret>private</secret>");
+        String include = "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\">"
+                + "<xsl:include href=\"" + secret.toUri() + "\"/></xsl:stylesheet>";
+        assertThrows(TransformerConfigurationException.class,
+                () -> factory.newTransformer(new StreamSource(new StringReader(include))));
+        String dtd = "<!DOCTYPE xsl:stylesheet SYSTEM \"" + secret.toUri() + "\">"
+                + "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\"/>";
+        assertThrows(TransformerConfigurationException.class,
+                () -> factory.newTransformer(new StreamSource(new StringReader(dtd))));
+    }
 
     @Test
     void createsManifestAndLogosForTheRegisteredStoreIdentity() throws Exception {
