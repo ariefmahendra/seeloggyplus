@@ -20,7 +20,7 @@ public class SyntaxHighlighter {
     );
 
     private static final Pattern XML_TAG_PATTERN = Pattern.compile(
-            "(?<ELEMENT>(?<OPENBRACKET></?\\h*)(?<TAGNAME>[a-zA-Z_][a-zA-Z0-9._:-]*)(?<ATTRIBUTES>[^<>]*)(?<CLOSEBRACKET>\\h*/?>))|" +
+            "(?<ELEMENT>(?<OPENBRACKET></?\\h*)(?<TAGNAME>[a-zA-Z_][a-zA-Z0-9._:-]*+)(?<ATTRIBUTES>[^<>]*+)(?<CLOSEBRACKET>\\h*/?>))|" +
             "(?<COMMENT><!--[\\s\\S]*?-->)|" +
             "(?<DECLARATION><\\?[\\s\\S]*?\\?>)|" +
             "(?<CDATA><!\\[CDATA\\[[\\s\\S]*?\\]\\]>)"

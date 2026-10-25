@@ -1106,7 +1106,9 @@ public class MainController {
                     booleanPredicate = createBooleanSearchPredicate(searchText, caseSensitive);
                 }
 
-                final boolean simpleLiteral = pattern == null && !searchText.matches("(?s).*\\s+(AND|OR)\\s+.*")
+                final boolean simpleLiteral = pattern == null
+                        && splitOnKeyword(searchText, "AND").size() == 1
+                        && splitOnKeyword(searchText, "OR").size() == 1
                         && !searchText.trim().startsWith("NOT ");
                 final String literalTerm = searchText.trim();
                 int numThreads = SEARCH_WORKERS;
@@ -3199,11 +3201,11 @@ public class MainController {
             return s -> true;
         }
 
-        String[] orParts = query.split("\\s+OR\\s+");
+        List<String> orParts = splitOnKeyword(query, "OR");
         Predicate<String> orPredicate = null;
 
         for (String orPart : orParts) {
-            String[] andParts = orPart.split("\\s+AND\\s+");
+            List<String> andParts = splitOnKeyword(orPart, "AND");
             Predicate<String> andPredicate = null;
 
             for (String andPart : andParts) {
@@ -3246,16 +3248,46 @@ public class MainController {
         return orPredicate != null ? orPredicate : s -> false;
     }
 
+    private static List<String> splitOnKeyword(String query, String keyword) {
+        List<String> parts = new ArrayList<>();
+        int partStart = 0;
+        int index = 0;
+        while (index < query.length()) {
+            if (!Character.isWhitespace(query.charAt(index))) {
+                index++;
+                continue;
+            }
+            int keywordStart = index;
+            while (keywordStart < query.length() && Character.isWhitespace(query.charAt(keywordStart))) {
+                keywordStart++;
+            }
+            int keywordEnd = keywordStart + keyword.length();
+            if (query.startsWith(keyword, keywordStart) && keywordEnd < query.length()
+                    && Character.isWhitespace(query.charAt(keywordEnd))) {
+                parts.add(query.substring(partStart, index));
+                index = keywordEnd;
+                while (index < query.length() && Character.isWhitespace(query.charAt(index))) {
+                    index++;
+                }
+                partStart = index;
+            } else {
+                index = Math.max(keywordStart, index + 1);
+            }
+        }
+        parts.add(query.substring(partStart));
+        return parts;
+    }
+
     private List<String> extractSearchTerms(String query) {
         if (query == null || query.trim().isEmpty()) {
             return Collections.emptyList();
         }
 
         Set<String> terms = new LinkedHashSet<>();
-        String[] orParts = query.split("\\s+OR\\s+");
+        List<String> orParts = splitOnKeyword(query, "OR");
 
         for (String orPart : orParts) {
-            String[] andParts = orPart.split("\\s+AND\\s+");
+            List<String> andParts = splitOnKeyword(orPart, "AND");
             for (String andPart : andParts) {
                 String term = andPart.trim();
                 boolean isNot = false;

@@ -10,10 +10,13 @@ import org.slf4j.LoggerFactory;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class GrokLogFormatDetector implements LogFormatDetector {
 
     private static final Logger logger = LoggerFactory.getLogger(GrokLogFormatDetector.class);
+    private static final Pattern FRACTION = Pattern.compile("[.,]\\d+");
+    private static final Pattern CLOCK_FRACTION = Pattern.compile("\\d{2}:\\d{2}:\\d{2}\\.\\d+");
     private final GrokCompiler grokCompiler;
     private final Map<String, String> candidatePatterns;
     private final Map<String, String> predefinedRegexes;
@@ -151,7 +154,7 @@ public class GrokLogFormatDetector implements LogFormatDetector {
         }
         if (formatName.contains("ISO8601") || formatName.contains("PostgreSQL")) {
             boolean hasT = tsVal.contains("T");
-            boolean hasFrac = tsVal.matches(".*[.,]\\d+.*");
+            boolean hasFrac = FRACTION.matcher(tsVal).find();
             boolean hasTZ = tsVal.endsWith("Z") || tsVal.matches(".*[+\\-]\\d{2}:?\\d{2}$");
             String base = hasT ? "yyyy-MM-dd'T'HH:mm:ss" : "yyyy-MM-dd HH:mm:ss";
             if (hasFrac)
@@ -163,7 +166,7 @@ public class GrokLogFormatDetector implements LogFormatDetector {
         if (formatName.contains("Apache Common") || formatName.contains("Apache Combined"))
             return "dd/MMM/yyyy:HH:mm:ss Z";
         if (formatName.contains("Apache Error")) {
-            if (tsVal.matches(".*\\d{2}:\\d{2}:\\d{2}\\.\\d+.*"))
+            if (CLOCK_FRACTION.matcher(tsVal).find())
                 return "EEE MMM dd HH:mm:ss.SSS yyyy";
             return "EEE MMM dd HH:mm:ss yyyy";
         }
@@ -178,7 +181,7 @@ public class GrokLogFormatDetector implements LogFormatDetector {
         if (formatName.equals("EU Date"))
             return "dd.MM.yyyy HH:mm:ss";
         if (formatName.equals("Time Only")) {
-            if (tsVal.matches(".*[.,]\\d+.*"))
+            if (FRACTION.matcher(tsVal).find())
                 return "HH:mm:ss.SSS";
             return "HH:mm:ss";
         }

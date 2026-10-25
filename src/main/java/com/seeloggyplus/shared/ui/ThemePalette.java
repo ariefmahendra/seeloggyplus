@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 
 public final class ThemePalette {
 
-    private static final Pattern TOKEN = Pattern.compile("(-sl-[a-z0-9-]+)\\s*:\\s*([^;]+);");
+    private static final Pattern TOKEN = Pattern.compile("(-sl-[a-z0-9-]++)\\s*:\\s*([^;]++);");
     private static final Map<Theme, Map<String, Color>> CACHE = new EnumMap<>(Theme.class);
 
     private ThemePalette() {
