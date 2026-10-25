@@ -12,6 +12,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  sonar-gate:
+    name: SonarQube dev gate
+    if: github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Require same-repository dev source
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref }}
+          SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: test "$SOURCE_BRANCH" = dev && test "$SOURCE_REPOSITORY" = "$GITHUB_REPOSITORY"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Verify latest dev scan for exact PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/sonar_gate.py --repository "$GITHUB_REPOSITORY" --revision "$SOURCE_SHA"
+
   validate:
     name: Validate (${{ matrix.os }})
     strategy:
@@ -61,6 +87,7 @@ jobs:
           python scripts/test_verify_release.py
           python scripts/test_release_publication.py
           python scripts/test_ci_fonts.py
+          python scripts/test_sonar_gate.py
           RELEASE_VERSION=$(sed -n 's/^version=//p' gradle.properties | tr -d '\r')
           python scripts/verify_release.py "$RELEASE_VERSION"
 

@@ -1,0 +1,53 @@
+name: SonarQube CE
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonarqube-ce-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: SonarQube analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Require dev branch
+        shell: bash
+        run: test "$GITHUB_REF" = refs/heads/dev
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate gate tests
+        run: python3 scripts/test_sonar_gate.py
+
+      - name: Compile and analyze
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || 'seeloggyplus' }}
+        shell: bash
+        run: |
+          test -n "$SONAR_HOST_URL" || { echo 'Missing SONAR_HOST_URL secret'; exit 1; }
+          test -n "$SONAR_TOKEN" || { echo 'Missing SONAR_TOKEN secret'; exit 1; }
+          chmod +x gradlew
+          ./gradlew --no-daemon classes testClasses sonar \
+            -Dsonar.scm.revision="$GITHUB_SHA" \
+            -Dsonar.qualitygate.wait=true \
+            -Dsonar.qualitygate.timeout=600

@@ -3,9 +3,19 @@ plugins {
     id 'application'
     id 'org.openjfx.javafxplugin' version '0.1.0'
     id 'jacoco'
+    id 'org.sonarqube' version '7.5.0.8588'
 }
 
 group = 'com.seeloggyplus'
+
+sonar {
+    properties {
+        property 'sonar.projectKey', System.getenv('SONAR_PROJECT_KEY') ?: 'seeloggyplus'
+        property 'sonar.projectName', 'SeeLoggyPlus'
+        property 'sonar.sourceEncoding', 'UTF-8'
+        property 'sonar.gradle.scanAll', 'true'
+    }
+}
 
 java {
     toolchain {

@@ -156,6 +156,39 @@ synthetic database records, credentials, trusted hosts and launcher settings, an
 exercises activation, checksum rejection, health confirmation and rollback.
 Run it on Windows and Linux before publishing. Never publish when this gate fails.
 
+## SonarQube Community Build release gate
+
+The `SonarQube CE` workflow analyzes only pushes to `dev`; manual dispatch must
+also target `dev`. The project key is the repository variable `SONAR_PROJECT_KEY`
+(default `seeloggyplus`). `SONAR_HOST_URL` and `SONAR_TOKEN` are repository secrets;
+the token needs Execute Analysis permission for that project. The GitHub-hosted
+Linux runner must be able to reach the SonarQube server.
+
+The scanner compiles Java sources and test classes, then waits for the server's
+Quality Gate. It does not run the full Java test suite or present selected-test
+coverage as full coverage. Java sources/tests use Gradle's defaults; scanAll also
+includes supported non-JVM files. Keep the server's Quality Gate enabled: a scan
+that uploads successfully but fails the gate is a failed workflow.
+
+Community Build receives no branch or pull-request analysis parameters. Only
+`dev` feeds this project's single branch. Rename the SonarQube project's main
+branch to `dev` in its UI for clarity; a remaining `main` label does not mean the
+workflow is analyzing GitHub main.
+
+The `SonarQube dev gate` check on PRs into `main` requires a successful scan of
+the exact same-repository `dev` head SHA. It rejects missing, stale, skipped,
+cancelled or failed scans and waits up to 15 minutes for an in-progress scan.
+An older successful scan cannot hide a newer failure. This PR check uses only
+GitHub Actions read permission and receives no SonarQube credentials. Configure
+it as a required status check for main, alongside the Windows/Linux validation
+jobs. If a scan finishes after the gate times out, rerun the failed gate check.
+
+Configure security conditions and the New Code definition in the SonarQube UI.
+Review the initial baseline and security hotspots rather than weakening the gate
+or broadly excluding application code to make it green. Coverage conditions need
+a matching full-suite JaCoCo XML report before they can be used meaningfully;
+the initial security scan does not produce one.
+
 ## Microsoft Store distribution
 
 The separate Windows x64 MSIX includes a console-free launcher and Java runtime.
