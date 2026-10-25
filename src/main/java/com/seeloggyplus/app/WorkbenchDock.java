@@ -70,9 +70,11 @@ final class WorkbenchDock {
 
     private void refresh() {
         if (updating) return;
+        Node detailNode=detail;
+        if (detailNode == null) throw new IllegalStateException("Detail node is unavailable");
         boolean nextRight=position.equals("right") || position.equals("auto") && vertical.getWidth()>=960;
         boolean tabbed=resultsVisible && !nextRight;
-        Node nextBottom=tabbed ? dock : detailVisible ? detail : null;
+        Node nextBottom=tabbed ? dock : detailVisible ? detailNode : null;
         boolean unchanged=right==nextRight
                 && search.getItems().contains(results)==(resultsVisible && nextRight)
                 && vertical.getItems().size()==(nextBottom==null?1:2)
@@ -85,7 +87,7 @@ final class WorkbenchDock {
             search.getItems().remove(results);
             vertical.getItems().removeIf(node -> node!=log);
             resultTab.setContent(null); detailTab.setContent(null); dock.getTabs().clear();
-            detail.setVisible(detailVisible); detail.setManaged(detailVisible);
+            detailNode.setVisible(detailVisible); detailNode.setManaged(detailVisible);
             if (resultsVisible && nextRight) search.getItems().add(results);
             if (tabbed) {
                 resultTab.setContent(results); dock.getTabs().add(resultTab);
