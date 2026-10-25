@@ -5,6 +5,7 @@ import com.seeloggyplus.shared.util.IntArrayList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,11 @@ class WorkbenchLayoutTest {
 
     @AfterEach void cleanup() throws Exception {
         fx(() -> { invoke("resetWorkbenchLayout"); invoke("hideSearchResultPanel"); AppTheme.setTheme(AppTheme.Theme.LIGHT); });
+    }
+
+    @Test void requiresADetailNode() {
+        assertThrows(NullPointerException.class,
+                () -> new WorkbenchDock(new SplitPane(), new SplitPane(), new StackPane(), null, new StackPane()));
     }
 
     @Test void dockingMovesExistingResultsAndKeepsSelectionAndQuery() throws Exception {
