@@ -137,14 +137,15 @@ public class LogParserServiceImpl implements LogParser {
             CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPLACE)
                     .onUnmappableCharacter(CodingErrorAction.REPLACE);
-            BufferedReader reader = new BufferedReader(Channels.newReader(channel, decoder, -1));
-            String line;
-            long linesRead = 0;
-            while (linesRead < chunkInfo.lineCount() && (line = reader.readLine()) != null) {
-                LogEntry logEntry = new LogEntry(currentLineNumber, line);
-                entries.add(logEntry);
-                currentLineNumber++;
-                linesRead++;
+            try (BufferedReader reader = new BufferedReader(Channels.newReader(channel, decoder, -1))) {
+                String line;
+                long linesRead = 0;
+                while (linesRead < chunkInfo.lineCount() && (line = reader.readLine()) != null) {
+                    LogEntry logEntry = new LogEntry(currentLineNumber, line);
+                    entries.add(logEntry);
+                    currentLineNumber++;
+                    linesRead++;
+                }
             }
         } catch (IOException e) {
             logger.error("Error processing file chunk", e);

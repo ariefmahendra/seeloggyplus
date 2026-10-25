@@ -1444,6 +1444,15 @@ public class MainController {
         }
     }
 
+    static LineOffsetIndex buildFileIndex(RandomAccessFile file, java.util.function.BiConsumer<Long, Integer> progress)
+            throws IOException {
+        try (file) {
+            var index = new LineOffsetIndex();
+            index.buildIndex(file, progress == null ? null : bytes -> progress.accept(bytes, index.getLineCount()));
+            return index;
+        }
+    }
+
     private void loadFileWithParallelParsing(LogSession session, File file, LogFile logFile, boolean updateRecentFilesList,
             boolean jumpToEnd, boolean selectInRecent) {
         loadFileWithParallelParsing(session, file, logFile, updateRecentFilesList, jumpToEnd, selectInRecent, false);
@@ -1462,17 +1471,13 @@ public class MainController {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
-                RandomAccessFile raf = new RandomAccessFile(file, "r");
-                LineOffsetIndex index = new LineOffsetIndex();
-
-                long fileSize = raf.length();
-                index.buildIndex(raf, bytesProcessed -> {
+                long fileSize = file.length();
+                LineOffsetIndex index = buildFileIndex(new RandomAccessFile(file, "r"), (bytesProcessed, lines) -> {
                     double percent = (double) bytesProcessed / fileSize * 100;
                     Platform.runLater(() -> showLoading(
-                            String.format("Indexing: %.1f%% (%d lines found)", percent, index.getLineCount())));
+                            String.format("Indexing: %.1f%% (%d lines found)", percent, lines)));
                 });
 
-                raf.close();
                 logger.info("Indexing complete! {} lines indexed in {}", index.getLineCount(), file.getName());
                 MappedFileReader oldReader = session.getReader();
                 MappedFileReader reader = new MappedFileReader(file);

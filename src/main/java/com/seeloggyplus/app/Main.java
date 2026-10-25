@@ -240,6 +240,7 @@ public class Main extends Application {
     private void cleanup() {
         logger.info("Cleaning up application resources");
         DevHotReloader.shutdown();
+        SSHSessionManagerImpl.getInstance().close();
     }
 
     private void showErrorAndExit(String message) {

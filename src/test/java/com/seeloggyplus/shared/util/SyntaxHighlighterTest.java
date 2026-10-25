@@ -14,6 +14,28 @@ import static org.junit.jupiter.api.Assertions.*;
 class SyntaxHighlighterTest {
 
     @Test
+    void handlesLongPlainAndEscapedJsonStringsWithoutStackOverflow() {
+        for (String value : new String[]{"a".repeat(100_000), "\\\"".repeat(50_000), "\\\\".repeat(50_000)}) {
+            String json = "{\"" + value + "\":\"" + value + "\"}";
+            var spans = assertDoesNotThrow(() -> SyntaxHighlighter.computeJsonHighlighting(json));
+            assertEquals(json.length(), spans.length());
+            var keys = spans.stream().filter(span -> span.getStyle().contains("json-key")).toList();
+            var strings = spans.stream().filter(span -> span.getStyle().contains("json-string")).toList();
+            assertEquals(1, keys.size());
+            assertEquals(1, strings.size());
+            assertEquals(value.length() + 2, keys.getFirst().getLength());
+            assertEquals(value.length() + 2, strings.getFirst().getLength());
+        }
+    }
+
+    @Test
+    void handlesUnterminatedLongStringsWithoutStackOverflow() {
+        String json = "{\"value\":\"" + "x".repeat(100_000);
+        var spans = assertDoesNotThrow(() -> SyntaxHighlighter.computeJsonHighlighting(json));
+        assertEquals(json.length(), spans.length());
+    }
+
+    @Test
     @DisplayName("Should correctly identify JSON syntax elements")
     void testComputeJsonHighlighting() {
         String json = "{\n" +
