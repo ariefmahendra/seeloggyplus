@@ -729,12 +729,14 @@ public class UnifiedFileManagerDialogController {
     }
 
     private static String parentPath(String path) {
-        int slash = path == null ? -1 : path.lastIndexOf('/');
+        if (path == null) return null;
+        int slash = path.lastIndexOf('/');
         return slash <= 0 ? null : path.substring(0, slash);
     }
 
     private static String leafName(String path) {
-        int slash = path == null ? -1 : path.lastIndexOf('/');
+        if (path == null) return null;
+        int slash = path.lastIndexOf('/');
         return slash < 0 ? path : path.substring(slash + 1);
     }
 
