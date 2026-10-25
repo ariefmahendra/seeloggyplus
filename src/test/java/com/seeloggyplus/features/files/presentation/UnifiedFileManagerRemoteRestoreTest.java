@@ -106,6 +106,7 @@ class UnifiedFileManagerRemoteRestoreTest {
         onFx(() -> controller.handleLocationClick(UnifiedFileManagerDialogController.LocationItem.of(server)));
         await(() -> controller.getActiveServer() != null && "srv-prod".equals(controller.getActiveServer().getId())
                 && "srv-prod".equals(preferences.getPreferencesByCode("file_manager_last_server_id").orElse(null)));
+        assertEquals("srv-prod", preferences.getPreferencesByCode("file_manager_last_server_id").orElse(null));
     }
 
     @Test

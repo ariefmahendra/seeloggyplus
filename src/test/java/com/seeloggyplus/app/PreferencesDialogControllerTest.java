@@ -237,6 +237,7 @@ class PreferencesDialogControllerTest {
             System.setProperty("seeloggyplus.launcherProperties",
                     blocker.resolve("launcher.properties").toString());
             updateLauncherConfig.invoke(dialog.controller(), 4);
+            assertFalse(Files.exists(blocker.resolve("launcher.properties")));
         } finally {
             if (original == null) {
                 System.clearProperty("seeloggyplus.launcherProperties");

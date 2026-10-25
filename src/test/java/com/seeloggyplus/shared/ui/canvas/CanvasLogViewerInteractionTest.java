@@ -106,6 +106,7 @@ class CanvasLogViewerInteractionTest {
             });
             WaitForAsyncUtils.waitFor(5, java.util.concurrent.TimeUnit.SECONDS,
                     () -> WaitForAsyncUtils.asyncFx(() -> raw.equals(Clipboard.getSystemClipboard().getString())).get());
+            assertEquals(raw, WaitForAsyncUtils.asyncFx(() -> Clipboard.getSystemClipboard().getString()).get());
         } finally {onFxThread(() -> {if (reference.get() != null) reference.get().resetView();}); history.close();}
     }
 
@@ -142,6 +143,14 @@ class CanvasLogViewerInteractionTest {
                             .allMatch(i -> lines[i] != null && lines[i].contains("POST row-" + i)));
                 });
                 return complete.get();
+            });
+            onFxThread(() -> {
+                String[] lines = (String[]) readField(reference.get(), "lineCache");
+                assertTrue(lines.length >= 10);
+                for (int i = 0; i < 10; i++) {
+                    assertNotNull(lines[i]);
+                    assertTrue(lines[i].contains("POST row-" + i));
+                }
             });
         } finally {onFxThread(() -> {if (reference.get() != null) reference.get().resetView();}); history.close();}
     }

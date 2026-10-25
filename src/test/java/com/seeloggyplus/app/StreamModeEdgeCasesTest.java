@@ -20,10 +20,17 @@ import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
 
+import javafx.scene.control.Dialog;
+import com.seeloggyplus.shared.ui.DialogPresenter;
+
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -163,6 +170,8 @@ public class StreamModeEdgeCasesTest {
     @Test
     @DisplayName("Edge Case 5: startRemoteTail must reject Windows local paths")
     public void testStartRemoteTailRejectsWindowsPath() throws Exception {
+        List<Dialog<?>> errors = new CopyOnWriteArrayList<>();
+        controller.setDialogPresenter(recordingPresenter(errors));
         Method startRemoteTailMethod = MainController.class.getDeclaredMethod(
                 "startRemoteTail", String.class, SSHService.class, SSHServerModel.class);
         startRemoteTailMethod.setAccessible(true);
@@ -177,12 +186,15 @@ public class StreamModeEdgeCasesTest {
             }
         });
 
-        WaitForAsyncUtils.waitForFxEvents();
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> !errors.isEmpty());
+        assertFalse(errors.isEmpty());
     }
 
     @Test
     @DisplayName("Edge Case 6: Recent files containing temporary paths are safely handled and do not invoke SSH tail")
     public void testRecentFileWithWindowsTempPathSafelyHandled() throws Exception {
+        List<Dialog<?>> errors = new CopyOnWriteArrayList<>();
+        controller.setDialogPresenter(recordingPresenter(errors));
         LogFile staleLogFile = new LogFile();
         staleLogFile.setName("setup_ssl_keystore.sh");
         staleLogFile.setFilePath("C:\\Users\\MYBOOK~1\\AppData\\Local\\Temp\\seeloggyplus-non-existent.sh");
@@ -202,6 +214,21 @@ public class StreamModeEdgeCasesTest {
             }
         });
 
-        WaitForAsyncUtils.waitForFxEvents();
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> !errors.isEmpty());
+        assertFalse(errors.isEmpty());
+    }
+
+    private static DialogPresenter recordingPresenter(List<Dialog<?>> target) {
+        return new DialogPresenter() {
+            @Override
+            public void present(Stage dialog) {
+            }
+
+            @Override
+            public <T> Optional<T> present(Dialog<T> dialog) {
+                target.add(dialog);
+                return Optional.empty();
+            }
+        };
     }
 }
