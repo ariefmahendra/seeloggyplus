@@ -10,12 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public final class ThemePalette {
 
-    private static final Pattern TOKEN = Pattern.compile("(-sl-[a-z0-9-]++)\\s*:\\s*([^;]++);");
     private static final Map<Theme, Map<String, Color>> CACHE = new EnumMap<>(Theme.class);
 
     private ThemePalette() {
@@ -58,9 +55,19 @@ public final class ThemePalette {
         if (block == null) {
             throw new IllegalStateException("Theme stylesheet has no root token block");
         }
-        Matcher matcher = TOKEN.matcher(block);
-        while (matcher.find()) {
-            target.put(matcher.group(1), Color.web(matcher.group(2).trim()));
+        int index = 0;
+        while ((index = block.indexOf("-sl-", index)) >= 0) {
+            int end = block.indexOf(';', index);
+            if (end < 0) {
+                break;
+            }
+            int colon = block.indexOf(':', index);
+            if (colon < 0 || colon > end) {
+                index = end + 1;
+                continue;
+            }
+            target.put(block.substring(index, colon).trim(), Color.web(block.substring(colon + 1, end).trim()));
+            index = end + 1;
         }
     }
 

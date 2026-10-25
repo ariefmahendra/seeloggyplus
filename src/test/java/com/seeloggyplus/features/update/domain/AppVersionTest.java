@@ -30,8 +30,15 @@ class AppVersionTest {
                 "Released/current version must not fall back to DEV");
         assertEquals(expected, AppVersion.current(),
                 "AppVersion.current() must equal the version declared in gradle.properties");
-        assertTrue(AppVersion.current().matches("\\d+\\.\\d+.*+"),
-                "Version must look like a real version, was: " + AppVersion.current());
+        String version = AppVersion.current();
+        int dot = version.indexOf('.');
+        boolean looksLikeVersion = dot > 0 && dot + 1 < version.length();
+        for (int i = 0; looksLikeVersion && i < dot; i++) {
+            looksLikeVersion = version.charAt(i) >= '0' && version.charAt(i) <= '9';
+        }
+        looksLikeVersion = looksLikeVersion
+                && version.charAt(dot + 1) >= '0' && version.charAt(dot + 1) <= '9';
+        assertTrue(looksLikeVersion, "Version must look like a real version, was: " + version);
     }
 
     @Test
