@@ -4,6 +4,8 @@ import com.jcraft.jsch.JSchException;
 import com.seeloggyplus.shared.dto.RemoteFileInfo;
 import com.seeloggyplus.shared.ssh.SshAuthConfig;
 import com.seeloggyplus.shared.util.RemoteLogPaths;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,6 +20,8 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.util.concurrent.Executors;
+
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,6 +32,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SSHServiceImplPureLogicTest {
+
+    private SSHSessionManagerImpl sessionManager;
+
+    @BeforeEach
+    void createSessionManager() {
+        sessionManager = new SSHSessionManagerImpl(Executors.newSingleThreadScheduledExecutor());
+    }
+
+    @AfterEach
+    void closeSessionManager() {
+        sessionManager.close();
+    }
 
     private static final String MISSING_KEY_PATH = "C:\\definitely\\missing\\id_ed25519";
 
@@ -40,7 +56,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("plain path is wrapped in single quotes")
     void escapesPlainPath() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
 
         assertEquals("'/var/log/app.log'", ssh.escapeShellArgument("/var/log/app.log"));
     }
@@ -48,7 +64,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("embedded single quote is escaped for POSIX shells")
     void escapesEmbeddedSingleQuote() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
 
         assertEquals("'it'\\''s.log'", ssh.escapeShellArgument("it's.log"));
     }
@@ -56,7 +72,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("every embedded single quote is escaped")
     void escapesMultipleSingleQuotes() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
 
         assertEquals("'a'\\''b'\\''c'", ssh.escapeShellArgument("a'b'c"));
     }
@@ -64,7 +80,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("spaces, dollar signs and backslashes stay literal inside quotes")
     void escapesSpacesDollarAndBackslashLiterally() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
 
         assertEquals("'/var/log/my $file\\x.log'", ssh.escapeShellArgument("/var/log/my $file\\x.log"));
     }
@@ -72,7 +88,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("a leading dash cannot become a command option")
     void escapesLeadingDash() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
 
         assertEquals("'-rf /'", ssh.escapeShellArgument("-rf /"));
     }
@@ -80,7 +96,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("full-time entry with a multi-word filename keeps the whole name")
     void parsesFullTimeEntryWithMultiWordFilename() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         String line = "drwxr-xr-x 2 root root 4096 2026-03-24 18:54:31.000000000 +0700 my logs";
 
         RemoteFileInfo info = ssh.parseLsLine(line, "/var");
@@ -100,7 +116,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("full-time symlink strips the arrow and its target")
     void parsesFullTimeSymlinkAndStripsArrowTarget() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         String line = "lrwxrwxrwx 1 root root 7 2026-03-24 18:54:31.000000000 +0700 latest.log -> app.log";
 
         RemoteFileInfo info = ssh.parseLsLine(line, "/var/log");
@@ -116,7 +132,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("old style listing with a year is parsed as a date")
     void parsesOldStyleTimestampWithYear() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         String line = "-rw-r--r-- 1 deploy deploy 128 Jan 15 2024 old.log";
 
         RemoteFileInfo info = ssh.parseLsLine(line, "/srv");
@@ -134,7 +150,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("non numeric size falls back to zero")
     void nonNumericSizeFallsBackToZero() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         String line = "-rw-r--r-- 1 u g abc Jan 15 10:30 weird.log";
 
         RemoteFileInfo info = ssh.parseLsLine(line, "/var/log");
@@ -148,7 +164,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("an impossible month and day leaves the modified time at zero")
     void unparsableMonthDayLeavesModifiedTimeZero() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         String line = "-rw-r--r-- 1 u g 10 Feb 30 10:30 bad-date.log";
 
         RemoteFileInfo info = ssh.parseLsLine(line, "/var/log");
@@ -161,7 +177,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("an impossible full-time stamp leaves the modified time at zero")
     void unparsableFullTimeStampLeavesModifiedTimeZero() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         String line = "drwxr-xr-x 2 root root 4096 2026-13-45 99:99:99.000000000 +0700 bad stamp";
 
         RemoteFileInfo info = ssh.parseLsLine(line, "/var");
@@ -175,7 +191,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("a parent path with a trailing slash is not doubled")
     void keepsParentPathWithTrailingSlash() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         String line = "-rw-r--r-- 1 u g 10 Jan 15 10:30 a.log";
 
         RemoteFileInfo info = ssh.parseLsLine(line, "/var/log/");
@@ -219,7 +235,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("a missing remote path reports the missing location message")
     void tailFileWithMissingPathReportsMissingLocation() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         List<String> logs = new ArrayList<>();
         List<String> errors = new ArrayList<>();
 
@@ -235,7 +251,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("a Windows local path reports the local location message")
     void tailFileWithWindowsLocalPathReportsLocalLocation() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         List<String> logs = new ArrayList<>();
         List<String> errors = new ArrayList<>();
 
@@ -248,7 +264,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("tailing without a session reports an init error")
     void tailFileWithoutSessionReportsInitError() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         List<String> logs = new ArrayList<>();
         List<String> errors = new ArrayList<>();
 
@@ -263,7 +279,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("a non positive line limit falls back to a full read and fails without a session")
     void nonPositiveLineLimitFailsWithoutSession() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
 
         assertThrows(IOException.class, () -> ssh.readFileLines("/var/log/app.log", 0));
         assertThrows(IOException.class, () -> ssh.readFileLines("/var/log/app.log", -5));
@@ -272,7 +288,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("download guards reject null and blank paths without a session")
     void downloadGuardsRejectNullAndBlankPathsWithoutSession(@TempDir Path tempDir) {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         Path target = tempDir.resolve("out.log");
 
         assertFalse(ssh.downloadFile(null, target.toString()));
@@ -284,7 +300,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("recovering without credentials reports failure")
     void recoverSessionWithoutCredentialsReturnsFalse() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
 
         assertFalse(ssh.recoverSession());
         assertFalse(ssh.isConnected());
@@ -293,7 +309,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("lifecycle calls are idempotent without a connection")
     void lifecycleCallsAreIdempotentWithoutConnection() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
 
         assertDoesNotThrow(() -> {
             ssh.disconnect();
@@ -311,7 +327,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("auth config defaults to password and a null config resets it")
     void authConfigDefaultsToPasswordAndNullResetsIt() throws Exception {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         assertEquals(SshAuthConfig.password(), authConfigOf(ssh));
 
         SshAuthConfig keyConfig = SshAuthConfig.key("C:\\keys\\id_ed25519", "secret");
@@ -325,7 +341,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("trusting a host key without a pending entry is safe")
     void trustPendingHostKeyWithoutPendingEntryIsSafe() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
 
         assertDoesNotThrow(ssh::trustPendingHostKey);
 
@@ -337,7 +353,7 @@ class SSHServiceImplPureLogicTest {
     @Test
     @DisplayName("failed key auth records the reason, defaults the port and survives disconnect")
     void failedKeyAuthConnectRecordsReasonDefaultsPortAndSurvivesDisconnect() {
-        SSHServiceImpl ssh = new SSHServiceImpl();
+        SSHServiceImpl ssh = new SSHServiceImpl(sessionManager);
         ssh.setAuthConfig(SshAuthConfig.key(MISSING_KEY_PATH, null));
 
         assertFalse(ssh.connect("key-auth.invalid", 0, "user", null));
