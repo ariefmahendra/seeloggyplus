@@ -173,6 +173,8 @@ public class MappedFileReader implements AutoCloseable {
             raf.close();
         } catch (IOException e) {
             logger.warn("Error closing file", e);
+        } finally {
+            READ_BUFFER.remove();
         }
     }
 }

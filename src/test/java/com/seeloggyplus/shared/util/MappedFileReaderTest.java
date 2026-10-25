@@ -93,6 +93,26 @@ class MappedFileReaderTest {
         }
     }
 
+    @Test
+    void closeReleasesThePerThreadReadBuffer() throws Exception {
+        File file = writeTempLog("line\n");
+        LineOffsetIndex index = buildIndex(file);
+
+        Object buffer;
+        try (MappedFileReader reader = new MappedFileReader(file)) {
+            assertEquals("line", reader.readLine(index, 0));
+            buffer = readBuffer().get();
+            assertNotNull(buffer);
+        }
+        assertNotSame(buffer, readBuffer().get());
+    }
+
+    private static ThreadLocal<?> readBuffer() throws Exception {
+        var field = MappedFileReader.class.getDeclaredField("READ_BUFFER");
+        field.setAccessible(true);
+        return (ThreadLocal<?>) field.get(null);
+    }
+
     private static File writeTempLog(String content) throws Exception {
         File file = File.createTempFile("mapped-reader", ".log");
         file.deleteOnExit();

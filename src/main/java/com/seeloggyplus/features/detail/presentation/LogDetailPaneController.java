@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -55,7 +56,7 @@ public class LogDetailPaneController implements Initializable {
     private StyleClassedTextArea detailCodeArea;
     private Label detailPlaceholderLabel;
     private String currentRawLogContent;
-    private volatile long formatGeneration;
+    private final AtomicLong formatGeneration = new AtomicLong();
     private FutureTask<Void> pendingFormat;
     private Executor formatExecutor = new ThreadPoolExecutor(0, 1, 5, TimeUnit.SECONDS,
             new ArrayBlockingQueue<>(1), runnable -> {
@@ -172,7 +173,7 @@ public class LogDetailPaneController implements Initializable {
     }
 
     private void cancelFormatting() {
-        formatGeneration++;
+        formatGeneration.incrementAndGet();
         if (pendingFormat != null) {
             pendingFormat.cancel(true);
             pendingFormat = null;
@@ -212,7 +213,7 @@ public class LogDetailPaneController implements Initializable {
         String raw = currentRawLogContent;
         if (detailCodeArea == null) return;
         if (raw == null || raw.isEmpty()) { syncMode(false, false, "Select a log line containing JSON or XML"); return; }
-        long generation = formatGeneration;
+        long generation = formatGeneration.get();
         boolean requestedMode = formattedMode;
         if (!requestedMode && !raw.equals(detailCodeArea.getText())) detailCodeArea.replaceText(raw);
         syncMode(false, false, "Checking for JSON or XML...");
@@ -221,9 +222,9 @@ public class LogDetailPaneController implements Initializable {
             return;
         }
         pendingFormat = new FutureTask<>(() -> {
-            if (generation != formatGeneration) return null;
+            if (generation != formatGeneration.get()) return null;
             Formatted formatted = format(raw, requestedMode);
-            if (generation == formatGeneration && !Thread.currentThread().isInterrupted()) {
+            if (generation == formatGeneration.get() && !Thread.currentThread().isInterrupted()) {
                 Platform.runLater(() -> applyFormatted(formatted, generation));
             }
             return null;
@@ -232,7 +233,7 @@ public class LogDetailPaneController implements Initializable {
     }
 
     private void applyFormatted(Formatted formatted, long generation) {
-        if (generation != formatGeneration || formatted == null) return;
+        if (generation != formatGeneration.get() || formatted == null) return;
         syncMode(formattedMode && formatted.supported, formatted.supported,
                 formatted.supported ? "Format detected JSON or XML; original log stays unchanged" : "No supported JSON/XML payload found");
         if (!formatted.text.equals(detailCodeArea.getText())) detailCodeArea.replaceText(formatted.text);
