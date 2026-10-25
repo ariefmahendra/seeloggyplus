@@ -86,8 +86,15 @@ public class UpdateInstaller {
 
     public static void ensureUnixExecutables(Path directory) throws IOException {
         if (Files.getFileAttributeView(directory, java.nio.file.attribute.PosixFileAttributeView.class) == null) return;
+        Path root = directory.toAbsolutePath().normalize();
+        if (Files.isSymbolicLink(root)) throw new IOException("Installation directory must not be a symbolic link");
         for (String name : new String[] {"launcher.sh", "jre/bin/java", "jre/bin/keytool", "jre/lib/jspawnhelper"}) {
-            Path file = directory.resolve(name);
+            Path file = root.resolve(name);
+            for (Path current = file; !current.equals(root); current = current.getParent()) {
+                if (Files.isSymbolicLink(current)) {
+                    throw new IOException("Executable path must not contain symbolic links: " + name);
+                }
+            }
             if (Files.isRegularFile(file)) Files.setPosixFilePermissions(file,
                     java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
         }

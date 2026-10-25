@@ -14,6 +14,7 @@ sonar {
         property 'sonar.projectName', 'SeeLoggyPlus'
         property 'sonar.sourceEncoding', 'UTF-8'
         property 'sonar.gradle.scanAll', 'true'
+        property 'sonar.coverage.jacoco.xmlReportPaths', layout.buildDirectory.file('reports/jacoco/sonar/jacoco.xml').get().asFile.absolutePath
     }
 }
 
@@ -495,6 +496,30 @@ jacocoTestReport {
     reports {
         xml.required = true
         html.required = true
+    }
+}
+
+def sonarCoverageData = ['coverage-linux', 'coverage-win'].collect {
+    layout.buildDirectory.file("sonar-coverage/${it}/test.exec")
+}
+
+tasks.register('validateSonarCoverage') {
+    doLast {
+        if (sonarCoverageData.any { !it.get().asFile.isFile() || it.get().asFile.length() == 0 }) {
+            throw new GradleException('Sonar coverage requires non-empty Windows and Linux execution data from this workflow run')
+        }
+    }
+}
+
+tasks.register('jacocoSonarReport', org.gradle.testing.jacoco.tasks.JacocoReport) {
+    dependsOn classes, tasks.named('validateSonarCoverage')
+    executionData sonarCoverageData
+    sourceSets sourceSets.main
+    reports {
+        xml.required = true
+        xml.outputLocation = layout.buildDirectory.file('reports/jacoco/sonar/jacoco.xml')
+        html.required = true
+        html.outputLocation = layout.buildDirectory.dir('reports/jacoco/sonar/html')
     }
 }
 tasks.register('testSummary') {

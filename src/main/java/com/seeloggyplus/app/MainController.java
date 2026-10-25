@@ -3984,7 +3984,8 @@ public class MainController {
             if (session.getLocalFile() != null && session.getLocalFile().exists()) {
                 try {
                     if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                        new ProcessBuilder("explorer.exe", "/select,", session.getLocalFile().getAbsolutePath()).start();
+                        new ProcessBuilder(FileExplorer.selectionCommand(
+                                FileExplorer.windowsDirectory(), session.getLocalFile())).start();
                     } else {
                         Desktop.getDesktop().open(session.getLocalFile().getParentFile());
                     }

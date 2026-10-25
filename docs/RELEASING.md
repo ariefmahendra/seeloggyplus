@@ -164,9 +164,13 @@ also target `dev`. The project key is the repository variable `SONAR_PROJECT_KEY
 the token needs Execute Analysis permission for that project. The GitHub-hosted
 Linux runner must be able to reach the SonarQube server.
 
-The scanner compiles Java sources and test classes, then waits for the server's
-Quality Gate. It does not run the full Java test suite or present selected-test
-coverage as full coverage. Java sources/tests use Gradle's defaults; scanAll also
+The workflow runs selected headless security, startup and updater regression
+classes on Windows and Linux at the same dev revision. Both jobs must pass and
+upload non-empty JaCoCo execution data. `jacocoSonarReport` combines those inputs
+against the matching classes before analysis; it does not invoke the full suite.
+The scanner imports the combined XML report and waits for the server's Quality
+Gate. This is selected-test coverage, not full-suite coverage. Java sources/tests
+use Gradle's defaults; scanAll also
 includes supported non-JVM files. Keep the server's Quality Gate enabled: a scan
 that uploads successfully but fails the gate is a failed workflow.
 
@@ -185,9 +189,9 @@ jobs. If a scan finishes after the gate times out, rerun the failed gate check.
 
 Configure security conditions and the New Code definition in the SonarQube UI.
 Review the initial baseline and security hotspots rather than weakening the gate
-or broadly excluding application code to make it green. Coverage conditions need
-a matching full-suite JaCoCo XML report before they can be used meaningfully;
-the initial security scan does not produce one.
+or broadly excluding application code to make it green. Review the combined
+coverage artifact for untested new behavior when a coverage condition fails;
+do not disable that condition or exclude new application code to pass it.
 
 ## Microsoft Store distribution
 

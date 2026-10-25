@@ -18,6 +18,37 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UpdateInstallerTest {
 
+    @Test
+    void doesNotChangePermissionsOutsideInstallationThroughSymbolicLinks() throws Exception {
+        Path work = Files.createTempDirectory("seeloggy-link-permissions");
+        try {
+            if (Files.getFileAttributeView(work, java.nio.file.attribute.PosixFileAttributeView.class) == null) return;
+            Path outside = Files.writeString(work.resolve("outside.sh"), "outside");
+            var original = java.nio.file.attribute.PosixFilePermissions.fromString("rw-------");
+            Files.setPosixFilePermissions(outside, original);
+            Path root = Files.createDirectory(work.resolve("installation"));
+            Files.createSymbolicLink(root.resolve("launcher.sh"), outside);
+            assertThrows(IOException.class, () -> UpdateInstaller.ensureUnixExecutables(root));
+            assertEquals(original, Files.getPosixFilePermissions(outside));
+        } finally { deleteRecursively(work); }
+    }
+
+    @Test
+    void rejectsLinkedRuntimeDirectoriesWithoutChangingTheirFiles() throws Exception {
+        Path work = Files.createTempDirectory("seeloggy-runtime-link");
+        try {
+            if (Files.getFileAttributeView(work, java.nio.file.attribute.PosixFileAttributeView.class) == null) return;
+            Path runtime = Files.createDirectories(work.resolve("outside/bin"));
+            Path executable = Files.writeString(runtime.resolve("java"), "outside");
+            var original = java.nio.file.attribute.PosixFilePermissions.fromString("rw-------");
+            Files.setPosixFilePermissions(executable, original);
+            Path root = Files.createDirectory(work.resolve("installation"));
+            Files.createSymbolicLink(root.resolve("jre"), runtime.getParent());
+            assertThrows(IOException.class, () -> UpdateInstaller.ensureUnixExecutables(root));
+            assertEquals(original, Files.getPosixFilePermissions(executable));
+        } finally { deleteRecursively(work); }
+    }
+
     @Test void restoresUnixLauncherAndRuntimeExecutePermissions() throws Exception {
         Path work = Files.createTempDirectory("seeloggy-permissions");
         try {
@@ -28,7 +59,8 @@ class UpdateInstallerTest {
                 Path file = staged.resolve(name);
                 assertTrue(Files.isRegularFile(file));
                 if (Files.getFileAttributeView(file, java.nio.file.attribute.PosixFileAttributeView.class) != null)
-                    assertTrue(Files.isExecutable(file), name + " must remain executable after ZIP extraction");
+                    assertEquals(java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"),
+                            Files.getPosixFilePermissions(file), name + " must be executable without public write access");
             }
         } finally { deleteRecursively(work); }
     }
