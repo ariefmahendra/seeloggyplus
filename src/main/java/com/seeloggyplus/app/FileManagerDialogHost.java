@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 
 public class FileManagerDialogHost implements FileManagerHost {
@@ -36,7 +37,7 @@ public class FileManagerDialogHost implements FileManagerHost {
     public FileManagerDialogHost(Stage owner, PreferenceService preferenceService,
             SSHServiceFactory sshServiceFactory, BiConsumer<String, String> errorReporter,
             DialogPresenter dialogPresenter) {
-        this.owner = owner;
+        this.owner = Objects.requireNonNull(owner, "owner");
         this.preferenceService = preferenceService;
         this.sshServiceFactory = sshServiceFactory;
         this.errorReporter = errorReporter == null ? (title, message) -> { } : errorReporter;

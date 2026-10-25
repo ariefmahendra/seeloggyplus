@@ -5,6 +5,7 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import java.util.Locale;
+import java.util.Objects;
 
 final class WorkbenchDock {
     private final SplitPane vertical;
@@ -26,7 +27,7 @@ final class WorkbenchDock {
     private double bottomDivider = .7;
 
     WorkbenchDock(SplitPane vertical, SplitPane search, Node log, Node detail, Node results) {
-        this.vertical=vertical; this.search=search; this.log=log; this.detail=detail; this.results=results;
+        this.vertical=vertical; this.search=search; this.log=log; this.detail=Objects.requireNonNull(detail); this.results=results;
         dock.setId("workbenchDock"); dock.getStyleClass().add("workbench-dock");
         dock.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         dock.setMinSize(0, 100);

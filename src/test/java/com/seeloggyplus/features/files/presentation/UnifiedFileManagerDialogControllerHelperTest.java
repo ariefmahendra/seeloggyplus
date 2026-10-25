@@ -190,6 +190,13 @@ class UnifiedFileManagerDialogControllerHelperTest {
     }
 
     @Test
+    void parentAndLeafHelpersHandleNullPaths() throws Exception {
+        UnifiedFileManagerDialogController controller = bare();
+        assertNull(invoke(controller, "parentPath", new Class<?>[]{String.class}, (Object) null));
+        assertNull(invoke(controller, "leafName", new Class<?>[]{String.class}, (Object) null));
+    }
+
+    @Test
     void getParentPathHandlesLocalAndRemotePaths() throws Exception {
         UnifiedFileManagerDialogController controller = bare();
         setField(controller, "currentLocation", UnifiedFileManagerDialogController.LocationItem.local());

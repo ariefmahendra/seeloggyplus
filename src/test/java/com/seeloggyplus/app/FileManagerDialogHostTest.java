@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(ApplicationExtension.class)
 class FileManagerDialogHostTest {
@@ -45,6 +46,13 @@ class FileManagerDialogHostTest {
         stage.show();
         host = new FileManagerDialogHost(stage, new InMemoryPreferenceService(), SSHServiceImpl::new,
                 (title, message) -> reportedErrors.add(title + ": " + message), presenter);
+    }
+
+    @Test
+    void rejectsANullOwner() {
+        assertThrows(NullPointerException.class,
+                () -> new FileManagerDialogHost(null, new InMemoryPreferenceService(), SSHServiceImpl::new,
+                        (title, message) -> { }, presenter));
     }
 
     @Test
