@@ -1,0 +1,18 @@
+{
+  "name": "SeeLoggyPlus JavaFX",
+  "language": "css",
+  "baseProfile": "Sonar way core",
+  "rules": {
+    "css:S4659": {
+      "parameters": {
+        "ignorePseudoClasses": "local,global,export,import,deep,selected,filled,focused,pressed,keyboard-focus,armed,showing,vertical,drop-ungroup,horizontal,drop-target,drop-before,drop-after,header,compact,disconnected,live,contains-focus"
+      }
+    },
+    "css:S4670": {
+      "parameters": {
+        "ignore": "custom-elements",
+        "ignoreTypes": "/^(mat|md|fa)-/,FontAwesomeIconView,Spinner"
+      }
+    }
+  }
+}
