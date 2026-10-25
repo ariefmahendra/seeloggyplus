@@ -71,6 +71,7 @@ jobs:
             --tests "com.seeloggyplus.app.MainStartupTest" \
             --tests "com.seeloggyplus.app.MainControllerIndexingTest" \
             --tests "com.seeloggyplus.app.MainControllerOpenAtLineTest" \
+            --tests "com.seeloggyplus.app.MainControllerHelperLogicTest" \
             --tests "com.seeloggyplus.shared.util.SyntaxHighlighterTest" \
             --tests "com.seeloggyplus.app.SearchResultsRegressionTest" \
             --tests "com.seeloggyplus.app.RemoteTailPathRegressionTest" \
