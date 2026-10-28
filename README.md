@@ -25,8 +25,7 @@ SeeLoggyPlus is a high-performance, JavaFX-based desktop log viewer designed for
 
 ### Windows distribution
 
-Microsoft Store is the primary Windows installation and update channel. Store
-publication is being prepared. Once published, install
+Microsoft Store is the primary Windows installation and update channel. Install
 [SeeLoggyPlus from Microsoft Store](https://apps.microsoft.com/detail/9PDJ4N28SNT7)
 and launch it from Start; Java is included and Store manages updates.
 
